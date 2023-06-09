@@ -54,6 +54,16 @@ export default {
         })        
     },
 
+    rerunTest(testingRunHexId){
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {testingRunHexId}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
     scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source) {
         return request({
             url: '/api/startTest',
@@ -118,6 +128,16 @@ export default {
             url: '/api/stopAllTests',
             method: 'post',
             data: {}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
+    stopTest(testingRunHexId) {
+        return request({
+            url: '/api/stopAllTests',
+            method: 'post',
+            data: {testingRunHexId}
         }).then((resp) => {
             return resp
         })        

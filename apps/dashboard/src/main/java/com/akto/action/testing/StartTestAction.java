@@ -357,6 +357,29 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String stopTest() {
+        // stop only scheduled and running tests
+
+        Bson filter = Filters.or(
+            Filters.eq(TestingRun.STATE, State.SCHEDULED),
+            Filters.eq(TestingRun.STATE, State.RUNNING)
+        );
+        if(this.testingRunHexId!=null){
+            try{
+                ObjectId testingId = new ObjectId(this.testingRunHexId);
+                TestingRunDao.instance.updateOne(
+                    Filters.and(filter, Filters.eq(Constants.ID,testingId)),
+                Updates.set(TestingRun.STATE, State.STOPPED));
+                return SUCCESS.toUpperCase();
+            } catch (Exception e){    
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            }
+        }
+
+        addActionError("Unable to stop test run");
+        return ERROR.toLowerCase();
+    }
+
     public String fetchTestRunTableInfo(){
         testingRuns = TestingRunDao.instance.findAll(Filters.ne("triggeredBy", "test_editor"));
         latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries();

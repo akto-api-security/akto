@@ -431,6 +431,7 @@ export default {
                 }
             ],
             actions:[{}],
+            selectedTestingRun:{},
             maxRequestPerMin: 0,
             maxRequestsPerMinLabel: "No Limit",
             maxRequestsPerMinOptions: [{ label: "No Limit", click: () => this.setMaxRequestsPerMin("No Limit", 0) }, ...maxRequestsValues]
@@ -443,6 +444,7 @@ export default {
         },
         computeTestActions(item){
             let arr = []
+            this.selectedTestingRun = item;
             this.actionsList[0].hasLastBorder = false
             if(item['run_type'] === 'One-time'){
                 arr.push(this.actionsList[0])
@@ -469,14 +471,40 @@ export default {
         addToCiCd(){
             console.log("addToCiCd")
         },
-        reRunTest(){
-            console.log("reRunTest")
+        async reRunTest(){
+            await api.rerunTest(this.selectedTestingRun.hexId).then((res)=>{
+                console.log(res);
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Test re-run",
+                    color: 'green'
+                })
+            }).catch((e) => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Unable to re-run test",
+                    color: 'red'
+                })
+            })
         },
         scheduleTest(){
             console.log("scheduleTest")
         },
-        stopTest(){
-            console.log("stopTest")
+        async stopTest(){
+            await api.stopTest(this.selectedTestingRun.hexId).then((res)=>{
+                console.log(res);
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Test run stopped",
+                    color: 'green'
+                })
+            }).catch((e) => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Unable to stop test run",
+                    color: 'red'
+                })
+            })
         },
         getColor(key){
             switch(key){

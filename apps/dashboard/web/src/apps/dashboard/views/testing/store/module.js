@@ -109,12 +109,13 @@ const testing = {
                     delete testingRunResultSummary.countIssues['MEDIUM']
                     delete testingRunResultSummary.countIssues['LOW']
                 }
+                obj['hexId'] = data.hexId;
                 obj['orderPriority'] = getOrderPriority(data.state)
                 obj['icon'] = getTestingRunIcon(data.state);
                 obj['name'] = data.name
                 obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
                 obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
-                obj['run_time_epoch'] = data.scheduleTimestamp > data.endTimestamp ? data.scheduleTimestamp : data.endTimestamp
+                obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
                 obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
                 obj['severity'] = testingRunResultSummary.countIssues == null ? [] : Object.entries(testingRunResultSummary.countIssues).map(([key, value]) => ({ [key]: value })).filter(obj => Object.values(obj)[0] > 0);
                 obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
@@ -128,6 +129,10 @@ const testing = {
                 state.latestTestingRuns.push(obj);
             })
             state.latestTestingRuns.sort(function(a,b){
+                if (a.orderPriority==1 & b.orderPriority!=1)
+                    return -1;
+                if (b.orderPriority==1 & a.orderPriority!=1)
+                    return 1;
                 return a.run_time_epoch > b.run_time_epoch ? -1 : 1;
             })
             
