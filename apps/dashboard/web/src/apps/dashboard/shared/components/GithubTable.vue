@@ -82,7 +82,7 @@
                     <div v-if="actions && actions.length > 0" class="table-row-actions">
                         <simple-menu :items="actions" :newView="true">
                             <template v-slot:activator2>
-                                <v-btn icon :ripple="false" @click="() => content.current = content.index">
+                                <v-btn icon :ripple="false" @click="$emit('actionsClicked',content.rowData)">
                                     <v-icon size="14" color="var(--themeColorDark)">$fas_ellipsis-h</v-icon>
                                 </v-btn>                    
                             </template>

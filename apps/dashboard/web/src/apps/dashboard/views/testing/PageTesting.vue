@@ -131,7 +131,7 @@
             </div>
         </template>
         <template slot="Table">
-            <github-table :headers="tableHeaders" :items="getlatestTestingRuns()" :actions="actions" sortKeyDefault="total_severity">
+            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions" @actionsClicked="computeTestActions">
                 <template #severity_1="{item}">
                     <template v-for="(val,index) in item">
                         <div class="box_container" v-for="(value, key) in val" :key="index + key" :style="getColor(key)">
@@ -224,6 +224,31 @@ export default {
             testRoleName: "",
             testLogicalGroupRegex: "",
             showTokenAutomation: false,
+            action1:{
+                label: 'Schedule test',
+                icon: '$far_calendar',
+                click: () => this.scheduleTest(),
+                isValid: true,
+            },
+            action2:{
+                label: 'Add to CI/CD pipeline',
+                icon: '$fas_infinity',
+                click: () => this.addToCiCd(),
+                isValid: true,
+            },
+            action3:{
+                label: 'Re-run',
+                icon: '$fas_redo',
+                click: () => this.reRunTest(),
+                isValid: true,
+            },
+            action4:{
+                label: 'Stop',
+                icon: '$far_stop-circle',
+                labelColor: '#EA392C',
+                click: () => this.stopTest(),
+                isValid: true,
+            },
 
             // calculate total_severity by= 10000*high + 100*medium + 1*low  // logic to be given.
             // calculate icon by mapping status {
@@ -426,6 +451,28 @@ export default {
     methods: {
         getlatestTestingRuns(){
             return this.latestTestingRuns;
+        },
+        computeTestActions(item){
+            let arr = []
+            if(item['run_type'] === 'One Time'){
+                arr.push(this.action1)
+            }else{
+                arr.push(this.action3)
+            }
+
+            if(item['run_type'] === 'CI/CD'){
+                arr.push(this.action1)
+                this.action4.isValid = false
+            }else{
+                this.action4.isValid = true
+                arr.push(this.action2)
+            }
+
+            arr.push(this.action4)
+            this.actions = arr
+        },
+        addToCiCd(){
+            console.log("addToCiCd")
         },
         reRunTest(){
             console.log("reRunTest")
