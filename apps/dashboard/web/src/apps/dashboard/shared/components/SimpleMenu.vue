@@ -157,25 +157,27 @@ export default {
         background: var(--white);
         min-width: 200px;
         .list-title{
-          font-family: Poppins, sans-serif !important;
+            font-family: Poppins, sans-serif !important;
             padding: 12px 16px;
             border-radius: 7px 7px 0px 0px;
             background: var(--themeColorDark22);
             font-size: 14px;
             font-weight: 500;
             color: var(--themeColorDark);
+            min-width: 235px;
         }
         .item-container {
             display: flex;
             align-items: center;
             gap: 4px;
-            padding: 2px 6px;
+            padding: 1px 6px;
             cursor: pointer;
             &:hover {background-color: var(--themeColorDark20)} 
             .title{
               font-family: Poppins, sans-serif !important;
                 font-size: 14px !important;
                 color: var(--themeColorDark);
+                padding: 4px 5px;
             }
         }
     }

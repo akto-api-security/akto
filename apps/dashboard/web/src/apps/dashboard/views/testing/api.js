@@ -135,7 +135,7 @@ export default {
 
     stopTest(testingRunHexId) {
         return request({
-            url: '/api/stopAllTests',
+            url: '/api/stopTest',
             method: 'post',
             data: {testingRunHexId}
         }).then((resp) => {

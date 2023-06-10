@@ -78,7 +78,7 @@ function getAlternateTestsInfo(state){
 }
 
 function getTestsInfo(testResultsCount, state){
-    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " Tests"
+    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
 }
 
 const testing = {
@@ -94,7 +94,8 @@ const testing = {
             state.cicdTestingRuns = []
             state.latestTestingRuns = []
         },
-        SAVE_TESTING_DETAILS(state, {testingRuns, latestTestingRunResultSummaries}) {
+        SAVE_TESTING_RUNS_DETAILS(state, {testingRuns, latestTestingRunResultSummaries}) {
+            state.latestTestingRuns = []
             testingRuns.forEach((data)=>{
                 let obj={};
                 let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']];
@@ -116,6 +117,7 @@ const testing = {
                 obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
                 obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
                 obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
+                obj['scheduleTimestamp'] = data.scheduleTimestamp
                 obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
                 obj['severity'] = testingRunResultSummary.countIssues == null ? [] : Object.entries(testingRunResultSummary.countIssues).map(([key, value]) => ({ [key]: value })).filter(obj => Object.values(obj)[0] > 0);
                 obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
@@ -161,16 +163,16 @@ const testing = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
+        async loadTestingRunDetails({commit}){
+            await api.fetchTestRunTableInfo().then((resp) => {
+                commit('SAVE_TESTING_RUNS_DETAILS', resp)
+            }).catch(() => {
+                
+            })
+        },
         async loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
             commit('EMPTY_STATE')
             state.loading = true
-
-            await api.fetchTestRunTableInfo().then((resp) => {
-                commit('SAVE_TESTING_DETAILS', resp)
-            }).catch(() => {
-                state.loading = false
-            })
-
             await api.fetchTestingDetails({startTimeStamp:0, endTimeStamp:0, fetchCicd:false}).then((resp) => {
                 commit('SAVE_DETAILS', resp)
             }).catch(() => {

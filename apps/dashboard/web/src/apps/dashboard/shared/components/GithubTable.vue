@@ -23,7 +23,7 @@
                 <div class="d-flex" :style="{gap:'8px'}">
                     <template v-for="(header) in headers">
                         <simple-menu :items="computeActionItems(getColumnValueList(header.value))" 
-                            :key="header.text" v-if="header.showFilterMenu && computeActionItems(getColumnValueList(header.value)).length>0" :newView="true" :title="header.text"
+                            :key="header.text" v-if="header.showFilterMenu && computeActionItems(getColumnValueList(header.value)).length>0" :newView="true" :title="ComputeTitle(header.text)"
                             @menuClicked="appliedFilter(header.value,itemClicked($event))"
                             :clear-filters-value="clearFilterValue"
                         >
@@ -146,6 +146,9 @@ export default {
             })
             return arr
         },
+        ComputeTitle(text){
+            return "Filter by " + text.toLowerCase()
+        },
         itemClicked(item){
             this.clearFilterValue = false
             if(item.item.header && item.item.header.showSort){
@@ -217,12 +220,12 @@ export default {
 }
 .github-table >>> .v-data-table__wrapper{
     border: 1px solid var(--themeColorDark16) !important;
-    border-radius: 0px 0px 6px 6px;
+    border-radius: 0px 0px 12px 12px;
 }
 .github-table >>> .github-table-row{
     display: flex !important;
     flex-direction: column !important;
-    padding: 12px 24px !important;
+    padding: 13px 24px !important;
     border-bottom: 1px solid var(--themeColorDark16) !important;
 }
 
@@ -242,10 +245,10 @@ export default {
 </style>
 <style scoped lang="scss">
     .github-header-container{
-        padding: 16px 24px;
+        padding: 20px 24px;
         width: 100%;
         background: var(--themeColorDark22);
-        border-radius: 6px 6px 0px 0px;
+        border-radius: 12px 12px 0px 0px;
         border: 1px solid var(--themeColorDark16);
         margin-top: 10px;
         border-bottom: none;
@@ -292,6 +295,7 @@ export default {
                 overflow: hidden;
                 text-overflow: ellipsis;
                 max-width: 20vw;
+                font-weight: 400;
             }
             .divider{
                 border-width: 2px !important;

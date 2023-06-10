@@ -131,7 +131,7 @@
             </div>
         </template>
         <template slot="Table">
-            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions" @actionsClicked="computeTestActions">
+            <github-table :headers="tableHeaders" :items="latestTestingRuns" :actions="actions" @actionsClicked="computeTestActions">
                 <template #severity_1="{item}">
                     <template v-for="(val,index) in item">
                         <div class="box_container" v-for="(value, key) in val" :key="index + key" :style="getColor(key)">
@@ -367,6 +367,13 @@ export default {
                     icon: '$fileShieldIcon'
                 },
                 {
+                    text: 'Severity',
+                    value: 'severityTags',
+                    showFilterMenu: true,
+                    showSort: false,
+                    row_order: 0,
+                },
+                {
                     text:'Run type',
                     value:'run_type',
                     showFilterMenu: true,
@@ -392,13 +399,6 @@ export default {
                     row_order: 1,
                     sortKey: 'total_severity',
                     sortText: 'Highest severity/1/Lowest severity/0'
-                },
-                {
-                    text: 'Severity',
-                    value: 'severityTags',
-                    showFilterMenu: true,
-                    showSort: false,
-                    row_order: 0,
                 }
             ],
             actionsList:[
@@ -439,8 +439,18 @@ export default {
         }
     },
     methods: {
-        getlatestTestingRuns(){
-            return this.latestTestingRuns;
+        pollLatestTestingRuns(){
+            let hasRunningTests = false;
+            this.latestTestingRuns.forEach((testRun) =>{
+                hasRunningTests |= ( (testRun.orderPriority==1) || 
+                ( testRun.orderPriority==2 && (testRun.scheduleTimestamp - Date.now()/1000) < 60 ) )
+            })
+            setTimeout(async () => {
+                if (hasRunningTests) {
+                    await this.$store.dispatch('testing/loadTestingRunDetails');
+                    this.pollLatestTestingRuns();
+                }
+            }, 3000)
         },
         computeTestActions(item){
             let arr = []
@@ -458,22 +468,20 @@ export default {
             }else{
                 arr.push(this.actionsList[2])
             }
-
-            if(item['orderPriority'] === 1 || item['orderPriority'] === 3){
-                this.actionsList[3].isValid = false
-            }else{
+            if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
                 this.actionsList[3].isValid = true
+            }else{
+                this.actionsList[3].isValid = false
             }
 
             arr.push(this.actionsList[3])
             this.actions = arr
         },
         addToCiCd(){
-            console.log("addToCiCd")
+            window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');
         },
         async reRunTest(){
             await api.rerunTest(this.selectedTestingRun.hexId).then((res)=>{
-                console.log(res);
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
                     text: "Test re-run",
@@ -486,13 +494,14 @@ export default {
                     color: 'red'
                 })
             })
+            await this.$store.dispatch('testing/loadTestingRunDetails');
+            this.pollLatestTestingRuns()
         },
         scheduleTest(){
             console.log("scheduleTest")
         },
         async stopTest(){
             await api.stopTest(this.selectedTestingRun.hexId).then((res)=>{
-                console.log(res);
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
                     text: "Test run stopped",
@@ -505,6 +514,7 @@ export default {
                     color: 'red'
                 })
             })
+            await this.$store.dispatch('testing/loadTestingRunDetails');
         },
         getColor(key){
             switch(key){
@@ -746,6 +756,8 @@ export default {
         let now = func.timeNow()
         this.$store.dispatch('test_roles/loadTestRoles')
         await this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
+        await this.$store.dispatch('testing/loadTestingRunDetails');
+        this.pollLatestTestingRuns();
     },
     watch: {
         authMechanism: {
