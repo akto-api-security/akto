@@ -634,7 +634,11 @@ public class TestExecutor {
         for (TestResult testResult: testResults) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
-            testResult.setConfidence(Confidence.valueOf(severity));
+            try {
+                testResult.setConfidence(Confidence.valueOf(severity));
+            } catch (Exception e){
+                testResult.setConfidence(Confidence.HIGH);
+            }
         }
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
