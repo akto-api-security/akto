@@ -16,6 +16,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
@@ -31,6 +32,7 @@ import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -249,8 +251,9 @@ public class TestExecutor {
 
         for (TestingRunResult testingRunResult: testingRunResults) {
             if (testingRunResult.isVulnerable()) {
-                int initialCount = totalCountIssues.get("HIGH");
-                totalCountIssues.put("HIGH", initialCount + 1);
+                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
+                int initialCount = totalCountIssues.get(severity);
+                totalCountIssues.put(severity, initialCount + 1);
             }
         }
 
@@ -265,6 +268,16 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
 
+    }
+
+    public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
+        Severity severity = Severity.HIGH;
+        try {
+            Confidence confidence = testingRunResult.getTestResults().get(0).getConfidence();
+            severity = Severity.valueOf(confidence.toString());
+        } catch (Exception e){
+        }
+        return severity;
     }
 
     public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap) throws URISyntaxException {
@@ -596,6 +609,7 @@ public class TestExecutor {
         Auth auth = testConfig.getAuth();
         Map<String, List<String>> wordListsMap = testConfig.getWordlists();
         Map<String, Object> varMap = new HashMap<>();
+        String severity = testConfig.getInfo().getSeverity();
 
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
@@ -620,6 +634,7 @@ public class TestExecutor {
         for (TestResult testResult: testResults) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
+            testResult.setConfidence(Confidence.valueOf(severity));
         }
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
