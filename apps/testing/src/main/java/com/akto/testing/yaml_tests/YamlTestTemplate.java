@@ -32,49 +32,54 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public boolean filter() {
-        loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
         List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism);
-        loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
         if (authHeaders != null && authHeaders.size() > 0) {
             this.varMap.put("auth_headers", authHeaders);
         }
         if (this.auth != null && this.auth.getAuthenticated() != null) {
-            loggerMaker.infoAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
+            // loggerMaker.infoAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
             boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism);
             if (!validAuthHeaders) {
-                loggerMaker.infoAndAddToDb("invalid auth, skipping filter " + logId, LogDb.TESTING);
+                // loggerMaker.infoAndAddToDb("invalid auth, skipping filter " + logId, LogDb.TESTING);
                 return false;
             }
         }
         boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
-        loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
     }
 
     @Override
-    public List<ExecutionResult>  executor() {
-        loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
+    public boolean checkAuthBeforeExecution() {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
-            loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
+            // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy());
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
                 if (statusCode >= 200 && statusCode < 300) {
-                    loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId, LogDb.TESTING);
-                    return null;
+                    // loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId, LogDb.TESTING);
+                    return false;
                 }
             }
         }
+        return true;
+    }
+
+    @Override
+    public List<ExecutionResult>  executor() {
+        // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
         List<ExecutionResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId, this.authMechanism);
-        loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }
 
     @Override
     public List<TestResult> validator(List<ExecutionResult> attempts) {
         List<TestResult> testResults = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("validation started " + logId, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("validation started " + logId, LogDb.TESTING);
         if (attempts == null) {
             return testResults;
         }
@@ -102,7 +107,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             testResults.add(testResult);
         }
 
-        loggerMaker.infoAndAddToDb("test results size " + testResults.size() + " " + logId, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("test results size " + testResults.size() + " " + logId, LogDb.TESTING);
 
         return testResults;
     }

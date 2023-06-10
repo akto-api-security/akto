@@ -13,7 +13,7 @@
                 <slot name="title"/>
             </div>
             <div class="d-flex justify-space-between">
-                <div class="pt-4 d-flex jc-sb" style="width: 100%">
+                <div class="control-padding d-flex jc-sb" style="width: 100%">
                     <div class="tabs-container">
                         <v-tabs
                             active-class="active-tab"
@@ -133,4 +133,6 @@
 
 .tabs-container
     padding-left: 0px
+.control-padding
+    padding-top: 16px
 </style>

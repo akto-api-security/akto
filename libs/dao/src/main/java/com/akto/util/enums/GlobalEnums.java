@@ -5,7 +5,8 @@ public class GlobalEnums {
 
     public enum TestErrorSource { // Whether issue came from runtime or automated testing via dashboard
         AUTOMATED_TESTING("testing"),
-        RUNTIME("runtime");
+        RUNTIME("runtime"),
+        TEST_EDITOR("test_editor");
 
         private final String name;
 
@@ -92,6 +93,12 @@ public class GlobalEnums {
         OPEN,
         IGNORED,
         FIXED
+    }
+
+    /* YamlTemplate source enum */
+    public enum YamlTemplateSource {
+        AKTO_TEMPLATES,
+        CUSTOM
     }
 
 
