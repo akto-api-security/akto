@@ -1,5 +1,5 @@
 <template>
-    <v-menu offset-y min-width="150" max-height="300px" v-model="showMenu" content-class="no-shadow">
+    <v-menu offset-y min-width="150" max-height="300px" content-class="no-shadow">
         <template v-slot:activator="{on, attrs}">
             <div v-on="on" v-bind="attrs">
                 <slot name="activator2"/>
@@ -18,7 +18,9 @@
                 :style="[ item.hasLastBorder===true ? {'border-bottom': '1px solid var(--themeColorDark23)'} : {} , item.isValid ? {} : {'opacity' : '0.3' } ]"  
                 @click="item.isValid ? clickFunc(item) : null"
             >
-                <v-icon v-if="item.icon" :size="12" :style="{color: item.labelColor ? item.labelColor:'var(--themeColorDark)'}">{{ item.icon }}</v-icon>
+                <v-icon :size="12" color="var(--themeColorDark)" v-if="checkedMap[item.label]">$fas_check</v-icon>
+                <v-icon v-else-if="item.icon" :size="12" :style="{color: item.labelColor ? item.labelColor:'var(--themeColorDark)'}">{{ item.icon }}</v-icon>
+                <v-icon v-else size="12" />
                 <span class="title" :style="{color: item.labelColor ? item.labelColor : ''}">{{ item.label }}</span>
             </div>
           </div>
@@ -33,7 +35,7 @@
                 >
                     <v-list-item-content class="content-nav-drawer">
                         <v-list-item-title class="title-nav-drawer">
-                          <v-icon v-if="item.icon" size="12" color="#fff">{{ item.icon }}</v-icon>{{item.label}}
+                          <v-icon v-if="item.icon" size="12" color="var(--white)">{{ item.icon }}</v-icon>{{item.label}}
                         </v-list-item-title>
                     </v-list-item-content>
                 </v-list-item>
@@ -57,9 +59,19 @@ export default {
         extraArrowClasses: obj.arrN,
         newView: obj.boolN,
         title: obj.strN,
+        selectExactlyOne: obj.boolN,
+        clearFiltersValue: obj.boolN,
     },
     data() {
       return {
+        checkedMap: this.items.reduce((m, i) => {
+                if (i.checked) {
+                    m[i.label] = true
+                } else {
+                    m[i.label] = false
+                }
+                return m
+            }, {}),
         showMenu: !!this.showMenuOnDraw
       }
     },
@@ -67,8 +79,15 @@ export default {
         clickFunc(item){
             if(item.click)
                 item.click()
-            else
-                this.$emit('menuClicked',item)
+            else{
+                if(this.selectExactlyOne){
+                  Object.keys(this.checkedMap).forEach((key) =>{
+                    this.checkedMap[key] = false
+                  })
+                }
+                this.checkedMap[item.label] = !this.checkedMap[item.label]
+                this.$emit('menuClicked',{item: item, checked: this.checkedMap[item.label]})
+            }
         }
     },
     computed: {
@@ -78,6 +97,15 @@ export default {
           ret = [...this.extraArrowClasses, ...ret]
         }
         return ret
+      }
+    },
+    watch:{
+      clearFiltersValue(newVal){
+        if(newVal){
+          Object.keys(this.checkedMap).forEach((key) =>{
+            this.checkedMap[key] = false
+          })
+        }
       }
     }
 }
@@ -141,8 +169,7 @@ export default {
             display: flex;
             align-items: center;
             gap: 4px;
-            padding: 0 14px;
-            height: 42px;
+            padding: 2px 6px;
             cursor: pointer;
             &:hover {background-color: var(--themeColorDark20)} 
             .title{

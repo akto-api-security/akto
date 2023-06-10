@@ -12,7 +12,7 @@
     >
         <!-- TODO: handle sorting and severity -->
         <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter,setSortOrInvertOrder,clearFilters,filters}">
-                <v-btn  :ripple="false" plain color="var(--themeColorDark3)" v-if="isFilter(filters)" @click="clearFilters" class="pa-0 btn-clear">
+                <v-btn  :ripple="false" plain color="var(--themeColorDark3)" v-if="isFilter(filters)" @click="handleFilters(clearFilters)" class="pa-0 btn-clear">
                     <v-icon :size="14">$fas_times</v-icon>
                     Clear filters
                 </v-btn>
@@ -25,6 +25,7 @@
                         <simple-menu :items="computeActionItems(getColumnValueList(header.value))" 
                             :key="header.text" v-if="header.showFilterMenu && computeActionItems(getColumnValueList(header.value)).length>0" :newView="true" :title="header.text"
                             @menuClicked="appliedFilter(header.value,itemClicked($event))"
+                            :clear-filters-value="clearFilterValue"
                         >
                             <template v-slot:activator2>
                                 <div class="d-flex align-center">
@@ -35,7 +36,8 @@
                         </simple-menu>
                     </template>
                     <simple-menu v-if="items.length>0" :newView="true" :items="sortHeaders" title="Sort By" 
-                            @menuClicked="setSortOrInvertOrder(itemClicked($event))"
+                            @menuClicked="setSortOrInvertOrder(itemClicked($event))" :select-exactly-one="true"
+                            :clear-filters-value="clearFilterValue"
                     >
                         <template v-slot:activator2>
                             <div class="d-flex align-center">
@@ -112,9 +114,18 @@ export default {
         SimpleTable,
         SimpleMenu
     },
+    data(){
+        return{
+            clearFilterValue: false,
+        }
+    },
     methods: {
         rowClicked(item){
             this.$emit('clickRow',item)
+        },
+        handleFilters(clearFilters){
+            clearFilters()
+            this.clearFilterValue = true
         },
         computeIcon(iconStr,index){
             let iconArr = iconStr.split("/")
@@ -136,6 +147,10 @@ export default {
             return arr
         },
         itemClicked(item){
+            this.clearFilterValue = false
+            if(item.item.header && item.item.header.showSort){
+                return item.item
+            }
             return item
         },
         isFilter(filters){

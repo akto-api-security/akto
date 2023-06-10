@@ -131,7 +131,7 @@
             </div>
         </template>
         <template slot="Table">
-            <github-table :headers="tableHeaders" :items="getlatestTestingRuns()" :actions="actions" @actionsClicked="computeTestActions">
+            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions" @actionsClicked="computeTestActions">
                 <template #severity_1="{item}">
                     <template v-for="(val,index) in item">
                         <div class="box_container" v-for="(value, key) in val" :key="index + key" :style="getColor(key)">

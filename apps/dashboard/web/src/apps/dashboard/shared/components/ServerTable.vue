@@ -27,7 +27,7 @@
         >
             <template v-slot:top="{ pagination, options, updateOptions }">
                 <slot name="add-custom-headers" 
-                    :appliedFilter="copyAppliedFilter" 
+                    :appliedFilter="appliedFilter" 
                     :setSortOrInvertOrder="copySetSortOrInvertOrder" 
                     :clearFilters="clearFilters"
                     :filters="filters"
@@ -228,7 +228,7 @@ export default {
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}
         },
-        appliedFilter (hValue, {item, checked, operator, type, min, max, searchText}) { 
+        appliedFilter (hValue, {item, checked, operator, type, min, max, searchText}) {
             if (type === "INTEGER") {
                 this.filters[hValue] = [min, max]
             } else if (type === "SEARCH") {
@@ -243,12 +243,6 @@ export default {
                 }
             }
             this.filters = {...this.filters}
-            this.showHideFilterIcon(hValue)
-            this.options = {...this.options, page: 1}
-        },
-        copyAppliedFilter(hValue,item){
-            this.filters = this.headers.reduce((map, e) => {map[e.sortKey || e.value] = new Set(); return map}, {})
-            this.filters[hValue].add(item.value)
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}
         },
