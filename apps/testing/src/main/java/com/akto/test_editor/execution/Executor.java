@@ -47,7 +47,7 @@ public class Executor {
             List<RawApi> sampleRawApis = new ArrayList<>();
             sampleRawApis.add(sampleRawApi);
 
-            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, sampleRawApi);
+            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, sampleRawApi.copy());
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
             if (testRawApis == null) {
@@ -76,14 +76,15 @@ public class Executor {
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutorSingleRequest(true, "", null, false);
+            return new ExecutorSingleRequest(true, "", rawApis, true);
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
-            return new ExecutorSingleRequest(true, "", null, true);
+            return new ExecutorSingleRequest(true, "", rawApis, false);
         }
         Boolean followRedirect = true;
         List<RawApi> newRawApis = new ArrayList<>();
+        List<RawApi> existingRawApis = new ArrayList<>();
 
         if (childNodes.size() == 0) {
             Object key = node.getOperationType();
@@ -143,6 +144,7 @@ public class Executor {
                         if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
                             continue;
                         }
+                        existingRawApis.add(rawApi.copy());
                     }
                     invokeOperation(operation, key, value, baseRawApi, varMap, authMechanism);
                 }
@@ -158,18 +160,23 @@ public class Executor {
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
-            followRedirect = followRedirect || executionResult.getFollowRedirect();
+            followRedirect = followRedirect && executionResult.getFollowRedirect();
         }
 
         if (newRawApis.size() > 0) {
-            if (rawApis.size() <= 1) {
-                rawApis = newRawApis;
+            if (existingRawApis.size() <= 1) {
+                existingRawApis = newRawApis;
             } else {
-                rawApis.addAll(newRawApis);
+                existingRawApis.addAll(newRawApis);
             }
         }
 
-        return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
+        if (childNodes.size() == 0 && newRawApis.size() > 0) {
+            return new ExecutorSingleRequest(true, "", existingRawApis, followRedirect);
+        } else {
+            return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
+        }
+
     }
 
     public Object expandKey(Map<String, Object> varMap, Object key, Object value) {
