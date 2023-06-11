@@ -1,4 +1,4 @@
-id: APPEND_XSS
+id: XSS_VIA_APPENDING_TO_QUERY_PARAMS
 info:
   name: "Sensitive files exposed due to SSRF"
   description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with popular sensitive file paths. The application responded with 2XX success code and also gave out details of these files." 
@@ -14,7 +14,7 @@ info:
     name: XSS
     shortName: XXS
     displayName: Cross-site scripting (XSS)
-  subCategory: BASIC_XSS
+  subCategory: XSS_VIA_APPENDING_TO_QUERY_PARAMS
   severity: HIGH
   tags:
     - Business logic

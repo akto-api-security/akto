@@ -1,4 +1,4 @@
-id: FILE_INCLUSION_ETC_PWD_IN_PARAMETER
+id: FILE_INCLUSION_IN_PARAMETER
 info:
   name: "Sensitive files exposed due to SSRF"
   description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with popular sensitive file paths. The application responded with 2XX success code and also gave out details of these files." 
@@ -11,10 +11,10 @@ info:
             The SSRF risk can not always be completely eliminated. While choosing a protection mechanism, it is important to consider the business risks and needs."
   impact: "Successful exploitation might compromise sensitive data such as passwords, source-code, confidential files etc."
   category:
-    name: FI
-    shortName: File Inclusion
-    displayName: File Inclusion (FI)
-  subCategory: FILE_INCLUSION_ETC_PWD_IN_PARAMETER
+    name: LFI
+    shortName: Local File Inclusion
+    displayName: Local File Inclusion (FI)
+  subCategory: FILE_INCLUSION_IN_PARAMETER
   severity: HIGH
   tags:
     - Business logic

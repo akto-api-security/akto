@@ -1,0 +1,56 @@
+id: DESCRIPTIVE_ERROR_MESSAGE
+info:
+  name: Descriptive Error Message
+  description: "Descriptive Error Message"
+  details: >
+          "Descriptive Error Message"
+  impact: "This information can be used to facilitate more sophisticated attacks on your application"
+  category:
+    name: VEM
+    shortName: VEM
+    displayName: Verbose Error Messages (VEM)
+  subCategory: DESCRIPTIVE_ERROR_MESSAGE
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-community/Improper_Error_Handling"
+
+api_selection_filters:
+  or:
+    - request_payload:
+        for_one:
+          key:
+            regex: .*
+            extract: keyVar
+    - query_param:
+        for_one:
+          key:
+            regex: .*
+            extract: keyVar
+        
+wordLists:
+  invalid_values: 
+    - null
+
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_body_param:
+          keyVar: ${invalid_values}
+      - modify_query_param:
+          keyVar: ${invalid_values}
+validate:
+  response_payload:
+    - contains_either:
+      - column
+      - row
+      - line
+      - function
+      - class
+      - stack
+      - trace

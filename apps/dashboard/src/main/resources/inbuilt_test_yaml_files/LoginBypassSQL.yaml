@@ -1,0 +1,70 @@
+id: LOGIN_BYPASS_SQL
+info:
+  name: "LOGIN_BYPASS_SQL"
+  description: "LOGIN_BYPASS_SQL"
+  details: >
+            "LOGIN_BYPASS_SQL"
+  impact: "Broken User authentication is a serious vulnerability. Attackers can gain control to other users’ accounts in the system, read their personal data, and perform sensitive actions on their behalf, like money transactions and sending personal messages."
+  category:
+    name: SQL_INJECTION
+    shortName: SQL Injection
+    displayName: SQL Injection (SQLI)
+  subCategory: LOGIN_BYPASS_SQL
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/"
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa2-broken-user-authentication.md"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+    - "https://cwe.mitre.org/data/definitions/798.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    contains_either:
+      - login
+      - signin
+      - sign-in
+      - log-in
+  request_payload:
+    for_one:
+      key: 
+        contains_either:
+          - login
+          - user
+          - email
+          - account
+          - identity
+        extract: login_key
+    for_one:
+      key: 
+        contains_either:
+          - password
+          - pwd
+          - pass
+          - passwd
+        extract: password_key
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_body_param: 
+          login_key: '/1#\'
+      - modify_body_param: 
+          password_key: '/1#\'
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match: 
+      gt: 80
+    length:
+      gt: 0

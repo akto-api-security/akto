@@ -1,0 +1,70 @@
+id: LOGIN_BYPASS_NO_SQL
+info:
+  name: "LOGIN_BYPASS_NO_SQL"
+  description: "LOGIN_BYPASS_NO_SQL"
+  details: >
+            "LOGIN_BYPASS_NO_SQL"
+  impact: "Broken User authentication is a serious vulnerability. Attackers can gain control to other users’ accounts in the system, read their personal data, and perform sensitive actions on their behalf, like money transactions and sending personal messages."
+  category:
+    name: NO_SQL_INJECTION
+    shortName: No SQL Injection
+    displayName: No SQL Injection (NO_SQLI)
+  subCategory: LOGIN_BYPASS_NO_SQL
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/"
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa2-broken-user-authentication.md"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+    - "https://cwe.mitre.org/data/definitions/798.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    contains_either:
+      - login
+      - signin
+      - sign-in
+      - log-in
+  request_payload:
+    for_one:
+      key: 
+        contains_either:
+          - login
+          - user
+          - email
+          - account
+          - identity
+        extract: login_key
+    for_one:
+      key: 
+        contains_either:
+          - password
+          - pwd
+          - pass
+          - passwd
+        extract: password_key
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_body_param: 
+          login_key: '{"$ne": null}' #should be able to pass object
+      - modify_body_param: 
+          password_key: '{"$ne": null}'
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match: 
+      gt: 80
+    length:
+      gt: 0

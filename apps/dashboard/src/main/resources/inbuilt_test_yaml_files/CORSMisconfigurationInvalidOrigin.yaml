@@ -1,0 +1,59 @@
+id: CORS_MISCONFIGURATION_INVALID_ORIGIN
+info:
+  name: "CORS Misconfiguration"
+  description: "CORS Misconfiguration"
+  details: >
+    "CORS"
+  impact: "CORS"
+  category:
+    name: CORS
+    shortName: CORS
+    displayName: Cross-Origin Resource Sharing (CORS)
+  subCategory: CORS_MISCONFIGURATION_INVALID_ORIGIN
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://cwe.mitre.org/data/definitions/639.html"
+
+auth:
+  authenticated: true
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  method:
+    extract: method_var
+
+wordLists:
+  invalid_cors_origin: 
+    - evil.com
+    - "`evil.com"
+    - "1221"
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - add_header:
+          origin:  ${cors_origin}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    and:
+      - for_one:
+          key:
+            contains: access-control-allow-origin
+          value:
+            contains: ${cors_origin}
+      - for_one:
+          key:
+            contains: access-control-allow-credentials
+          value:
+            contains: true
