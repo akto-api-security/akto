@@ -85,6 +85,7 @@ public class Executor {
         Boolean followRedirect = true;
         List<RawApi> newRawApis = new ArrayList<>();
         List<RawApi> existingRawApis = new ArrayList<>();
+        boolean addNewRawApis = true;
 
         if (childNodes.size() == 0) {
             Object key = node.getOperationType();
@@ -139,6 +140,7 @@ public class Executor {
                         newRawApis.add(copyRApi);
                     }
                 } else {
+                    addNewRawApis = false;
                     for (RawApi rawApi : rawApis) {
                         ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap, authMechanism);
                         if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
@@ -164,14 +166,14 @@ public class Executor {
         }
 
         if (newRawApis.size() > 0) {
-            if (existingRawApis.size() <= 1) {
-                existingRawApis = newRawApis;
+            if (rawApis.size() <= 1) {
+                rawApis = newRawApis;
             } else {
-                existingRawApis.addAll(newRawApis);
+                rawApis.addAll(newRawApis);
             }
         }
 
-        if (childNodes.size() == 0 && newRawApis.size() > 0) {
+        if (childNodes.size() == 0 && !addNewRawApis) {
             return new ExecutorSingleRequest(true, "", existingRawApis, followRedirect);
         } else {
             return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
