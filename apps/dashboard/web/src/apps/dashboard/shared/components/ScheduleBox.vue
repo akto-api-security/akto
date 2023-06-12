@@ -16,6 +16,21 @@
                     </div>
                     <v-checkbox v-model="recurringDaily" label="Run daily" on-icon="$far_check-square"
                         off-icon="$far_square" class="run-daily-box" :ripple="false" />
+
+                </div>
+                <div class="d-flex">
+                  <v-checkbox v-model="hasOverriddenTestAppUrl" label="Use different target for testing" on-icon="$far_check-square"
+                              off-icon="$far_square" class="run-daily-box" :ripple="false" />
+
+                    <v-text-field v-if="hasOverriddenTestAppUrl"
+                        class="form-field-text"
+                        type="text"
+                        label="Override test app host"
+                        v-model="overriddenTestAppUrl"
+                    ></v-text-field>
+
+                </div>
+                <div class="d-flex">
                 </div>
                 <div class="d-flex" style="gap: 20px">
                     <div>
@@ -53,11 +68,13 @@
 <script>
 import func from '@/util/func'
 import SimpleMenu from "@/apps/dashboard/shared/components/SimpleMenu"
+import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 
 export default {
     name: "ScheduleBox",
     components: {
-        SimpleMenu
+        SimpleMenu,
+        SimpleTextField
     },
     data() {
         let hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -97,6 +114,8 @@ export default {
 
         return {
             startTimestamp: func.timeNow(),
+            overriddenTestAppUrl: '',
+            hasOverriddenTestAppUrl: false,
             label: "Now",
             recurringDaily: false,
             hourlyTimes: [{ label: "Now", click: () => this.setForNow() }, ...amTimes, ...pmTimes],
@@ -131,8 +150,9 @@ export default {
             this.label = "Now"
         },
         schedule() {
+            let overriddenHost = this.hasOverriddenTestAppUrl ? this.overriddenTestAppUrl : null
             return this.$emit("schedule", { recurringDaily: this.recurringDaily, startTimestamp: this.startTimestamp,
-                  testRunTime : this.testRunTime, maxConcurrentRequests: this.maxConcurrentRequests})
+                  testRunTime : this.testRunTime, maxConcurrentRequests: this.maxConcurrentRequests, overriddenTestAppUrl: overriddenHost})
         }
     },
     computed: {
@@ -178,5 +198,41 @@ export default {
     font-weight: 500;
     color: var(--themeColorDark) !important;
     opacity: 1 !important
+}
+</style>
+
+
+<style scoped lang="sass">
+.form-field-text
+  padding-top: 0px !important
+  margin-top: 0px !important
+  margin-left: 20px
+</style>
+
+<style scoped>
+.form-field-text >>> .v-label {
+  font-size: 12px;
+  color: var(--themeColor);
+  font-weight: 400;
+}
+
+.form-field-text >>> input {
+  font-size: 12px;
+  color: var(--themeColorDark) !important;
+}
+
+.form-field-text >>> .v-text-field__details {
+  display: none !important;
+}
+.form-field-text >>> .v-input__slot {
+  margin-bottom: 0px !important;
+}
+
+
+.run-daily-box >>> .v-text-field__details {
+  display: none !important;
+}
+.run-daily-box >>> .v-input__slot {
+  margin-bottom: 0px !important;
 }
 </style>
