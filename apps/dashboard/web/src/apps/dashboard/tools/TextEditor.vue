@@ -1,6 +1,6 @@
 <template>
     <div>
-        <simple-layout title="Test Editor" version="Beta">
+        <simple-layout title="Test Editor" version="Beta" :isAnonymousPage="isAnonymousPage">
             <template>
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
@@ -19,9 +19,11 @@
                                     </span>
                                 </div>
 
-                                <v-list dense nav class="tests-list" :style="{display: !customToggle ? 'none' : ''}">
-                                    <v-list-group v-for="item in selectedTestCategories(customTestObj)" :key="item.displayName"
-                                        class="tests-category-container" active-class="tests-category-container-active" :value="currentCategory === item.displayName">
+                                <v-list dense nav class="tests-list" :style="{ display: !customToggle ? 'none' : '' }">
+                                    <v-list-group v-for="item in selectedTestCategories(customTestObj)"
+                                        :key="item.displayName" class="tests-category-container"
+                                        active-class="tests-category-container-active"
+                                        :value="currentCategory === item.displayName">
                                         <template v-slot:prependIcon>
                                             <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
                                         </template>
@@ -39,16 +41,17 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
-                                            class="test-container"  @click="setSelectedMethod(test.value)">
-                                            <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
+                                            class="test-container" @click="setSelectedMethod(test.value)">
+                                            <v-list-item-content
+                                                :class="test.label === defaultTestName ? 'test-container-active' : ''">
                                                 <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
-                                                            <span v-bind="attrs" v-on="on" >
-                                                                {{test.label}}
+                                                            <span v-bind="attrs" v-on="on">
+                                                                {{ test.label }}
                                                             </span>
                                                         </template>
-                                                        <span>{{test.label}}</span>
+                                                        <span>{{ test.label }}</span>
                                                     </v-tooltip>
                                                 </div>
                                             </v-list-item-content>
@@ -67,9 +70,10 @@
                                         {{ totalAktoTests }}
                                     </span>
                                 </div>
-                                <v-list dense nav class="tests-list" :style="{display: !aktoToggle ? 'none' : ''}">
+                                <v-list dense nav class="tests-list" :style="{ display: !aktoToggle ? 'none' : '' }">
                                     <v-list-group v-for="item in selectedTestCategories(testsObj)" :key="item.displayName"
-                                        class="tests-category-container" active-class="tests-category-container-active" :value="currentCategory === item.displayName">
+                                        class="tests-category-container" active-class="tests-category-container-active"
+                                        :value="currentCategory === item.displayName">
                                         <template v-slot:prependIcon>
                                             <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
                                         </template>
@@ -88,15 +92,16 @@
 
                                         <v-list-item v-for="(test, index) in testsObj[item.name].all" :key="index"
                                             class="test-container">
-                                            <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
+                                            <v-list-item-content
+                                                :class="test.label === defaultTestName ? 'test-container-active' : ''">
                                                 <div class="test-name show-tooltip" @click="setSelectedMethod(test.value)">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
-                                                            <span v-bind="attrs" v-on="on" >
-                                                                {{test.label}}
+                                                            <span v-bind="attrs" v-on="on">
+                                                                {{ test.label }}
                                                             </span>
                                                         </template>
-                                                        <span>{{test.label}}</span>
+                                                        <span>{{ test.label }}</span>
                                                     </v-tooltip>
                                                 </div>
                                             </v-list-item-content>
@@ -109,23 +114,46 @@
                     <div class="editor-col">
                         <div class="editor-header-container">
                             <div class="d-flex fd-column">
-                                <div class="file-name show-overflow">
-                                    {{defaultTestName || "Test editor"}}
-                                    <v-icon v-if="!allCustomTests[defaultTestName]"
-                                        :style="{ 'cursor': 'pointer' }" 
-                                        size=14 
-                                        @click='openGithubLink' 
-                                        :ripple="false"
-                                    >
+                                <div class="file-name show-overflow mb-1">
+                                    {{ defaultTestName || "Test editor" }}
+                                    <v-icon v-if="!allCustomTests[defaultTestName]" :style="{ 'cursor': 'pointer' }" size=14
+                                        @click='openGithubLink' :ripple="false">
                                         $githubIcon
                                     </v-icon>
                                 </div>
-                                <div>
+                                <div v-if="isAnonymousPage">
+                                    <span class="unsaved-changes" v-if="IsEdited">unsaved changes</span>
+                                </div>
+                                <div v-else>
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
-
                                 </div>
                             </div>
-                            <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
+                            <v-menu left v-if="isAnonymousPage" offset-y>
+                                <template v-slot:activator="{ on, attrs }">
+                                    <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }" v-on="on"
+                                        v-bind="attrs">
+                                        <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
+                                        <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
+                                    </div>
+                                </template>
+                                <v-card>
+                                    <v-list>
+                                        <v-list-item>
+                                            <v-list-item-content>
+                                                <v-list-item-subtitle>In order to unlock the power to save your
+                                                    tests.</v-list-item-subtitle>
+                                            </v-list-item-content>
+                                            <v-list-item-action>
+                                                <v-btn primary dark depressed color="var(--themeColor)"
+                                                    href="https://app.akto.io/login" target="_blank">
+                                                    Sign up now
+                                                </v-btn>
+                                            </v-list-item-action>
+                                        </v-list-item>
+                                    </v-list>
+                                </v-card>
+                            </v-menu>
+                            <div v-else class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
                                 @click="saveTestTemplate">
                                 <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
                                 <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
@@ -133,20 +161,45 @@
                         </div>
                         <div ref="editor" style="height: calc(100vh - 120px);" class="monaco-editor"></div>
                         <selector-modal :show-dialog="showDialogBox" :title="titleBox" @closeDialog="closeDialog"
-                            :currentParam="currentParam" :test-categories="testCategories"
-                            @get_form_values="getFormValues" :custom-test="setTextId" />
+                            :currentParam="currentParam" :test-categories="testCategories" @get_form_values="getFormValues"
+                            :custom-test="setTextId" />
                     </div>
                     <div class="req-resp-col">
                         <div class="req-box-container" v-if="messageJson.message">
                             <sample-data :json="json" requestTitle="Request" responseTitle="Response" :tabularDisplay="true"
-                                @run_tests="runTestForGivenTemplate()" :isLoading="runTestObj.isLoading"/>
+                                @run_tests="runTestForGivenTemplate()" :isLoading="runTestObj.isLoading" />
                         </div>
                         <div class="empty-container" v-else>
                             No Values Yet !!
                         </div>
-                        <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
-                            <v-icon size=12>$fas_check</v-icon>
-                            <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
+                        <div class="select-url" v-if="isAnonymousPage">
+                            <v-menu offset-y>
+                                <template v-slot:activator="{ on, attrs }">
+                                    <div class="d-flex jc-sb" v-on="on" v-bind="attrs">
+                                        <span class="file-name url-name show-overflow">{{ selectedAnonymousOption }}</span>
+                                        <v-icon size=12>$fas_angle-down</v-icon>
+                                    </div>
+                                </template>
+                                <v-list>
+                                    <v-list-item @click="resetSampleData()">
+                                        <v-list-item-title>Sample data<v-icon v-if="selectedAnonymousOption == 'Sample data'">$fas_check</v-icon></v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="(customSampleDataDialogBox = true)">
+                                        <v-list-item-title>Copy/paste data<v-icon v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon></v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item href="https://app.akto.io/login" target="_blank">
+                                        <v-list-item-title color="var(--themeColor)">Add automated
+                                            collection<v-icon>$fas_arrow-right</v-icon></v-list-item-title>
+
+                                    </v-list-item>
+                                </v-list>
+                            </v-menu>
+                        </div>
+                        <div v-else>
+                            <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
+                                <v-icon size=12>$fas_check</v-icon>
+                                <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
+                            </div>
                         </div>
                         <div class="footer-div">
                             <div class="show-run-test" v-if="!runTest">
@@ -169,8 +222,7 @@
                                 </div>
                                 <div class="vulnerable-container">
                                     <span>
-                                        <v-icon size=14
-                                            :style="{cursor: 'pointer' }"
+                                        <v-icon size=14 :style="{ cursor: 'pointer' }"
                                             @click="showAllDetails = !showAllDetails">
                                             {{ showdetailsIcon }}
                                         </v-icon>
@@ -189,10 +241,17 @@
                 </div>
             </template>
         </simple-layout>
-        <issues-dialog :openDetailsDialog="dialogBox"
-            :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
-            @closeDialogBox="(dialogBox = false)">
+        <issues-dialog :openDetailsDialog="dialogBox" :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap"
+            :issue="dialogBoxIssue" @closeDialogBox="(dialogBox = false)">
         </issues-dialog>
+        <simple-modal :class='["arrow-up", "mlp-74"]' :parentDialog="simpleModalDialogBox"
+            title="Get Started with API Testing Today" body="Our API test templates can help you save time and effort when
+         testing your APIs. Sign up for Akto today and start using them!"
+            @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal>
+        <custom-sample-data-api-modal title="Add your own API" :parentDialog="customSampleDataDialogBox"
+         @closeCustomSampleDataDialog="(customSampleDataDialogBox = false)"
+         @setSampleDataApi="setSampleDataApi">
+        </custom-sample-data-api-modal>
     </div>
 </template>
 
@@ -205,6 +264,8 @@ import SampleData from '../shared/components/SampleData.vue';
 import SimpleLayout from '../layouts/SimpleLayout.vue';
 import SelectorModal from './SelectorModal.vue';
 import IssuesDialog from '../../dashboard/views/issues/components/IssuesDialog'
+import SimpleModal from './SimpleModal.vue'
+import CustomSampleDataApiModal from "./CustomSampleDataApiModal.vue";
 
 import issuesApi from "../views/issues/api"
 import inventoryApi from "../views/observe/inventory/api"
@@ -238,7 +299,9 @@ export default {
         SampleData,
         SimpleLayout,
         SelectorModal,
-        IssuesDialog
+        IssuesDialog,
+        SimpleModal,
+        CustomSampleDataApiModal
     },
     props: {
         defaultTestId: obj.strN,
@@ -249,7 +312,7 @@ export default {
             editorOptions: {
                 language: "yaml",
                 minimap: { enabled: false },
-                wordWrap: true,
+                wordWrap: true, 
                 automaticLayout: true,
                 colorDecorations: true,
                 scrollBeyondLastLine: false
@@ -261,7 +324,7 @@ export default {
             businessLogicSubcategories: [],
             vulnerableRequests: [],
             mapTestToYaml: {},
-            mapTestToStamp:{},
+            mapTestToStamp: {},
             totalAktoTests: 0,
             aktoToggle: false,
             customToggle: false,
@@ -276,6 +339,7 @@ export default {
             showAllDetails: false,
             mapRequestsToId: {},
             selectedUrl: {},
+            selectedAnonymousOption: "Sample data",
             runTestObj: {
                 isLoading: false,
                 totalAttempts: 16,
@@ -296,13 +360,24 @@ export default {
             allCustomTests: {},
             setTextId: {},
             subCatogoryMap: {},
-            sampleDataListForTestRun: null
+            sampleDataListForTestRun: null,
+            simpleModalDialogBox: false,
+            customSampleDataDialogBox: false
         }
     },
     methods: {
+        async setSampleDataApi(test) {
+            await testingApi.setCustomSampleApi(test.requestValue, test.responseValue).then((resp) => {
+                if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
+                    this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
+                    this.sampleDataListForTestRun = resp.sampleDataList
+                }
+                this.selectedAnonymousOption = 'Copy/paste data'
+            })
+        },
         findTestLabelFromTestValue(testValue) {
-            let aktoTest = Object.values(this.testsObj).map (x => x.all).flat().find(x=>x.value === testValue)
-            let customTest = Object.values(this.customTestObj).map (x => x.all).flat().find(x=>x.value === testValue)
+            let aktoTest = Object.values(this.testsObj).map(x => x.all).flat().find(x => x.value === testValue)
+            let customTest = Object.values(this.customTestObj).map(x => x.all).flat().find(x => x.value === testValue)
 
             if (aktoTest) {
                 this.aktoToggle = true
@@ -332,7 +407,7 @@ export default {
                 }
                 this.makeJson()
             } else if (param === 'save') {
-                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp)=>{
+                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp) => {
                     window._AKTO.$emit('SHOW_SNACKBAR', {
                         show: true,
                         text: "Test template added successfully!",
@@ -343,7 +418,27 @@ export default {
                 })
             }
         },
-        setSelectedMethod(testId) {
+        resetSampleData() {
+            this.selectedUrl = {}
+            this.messageJson = {}
+            let testId = this.defaultTest
+            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0]) {
+
+                let obj = {
+                    apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
+                    url: this.mapRequestsToId[testId][0].url,
+                    method: this.mapRequestsToId[testId][0].method._name
+                }
+                this.selectedUrl = obj
+                this.makeJson()
+            }
+            this.selectedAnonymousOption = 'Sample data'
+        },
+        setSelectedMethod(testId, isCalledFromMounted) {
+            if (this.isAnonymousPage && !isCalledFromMounted) {
+                this.simpleModalDialogBox = true
+                return
+            }
             let testName = this.findTestLabelFromTestValue(testId)
             this.changeValue(testName)
             this.defaultTest = testId
@@ -352,9 +447,9 @@ export default {
             this.messageJson = {}
             this.runTest = false
             if (this.isAnonymousPage) {
-                window.history.pushState({urlPath:'/tools/test-editor/'+testId},"",'/tools/test-editor/'+testId)
+                window.history.pushState({ urlPath: '/tools/test-editor/' + testId }, "", '/tools/test-editor/' + testId)
             } else {
-                window.history.pushState({urlPath:'/dashboard/test-editor/'+testId},"",'/dashboard/test-editor/'+testId)
+                window.history.pushState({ urlPath: '/dashboard/test-editor/' + testId }, "", '/dashboard/test-editor/' + testId)
             }
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
@@ -366,7 +461,7 @@ export default {
                     apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
                     url: this.mapRequestsToId[testId][0].url,
                     method: this.mapRequestsToId[testId][0].method._name
-                }    
+                }
                 this.selectedUrl = obj
                 this.makeJson()
             }
@@ -396,22 +491,25 @@ export default {
                     this.runTestObj.vulnerability = "No "
                     this.runTestObj.isLoading = false
                 }
-                this.runTime = Math.round((new Date().getTime() - testStartTime.getTime())/1000) + " seconds"
+                this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
             })
         },
         showAllAttempts() {
             this.dialogBox = true
         },
         saveTestTemplate() {
-            this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp)=>{
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: "Test template added successfully!",
-                    color: 'green'
-                });
-                await this.refreshTestTemplates()
-                this.setSelectedMethod(resp.finalTestId)
-            })
+            debugger
+            if (this.IsEdited) {
+                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp) => {
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: "Test template added successfully!",
+                        color: 'green'
+                    });
+                    await this.refreshTestTemplates()
+                    this.setSelectedMethod(resp.finalTestId)
+                })
+            }
         },
         openDialogBox(param) {
             this.currentParam = param
@@ -442,20 +540,20 @@ export default {
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
         },
         findSuffixForNewTest(testId) {
-            let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            
-            let customTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            
+            let aktoTests = Object.values(this.testsObj).map(x => x.all).flat().filter(x => x.value.indexOf(testId) == 0)
+            let customTests = Object.values(this.testsObj).map(x => x.all).flat().filter(x => x.value.indexOf(testId) == 0)
 
-            let currMaxIndex = Math.max(0, ...[...aktoTests, ...customTests].map(x=>+(x.value.replace(testId+"_CUSTOM_", ""))).filter(isFinite))
+            let currMaxIndex = Math.max(0, ...[...aktoTests, ...customTests].map(x => +(x.value.replace(testId + "_CUSTOM_", ""))).filter(isFinite))
 
-            
 
-            return currMaxIndex+1
+
+            return currMaxIndex + 1
         },
         changeValue(testName) {
             this.setTextId = {}
             this.lastEdited = -1
             this.defaultTestName = testName
-            if(this.allCustomTests[testName]){
+            if (this.allCustomTests[testName]) {
                 this.setTextId = this.allCustomTests[testName]
             }
             if (!this.mapTestToYaml[testName]) {
@@ -473,16 +571,16 @@ export default {
             this.totalCustomTests = this.searchObjects(this.customTestObj, val.toLowerCase())
             this.totalAktoTests = this.searchObjects(this.testsObj, val.toLowerCase())
         },
-        searchObjects(objects,searchString) {
+        searchObjects(objects, searchString) {
             let totalTests = 0
             for (let key in objects) {
                 if (objects.hasOwnProperty(key)) {
                     let obj = objects[key]
-                    let arr = obj.all.filter((test)=>{
+                    let arr = obj.all.filter((test) => {
                         let name = test.label.toString().toLowerCase().replace(/ /g, "")
                         let category = test.category.toString().toLowerCase().replace(/ /g, "")
                         let content = this.mapTestToYaml[test.label].toString().toLowerCase();
-                        if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
+                        if (name.includes(searchString) || category.includes(searchString) || content.includes(searchString)) {
                             totalTests++
                             return true
                         }
@@ -494,7 +592,7 @@ export default {
         },
         populateMapCategoryToSubcategory() {
             let ret = {}
-            this.customTestObj={}
+            this.customTestObj = {}
             this.mapTestToYaml = {}
             this.totalCustomTests = 0
             this.allCustomTests = {}
@@ -510,7 +608,7 @@ export default {
                 }
                 this.mapTestToYaml[x.testName] = x.content
                 this.mapTestToStamp[x.testName] = func.prettifyEpoch(x.updatedTs)
-                if(x.templateSource._name === "CUSTOM"){
+                if (x.templateSource._name === "CUSTOM") {
                     let customVal = {
                         name: x._name,
                         category: x.superCategory.name
@@ -521,7 +619,7 @@ export default {
                         this.customTestObj[x.superCategory.name] = { all: [] }
                     }
                     this.customTestObj[x.superCategory.name].all.push(obj)
-                }else{
+                } else {
                     ret[x.superCategory.name].all.push(obj)
                 }
                 this.copyCustomObj = JSON.parse(JSON.stringify(this.customTestObj))
@@ -561,19 +659,20 @@ export default {
                 _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
                 _this.mapRequests()
             })
-        }        
+        }
     },
     async mounted() {
-            if (this.isAnonymousPage) {
-                await request({
-                    url: '/tools/publicApi',
-                    method: 'GET'
+        if (this.isAnonymousPage) {
+            await request({
+                url: '/tools/publicApi',
+                method: 'GET'
             })
         }
+        debugger
         this.createEditor()
         let _this = this
         await this.refreshTestTemplates()
-        this.setSelectedMethod(this.defaultTest)
+        this.setSelectedMethod(this.defaultTest, true)
         _this.textEditor.onDidChangeModelContent(() => {
             _this.IsEdited = _this.textEditor.getValue() !== _this.defaultValue
         })
@@ -586,10 +685,10 @@ export default {
                 "highlightPaths": this.messageJson["highlightPaths"],
             }
         },
-        showSelector(){
+        showSelector() {
             return this.defaultValue.length > 0
         },
-        showdetailsIcon(){
+        showdetailsIcon() {
             return this.showAllDetails ? "$fas_angle-double-down" : "$fas_angle-double-up"
         },
         getTextColor() {
@@ -611,12 +710,11 @@ export default {
 </script>
 
 <style scoped>
-
-.tests-category-container.v-list-group--active >>> .v-list-group__header__prepend-icon {
+.tests-category-container.v-list-group--active>>>.v-list-group__header__prepend-icon {
     transform: rotate(90deg);
 }
 
-.test-editor-panel >>> .akto-left-pane {
+.test-editor-panel>>>.akto-left-pane {
     padding-left: 4px;
     padding-right: 4px;
 }
@@ -647,10 +745,9 @@ export default {
     overflow-y: auto;
 }
 
-.test-editor-panel >>> .akto-left-pane {
+.test-editor-panel>>>.akto-left-pane {
     border: none !important;
 }
-
 </style>
 
 <style lang="scss" scoped>
@@ -670,11 +767,20 @@ export default {
         display: flex;
         padding: 4px 24px;
         justify-content: space-between;
+        height: 48px;
 
         .file-title {
             display: flex;
             gap: 4px;
             align-items: center;
+        }
+
+        .unsaved-changes {
+            background: var(--warning);
+            font-size: 12px;
+            border-radius: 4px;
+            color: var(--white);
+            padding: 1px 8px 1px 8px;
         }
 
         .last-edited {
@@ -772,9 +878,10 @@ export default {
     gap: 2px;
     align-items: center;
     cursor: pointer;
-    .shift-right{
+
+    .shift-right {
         position: absolute;
-        right: 20px; 
+        right: 20px;
     }
 }
 
@@ -858,6 +965,7 @@ export default {
         word-break: break-all;
     }
 }
+
 .show-overflow {
     overflow: hidden;
     white-space: nowrap;

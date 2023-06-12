@@ -91,6 +91,15 @@ export default {
             return resp
         })
     },
+    setCustomSampleApi(sampleRequestString, sampleResponseString) {
+        return request({
+            url: '/api/createSampleDataJson',
+            method: 'post',
+            data:{sampleRequestString, sampleResponseString}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
