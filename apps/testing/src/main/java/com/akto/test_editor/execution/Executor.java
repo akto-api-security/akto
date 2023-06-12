@@ -15,6 +15,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.testing.ApiExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -24,7 +25,7 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
-    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId, AuthMechanism authMechanism) {
+    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
 
         List<ExecutionResult> result = new ArrayList<>();
         
@@ -54,7 +55,7 @@ public class Executor {
             for (RawApi testReq: testRawApis) {
                 try {
                     // follow redirects = true for now
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect());
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse));
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
