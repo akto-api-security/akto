@@ -67,6 +67,7 @@ public class PublicApiAction implements Action, ServletResponseAware, ServletReq
 
 
             response.addCookie(cookie);
+            response.addHeader("Set-Cookie", "SameSite=None; Secure");
             HttpSession session = request.getSession(true);
             session.setAttribute("username", user.getLogin());
             session.setAttribute("user", user);
