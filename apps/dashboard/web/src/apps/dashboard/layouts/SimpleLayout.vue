@@ -1,40 +1,49 @@
 <template>
     <div>
-        <div class="layout-border pl-8" style="padding-bottom: 12px">
-            <div v-if="title" :class="['pt-6', version && version.length > 0 ? 'version-class': '']">
-                <div>
-                    <span class="board-name">{{ title || 'Loading...' }}</span>
-                </div>
-    
-                <div v-if="description">
-                    <span class="board-description">{{description}}</span>
-                </div>
+        <div class="layout-border pl-8 pr-8" style="padding-bottom: 12px">
+            <div v-if="title" class="d-flex jc-sb">
+                <div :class="['pt-6', version && version.length > 0 ? 'version-class' : '']">
+                    <div>
+                        <span class="board-name">{{ title || 'Loading...' }}</span>
+                    </div>
 
-                <div v-if="version && version.length > 0" class="version-name">
-                    {{ version }}
+                    <div v-if="description">
+                        <span class="board-description">{{ description }}</span>
+                    </div>
+
+                    <div v-if="version && version.length > 0" class="version-name">
+                        {{ version }}
+                    </div>
+                </div>
+                <div v-if="isAnonymousPage" class="mt-6">
+                    <v-btn primary dark depressed color="var(--themeColor)" >
+                        Try on your APIs
+                        <v-icon size="10">$fas_external-link-alt</v-icon>
+                    </v-btn>
                 </div>
             </div>
             <div v-else>
-                <slot name="title"/>
+                <slot name="title" />
             </div>
         </div>
         <div>
-            <slot/>
+            <slot />
         </div>
     </div>
 </template>
 
 <script>
-    import obj from "@/util/obj";
+import obj from "@/util/obj";
 
-    export default {
-        name: "SimpleLayout",
-        props: {
-            title: obj.strN,
-            description: obj.strN,
-            version: obj.strN,
-        }
+export default {
+    name: "SimpleLayout",
+    props: {
+        title: obj.strN,
+        description: obj.strN,
+        version: obj.strN,
+        isAnonymousPage: obj.boolN
     }
+}
 
 </script>
 

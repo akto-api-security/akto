@@ -1,9 +1,14 @@
 package com.akto.filter;
 
 import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
+import com.akto.dto.User;
+import com.akto.listener.RuntimeListener;
 import com.akto.utils.HttpUtils;
+import org.mortbay.jetty.servlet.AbstractSessionManager;
 
 import java.io.IOException;
 
@@ -17,8 +22,13 @@ public class SecurityHeadersFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
+        HttpServletRequest httpServletRequest= (HttpServletRequest) request;
+        HttpSession session = httpServletRequest.getSession();
+        String user = (String) session.getAttribute("username");
 
-        httpServletResponse.addHeader("X-Frame-Options", "deny");
+//        if (!RuntimeListener.ANONYMOUS_EMAIL.equals(user)) {
+//            httpServletResponse.addHeader("X-Frame-Options", "deny");
+//        }
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
