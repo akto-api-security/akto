@@ -15,6 +15,7 @@ const state = {
     latestTestingRuns: []
 }
 
+const MAX_SEVERITY_THRESHOLD = 100000;
 
 function getOrderPriority(state){
     switch(state._name){
@@ -49,7 +50,7 @@ function getTotalSeverity(countIssues){
     if(countIssues==null){
         return 0;
     }
-    ts = countIssues['High']*1000*1000 + countIssues['Medium']*1000 + countIssues['Low']
+    ts = MAX_SEVERITY_THRESHOLD*(countIssues['High']*MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
     return ts;
 }
 

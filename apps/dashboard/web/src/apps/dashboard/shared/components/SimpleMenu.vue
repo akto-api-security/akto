@@ -160,7 +160,7 @@ export default {
             font-family: Poppins, sans-serif !important;
             padding: 12px 16px;
             border-radius: 7px 7px 0px 0px;
-            background: var(--themeColorDark22);
+            background: var(--themeColorDark21);
             font-size: 14px;
             font-weight: 500;
             color: var(--themeColorDark);

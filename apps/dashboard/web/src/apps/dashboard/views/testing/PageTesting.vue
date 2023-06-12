@@ -1,6 +1,6 @@
 <template>
     <layout-with-tabs title="API Testing" class="page-testing"
-        :tabs='["Table","Test results", "User config", "Roles", "Rate Limit"]' :tab="tab" :disableHash="true">
+        :tabs='["Test results new","Test results", "User config", "Roles", "Rate Limit"]' :tab="tab" :disableHash="true">
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -130,7 +130,7 @@
                 <log-fetch />
             </div>
         </template>
-        <template slot="Table">
+        <template slot="Test results new">
             <github-table :headers="tableHeaders" :items="latestTestingRuns" :actions="actions" @actionsClicked="computeTestActions">
                 <template #severity_1="{item}">
                     <template v-for="(val,index) in item">

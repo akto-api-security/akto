@@ -151,7 +151,7 @@ export default {
         },
         itemClicked(item){
             this.clearFilterValue = false
-            if(item.item.header && item.item.header.showSort){
+            if(item.item.header?.showSort){
                 return item.item
             }
             return item
