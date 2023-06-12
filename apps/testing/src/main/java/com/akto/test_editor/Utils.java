@@ -1,15 +1,11 @@
 package com.akto.test_editor;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dto.RawApi;
-import com.akto.dto.type.RequestTemplate;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
