@@ -197,9 +197,7 @@ public class TestEditorEnums {
         MODIFY_METHOD,
         FOLLOW_REDIRECT,
         REMOVE_AUTH_HEADER,
-        REPLACE_AUTH_HEADER,
-        MODIFY_ALL_BODY_PARAMS,
-        MODIFY_ALL_QUERY_PARAMS
+        REPLACE_AUTH_HEADER
     }
 
     public enum NonTerminalExecutorDataOperands {
