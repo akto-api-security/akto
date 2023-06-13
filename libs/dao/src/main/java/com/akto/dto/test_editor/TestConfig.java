@@ -1,5 +1,7 @@
 package com.akto.dto.test_editor;
 
+import com.akto.util.enums.GlobalEnums;
+
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +20,9 @@ public class TestConfig {
     private ExecutorConfigParserResult execute;
 
     private ConfigParserResult validation;
+    private String content;
+    private GlobalEnums.YamlTemplateSource templateSource;
+    private int updateTs;
 
     private Metadata metadata;
 
@@ -92,11 +97,36 @@ public class TestConfig {
         this.validation = validation;
     }
 
+<<<<<<< HEAD
     public Metadata getMetadata() {
         return metadata;
     }
 
     public void setMetadata(Metadata metadata) {
         this.metadata = metadata;
+=======
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public GlobalEnums.YamlTemplateSource getTemplateSource() {
+        return templateSource;
+    }
+
+    public void setTemplateSource(GlobalEnums.YamlTemplateSource templateSource) {
+        this.templateSource = templateSource;
+    }
+
+    public int getUpdateTs() {
+        return updateTs;
+    }
+
+    public void setUpdateTs(int updateTs) {
+        this.updateTs = updateTs;
+>>>>>>> feature/test_editor_files_github_sync
     }
 }

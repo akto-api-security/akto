@@ -1,5 +1,7 @@
 package com.akto.dto.test_editor;
 
+import com.akto.util.enums.GlobalEnums;
+
 public class YamlTemplate {
 
     private String id;
@@ -7,6 +9,8 @@ public class YamlTemplate {
     public static final String CREATED_AT = "createdAt";
     private String author;
     public static final String AUTHOR = "author";
+    private GlobalEnums.YamlTemplateSource source;
+    public static final String SOURCE = "source";
     private int updatedAt;
     public static final String UPDATED_AT = "updatedAt";
     private String content;
@@ -105,5 +109,16 @@ public class YamlTemplate {
 
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+    
+    public GlobalEnums.YamlTemplateSource getSource() {
+        if (source == null) {
+            source = GlobalEnums.YamlTemplateSource.AKTO_TEMPLATES;
+        }
+        return source;
+    }
+
+    public void setSource(GlobalEnums.YamlTemplateSource source) {
+        this.source = source;
     }
 }

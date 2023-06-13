@@ -92,7 +92,12 @@ const testing = {
         },
         addAuthMechanism({commit}, {type, requestData, authParamData}) {
             return api.addAuthMechanism(type, requestData, authParamData).then(resp => {
-                commit('SAVE_AUTH_MECHANISM', resp)
+
+            })
+        },
+        addTestTemplate({commit},{content, originalTestId}) {
+            return api.addTestTemplate(content, originalTestId).then(resp => {
+                return resp
             })
         },
         loadTestingRunResults({commit}) {
