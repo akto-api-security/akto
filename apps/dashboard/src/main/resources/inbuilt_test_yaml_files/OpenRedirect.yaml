@@ -67,3 +67,6 @@ validate:
       value:
         contains_either:
           - evil.com
+metadata:
+  minAktoVersion: 1.29.1
+  minOnpremVersion: 1.30.8

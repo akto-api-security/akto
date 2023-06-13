@@ -51,3 +51,6 @@ validate:
     lt: 300
   url:
     endpoint_in_traffic_context: false
+metadata:
+  minAktoVersion: 1.29.1
+  minOnpremVersion: 1.30.8

@@ -28,6 +28,7 @@ import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
+import com.akto.dto.test_editor.Metadata;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
@@ -46,9 +47,11 @@ import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.DashboardVersion;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.itextpdf.text.Meta;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -898,7 +901,7 @@ public class InitializerListener implements ServletContextListener {
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
             enableNewMerging(backwardCompatibility);
-            loadTemplateFilesFromDirectory(backwardCompatibility);
+            //loadTemplateFilesFromDirectory(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -926,6 +929,8 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            //remove later
+            updateTestEditorTemplatesFromGithub();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -1041,9 +1046,13 @@ public class InitializerListener implements ServletContextListener {
 
         GithubSync githubSync = new GithubSync();
         Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", yamlTemplatesGithubFileSha);
-
+        
         if (templates != null) {
             for (GithubFile template : templates.values()) {
+                if (template == null) {
+                    continue;
+                }
+
                 String templateContent = template.getContent();
                 String fileName = template.getName();
                 String sha = template.getSha();
@@ -1056,14 +1065,47 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName(), e.toString()), LogDb.DASHBOARD);
                 }
 
-
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
                 } else {
+                    Metadata metadata = testConfig.getMetadata();
+
+                    // Skip template if metadata field is empty
+                    if (metadata == null) {
+                        continue;
+                    }
+
+                    // Get deployment type and the appropriate template version
+                    String templateMinimumAktoVersion = null;
+
+                    if (DashboardMode.isLocalDeployment()) {
+                        templateMinimumAktoVersion = metadata.getMinAktoVersion();
+                    } else {
+                        templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
+                    }
+
+                    // Ignore template if templateMinimumAktoVersion is not a semantic version string
+                    if(!DashboardVersion.isSemanticVersionString(templateMinimumAktoVersion)) {
+                        logger.info(String.format("Template %s has malformatted akto version specified.", fileName));
+                        continue;
+                    }
+
+                    // Get dashboard version
+                    String dashboardVersion = DashboardVersion.getDashboardVersion();
+
+                    // Check if updated template is not supported by dashboard
+                    if (DashboardVersion.isSemanticVersionString(dashboardVersion)) {
+                        if (DashboardVersion.compareVersions(templateMinimumAktoVersion, dashboardVersion) > 0) {
+                            logger.info(String.format("Updated Template %s requires minimum akto version %s, skipping update.", fileName, templateMinimumAktoVersion));
+                            continue;
+                        } 
+                    } 
+
                     String id = testConfig.getId();
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
                     String author = "AKTO";
+                    Boolean isActive = metadata.getIsActive();
                     
                     YamlTemplateDao.instance.updateOne(
                         Filters.eq("_id", id),
@@ -1074,9 +1116,33 @@ public class InitializerListener implements ServletContextListener {
                                 Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                 Updates.set(YamlTemplate.CONTENT, templateContent),
                                 Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-                                Updates.set(YamlTemplate.SHA, sha)
+                                Updates.set(YamlTemplate.SHA, sha),
+                                Updates.set(YamlTemplate.IS_ACTIVE, isActive)
                         )
                     );
+                }
+            }
+
+            // Set templates to inactive if not present in Github
+            Set<String> githubFileNames = templates.keySet();
+
+            for(YamlTemplate yamlTemplate: yamlTemplates) {
+                String id = yamlTemplate.getId();
+                String fileName = yamlTemplate.getFileName();
+
+                if (!githubFileNames.contains(fileName)) {
+                    logger.info(String.format("%s not present in Github, marking as inactive", fileName));
+
+                    int updatedAt = Context.now();
+                    Boolean isActive = false;
+
+                    YamlTemplateDao.instance.updateOne(
+                            Filters.eq("_id", id),
+                            Updates.combine(
+                                    Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                    Updates.set(YamlTemplate.IS_ACTIVE, isActive)
+                            )
+                        );
                 }
             }
         }
@@ -1122,14 +1188,22 @@ public class InitializerListener implements ServletContextListener {
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s", fileName), LogDb.DASHBOARD);
                 } else {
-                    //todo: Store template only if is_active is true
+
                     String id = testConfig.getId();
+                    
+                    Metadata metadata = testConfig.getMetadata();
+                    Boolean isActive = true;
+
+                    if (metadata != null) {
+                        isActive = metadata.getIsActive();
+                    } 
+
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
                     String author = "AKTO";
                     String sha = "0";
 
-                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha, fileName);
+                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha, fileName, isActive);
                     YamlTemplateDao.instance.insertOne(yamlTemplate);
                 }
             }
