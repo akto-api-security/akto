@@ -182,10 +182,12 @@
                                 </template>
                                 <v-list>
                                     <v-list-item @click="resetSampleData()">
-                                        <v-list-item-title>Sample data<v-icon v-if="selectedAnonymousOption == 'Sample data'">$fas_check</v-icon></v-list-item-title>
+                                        <v-list-item-title>Sample data<v-icon
+                                                v-if="selectedAnonymousOption == 'Sample data'">$fas_check</v-icon></v-list-item-title>
                                     </v-list-item>
                                     <v-list-item @click="(customSampleDataDialogBox = true)">
-                                        <v-list-item-title>Copy/paste data<v-icon v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon></v-list-item-title>
+                                        <v-list-item-title>Copy/paste data<v-icon
+                                                v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon></v-list-item-title>
                                     </v-list-item>
                                     <v-list-item href="https://app.akto.io/login" target="_blank">
                                         <v-list-item-title color="var(--themeColor)">Add automated
@@ -249,8 +251,7 @@
          testing your APIs. Sign up for Akto today and start using them!"
             @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal>
         <custom-sample-data-api-modal title="Add your own API" :parentDialog="customSampleDataDialogBox"
-         @closeCustomSampleDataDialog="(customSampleDataDialogBox = false)"
-         @setSampleDataApi="setSampleDataApi">
+            @closeCustomSampleDataDialog="(customSampleDataDialogBox = false)" @setSampleDataApi="setSampleDataApi">
         </custom-sample-data-api-modal>
     </div>
 </template>
@@ -312,7 +313,7 @@ export default {
             editorOptions: {
                 language: "yaml",
                 minimap: { enabled: false },
-                wordWrap: true, 
+                wordWrap: true,
                 automaticLayout: true,
                 colorDecorations: true,
                 scrollBeyondLastLine: false
@@ -372,8 +373,8 @@ export default {
                     this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
                     this.sampleDataListForTestRun = resp.sampleDataList
                 }
-                this.selectedAnonymousOption = 'Copy/paste data'
             })
+            this.selectedAnonymousOption = 'Copy/paste data'
         },
         findTestLabelFromTestValue(testValue) {
             let aktoTest = Object.values(this.testsObj).map(x => x.all).flat().find(x => x.value === testValue)
@@ -467,38 +468,73 @@ export default {
             }
         },
         async makeJson() {
-            await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
-                if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
-                    this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
-                    this.sampleDataListForTestRun = resp.sampleDataList
-                }
-            })
+            if (this.isAnonymousPage) {
+                await request({
+                    url: '/tools/fetchSampleData',
+                    method: 'POST',
+                    data: {
+                        url: this.selectedUrl.url,
+                        apiCollectionId: this.selectedUrl.apiCollectionId,
+                        method: this.selectedUrl.method
+                    }
+                }).then((resp) => {
+                    if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
+                        this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
+                        this.sampleDataListForTestRun = resp.sampleDataList
+                    }
+                })
+            } else {
+                await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
+                    if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
+                        this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
+                        this.sampleDataListForTestRun = resp.sampleDataList
+                    }
+                })
+            }
         },
         async runTestForGivenTemplate() {
             this.runTest = true
             let testStartTime = new Date()
             this.runTestObj.isLoading = true
-            await testingApi.runTestForTemplate(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
-                this.testingRunResult = resp["testingRunResult"]
-                this.testingRunHexId = resp["testingRunHexId"]
-                this.dialogBoxIssue = resp["testingRunIssues"]
-                this.subCatogoryMap = resp["subCategoryMap"]
+            if (this.isAnonymousPage) {
+                await testingApi.runTestForTemplateAnonymous(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
+                    debugger
+                    this.testingRunResult = resp["testingRunResult"]
+                    this.testingRunHexId = resp["testingRunHexId"]
+                    this.dialogBoxIssue = resp["testingRunIssues"]
+                    this.subCatogoryMap = resp["subCategoryMap"]
 
-                if (this.dialogBoxIssue) {
-                    this.runTestObj.vulnerability = this.dialogBoxIssue.severity
-                    this.runTestObj.isLoading = false
-                } else {//No issues found
-                    this.runTestObj.vulnerability = "No "
-                    this.runTestObj.isLoading = false
-                }
-                this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
-            })
+                    if (this.dialogBoxIssue) {
+                        this.runTestObj.vulnerability = this.dialogBoxIssue.severity
+                        this.runTestObj.isLoading = false
+                    } else {//No issues found
+                        this.runTestObj.vulnerability = "No "
+                        this.runTestObj.isLoading = false
+                    }
+                    this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
+                })
+            } else {
+                await testingApi.runTestForTemplate(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
+                    this.testingRunResult = resp["testingRunResult"]
+                    this.testingRunHexId = resp["testingRunHexId"]
+                    this.dialogBoxIssue = resp["testingRunIssues"]
+                    this.subCatogoryMap = resp["subCategoryMap"]
+
+                    if (this.dialogBoxIssue) {
+                        this.runTestObj.vulnerability = this.dialogBoxIssue.severity
+                        this.runTestObj.isLoading = false
+                    } else {//No issues found
+                        this.runTestObj.vulnerability = "No "
+                        this.runTestObj.isLoading = false
+                    }
+                    this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
+                })
+            }
         },
         showAllAttempts() {
             this.dialogBox = true
         },
         saveTestTemplate() {
-            debugger
             if (this.IsEdited) {
                 this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp) => {
                     window._AKTO.$emit('SHOW_SNACKBAR', {
@@ -651,24 +687,39 @@ export default {
         },
         async refreshTestTemplates() {
             let _this = this
-            await issuesApi.fetchAllSubCategories().then(resp => {
-                _this.testCategories = resp.categories
-                _this.businessLogicSubcategories = resp.subCategories
-                _this.vulnerableRequests = resp.vulnerableRequests
-                _this.testsObj = _this.populateMapCategoryToSubcategory()
-                _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
-                _this.mapRequests()
-            })
+            if (this.isAnonymousPage) {
+                await request({
+                    url: '/tools/fetchAllSubCategories',
+                    method: 'POST',
+                    data: {}
+                }).then(resp => {
+                    _this.testCategories = resp.categories
+                    _this.businessLogicSubcategories = resp.subCategories
+                    _this.vulnerableRequests = resp.vulnerableRequests
+                    _this.testsObj = _this.populateMapCategoryToSubcategory()
+                    _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
+                    _this.mapRequests()
+                })
+            } else {
+                await issuesApi.fetchAllSubCategories().then(resp => {
+                    _this.testCategories = resp.categories
+                    _this.businessLogicSubcategories = resp.subCategories
+                    _this.vulnerableRequests = resp.vulnerableRequests
+                    _this.testsObj = _this.populateMapCategoryToSubcategory()
+                    _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
+                    _this.mapRequests()
+                })
+            }
+
         }
     },
     async mounted() {
-        if (this.isAnonymousPage) {
-            await request({
-                url: '/tools/publicApi',
-                method: 'GET'
-            })
-        }
-        debugger
+        // if (this.isAnonymousPage) {
+        //     await request({
+        //         url: '/tools/publicApi',
+        //         method: 'GET'
+        //     })
+        // }
         this.createEditor()
         let _this = this
         await this.refreshTestTemplates()
