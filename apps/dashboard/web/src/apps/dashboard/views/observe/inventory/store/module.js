@@ -185,8 +185,9 @@ const inventory = {
                 return resp
             })
         },
-        uploadHarFile({commit,state},{content,filename, skipKafka}) {
-            return api.uploadHarFile(content,state.apiCollectionId,skipKafka).then(resp => {
+        uploadHarFile({commit,state},{formData}) {
+            formData.append("apiCollectionId",state.apiCollectionId);
+            return api.uploadHarFile(formData).then(resp => {
                 return resp
             })
         },

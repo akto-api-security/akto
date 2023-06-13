@@ -9,6 +9,7 @@
     <constant name="struts.mapper.alwaysSelectFullNamespace" value="false"/>
     <constant name="struts.patternMatcher" value="regex" />
     <constant name="struts.matcher.appendNamedParameters" value="true"/>
+    <constant name="struts.multipart.maxSize" value = "209715200" />
 
     <package name="user" namespace="" extends="struts-default, json-default">
         <default-action-ref name="home" />
