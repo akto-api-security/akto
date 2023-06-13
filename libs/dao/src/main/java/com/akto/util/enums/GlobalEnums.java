@@ -5,7 +5,8 @@ public class GlobalEnums {
 
     public enum TestErrorSource { // Whether issue came from runtime or automated testing via dashboard
         AUTOMATED_TESTING("testing"),
-        RUNTIME("runtime");
+        RUNTIME("runtime"),
+        TEST_EDITOR("test_editor");
 
         private final String name;
 
@@ -31,7 +32,12 @@ public class GlobalEnums {
         ILM("ILM", Severity.HIGH, "Insufficient Logging & Monitoring (ILM)", "Insufficient Logging and Monitoring"),
         SM("SM", Severity.HIGH, "Security Misconfiguration (SM)", "Misconfiguration"),
         SSRF("SSRF", Severity.HIGH, "Server Side Request Forgery (SSRF)", "Server Side Request Forgery"),
-        UC("UC", Severity.HIGH, "Uncategorized (UC)", "Uncategorized");
+        UC("UC", Severity.HIGH, "Uncategorized (UC)", "Uncategorized"),
+        UHM("UHM", Severity.LOW, "Unnecessary HTTP Methods (UHM)", "Unnecessary HTTP Methods"),
+        VEM("VEM", Severity.LOW, "Verbose Error Messages (VEM)", "Verbose Error Messages"),
+        MHH("MHH", Severity.LOW, "Misconfigured HTTP Headers (MHH)", "Misconfigured HTTP Headers"),
+        SVD("SVD", Severity.LOW, "Server Version Disclosure (SVD)", "Server Version Disclosure");
+
         private final String name;
         private final Severity severity;
         private final String displayName;
@@ -86,6 +92,12 @@ public class GlobalEnums {
         OPEN,
         IGNORED,
         FIXED
+    }
+
+    /* YamlTemplate source enum */
+    public enum YamlTemplateSource {
+        AKTO_TEMPLATES,
+        CUSTOM
     }
 
 

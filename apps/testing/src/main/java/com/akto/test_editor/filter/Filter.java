@@ -70,11 +70,11 @@ public class Filter {
         for (int i = 0; i < childNodes.size(); i++) {
             FilterNode childNode = childNodes.get(i);
             dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId);
-            if (!dataOperandsFilterResponse.getResult()) {
-                loggerMaker.infoAndAddToDb("invalid node condition " + logId + " operand " + childNode.getOperand() + 
-                " concernedProperty " + childNode.getConcernedProperty() + " subConcernedProperty " + childNode.getSubConcernedProperty()
-                + " contextProperty " + childNode.getContextProperty() + " context " + context, LogDb.TESTING);
-            }
+            // if (!dataOperandsFilterResponse.getResult()) {
+            //     loggerMaker.infoAndAddToDb("invalid node condition " + logId + " operand " + childNode.getOperand() + 
+            //     " concernedProperty " + childNode.getConcernedProperty() + " subConcernedProperty " + childNode.getSubConcernedProperty()
+            //     + " contextProperty " + childNode.getContextProperty() + " context " + context, LogDb.TESTING);
+            // }
             contextEntities = dataOperandsFilterResponse.getContextEntities();
             result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
             
