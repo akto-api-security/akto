@@ -1,12 +1,17 @@
 <template>
     <div>
         <div class="layout-border pl-8" style="padding-bottom: 12px">
-            <div v-if="title" class="pt-6">
+            <div v-if="title" :class="['pt-6', version && version.length > 0 ? 'version-class': '']">
                 <div>
                     <span class="board-name">{{ title || 'Loading...' }}</span>
                 </div>
+    
                 <div v-if="description">
                     <span class="board-description">{{description}}</span>
+                </div>
+
+                <div v-if="version && version.length > 0" class="version-name">
+                    {{ version }}
                 </div>
             </div>
             <div v-else>
@@ -26,7 +31,8 @@
         name: "SimpleLayout",
         props: {
             title: obj.strN,
-            description: obj.strN
+            description: obj.strN,
+            version: obj.strN,
         }
     }
 
@@ -46,4 +52,18 @@
     padding-top: 4px
 .layout-border
     border-bottom: 1px solid var(--themeColorDark16)
+.version-class
+    display: flex
+    gap: 12px
+    align-items: center
+.version-name
+    display: flex
+    align-items: center
+    font-size: 14px
+    color: var(--themeColor)
+    border: 1px solid
+    border-radius: 4px
+    padding: 0 4px
+    font-weight: 500
+    
 </style>

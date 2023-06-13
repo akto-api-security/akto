@@ -1,7 +1,58 @@
 <template>
     <div>
-    <div class="d-flex">
-        <div class="flex-equal" >
+        <div v-if="tabularDisplay">
+            <layout-with-tabs :tabs="['Request', 'Response']" class="req-resp-tab" :disableHash="!!disableHash">
+                <template slot="Request">
+                    <sample-single-side
+                        :title="requestTitle" 
+                        :firstLine='requestFirstLine'
+                        :firstLineToolTipValue="requestFirstLineToolTipValue"
+                        :headers="{}" 
+                        :data="requestJson"
+                        :complete-data="json['message']"
+                        :simpleCopy="false"
+                        style="margin: 8px"
+                    />
+                    <div class="d-flex jc-end" :style="{'margin' :'24px 36px 0 0'}">
+                        <v-btn 
+                            class="run-btn" primary dense dark color="var(--themeColor)" 
+                            @click="$emit('run_tests')" 
+                            :disabled="isLoading"
+                            :style="isLoading ? {'background' : 'var(--themeColor) !important', color: 'var(--white) !important'} : {}"
+                        >
+                            <spinner v-if="isLoading" :style="{'color' : 'white !important' , 'margin-right' : '8px'}"/>
+                            <v-icon v-else size=16>$fas_play</v-icon>
+                            Run Test
+                        </v-btn>
+                    </div>
+                </template>
+                <template slot="Response">
+                    <sample-single-side               
+                        :title="responseTitle" 
+                        :firstLine='responseFirstLine' 
+                        :headers="{}" 
+                        :data="responseJson"
+                        :simpleCopy="true"
+                        :complete-data="json['message']"
+                        style="margin: 8px"
+                    />
+                    <div class="d-flex jc-end" :style="{'margin' :'24px 36px 0 0'}">
+                        <v-btn 
+                            class="run-btn" primary dense dark color="var(--themeColor)" 
+                            @click="$emit('run_tests')" 
+                            :disabled="isLoading"
+                            :style="isLoading ? {'background' : 'var(--themeColor) !important', color: 'var(--white) !important'} : {}"
+                        >
+                            <spinner v-if="isLoading" :style="{'color' : 'white !important' , 'margin-right' : '8px'}"/>
+                            <v-icon v-else size=16>$fas_play</v-icon>
+                            Run Test
+                        </v-btn>
+                    </div>
+                </template>
+            </layout-with-tabs>
+        </div>
+        <div class="d-flex" v-else>
+        <div class="flex-equal">
             <sample-single-side
                 :title="requestTitle" 
                 :firstLine='requestFirstLine'
@@ -33,20 +84,23 @@ import obj from "@/util/obj"
 import api from "../api"
 
 import SampleSingleSide from './SampleSingleSide'
+import LayoutWithTabs from '../../layouts/LayoutWithTabs.vue'
+import Spinner from "./Spinner.vue"
 
 export default {
     name: "SampleData",
     components: {
-        SampleSingleSide
+        SampleSingleSide,
+        LayoutWithTabs,
+        Spinner
     },
     props: {
         json: obj.objR,
         requestTitle: obj.ObjR,
-        responseTitle: obj.ObjR
-    },
-    data () {
-        return {
-        }
+        responseTitle: obj.ObjR,
+        tabularDisplay: obj.boolN,
+        isLoading: obj.boolN,
+        disableHash: obj.boolN
     },
     computed: {
         requestFirstLine: function() {
@@ -184,9 +238,22 @@ export default {
     }
 }
 </script>
-
-<style lang="sass" scoped>
-.flex-equal
-    width: 50%
+<style scoped>
+.flex-equal{
+    width: 50%;
+}
+.req-resp-tab >>> .active-tab{
+    color: var(--themeColor) !important;
+}
+.req-resp-tab >>> .control-padding{
+    padding-top: 8px !important;
+}
+.run-btn {
+    box-shadow: none !important;
+    display: flex;
+    width: 120px;
+    align-items: center;
+    gap: 8px;
+}
 
 </style>

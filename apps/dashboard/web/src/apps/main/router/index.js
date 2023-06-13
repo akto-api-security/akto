@@ -24,6 +24,7 @@ const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes"
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
+const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
 
 Vue.use(Router)
 
@@ -236,6 +237,18 @@ const router =  new Router({
                             })
                         }
                     ]                    
+                },
+                {
+                    path: 'test-editor',
+                    redirect: '/dashboard/test-editor/REMOVE_TOKENS'
+                },
+                {
+                    path: 'test-editor/:testId',
+                    name: 'test-editor-id',
+                    component: TextEditor,
+                    props: route => ({
+                        defaultTestId: decodeURIComponent(route.params.testId)
+                    })    
                 }
             ]
         },
