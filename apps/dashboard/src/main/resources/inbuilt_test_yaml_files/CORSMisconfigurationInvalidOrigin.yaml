@@ -39,7 +39,7 @@ execute:
   requests:
     - req:
       - add_header:
-          origin:  ${cors_origin}
+          origin:  ${invalid_cors_origin}
 
 validate:
   response_code:
@@ -51,7 +51,7 @@ validate:
           key:
             contains: access-control-allow-origin
           value:
-            contains: ${cors_origin}
+            contains: ${invalid_cors_origin}
       - for_one:
           key:
             contains: access-control-allow-credentials

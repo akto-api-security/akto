@@ -39,6 +39,7 @@ api_selection_filters:
   query_param:
     for_one:
       key:
+        regex: .*
         extract: query_param_key
 
 

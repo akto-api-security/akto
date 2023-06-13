@@ -44,7 +44,7 @@ execute:
   requests:
     - req:
         - add_header: 
-          x-forwarded-for: "127.0.0.1"
+            x-forwarded-for: "127.0.0.1"
 
 validate:
   response_code:

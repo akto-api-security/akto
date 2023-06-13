@@ -27,10 +27,10 @@ api_selection_filters:
     lt: 300
   method:
     contains_either:
-      - "POST"
-      - "PUT"
-      - "PATCH"
-      - "DELETE"
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
   request_headers:
     for_one:
       key:
