@@ -97,14 +97,14 @@ public class TestConfig {
         this.validation = validation;
     }
 
-<<<<<<< HEAD
     public Metadata getMetadata() {
         return metadata;
     }
 
     public void setMetadata(Metadata metadata) {
         this.metadata = metadata;
-=======
+    }
+    
     public String getContent() {
         return content;
     }
@@ -127,6 +127,5 @@ public class TestConfig {
 
     public void setUpdateTs(int updateTs) {
         this.updateTs = updateTs;
->>>>>>> feature/test_editor_files_github_sync
     }
 }
