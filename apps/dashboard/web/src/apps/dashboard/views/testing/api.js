@@ -91,9 +91,18 @@ export default {
             return resp
         })
     },
+    runTestForTemplateAnonymous(content, apiInfoKey, sampleDataList) {
+        return request({
+            url: '/tools/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
     setCustomSampleApi(sampleRequestString, sampleResponseString) {
         return request({
-            url: '/api/createSampleDataJson',
+            url: '/tools/createSampleDataJson',
             method: 'post',
             data:{sampleRequestString, sampleResponseString}
         }).then((resp) => {
