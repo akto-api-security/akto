@@ -51,11 +51,11 @@ validate:
     and:
       - for_one:
           key:
-            contains: access-control-allow-origin
+            contains_either: access-control-allow-origin
           value:
-            contains: ${host_val}.evil.com
+            contains_either: ${host_val}.evil.com
       - for_one:
           key:
-            contains: access-control-allow-credentials
+            contains_either: access-control-allow-credentials
           value:
-            contains: true
+            contains_either: true

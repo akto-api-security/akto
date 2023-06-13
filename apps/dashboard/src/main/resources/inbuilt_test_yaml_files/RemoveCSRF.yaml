@@ -29,17 +29,17 @@ api_selection_filters:
     - request_headers:
         for_one:
           key:
-            contains: csrf
+            contains_either: csrf
             extract: csrf_key
     - request_payload:
         for_one:
           key:
-            contains: csrf
+            contains_either: csrf
             extract: csrf_key
     - query_param:
         for_one:
           key:
-            contains: csrf
+            contains_either: csrf
             extract: csrf_key
 
 execute:

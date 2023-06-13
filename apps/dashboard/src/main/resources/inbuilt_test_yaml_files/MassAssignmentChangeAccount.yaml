@@ -44,7 +44,7 @@ api_selection_filters:
   request_payload:
     for_one:
       key:
-        not_contains: ${account_key}
+        not_contains_either: ${account_key}
 
   param_context:
     param: ${account_key}

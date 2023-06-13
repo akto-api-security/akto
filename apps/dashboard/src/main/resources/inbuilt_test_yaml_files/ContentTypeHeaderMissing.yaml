@@ -47,4 +47,4 @@ validate:
   response_headers:
     for_one:
       key:
-        not_contains: Content-Type
+        not_contains_either: Content-Type

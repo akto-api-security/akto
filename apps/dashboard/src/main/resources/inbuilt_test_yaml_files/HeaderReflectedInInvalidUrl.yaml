@@ -50,4 +50,4 @@ execute:
 
 validate:
   response_payload:
-    contains: akto
+    contains_either: akto

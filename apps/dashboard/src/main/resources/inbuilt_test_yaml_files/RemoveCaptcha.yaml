@@ -29,17 +29,17 @@ api_selection_filters:
     - request_headers:
         for_one:
           key:
-            contains: captcha
+            contains_either: captcha
             extract: captcha_key
     - request_payload:
         for_one:
           key:
-            contains: captcha
+            contains_either: captcha
             extract: captcha_key
     - query_param:
         for_one:
           key:
-            contains: captcha
+            contains_either: captcha
             extract: captcha_key
 
 execute:

@@ -44,7 +44,7 @@ api_selection_filters:
   request_payload:
     for_one:
       key:
-        not_contains: ${role_key}
+        not_contains_either: ${role_key}
 
   param_context:
     param: ${role_key}

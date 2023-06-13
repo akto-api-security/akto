@@ -49,11 +49,11 @@ validate:
     and:
       - for_one:
           key:
-            contains: access-control-allow-origin
+            contains_either: access-control-allow-origin
           value:
-            contains: ${invalid_cors_origin}
+            contains_either: ${invalid_cors_origin}
       - for_one:
           key:
-            contains: access-control-allow-credentials
+            contains_either: access-control-allow-credentials
           value:
-            contains: true
+            contains_either: true
