@@ -16,7 +16,7 @@
                     </div>
                 </div>
                 <div v-if="isAnonymousPage" class="mt-6">
-                    <v-btn primary dark depressed color="var(--themeColor)" >
+                    <v-btn primary dark depressed color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
                         Try on your APIs
                         <v-icon size="10">$fas_external-link-alt</v-icon>
                     </v-btn>
