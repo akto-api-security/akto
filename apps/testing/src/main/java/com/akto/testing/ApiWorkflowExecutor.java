@@ -386,7 +386,7 @@ public class ApiWorkflowExecutor {
                     Thread.sleep(sleep);
                 }
 
-                response = ApiExecutor.sendRequest(request, followRedirects);
+                response = ApiExecutor.sendRequest(request, followRedirects, null);
 
                 int statusCode = response.getStatusCode();
 
