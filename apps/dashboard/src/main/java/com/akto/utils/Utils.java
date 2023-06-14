@@ -26,6 +26,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -49,6 +52,15 @@ public class Utils {
             result.put(variable.get("key").asText(), variable.get("value").asText());
         }
         return result;
+    }
+
+    public static boolean isValidURL(String url) {
+        try {
+            new URL(url).toURI();
+            return true;
+        } catch (MalformedURLException | URISyntaxException e) {
+            return false;
+        }
     }
 
     public static String replaceVariables(String payload, Map<String, String> variableMap) {
@@ -117,7 +129,7 @@ public class Utils {
 
                     OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
                     try {
-                        OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
+                        OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null);
                         responseHeadersString = convertHeaders(res.getHeaders());
                         responsePayload =  res.getBody();
                         statusCode =  res.getStatusCode()+"";
