@@ -29,7 +29,7 @@ public class CustomAuthUtilTest extends MongoBasedTest{
 
     @Test
     public void test1(){
-        ApiInfo apiInfo = new ApiInfo(ACCOUNT_ID, "/api", Method.POST);
+        ApiInfo apiInfo =  new ApiInfo(ACCOUNT_ID, "/api", Method.POST);
         Set<Set<ApiInfo.AuthType>> authTypes = new HashSet<>();
         Set<ApiInfo.AuthType> types = new HashSet<>();
         types.add(ApiInfo.AuthType.UNAUTHENTICATED);
