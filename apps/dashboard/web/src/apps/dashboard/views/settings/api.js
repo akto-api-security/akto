@@ -230,6 +230,14 @@ export default {
                 "currentState": aktoConfigList
             }
         })
+    },
+
+    resetAllCustomAuthTypes() {
+        return request({
+            url: '/api/resetAllCustomAuthTypes',
+            method: 'post',
+            data: {}
+        })
     }
 
 }
