@@ -198,7 +198,7 @@ public class Utils {
         if(mode.equals("file")){
             return bodyNode.get("file").get("src").asText();
         }
-        return "";
+        return bodyNode.toPrettyString();
     }
 
     private static String getContentType(JsonNode request, JsonNode response, Map<String, String> responseHeadersMap) {
