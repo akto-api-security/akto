@@ -260,7 +260,7 @@ public class SaveTestEditorAction extends UserAction {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleDataMap, null, null);
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig);
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(0),
