@@ -8,6 +8,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 
 import java.util.Collections;
 
@@ -27,7 +28,9 @@ public abstract class SecurityTestTemplate {
     AuthMechanism authMechanism;
     String logId;
 
-    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId) {
+    TestingRunConfig testingRunConfig;
+
+    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig) {
         this.apiInfoKey = apiInfoKey;
         this.filterNode = filterNode;
         this.validatorNode = validatorNode;
@@ -37,6 +40,7 @@ public abstract class SecurityTestTemplate {
         this.auth = auth;
         this.authMechanism = authMechanism;
         this.logId = logId;
+        this.testingRunConfig = testingRunConfig;
     }
 
     public abstract boolean filter();

@@ -6,6 +6,7 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -46,15 +47,19 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
+    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
 
-        calculateDefaultPayloads(sampleDataMap);
-        fillResult(sampleDataMap);
+        loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
+
+        calculateDefaultPayloads(sampleDataMap, testingRunConfig);
+
+        loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
+        fillResult(sampleDataMap, testingRunConfig);
     }
 
-    public static void calculateDefaultPayloads(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
+    public static void calculateDefaultPayloads(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
         Set<String> hosts = new HashSet<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             String host;
@@ -69,6 +74,7 @@ public class StatusCodeAnalyser {
         }
 
         for (String host: hosts) {
+            loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
             for (int idx=0; idx<11;idx++) {
                 try {
                     String url = host;
@@ -76,7 +82,7 @@ public class StatusCodeAnalyser {
                     if (idx > 0) url += "akto-"+idx; // we want to hit host url once too
 
                     OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
-                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true);
+                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig);
                     boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
                     if (!isStatusGood) continue;
 
@@ -106,7 +112,7 @@ public class StatusCodeAnalyser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
-    public static void fillResult(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
+    public static void fillResult(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
         loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
@@ -137,7 +143,7 @@ public class StatusCodeAnalyser {
                 List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
                 boolean success;
                 try {
-                    success = fillFrequencyMap(messages, authMechanism, frequencyMap);
+                    success = fillFrequencyMap(messages, authMechanism, frequencyMap, testingRunConfig);
                 } catch (Exception e) {
                     inc += 1;
                     continue;
@@ -169,7 +175,8 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) throws Exception {
+    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism,
+                                           Map<Set<String>, Map<String,Integer>> frequencyMap, TestingRunConfig testingRunConfig) throws Exception {
 
         // fetch sample message
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
@@ -191,7 +198,7 @@ public class StatusCodeAnalyser {
         if (!result) return false;
 
         // execute API
-        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true);
+        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true, testingRunConfig);
 
         // if non 2xx then skip this api
         if (finalResponse.getStatusCode() < 200 || finalResponse.getStatusCode() >= 300) return false;
