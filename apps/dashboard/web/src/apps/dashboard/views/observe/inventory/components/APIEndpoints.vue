@@ -384,6 +384,14 @@ export default {
                 // of the file in the v-model prop
                 
                 let isHar = file.name.endsWith(".har")
+                if(isHar && file.size >= 52428800){
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: "Please limit the file size to less than 50 MB",
+                        color: 'red'
+                    })
+                    return
+                }
                 let isJson = file.name.endsWith(".json")
                 let isPcap = file.name.endsWith(".pcap")
                 if (isHar || isJson) {
@@ -394,7 +402,46 @@ export default {
                 reader.onload = async () => {
                     let skipKafka = false;//window.location.href.indexOf("http://localhost") != -1
                     if (isHar) {
-                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                        var formData = new FormData();
+                        formData.append("harString", reader.result)
+                        formData.append("hsFile", reader.result)
+                        formData.append("skipKafka", skipKafka)
+                        window._AKTO.$emit('SHOW_SNACKBAR', {
+                            show: true,
+                            text: "We are uploading your har file, please dont refresh the page!",
+                            color: 'green'
+                        })
+                        this.$store.dispatch('inventory/uploadHarFile', { formData }).then(resp => {
+                            if(file.size > 2097152){
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "We have successfully read your file, please refresh the page in a few mins to check your APIs",
+                                    color: 'green'
+                                })
+                            }
+                            else {
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "Your Har file has been successfully processed, please refresh the page to see your APIs",
+                                    color: 'green'
+                                })
+                            }
+                        }).catch(err => {
+                            if(err.message.includes(404)){
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "Please limit the file size to less than 50 MB",
+                                    color: 'red'
+                                })
+                            } else {
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "Something went wrong while processing the file",
+                                    color: 'red'
+                                })
+                            }
+                        })
+
                     } else if (isPcap) {
                         var arrayBuffer = reader.result
                         var bytes = new Uint8Array(arrayBuffer);
@@ -483,16 +530,16 @@ export default {
                 }
             })
         },
-        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests}) {
+        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
             if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
+                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl})
             } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source: "TESTING_UI"})
+                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source: "TESTING_UI"})
             }
             
             this.showTestSelectorDialog = false            

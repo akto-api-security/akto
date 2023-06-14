@@ -15,6 +15,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.testing.ApiExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -24,7 +25,7 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
-    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId, AuthMechanism authMechanism) {
+    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
 
         List<ExecutionResult> result = new ArrayList<>();
         
@@ -54,7 +55,7 @@ public class Executor {
             for (RawApi testReq: testRawApis) {
                 try {
                     // follow redirects = true for now
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect());
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse));
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
@@ -263,24 +264,27 @@ public class Executor {
                 return Operations.modifyMethod(rawApi, key.toString());
             case "remove_auth_header":
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
+                boolean removed = false;
                 for (String header: authHeaders) {
-                    ExecutorSingleOperationResp resp = Operations.deleteHeader(rawApi, header);
-                    if (resp.getErrMsg().contains("header key not present")) {
-                        return new ExecutorSingleOperationResp(false, resp.getErrMsg());
-                    }
+
+                    removed = removed || Operations.deleteHeader(rawApi, header).getErrMsg().isEmpty();
                 }
                 List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
                 for (CustomAuthType customAuthType : customAuthTypes) {
                     List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
                     for (String headerAuthKey: customAuthTypeHeaderKeys) {
-                        Operations.deleteHeader(rawApi, headerAuthKey);
+                        removed = removed || Operations.deleteHeader(rawApi, headerAuthKey).getErrMsg().isEmpty();
                     }
                     List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
                     for (String payloadAuthKey: customAuthTypePayloadKeys) {
-                        Operations.deleteBodyParam(rawApi, payloadAuthKey);
+                        removed = removed || Operations.deleteBodyParam(rawApi, payloadAuthKey).getErrMsg().isEmpty();
                     }
                 }
-                return new ExecutorSingleOperationResp(true, "");
+                if (removed) {
+                    return new ExecutorSingleOperationResp(true, "");
+                } else {
+                    return new ExecutorSingleOperationResp(false, "header key not present");
+                }
             case "replace_auth_header":
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
