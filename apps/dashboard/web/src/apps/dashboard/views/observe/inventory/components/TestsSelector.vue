@@ -147,7 +147,7 @@ export default {
             let currObj = this.mapCategoryToSubcategory[this.selectedCategory]
             currObj.selected = this.globalCheckbox ? [...currObj.all] : []
         },
-        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests}) {
+        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}) {
             if (!this.testName) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -165,7 +165,8 @@ export default {
                 selectedTests, 
                 testRunTime,
                 maxConcurrentRequests,
-                testName: this.testName
+                testName: this.testName,
+                overriddenTestAppUrl
             }
             return this.$emit('testsSelected', ret)
         },
@@ -235,14 +236,16 @@ export default {
 
 .category-list-container
     width: 40%
+    min-width: 40%
+    max-width: 40%
     flex-grow: 0
 
 .test-list
-    height: 400px
+    height: 350px
     overflow: scroll
 
 .category-list
-    height: 400px
+    height: 350px
     overflow: scroll
 
 .column-title

@@ -25,11 +25,13 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -59,6 +61,7 @@ public class StartTestAction extends UserAction {
     private String triggeredBy;
     private boolean isTestRunByTestEditor;
 
+    private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
     private static List<ObjectId> getCicdTests(){
@@ -74,6 +77,15 @@ public class StartTestAction extends UserAction {
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
+
+        if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
+            boolean isValidUrl = Utils.isValidURL(this.overriddenTestAppUrl);
+
+            if (!isValidUrl) {
+                addActionError("The override url is invalid. Please check the url again.");
+                return null;
+            }
+        }
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null && testIdConfig == 0) {
@@ -107,7 +119,7 @@ public class StartTestAction extends UserAction {
                 return null;
         }
         if (this.selectedTests != null) {
-            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId());
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -516,6 +528,14 @@ public class StartTestAction extends UserAction {
 
     public void setIsTestRunByTestEditor(boolean testRunByTestEditor) {
         isTestRunByTestEditor = testRunByTestEditor;
+    }
+
+    public void setOverriddenTestAppUrl(String overriddenTestAppUrl) {
+        this.overriddenTestAppUrl = overriddenTestAppUrl;
+    }
+
+    public String getOverriddenTestAppUrl() {
+        return overriddenTestAppUrl;
     }
 
     public enum CallSource{
