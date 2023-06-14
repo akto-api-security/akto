@@ -95,7 +95,7 @@ public class Utils {
             result.put("requestHeaders", requestHeadersString);
 
             JsonNode bodyNode = request.get("body");
-            String requestPayload = bodyNode != null ?  bodyNode.asText() : "";
+            String requestPayload = extractRequestPayload(bodyNode);
             requestPayload = replaceVariables(requestPayload, variables);
 
             JsonNode responseNode = apiInfo.get("response");
@@ -156,6 +156,49 @@ public class Utils {
             loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
             return null;
         }
+    }
+
+    public static String extractRequestPayload(JsonNode bodyNode) {
+        if(bodyNode == null || bodyNode.isNull()){
+            return "";
+        }
+        String mode = bodyNode.get("mode").asText();
+        if(mode.equals("none")){
+            return "";
+        }
+        if(mode.equals("raw")){
+            return bodyNode.get("raw").asText();
+        }
+        if(mode.equals("formdata")){
+            ArrayNode formdata = (ArrayNode) bodyNode.get("formdata");
+            StringBuilder sb = new StringBuilder();
+            for(JsonNode node : formdata){
+                String type = node.get("type").asText();
+                if(type.equals("file")){
+                    sb.append(node.get("key").asText()).append("=").append(node.get("src").asText()).append("&");
+                } else if(type.equals("text")){
+                    sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
+                }
+            }
+            sb.deleteCharAt(sb.length()-1);
+            return sb.toString();
+        }
+        if(mode.equals("urlencoded")){
+            ArrayNode urlencoded = (ArrayNode) bodyNode.get("urlencoded");
+            StringBuilder sb = new StringBuilder();
+            for(JsonNode node : urlencoded){
+                sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
+            }
+            sb.deleteCharAt(sb.length()-1);
+            return sb.toString();
+        }
+        if(mode.equals("graphql")){
+            return bodyNode.get("graphql").toPrettyString();
+        }
+        if(mode.equals("file")){
+            return bodyNode.get("file").get("src").asText();
+        }
+        return "";
     }
 
     private static String getContentType(JsonNode request, JsonNode response, Map<String, String> responseHeadersMap) {
