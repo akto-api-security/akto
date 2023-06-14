@@ -51,7 +51,11 @@ public class StatusCodeAnalyser {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
 
+        loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
+
         calculateDefaultPayloads(sampleDataMap, testingRunConfig);
+
+        loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
         fillResult(sampleDataMap, testingRunConfig);
     }
 
@@ -70,6 +74,7 @@ public class StatusCodeAnalyser {
         }
 
         for (String host: hosts) {
+            loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
             for (int idx=0; idx<11;idx++) {
                 try {
                     String url = host;

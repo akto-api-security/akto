@@ -264,24 +264,27 @@ public class Executor {
                 return Operations.modifyMethod(rawApi, key.toString());
             case "remove_auth_header":
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
+                boolean removed = false;
                 for (String header: authHeaders) {
-                    ExecutorSingleOperationResp resp = Operations.deleteHeader(rawApi, header);
-                    if (resp.getErrMsg().contains("header key not present")) {
-                        return new ExecutorSingleOperationResp(false, resp.getErrMsg());
-                    }
+
+                    removed = removed || Operations.deleteHeader(rawApi, header).getErrMsg().isEmpty();
                 }
                 List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
                 for (CustomAuthType customAuthType : customAuthTypes) {
                     List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
                     for (String headerAuthKey: customAuthTypeHeaderKeys) {
-                        Operations.deleteHeader(rawApi, headerAuthKey);
+                        removed = removed || Operations.deleteHeader(rawApi, headerAuthKey).getErrMsg().isEmpty();
                     }
                     List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
                     for (String payloadAuthKey: customAuthTypePayloadKeys) {
-                        Operations.deleteBodyParam(rawApi, payloadAuthKey);
+                        removed = removed || Operations.deleteBodyParam(rawApi, payloadAuthKey).getErrMsg().isEmpty();
                     }
                 }
-                return new ExecutorSingleOperationResp(true, "");
+                if (removed) {
+                    return new ExecutorSingleOperationResp(true, "");
+                } else {
+                    return new ExecutorSingleOperationResp(false, "header key not present");
+                }
             case "replace_auth_header":
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
