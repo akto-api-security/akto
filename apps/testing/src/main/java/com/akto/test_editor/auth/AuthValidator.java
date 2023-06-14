@@ -14,6 +14,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.CookieTransformer;
 
 public class AuthValidator {
     
@@ -34,8 +35,9 @@ public class AuthValidator {
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         boolean contains;
         boolean res;
+        List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
         for (String header: headerKeys) {
-            contains = headers.containsKey(header);
+            contains = headers.containsKey(header) || CookieTransformer.isKeyPresentInCookie(cookieList, header);
             res = auth.getAuthenticated() && contains;
             if (!res) {
                 return res;
