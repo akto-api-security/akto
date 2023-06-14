@@ -3,7 +3,6 @@ package com.akto.testing.yaml_tests;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
-import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
@@ -43,9 +42,7 @@ public abstract class SecurityTestTemplate {
 
     public abstract boolean checkAuthBeforeExecution();
 
-    public abstract List<ExecutionResult>  executor();
-
-    public abstract List<TestResult> validator(List<ExecutionResult> attempts);
+    public abstract List<TestResult>  executor();
 
     public List<TestResult> run() {
         boolean valid = filter();
@@ -60,8 +57,8 @@ public abstract class SecurityTestTemplate {
             testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed authentication check, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
             return testResults;
         }
-        List<ExecutionResult> attempts = executor();
-        return validator(attempts);
+        List<TestResult> attempts = executor();
+        return attempts;
     }
 
     public ApiInfo.ApiInfoKey getApiInfoKey() {
