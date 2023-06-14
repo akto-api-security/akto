@@ -64,7 +64,7 @@ public class AktoPolicyNew {
             apiInfoList =  ApiInfoDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         }
 
-        List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
+        List<FilterSampleData> filterSampleDataList = new ArrayList<>(); // FilterSampleDataDao.instance.findAll(new BasicDBObject());
 
         Map<ApiInfo.ApiInfoKey, Map<Integer, FilterSampleData>> filterSampleDataMapToApiInfo = new HashMap<>();
         for (FilterSampleData filterSampleData: filterSampleDataList) {
@@ -335,19 +335,19 @@ public class AktoPolicyNew {
 
     public static List<WriteModel<FilterSampleData>> getUpdatesForSampleData(List<FilterSampleData> filterSampleDataList) {
         ArrayList<WriteModel<FilterSampleData>> bulkUpdates = new ArrayList<>();
-        if (filterSampleDataList == null) filterSampleDataList = new ArrayList<>();
-
-        for (FilterSampleData filterSampleData: filterSampleDataList) {
-            List<String> sampleData = filterSampleData.getSamples().get();
-            Bson bson = Updates.pushEach(FilterSampleData.SAMPLES+".elements", sampleData, new PushOptions().slice(-1 * FilterSampleData.cap));
-            bulkUpdates.add(
-                    new UpdateOneModel<>(
-                            FilterSampleDataDao.getFilter(filterSampleData.getId().getApiInfoKey(), filterSampleData.getId().getFilterId()),
-                            bson,
-                            new UpdateOptions().upsert(true)
-                    )
-            );
-        }
+//        if (filterSampleDataList == null) filterSampleDataList = new ArrayList<>();
+//
+//        for (FilterSampleData filterSampleData: filterSampleDataList) {
+//            List<String> sampleData = filterSampleData.getSamples().get();
+//            Bson bson = Updates.pushEach(FilterSampleData.SAMPLES+".elements", sampleData, new PushOptions().slice(-1 * FilterSampleData.cap));
+//            bulkUpdates.add(
+//                    new UpdateOneModel<>(
+//                            FilterSampleDataDao.getFilter(filterSampleData.getId().getApiInfoKey(), filterSampleData.getId().getFilterId()),
+//                            bson,
+//                            new UpdateOptions().upsert(true)
+//                    )
+//            );
+//        }
 
         return bulkUpdates;
     }
