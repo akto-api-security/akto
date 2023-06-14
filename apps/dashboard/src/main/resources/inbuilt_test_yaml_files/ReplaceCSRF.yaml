@@ -1,10 +1,14 @@
 id: REPLACE_CSRF
 info:
-  name: "Replace CSRF"
-  description: "Replace CSRF"
+  name: "CSRF test by replacing with invalid csrf token"
+  description: "Vulnerability assessment by replacing the CSRF token with an invalid one"
   details: >
-            "Replace CSRF"
-  impact: "Broken User authentication is a serious vulnerability. Attackers can gain control to other users’ accounts in the system, read their personal data, and perform sensitive actions on their behalf, like money transactions and sending personal messages."
+            "Evaluating the effectiveness of the web application's CSRF protection mechanism by intentionally replacing the CSRF token"
+            "and assessing if unauthorized actions can be successfully executed, potentially exposing the system to security risks and breaches."
+  impact: >
+    "Successful execution of unauthorized actions due to the absence of CSRF token may result in severe consequences,"
+    "such as unauthorized data modification, account hijacking, or sensitive information disclosure,"
+    "highlighting critical vulnerabilities and emphasizing the need for robust CSRF protection measures."
   category:
     name: NO_AUTH
     shortName: Broken Authentication
@@ -16,10 +20,8 @@ info:
     - OWASP top 10
     - HackerOne top 10
   references:
-    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/"
-    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa2-broken-user-authentication.md"
-    - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
-    - "https://cwe.mitre.org/data/definitions/798.html"
+    - "https://portswigger.net/web-security/csrf"
+    - "https://owasp.org/www-community/attacks/csrf"
 
 api_selection_filters:
   response_code:
