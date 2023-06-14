@@ -16,9 +16,9 @@
                     </div>
                 </div>
                 <div v-if="isAnonymousPage" class="mt-6">
-                    <v-btn primary dark depressed color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
+                    <v-btn primary dark depressed class="white-color" color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
                         Try on your APIs
-                        <v-icon size="10">$fas_external-link-alt</v-icon>
+                        <v-icon size="11">$fas_external-link-alt</v-icon>
                     </v-btn>
                 </div>
             </div>
@@ -74,5 +74,10 @@ export default {
     border-radius: 4px
     padding: 0 4px
     font-weight: 500
+
+.white-color
+    color: var(--white) !important
+    font-weight: 600
+
     
 </style>

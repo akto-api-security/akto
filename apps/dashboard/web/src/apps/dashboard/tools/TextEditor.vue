@@ -128,7 +128,7 @@
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
                                 </div>
                             </div>
-                            <v-menu left v-if="isAnonymousPage" offset-y>
+                            <v-menu left v-if="isAnonymousPage" offset-y rounded="lg">
                                 <template v-slot:activator="{ on, attrs }">
                                     <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }" v-on="on"
                                         v-bind="attrs">
@@ -137,14 +137,13 @@
                                     </div>
                                 </template>
                                 <v-card>
-                                    <v-list>
-                                        <v-list-item>
+                                    <v-list class="pa-0" >
+                                        <v-list-item class="save-option-class d-flex flex-column">
                                             <v-list-item-content>
-                                                <v-list-item-subtitle>In order to unlock the power to save your
-                                                    tests.</v-list-item-subtitle>
+                                                <v-list-item-subtitle>In order to unlock the power to save your tests.</v-list-item-subtitle>
                                             </v-list-item-content>
                                             <v-list-item-action>
-                                                <v-btn primary dark depressed color="var(--themeColor)"
+                                                <v-btn class="white-color" primary dark depressed color="var(--themeColor)"
                                                     href="https://app.akto.io/login" target="_blank">
                                                     Sign up now
                                                 </v-btn>
@@ -173,25 +172,32 @@
                             No Values Yet !!
                         </div>
                         <div class="select-url" v-if="isAnonymousPage">
-                            <v-menu offset-y>
+                            <v-menu offset-y rounded="lg" nudge-bottom="12" nudge-left="100">
                                 <template v-slot:activator="{ on, attrs }">
                                     <div class="d-flex jc-sb" v-on="on" v-bind="attrs">
                                         <span class="file-name url-name show-overflow">{{ selectedAnonymousOption }}</span>
                                         <v-icon size=12>$fas_angle-down</v-icon>
                                     </div>
                                 </template>
-                                <v-list>
+                                <v-list class="pa-0">
                                     <v-list-item @click="resetSampleData()">
-                                        <v-list-item-title>Sample data<v-icon
-                                                v-if="selectedAnonymousOption == 'Sample data'">$fas_check</v-icon></v-list-item-title>
+                                        <v-list-item-title>
+                                            <div class="d-flex jc-sb">
+                                                <span class="menu-list-font">Sample data</span>
+                                                <v-icon v-if="selectedAnonymousOption == 'Sample data'">$fas_check</v-icon>
+                                            </div>
+                                            </v-list-item-title>
                                     </v-list-item>
                                     <v-list-item @click="(customSampleDataDialogBox = true)">
-                                        <v-list-item-title>Copy/paste data<v-icon
-                                                v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon></v-list-item-title>
+                                        <v-list-item-title>
+                                            <div class="d-flex jc-sb">
+                                                <span class="menu-list-font">Copy/paste data</span>
+                                                <v-icon v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon>
+                                            </div>
+                                        </v-list-item-title>
                                     </v-list-item>
-                                    <v-list-item href="https://app.akto.io/login" target="_blank">
-                                        <v-list-item-title color="var(--themeColor)">Add automated
-                                            collection<v-icon>$fas_arrow-right</v-icon></v-list-item-title>
+                                    <v-list-item class="theme-color" href="https://app.akto.io/login" target="_blank">
+                                        <v-list-item-title><span class="menu-list-font">Add automated collection</span><v-icon class="white-color">$fas_arrow-right</v-icon></v-list-item-title>
 
                                     </v-list-item>
                                 </v-list>
@@ -232,7 +238,6 @@
                                         <span>Vulnerability Found</span>
                                     </span>
                                     <span class="show-side">
-
                                         <v-icon size=16>$far_clock</v-icon>
                                         <span>{{ runTestObj.runTime }}</span>
                                     </span>
@@ -498,7 +503,6 @@ export default {
             this.runTestObj.isLoading = true
             if (this.isAnonymousPage) {
                 await testingApi.runTestForTemplateAnonymous(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
-                    debugger
                     this.testingRunResult = resp["testingRunResult"]
                     this.testingRunHexId = resp["testingRunHexId"]
                     this.dialogBoxIssue = resp["testingRunIssues"]
@@ -714,12 +718,6 @@ export default {
         }
     },
     async mounted() {
-        // if (this.isAnonymousPage) {
-        //     await request({
-        //         url: '/tools/publicApi',
-        //         method: 'GET'
-        //     })
-        // }
         this.createEditor()
         let _this = this
         await this.refreshTestTemplates()
@@ -1029,5 +1027,26 @@ export default {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+}
+
+.white-color {
+    color: var(--white) !important;
+}
+
+.theme-color {
+    background-color: var(--themeColor) !important;
+    color: var(--white) !important;
+}
+
+.menu-list-font {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+.save-option-class {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: var(--themeColorDark) !important;
+    background-color: var(--hexColor29) !important;
 }
 </style>

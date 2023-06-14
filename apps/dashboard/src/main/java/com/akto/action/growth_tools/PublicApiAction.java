@@ -76,58 +76,6 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
 
     @Override
     public String execute() throws Exception {
-        User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, RuntimeListener.ANONYMOUS_EMAIL));
-        String refreshToken;
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("username", user.getLogin());
-        claims.put("signedUp", true + "");
-
-        try {
-            refreshToken = JWT.createJWT(
-                    "",
-                    claims,
-                    "Akto",
-                    "refreshToken",
-                    Calendar.DAY_OF_MONTH,
-                    6
-            );
-            List<String> refreshTokens = user.getRefreshTokens();
-            if (refreshTokens == null) {
-                refreshTokens = new ArrayList<>();
-            }
-            if (refreshTokens.size() > 10) {
-                refreshTokens = refreshTokens.subList(refreshTokens.size() - 10, refreshTokens.size());
-            }
-            refreshTokens.add(refreshToken);
-
-            Token token = new Token(refreshToken);
-            response.addHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME, token.getAccessToken());
-            Cookie cookie = new Cookie(LoginAction.REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-            cookie.setHttpOnly(true);
-            cookie.setPath("/dashboard");
-
-            cookie.setSecure(HttpUtils.isHttpsEnabled());
-
-
-            response.addCookie(cookie);
-            response.addHeader("Set-Cookie", "SameSite=None; Secure");
-            HttpSession session = request.getSession(true);
-            session.setAttribute("username", user.getLogin());
-            session.setAttribute("user", user);
-            session.setAttribute("login", Context.now());
-            session.setAttribute("accountId", 1_000_000);
-            UsersDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.eq("_id", user.getId()),
-                    Updates.combine(
-                            Updates.set("refreshTokens", refreshTokens),
-                            Updates.set(User.LAST_LOGIN_TS, Context.now())
-                    )
-            );
-            return Action.SUCCESS.toUpperCase();
-        } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-            ;
-        }
-
         return SUCCESS.toUpperCase();
     }
 
