@@ -8,6 +8,8 @@ public class SensitiveSampleData {
     private SingleTypeInfo.ParamId id;
     public static final String SAMPLE_DATA = "sampleData";
     private List<String> sampleData;
+
+    private boolean invalid;
     public static final int cap = 10;
 
     public SensitiveSampleData() {}
@@ -31,5 +33,14 @@ public class SensitiveSampleData {
 
     public void setSampleData(List<String> sampleData) {
         this.sampleData = sampleData;
+    }
+
+
+    public boolean getInvalid() {
+        return invalid;
+    }
+
+    public void setInvalid(boolean invalid) {
+        this.invalid = invalid;
     }
 }
