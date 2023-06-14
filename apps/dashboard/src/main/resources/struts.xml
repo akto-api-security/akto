@@ -9,6 +9,7 @@
     <constant name="struts.mapper.alwaysSelectFullNamespace" value="false"/>
     <constant name="struts.patternMatcher" value="regex" />
     <constant name="struts.matcher.appendNamedParameters" value="true"/>
+    <constant name="struts.multipart.maxSize" value = "209715200" />
 
     <package name="user" namespace="" extends="struts-default, json-default">
         <default-action-ref name="home" />
@@ -820,6 +821,18 @@
         </action>
 
         <action name="api/updateCustomAuthType" class="com.akto.action.CustomAuthTypeAction" method="updateCustomAuthType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+
+        <action name="api/resetAllCustomAuthTypes" class="com.akto.action.CustomAuthTypeAction" method="resetAllCustomAuthTypes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>
