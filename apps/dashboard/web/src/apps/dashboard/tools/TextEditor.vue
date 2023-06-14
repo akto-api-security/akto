@@ -138,17 +138,20 @@
                                 </template>
                                 <v-card>
                                     <v-list class="pa-0" >
-                                        <v-list-item class="save-option-class d-flex flex-column">
-                                            <v-list-item-content>
-                                                <v-list-item-subtitle>In order to unlock the power to save your tests.</v-list-item-subtitle>
-                                            </v-list-item-content>
-                                            <v-list-item-action>
-                                                <v-btn class="white-color" primary dark depressed color="var(--themeColor)"
-                                                    href="https://app.akto.io/login" target="_blank">
-                                                    Sign up now
-                                                </v-btn>
-                                            </v-list-item-action>
-                                        </v-list-item>
+                                        <v-list-item  class="save-option-class">
+                                                <div class="d-flex flex-column">
+                                                    <v-list-item-content class="d-flex flex-column" >
+                                                        <v-list-item-subtitle>In order to unlock the </v-list-item-subtitle>
+                                                        <v-list-item-subtitle>power to save your tests.</v-list-item-subtitle>
+                                                    </v-list-item-content>
+                                                    <v-list-item-action >
+                                                        <v-btn width="100%" class="white-color" primary dark depressed color="var(--themeColor)"
+                                                            href="https://app.akto.io/login" target="_blank">
+                                                            Sign up now
+                                                        </v-btn>
+                                                    </v-list-item-action>
+                                                </div>
+                                            </v-list-item>
                                     </v-list>
                                 </v-card>
                             </v-menu>
