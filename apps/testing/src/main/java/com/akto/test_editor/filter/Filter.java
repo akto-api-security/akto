@@ -29,7 +29,7 @@ public class Filter {
     public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId) {
 
         List<FilterNode> childNodes = node.getChildNodes();
-        if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString())) {
+        if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString()) || node.getNodeType().equalsIgnoreCase(OperandTypes.Collection.toString())) {
             matchingKeySet = null;
         }
         if (childNodes.size() == 0) {
