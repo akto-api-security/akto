@@ -32,9 +32,6 @@ public class VariableResolver {
                 match = match.substring(2, match.length());
                 match = match.substring(0, match.length() - 1);
                 Object val = getValue(varMap, match);
-                if (val == null) {
-                    
-                }
                 if (val instanceof String) {
                     String valString = val.toString();
                     return expression.replaceAll("(\\$\\{[^}]*\\})", valString);
@@ -226,6 +223,10 @@ public class VariableResolver {
             return false;
         }
 
+        if (varMap.containsKey("wordList_" + key)) {
+            return true;
+        }
+
         if (key.toString().length() < 3) {
             return false;
         }
@@ -241,6 +242,10 @@ public class VariableResolver {
 
     public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
         String expression = key.toString();
+
+        if (varMap.containsKey("wordList_" + expression)) {
+            return (List<String>) varMap.get("wordList_" + expression);
+        }
 
         expression = expression.substring(2, expression.length());
         expression = expression.substring(0, expression.length() - 1);
