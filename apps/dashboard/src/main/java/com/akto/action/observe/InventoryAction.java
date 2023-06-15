@@ -130,10 +130,8 @@ public class InventoryAction extends UserAction {
 
     public String fetchCollectionWiseApiEndpoints() {
         listOfEndpointsInCollection = new HashSet<>();
-        List<BasicDBObject> list = null;
-        if (apiCollectionId > -1) {
-            list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
-        }
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+
         if (list != null && !list.isEmpty()) {
             list.forEach(element -> {
                 BasicDBObject item = (BasicDBObject) element.get(Constants.ID);
