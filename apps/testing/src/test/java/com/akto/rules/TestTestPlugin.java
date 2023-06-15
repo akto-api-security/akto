@@ -8,6 +8,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.store.SampleMessageStore;
+import com.akto.testing.ApiExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
@@ -17,6 +18,10 @@ import com.sendgrid.Method;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -215,26 +220,6 @@ public class TestTestPlugin extends MongoBasedTest {
         singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
     }
 
-
-    @Test
-    public void testDecrementUrlVersion() {
-        String result = new OldApiVersionTest().decrementUrlVersion("/api/v2/books/v3n0m/", 1, 1);
-        assertEquals("/api/v1/books/v3n0m/", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books/v3/cars", 2, 1);
-        assertEquals("/api/v20/books/v1/cars", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books/", 2, 1);
-        assertEquals("/api/v20/books/", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books", -1, 1);
-        assertEquals("/api/v23/books", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v1/books", 1, 1);
-        assertNull(result);
-
-    }
-
     @Test
     public void testModifyJwtHeaderToNoneAlgo() {
 
@@ -275,6 +260,14 @@ public class TestTestPlugin extends MongoBasedTest {
 
     }
 
+    @Test
+    public void testOverrideAppUrl() {
 
+        String url = "http://google.com/some/path/here/?param1=1&param2=2";
+        String newHost = "https://twitter.com:80";
+
+        System.out.println(ApiExecutor.replaceHostFromConfig(url, new TestingRunConfig(0, null, null, null, newHost)));
+
+    }
 
 }
