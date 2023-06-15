@@ -43,7 +43,7 @@ api_selection_filters:
   request_headers:
     for_one:
       key:
-        regex: ^(?!.*host)(?!.*cookie)(?!.*content-type).*$
+        contains_either: cookie
         extract: header_key
 
 execute:
