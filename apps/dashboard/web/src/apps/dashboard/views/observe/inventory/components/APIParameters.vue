@@ -56,7 +56,7 @@
                 <spinner v-else/>
             </template>
             <template slot="Sensitive Values">
-                <sample-data-list :messages="sensitiveSampleData" v-if="sensitiveSampleData"/>
+                <sample-data-list :messages="sensitiveSampleData.filter(x => !x.invalid)" v-if="sensitiveSampleData"/>
                 <spinner v-else/>
             </template>
         </layout-with-tabs>
