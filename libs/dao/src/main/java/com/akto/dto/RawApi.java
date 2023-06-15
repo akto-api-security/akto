@@ -84,7 +84,9 @@ public class RawApi {
         for (String key: payload.keySet()) {
             queryParams = queryParams + key + "=" + payload.get(key) + "&";
         }
-        queryParams = queryParams.substring(0, queryParams.length() - 1);
+        if (queryParams.length() > 0) {
+            queryParams = queryParams.substring(0, queryParams.length() - 1);
+        }
 
         // recheck
         req.setQueryParams(queryParams);
