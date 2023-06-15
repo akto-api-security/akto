@@ -180,7 +180,7 @@ public class Utils {
                     sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
                 }
             }
-            sb.deleteCharAt(sb.length()-1);
+            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
             return sb.toString();
         }
         if(mode.equals("urlencoded")){
@@ -189,7 +189,7 @@ public class Utils {
             for(JsonNode node : urlencoded){
                 sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
             }
-            sb.deleteCharAt(sb.length()-1);
+            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
             return sb.toString();
         }
         if(mode.equals("graphql")){
