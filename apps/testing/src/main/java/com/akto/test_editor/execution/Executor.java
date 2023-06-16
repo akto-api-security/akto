@@ -58,8 +58,9 @@ public class Executor {
             if (testRawApis == null) {
                 continue;
             }
+            boolean vulnerable = false;
             for (RawApi testReq: testRawApis) {
-                if (result.size() > 0) { //todo: introduce a flag stopAtFirstMatch
+                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
                     break;
                 }
                 try {
@@ -70,6 +71,7 @@ public class Executor {
                     if (res != null) {
                         result.add(res);
                     }
+                    vulnerable = res.getVulnerable();
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
