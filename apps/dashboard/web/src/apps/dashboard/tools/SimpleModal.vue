@@ -1,15 +1,15 @@
 <template>
-    <v-dialog :width="width" v-model="dialog" persistent>
-        <v-card>
+    <v-dialog :width="width" v-model="dialog">
+        <v-card style="">
             <v-card-title class="modal-title">
                 {{ title }}
             </v-card-title>
             <v-card-text class="modal-body">{{ body }}</v-card-text>
             <v-card-actions class="button-class">
-                <v-btn width="45%" class="button-border-class" :class='["elevation-0"]' @click=" dialog = false">
+                <v-btn width="45%" class="button-border-class" :ripple="false" :class='["elevation-0"]' @click=" dialog = false">
                     Cancel
                 </v-btn>
-                <v-btn primary dark depressed width="45%" color="var(--themeColor)" class="white-color button-border-class" @click="dialog = false"
+                <v-btn primary dark depressed width="45%" :ripple="false" color="var(--themeColor)" class="white-color button-border-class" @click="dialog = false"
                     href="https://app.akto.io/login" target="_blank">
                     Sign-up now
                 </v-btn>
@@ -49,20 +49,19 @@ export default {
 
 <style scoped>
 .modal-title {
-    font-weight: 600;
-    font-size: 18px;
+    font-weight: 600 !important;
+    font-size: 18px !important;
 }
 
 .modal-body {
-    font-weight: 400;
-    font-size: 14px;
+    font-weight: 400 !important;
+    font-size: 14px !important;
 }
 
 .button-class {
     display: flex;
     justify-content: space-around;
-    padding-top: 32px;
-    padding-bottom: 24px;
+    padding-bottom: 24px !important;
 
 }
 
@@ -71,6 +70,8 @@ export default {
     border-radius: 8px;
     font-size: 16px;
     font-weight: 600;
+    color: var(--themeColorDark);
+    height: 40px !important;
 }
 
 .white-color {

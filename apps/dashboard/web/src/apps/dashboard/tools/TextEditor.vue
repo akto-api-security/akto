@@ -1,6 +1,6 @@
 <template>
     <div>
-        <simple-layout title="Test Editor" version="Beta" :isAnonymousPage="isAnonymousPage">
+        <simple-layout title="Test editor" version="Beta" :isAnonymousPage="isAnonymousPage">
             <template>
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
@@ -144,10 +144,10 @@
                                                         <v-list-item-subtitle>In order to unlock the </v-list-item-subtitle>
                                                         <v-list-item-subtitle>power to save your tests.</v-list-item-subtitle>
                                                     </v-list-item-content>
-                                                    <v-list-item-action >
+                                                    <v-list-item-action class="ml-0">
                                                         <v-btn width="100%" class="white-color" primary dark depressed color="var(--themeColor)"
                                                             href="https://app.akto.io/login" target="_blank">
-                                                            Sign up now
+                                                            Sign-up now
                                                         </v-btn>
                                                     </v-list-item-action>
                                                 </div>
@@ -174,11 +174,12 @@
                         <div class="empty-container" v-else>
                             No Values Yet !!
                         </div>
-                        <div class="select-url" v-if="isAnonymousPage">
-                            <v-menu offset-y rounded="lg" nudge-bottom="12" nudge-left="100">
+
+                        <v-menu offset-y rounded="lg" nudge-bottom="12" nudge-left="100" v-if="isAnonymousPage">
                                 <template v-slot:activator="{ on, attrs }">
-                                    <div class="d-flex jc-sb" v-on="on" v-bind="attrs">
-                                        <span class="file-name url-name show-overflow">{{ selectedAnonymousOption }}</span>
+
+                                    <div class="d-flex jc-sb select-url" v-on="on" v-bind="attrs">
+                                        <span class="file-name url-name show-overflow ml-2">{{ selectedAnonymousOption }}</span>
                                         <v-icon size=12>$fas_angle-down</v-icon>
                                     </div>
                                 </template>
@@ -194,7 +195,7 @@
                                     <v-list-item @click="(customSampleDataDialogBox = true)">
                                         <v-list-item-title>
                                             <div class="d-flex jc-sb">
-                                                <span class="menu-list-font">Copy/paste data</span>
+                                                <span class="menu-list-font">Use custom API</span>
                                                 <v-icon v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon>
                                             </div>
                                         </v-list-item-title>
@@ -205,7 +206,6 @@
                                     </v-list-item>
                                 </v-list>
                             </v-menu>
-                        </div>
                         <div v-else>
                             <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
                                 <v-icon size=12>$fas_check</v-icon>
@@ -214,7 +214,7 @@
                         </div>
                         <div class="footer-div">
                             <div class="show-run-test" v-if="!runTest">
-                                Run test to see Results
+                                Run test to see results
                             </div>
                             <div class="show-run-test" v-else-if="runTestObj.isLoading">
                                 Running tests...
@@ -255,7 +255,7 @@
             :issue="dialogBoxIssue" @closeDialogBox="(dialogBox = false)">
         </issues-dialog>
         <simple-modal :class='["arrow-up", "mlp-74"]' :parentDialog="simpleModalDialogBox"
-            title="Get Started with API Testing Today" body="Our API test templates can help you save time and effort when
+            title="Get started with API Testing today" body="Our API test templates can help you save time and effort for
          testing your APIs. Sign up for Akto today and start using them!"
             @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal>
         <custom-sample-data-api-modal title="Add your own API" :parentDialog="customSampleDataDialogBox"
@@ -765,6 +765,17 @@ export default {
 .tests-category-container.v-list-group--active>>>.v-list-group__header__prepend-icon {
     transform: rotate(90deg);
 }
+.req-resp-col >>> .copy-icon {
+  display: none;
+}
+
+.req-resp-col >>> .sample-data-title {
+  display: none;
+}
+
+.req-resp-col >>> .sample-data-container {
+  background: #FFFFFF;
+}
 
 .test-editor-panel>>>.akto-left-pane {
     padding-left: 4px;
@@ -876,7 +887,7 @@ export default {
             border-top: 1px solid var(--hexColor44);
             width: -webkit-fill-available;
             font-weight: 500;
-            font-size: 16px;
+            font-size: 14px;
             color: var(--themeColorDark);
         }
 
@@ -1044,6 +1055,7 @@ export default {
 .menu-list-font {
     font-size: 14px !important;
     font-weight: 500 !important;
+    margin: auto 0px;
 }
 
 .save-option-class {
