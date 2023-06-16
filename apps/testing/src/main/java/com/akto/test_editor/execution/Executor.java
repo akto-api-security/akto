@@ -19,6 +19,7 @@ import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.testing.ApiExecutor;
 import com.akto.utils.RedactSampleData;
 import com.akto.log.LoggerMaker;
@@ -31,8 +32,7 @@ public class Executor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
     public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
-        AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {
-
+        AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig) {
         List<TestResult> result = new ArrayList<>();
         
         if (node.getChildNodes().size() < 2) {
@@ -64,7 +64,7 @@ public class Executor {
                 }
                 try {
                     // follow redirects = true for now
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect());
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                     TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                     if (res != null) {
@@ -111,11 +111,16 @@ public class Executor {
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutorSingleRequest(true, "", null, false);
+            return new ExecutorSingleRequest(true, "", null, true);
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
-            return new ExecutorSingleRequest(true, "", null, true);
+            boolean redirect = true;
+            try {
+                redirect = Boolean.valueOf(node.getValues().toString());
+            } catch (Exception e) {
+            }
+            return new ExecutorSingleRequest(true, "", rawApis, redirect);
         }
         Boolean followRedirect = true;
         List<RawApi> newRawApis = new ArrayList<>();
@@ -209,7 +214,7 @@ public class Executor {
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
-            followRedirect = followRedirect || executionResult.getFollowRedirect();
+            followRedirect = followRedirect && executionResult.getFollowRedirect();
         }
 
         if (newRawApis.size() > 0) {

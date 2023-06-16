@@ -5,6 +5,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
@@ -64,7 +65,7 @@ public class FuzzingTest extends TestPlugin {
     }
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig) {
         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
         RawApi rawApi;
         if (messages.isEmpty()) {
@@ -74,7 +75,7 @@ public class FuzzingTest extends TestPlugin {
 
             OriginalHttpResponse originalHttpResponse = null;
             try {
-                originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true);
+                originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true, testingRunConfig);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e, LogDb.TESTING);
                 return null;
@@ -85,10 +86,10 @@ public class FuzzingTest extends TestPlugin {
             rawApi = messages.get(0);
         }
 
-        return runNucleiTest(rawApi);
+        return runNucleiTest(rawApi, testingRunConfig);
     }
 
-    public Result runNucleiTest(RawApi rawApi) {
+    public Result runNucleiTest(RawApi rawApi, TestingRunConfig testingRunConfig) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
         String originalMessage = rawApi.getOriginalMessage();
@@ -125,6 +126,10 @@ public class FuzzingTest extends TestPlugin {
         String fullUrlWithHost;
         try {
             fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
+
+            fullUrlWithHost = ApiExecutor.replaceHostFromConfig(fullUrlWithHost, testingRunConfig);
+
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LogDb.TESTING);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
