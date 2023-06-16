@@ -1,20 +1,25 @@
 <template>
-    <v-dialog ref="dialogABC" :width="width" v-model="dialog" persistent eager>
+    <v-dialog ref="dialogABC" :width="width" v-model="dialog" eager>
         <v-card>
             <v-card-title class="modal-title">
                 {{ title }}
             </v-card-title>
-            <v-card-text  class="modal-body">Request</v-card-text>
+            <v-card-text  class="modal-body">
+              Request
+              <span class="grey--text">(Paste API request here...)</span>
+
+            </v-card-text>
             <div ref="editorRequest" style="height: 150px;" class="monaco-editor"></div>
             <!-- <v-textarea solo no-resize rows="6" label="Ctrl-V to paste" v-model="requestValue"></v-textarea> -->
-            <v-card-text class="modal-body">Response</v-card-text>
+            <v-card-text class="modal-body">
+              Response
+              <span class="grey--text">(Paste API response here...)</span>
+            </v-card-text>
             <div ref="editorResponse" style="height: 150px;" class="monaco-editor"></div>
             <!-- <v-textarea solo no-resize rows="6" label="Ctrl-V to paste" v-model="responseValue"></v-textarea> -->
             <v-card-actions class="button-class">
-                <v-btn width="46%" class="button-border-class" :class='["elevation-0"]' @click=" dialog = false">
-                    Cancel
-                </v-btn>
-                <v-btn primary dark depressed width="46%" class="button-border-class var(--white)--text" color="var(--themeColor)" @click="saveTextValues()"
+                <v-btn primary dark depressed width="200px" class="button-border-class var(--white)--text" color="var(--themeColor)" @click="saveTextValues()"
+                       :ripple="false"
                     >
                     Save
                 </v-btn>
@@ -47,28 +52,20 @@ export default {
     props: {
         title: "",
         parentDialog: {default: false},
-        width: {default : '600px'}
+        width: {default : '800px'}
     },
     data() {
         return {
             editorRequest: null,
             editorResponse: null,
             editorOptions: {
-                language: "yaml",
-                minimap: { enabled: false },
-                wordWrap: true,
-                automaticLayout: true,
-                colorDecorations: true,
-                scrollBeyondLastLine: false,
-                lineNumbers: "off",
-                scrollbar: {
-                    vertical: "hidden",
-                    horizontal: "hidden",
-                    verticalScrollbarSize: 0,
-                    horizontalScrollbarSize: 0
-                },
-                autoClosingBrackets : "never",
-                areaLabel: "Sample Data API",
+              language: "yaml",
+              minimap: { enabled: false },
+              wordWrap: false,
+              automaticLayout: true,
+              colorDecorations: true,
+              scrollBeyondLastLine: false,
+              lineDecorationsWidth: 3,
             },
             requestValue: "",
             responseValue: "",
@@ -83,8 +80,8 @@ export default {
         createEditor() {
             this.editorRequest = editor.create(this.$refs.editorRequest, this.editorOptions)
             this.editorResponse = editor.create(this.$refs.editorResponse, this.editorOptions)
-            this.editorRequest.setValue("Ctrl-V to paste")
-            this.editorResponse.setValue("Ctrl-V to paste")
+            this.editorRequest.setValue("")
+            this.editorResponse.setValue("")
         }
     },
     mounted() {
@@ -115,6 +112,7 @@ export default {
     font-size: 14px !important;
     margin-top: 12px;
     margin-bottom: 6px;
+    padding-bottom: 4px !important;
 }
 
 .modal-title {
@@ -125,22 +123,21 @@ export default {
 .monaco-editor {
     border: 1px solid rgba(71, 70, 106, 0.12);
     box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
-    border-radius: 8px;
     margin-left: 24px;
     margin-right: 24px;
 }
 
 .button-class {
     display: flex;
-    justify-content: space-around;
-    margin-top: 24px;
-    margin-bottom: 24px;
+    justify-content: flex-end;
+    margin-top: 24px ;
+    margin-bottom: 0px !important;
+    padding-bottom: 24px !important;
 }
 
 .button-border-class {
     border-color: var(--black);
-    border-radius: 8px;
     font-size: 16px;
-    font-weight: 600;
+    height: 40px !important;
 }
 </style>
