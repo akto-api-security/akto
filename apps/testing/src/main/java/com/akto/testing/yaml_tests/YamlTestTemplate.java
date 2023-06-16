@@ -9,6 +9,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
@@ -22,8 +23,10 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(YamlTestTemplate.class);
 
-    public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId) {
-        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId);
+    public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode,
+                            ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth,
+                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig) {
+        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig);
     }
 
     @Override
@@ -51,7 +54,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public boolean checkAuthBeforeExecution() {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
-            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy());
+            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig);
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
@@ -67,7 +70,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public List<TestResult>  executor() {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
-        List<TestResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId, this.authMechanism, this.validatorNode, this.apiInfoKey);
+        List<TestResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId, this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }
