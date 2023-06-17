@@ -241,7 +241,7 @@ public class Executor {
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":
-                return Operations.replaceBody(rawApi, key, value);
+                return Operations.replaceBody(rawApi, key);
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
