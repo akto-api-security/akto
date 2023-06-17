@@ -1,0 +1,53 @@
+id: REMOVE_CAPTCHA
+info:
+  name: "Remove Captcha from request"
+  description: "Ignoring CAPTCHA validation without the field present in the backend server can result in severe damage and vulnerabilities."
+  details: >
+            "By neglecting CAPTCHA validation when the field is absent, the backend server becomes vulnerable to significant damage."
+            "Hackers can exploit this loophole to gain unauthorized access, engage in malicious activities, compromise privacy, and cause financial losses or service disruptions."
+  impact: "Bypassing CAPTCHA protection enables hackers to automate malicious activities, such as unauthorized account access, spamming, data harvesting, and DDoS attacks."
+  category:
+    name: RL
+    shortName: Lack of Resources & Rate Limiting
+    displayName: Lack of Resources & Rate Limiting (RL)
+  subCategory: REMOVE_CAPTCHA
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://hackerone.com/reports/124173"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either: captcha
+            extract: captcha_key
+    - query_param:
+        for_one:
+          key:
+            contains_either: captcha
+            extract: captcha_key
+
+execute:
+  type: single
+  requests:
+    - req:
+        - delete_body_param: ${captcha_key}
+        - delete_query_param: ${captcha_key}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match: 
+      gt: 80
+    length:
+      gt: 0
