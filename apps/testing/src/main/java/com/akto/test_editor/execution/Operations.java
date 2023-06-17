@@ -133,7 +133,7 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
-    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key, Object value) {
+    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key) {
         rawApi.getRequest().setBody(key.toString());
         return new ExecutorSingleOperationResp(true, "");
     }
