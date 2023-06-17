@@ -188,7 +188,7 @@ public class QuickStartAction extends UserAction {
                 parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
                 parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                 String template = convertStreamToString(AwsStack.class
-                        .getResourceAsStream("/cloud_formation_templates/kubernetes_mirroring.template"));
+                        .getResourceAsStream("/cloud_formation_templates/kubernetes_setup.yaml"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
                 String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
                 AccountSettingsDao.instance.updateInitStackType(this.deploymentMethod.name());

@@ -8,8 +8,6 @@ Parameters:
     Type: 'AWS::EC2::Subnet::Id'
   KeyPair:
     Type: 'AWS::EC2::KeyPair::KeyName'
-  SourceLBs:
-    Type: CommaDelimitedList
   MongoIp:
     Type: String
 Mappings:
@@ -59,87 +57,6 @@ Mappings:
     us-west-2:
       AMI: ami-0ec021424fb596d6c
 Resources:
-  TrafficMirrorTarget:
-    Type: 'AWS::EC2::TrafficMirrorTarget'
-    Properties:
-      Description: Traffic Mirror target set to network interface of Akto EC2 instance
-      Tags:
-        - Key: Name
-          Value: !Join
-            - ''
-            - - !Ref 'AWS::StackName'
-              - '-'
-              - Target
-        - Key: Deployment
-          Value: Akto-CloudFormation
-      NetworkLoadBalancerArn: !Ref AktoNLB
-  LBTrafficMirrorFilter:
-    Type: 'AWS::EC2::TrafficMirrorFilter'
-    Properties:
-      Description: Traffic mirror filter for LBs and Target Groups
-      NetworkServices:
-        - amazon-dns
-      Tags:
-        - Key: Name
-          Value: !Join
-            - ''
-            - - !Ref 'AWS::StackName'
-              - '-'
-              - Filter
-        - Key: Deployment
-          Value: Akto-CloudFormation
-  LambdaLogGroup:
-    Type: 'AWS::Logs::LogGroup'
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${CreateMirrorSession}'
-      RetentionInDays: 7
-  LambdaBasicExecutionRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Path: /
-      Policies:
-        - PolicyName: LBCreateTrafficMirrorSession
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'ec2:DescribeNetworkInterfaces'
-                  - 'ec2:DescribeTrafficMirrorSessions'
-                  - 'ec2:DescribeInstances'
-                  - 'ec2:DescribeVpcs'
-                  - 'elasticloadbalancing:DescribeLoadBalancers'
-                  - 'elasticloadbalancing:DescribeTargetGroups'
-                  - 'elasticloadbalancing:DescribeTargetHealth'
-                  - 'ec2:DescribeTrafficMirrorFilters'
-                  - 'ec2:DeleteTrafficMirrorFilterRule'
-                  - 'ec2:CreateTrafficMirrorFilterRule'
-                  - 'lambda:InvokeFunction'
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - 'ec2:CreateTrafficMirrorSession'
-                Resource:
-                  - 'arn:aws:ec2:*:*:traffic-mirror-session/*'
-                  - 'arn:aws:ec2:*:*:network-interface/*'
-                  - !Join
-                    - ''
-                    - - 'arn:aws:ec2:*:*:traffic-mirror-target/'
-                      - !Ref TrafficMirrorTarget
-                  - !Join
-                    - ''
-                    - - 'arn:aws:ec2:*:*:traffic-mirror-filter/*'
-              - Effect: Allow
-                Action:
-                  - 'ec2:DeleteTrafficMirrorSession'
-                Resource:
-                  - 'arn:aws:ec2:*:*:traffic-mirror-session/*'
   GetAktoSetupDetailsLambdaBasicExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -165,26 +82,6 @@ Resources:
                   - 'elasticloadbalancing:DescribeTargetGroups'
                   - 'elasticloadbalancing:DescribeTargetHealth'
                 Resource: '*'
-  LambdaLogPermissions:
-    Type: 'AWS::IAM::Policy'
-    Properties:
-      Roles:
-        - !Ref LambdaBasicExecutionRole
-      PolicyName: !Sub '${AWS::Region}-LambdaLogGroup'
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - 'logs:CreateLogStream'
-              - 'logs:PutLogEvents'
-            Resource:
-              - !Sub >-
-                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${CreateMirrorSession}
-              - !Sub >-
-                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${CreateMirrorSession}:*
-              - !Sub >-
-                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${CreateMirrorSession}:*:*
   GetAktoSetupDetails:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -200,132 +97,6 @@ Resources:
       Code:
         S3Bucket: !Sub 'akto-setup-${AWS::Region}'
         S3Key: templates/get-akto-setup-details.zip
-  CustomSourceAktoSetupDetails:
-    Type: 'AWS::CloudFormation::CustomResource'
-    Properties:
-      ServiceToken: !GetAtt
-        - GetAktoSetupDetails
-        - Arn
-  CreateMirrorSession:
-    Type: 'AWS::Lambda::Function'
-    Properties:
-      Runtime: nodejs16.x
-      Timeout: 300
-      Role: !GetAtt
-        - LambdaBasicExecutionRole
-        - Arn
-      Handler: index.handler
-      Environment:
-        Variables:
-          ELB_NAMES: !Join
-            - ','
-            - !Ref SourceLBs
-          TRAFFIC_MIRROR_FILTER_ID: !Ref LBTrafficMirrorFilter
-          TRAFFIC_MIRROR_TARGET_ID: !Ref TrafficMirrorTarget
-          TARGET_LB: !Ref AktoNLB
-          SAVE_COLLECTION_NAMES_LAMBDA_ARN: !GetAtt
-            - SaveCollectionNames
-            - Arn
-      Code:
-        S3Bucket: !Sub 'akto-setup-${AWS::Region}'
-        S3Key: templates/create-mirror-session.zip
-      Description: Auto create mirroring configuration
-      TracingConfig:
-        Mode: Active
-  PeriodicEventRule:
-    Type: 'AWS::Events::Rule'
-    Properties:
-      Description: Generate an event periodically
-      Name: !Join
-        - ''
-        - - !Ref 'AWS::StackName'
-          - '-'
-          - PeriodicRule
-      ScheduleExpression: rate(15 minutes)
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt
-            - CreateMirrorSession
-            - Arn
-          Id: !Ref CreateMirrorSession
-  PeriodicEventPermission:
-    Type: 'AWS::Lambda::Permission'
-    Properties:
-      FunctionName: !GetAtt
-        - CreateMirrorSession
-        - Arn
-      Action: 'lambda:InvokeFunction'
-      Principal: events.amazonaws.com
-      SourceAccount: !Ref 'AWS::AccountId'
-      SourceArn: !GetAtt
-        - PeriodicEventRule
-        - Arn
-  LambdaVPCAccessRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Path: /
-      Policies:
-        - PolicyName: LambdaBasicAccessVPCPolicy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'ec2:DescribeNetworkInterfaces'
-                  - 'ec2:DescribeInstances'
-                  - 'ec2:CreateNetworkInterface'
-                  - 'ec2:DeleteNetworkInterface'
-                  - 'ec2:AttachNetworkInterface'
-                Resource: '*'
-  LambdaSecurityGroupVPC:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      VpcId: !GetAtt
-        - CustomSourceAktoSetupDetails
-        - VpcId
-      GroupDescription: Security group is required to create a lambda inside a VPC
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 9092
-          ToPort: 9092
-          CidrIp: 0.0.0.0/0
-  SaveCollectionNames:
-    Type: 'AWS::Lambda::Function'
-    Properties:
-      Runtime: nodejs16.x
-      Timeout: 60
-      Role: !GetAtt
-        - LambdaVPCAccessRole
-        - Arn
-      Handler: nodejs/index.handler
-      VpcConfig:
-        SecurityGroupIds:
-          - !GetAtt
-            - LambdaSecurityGroupVPC
-            - GroupId
-        SubnetIds: !GetAtt
-          - CustomSourceAktoSetupDetails
-          - SubnetId
-      Environment:
-        Variables:
-          PRIVATE_IP: !GetAtt
-            - CustomSourceAktoSetupDetails
-            - kafkaIp
-          SUCCESS_ENIS: !GetAtt
-            - CustomSourceAktoSetupDetails
-            - successEnis
-      Code:
-        S3Bucket: !Sub 'akto-setup-${AWS::Region}'
-        S3Key: templates/mirroring-collections-split.zip
-      Description: Send collection name to id mapping to Akto modules
-      TracingConfig:
-        Mode: Active
   GetVpcDetailsLambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -407,7 +178,7 @@ Resources:
         - RegionMap
         - !Ref 'AWS::Region'
         - AMI
-      InstanceType: t3a.medium
+      InstanceType: m5a.xlarge
       KeyName: !Ref KeyPair
       AssociatePublicIpAddress: 'false'
       SecurityGroups:
@@ -549,7 +320,7 @@ Resources:
         - RegionMap
         - !Ref 'AWS::Region'
         - AMI
-      InstanceType: t3a.medium
+      InstanceType: m5a.xlarge
       KeyName: !Ref KeyPair
       AssociatePublicIpAddress: 'false'
       IamInstanceProfile: !Ref IamInstanceProfile
@@ -652,15 +423,6 @@ Resources:
         - CustomSourceGetVpcDetails
         - VpcId
       Targets: []
-  AktoTrafficMirroringListener:
-    Type: 'AWS::ElasticLoadBalancingV2::Listener'
-    Properties:
-      LoadBalancerArn: !Ref AktoNLB
-      Port: '4789'
-      Protocol: UDP
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref AktoTrafficMirroringTargetGroup
   AktoKafkaTargetGroup:
     Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
     Properties:
@@ -846,5 +608,9 @@ Resources:
                 Resource: '*'
 Outputs:
   AktoNLB:
-    Value: !Ref AktoNLB
-    Description: Arn of Akto Network Load Balancer
+    Description: The IP address of the AktoNLB
+    Value: !GetAtt
+      - AktoNLB
+      - DNSName
+    Export:
+      Name: AktoNLBIP
