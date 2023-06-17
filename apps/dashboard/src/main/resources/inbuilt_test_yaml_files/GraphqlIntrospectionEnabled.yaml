@@ -1,0 +1,39 @@
+id: GRAPHQL_INTROSPECTION_MODE_ENABLED
+info:
+  name: "Graphql Introspection Mode Enabled"
+  description: "An attacker can retrieve the Graphql schema"
+  details: > 
+            "cvbgfdhsjakmdjnhfdjnbfhdnjsk sdfgbfvdcsd"
+  impact: "bxcnvhncxmjdhfnjsjdhnjsdhefdnjsm hndfjnhdbsnj"
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GRAPHQL_INTROSPECTION_MODE_ENABLED
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+        regex_replace:
+          regex: graphql.*
+          replace_with: graphql
+      - replace_body: '{ "query": "query IntrospectionQuery { __schema { queryType { name } mutationType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }" }'
+
+validate:
+  response_payload:
+    contains_all: 
+      - "data"
+      - "__schema"
