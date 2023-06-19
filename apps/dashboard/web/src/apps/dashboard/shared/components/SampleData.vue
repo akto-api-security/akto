@@ -52,31 +52,31 @@
             </layout-with-tabs>
         </div>
         <div class="d-flex" v-else>
-            <div class="flex-equal">
-                <sample-single-side
-                    :title="requestTitle" 
-                    :firstLine='requestFirstLine'
-                    :firstLineToolTipValue="requestFirstLineToolTipValue"
-                    :headers="{}" 
-                    :data="requestJson"
-                    :complete-data="json['message']"
-                    :simpleCopy="false"
-                    style="margin: 8px 4px 0px 0px"
-                />
-            </div>
-            <div class="flex-equal" >
-                <sample-single-side               
-                    :title="responseTitle" 
-                    :firstLine='responseFirstLine' 
-                    :headers="{}" 
-                    :data="responseJson"
-                    :simpleCopy="true"
-                    :complete-data="json['message']"
-                    style="margin: 8px 0px 0px 4px"
-                />
-            </div>
+        <div class="flex-equal">
+            <sample-single-side
+                :title="requestTitle"
+                :firstLine='requestFirstLine'
+                :firstLineToolTipValue="requestFirstLineToolTipValue"
+                :headers="{}"
+                :data="requestJson"
+                :complete-data="json['message']"
+                :simpleCopy="false"
+                style="margin: 8px 4px 0px 0px"
+            />
+        </div>
+        <div class="flex-equal" >
+            <sample-single-side
+                :title="responseTitle"
+                :firstLine='responseFirstLine'
+                :headers="{}"
+                :data="responseJson"
+                :simpleCopy="true"
+                :complete-data="json['message']"
+                style="margin: 8px 0px 0px 4px"
+            />
         </div>
     </div>
+</div>
 </template>
 
 <script>

@@ -1,14 +1,10 @@
 package com.akto.action.growth_tools;
 
-import com.akto.action.AccessTokenAction;
-import com.akto.action.LoginAction;
 import com.akto.action.TrafficAction;
 import com.akto.action.test_editor.SaveTestEditorAction;
 import com.akto.action.testing_issues.IssuesAction;
-import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.User;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
@@ -16,28 +12,17 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
-import com.akto.utils.HttpUtils;
-import com.akto.utils.JWT;
-import com.akto.utils.Token;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 
-import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 
 public class PublicApiAction extends ActionSupport implements Action, ServletResponseAware, ServletRequestAware {

@@ -1,12 +1,15 @@
 package com.akto.listener;
 
 
-import com.akto.DaoInit;
 import com.akto.action.HarAction;
-import com.akto.dao.*;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
-import com.akto.dto.*;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
@@ -18,10 +21,6 @@ import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicy;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
 import java.io.IOException;
@@ -33,34 +32,6 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicy aktoPolicy = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
-    public static final String ANONYMOUS_EMAIL = "anonymoustesteditor@akto.io";
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        String salt = "127oy";
-        String passHash = Integer.toString((salt + "admin123").hashCode());
-        SignupInfo signupInfo = new SignupInfo.PasswordHashInfo(salt, passHash);
-        User user = UsersDao.instance.insertSignUp(ANONYMOUS_EMAIL, "Anonymous User", signupInfo, 1_000_000);
-        long count = UsersDao.instance.getMCollection().countDocuments();
-        // if first user then automatic admin
-        // else check if rbac is 0 or not. If 0 then make the user that was created first as admin.
-        // done for customers who were there before rbac feature
-        if (count == 1) {
-            RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.ADMIN));
-        } else {
-            long rbacCount = RBACDao.instance.getMCollection().countDocuments();
-            if (rbacCount == 0) {
-                MongoCursor<User> cursor = UsersDao.instance.getMCollection().find().sort(Sorts.ascending("_id")).limit(1).cursor();
-                if (cursor.hasNext()) {
-                    User firstUser = cursor.next();
-                    RBACDao.instance.insertOne(new RBAC(firstUser.getId(), RBAC.Role.ADMIN));
-                }
-            }
-        }
-
-    }
 
     private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
 
@@ -72,27 +43,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
         aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
 
         try {
-            initialiseAnonymousUser();
             initialiseDemoCollections();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
-        }
-    }
-
-    private void initialiseAnonymousUser() {
-
-        User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, ANONYMOUS_EMAIL));
-        if (user != null) {
-            loggerMaker.infoAndAddToDb("Anonymous user already initialised", LoggerMaker.LogDb.DASHBOARD);
-            return;
-        }
-
-        String salt = "127oy";
-        String passHash = Integer.toString((salt + "admin123").hashCode());
-        SignupInfo signupInfo = new SignupInfo.PasswordHashInfo(salt, passHash);
-        user = UsersDao.instance.insertSignUp(ANONYMOUS_EMAIL, "Anonymous User", signupInfo, 1_000_000);
-        if (user != null) {
-            loggerMaker.infoAndAddToDb("Anonymous user initialised", LoggerMaker.LogDb.DASHBOARD);
         }
     }
 
