@@ -48,8 +48,6 @@ public class SaveTestEditorAction extends UserAction {
         return super.execute();
     }
 
-    private static ObjectMapper mapper = new ObjectMapper();
-    private static Gson gson = new Gson();
     private String content;
     private String testingRunHexId;
     private BasicDBObject apiInfoKey;
