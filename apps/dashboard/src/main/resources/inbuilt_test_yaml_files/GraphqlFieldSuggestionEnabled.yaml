@@ -14,12 +14,14 @@ info:
   subCategory: GRAPHQL_FIELD_SUGGESTIONS_ENABLED
   severity: LOW
   tags:
-    - Graphql
+    - GraphQL
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
-    - "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
+    - "https://nostarch.com/black-hat-graphql Chapter 6 - Information Disclosure"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
+    - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
 
 api_selection_filters:
   url:
