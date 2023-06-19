@@ -34,6 +34,7 @@ import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -41,17 +42,20 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
+import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.*;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
@@ -106,6 +110,22 @@ public class InitializerListener implements ServletContextListener {
 
         return domain;
     }
+
+    public void setUpPiiCleanerScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
+                try {
+                    executePiiCleaner(true);
+                } catch (Exception e) {
+
+                }
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
+
 
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -250,6 +270,146 @@ public class InitializerListener implements ServletContextListener {
         }
 
 
+    }
+
+    static void executePiiCleaner(boolean isDryRun) {
+        final int BATCH_SIZE = 100;
+        int currMarker = 0;
+        Bson filterSsdQ =
+                Filters.and(
+                        Filters.ne("_id.responseCode", -1),
+                        Filters.eq("_id.isHeader", false)
+                );
+
+        MongoCursor<SensitiveSampleData> cursor = null;
+        int dataPoints = 0;
+        List<SingleTypeInfo.ParamId> idsToDelete = new ArrayList<>();
+        do {
+            idsToDelete = new ArrayList<>();
+            cursor = SensitiveSampleDataDao.instance.getMCollection().find(filterSsdQ).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
+            currMarker += BATCH_SIZE;
+            dataPoints = 0;
+            loggerMaker.infoAndAddToDb("processing batch: " + currMarker, LogDb.DASHBOARD);
+            while(cursor.hasNext()) {
+                SensitiveSampleData ssd = cursor.next();
+                SingleTypeInfo.ParamId ssdId = ssd.getId();
+                Bson filterCommonSampleData =
+                        Filters.and(
+                                Filters.eq("_id.method", ssdId.getMethod()),
+                                Filters.eq("_id.url", ssdId.getUrl()),
+                                Filters.eq("_id.apiCollectionId", ssdId.getApiCollectionId())
+                        );
+
+
+                SampleData commonSampleData = SampleDataDao.instance.findOne(filterCommonSampleData);
+                List<String> commonPayloads = commonSampleData.getSamples();
+
+                if (!isSimilar(ssdId.getParam(), commonPayloads)) {
+                    idsToDelete.add(ssdId);
+                }
+
+                dataPoints++;
+            }
+
+            bulkSensitiveInvalidate(idsToDelete, isDryRun);
+            bulkSingleTypeInfoDelete(idsToDelete, isDryRun);
+
+        } while (dataPoints == BATCH_SIZE);
+    }
+
+    private static void bulkSensitiveInvalidate(List<SingleTypeInfo.ParamId> idsToDelete, boolean isDryRun) {
+        ArrayList<WriteModel<SensitiveSampleData>> bulkSensitiveInvalidateUpdates = new ArrayList<>();
+        for(SingleTypeInfo.ParamId paramId: idsToDelete) {
+            String paramStr = "PII cleaner - invalidating: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
+            String url = "dashboard/observe/inventory/"+paramId.getApiCollectionId()+"/"+Base64.getEncoder().encodeToString((paramId.getUrl() + " " + paramId.getMethod()).getBytes());
+            loggerMaker.infoAndAddToDb(paramStr + url, LogDb.DASHBOARD);
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq("url", paramId.getUrl()));
+            filters.add(Filters.eq("method", paramId.getMethod()));
+            filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
+            filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
+            filters.add(Filters.eq("param", paramId.getParam()));
+            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+
+            bulkSensitiveInvalidateUpdates.add(new UpdateOneModel<>(Filters.and(filters), Updates.set("invalid", true)));
+        }
+
+        if (!bulkSensitiveInvalidateUpdates.isEmpty()) {
+            if (!isDryRun) {
+                BulkWriteResult bwr =
+                        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkSensitiveInvalidateUpdates, new BulkWriteOptions().ordered(false));
+
+                loggerMaker.infoAndAddToDb("PII cleaner - modified " + bwr.getModifiedCount() + " from STI", LogDb.DASHBOARD);
+            }
+        }
+
+    }
+
+    private static void bulkSingleTypeInfoDelete(List<SingleTypeInfo.ParamId> idsToDelete, boolean isDryRun) {
+        ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
+        for(SingleTypeInfo.ParamId paramId: idsToDelete) {
+            String paramStr = "PII cleaner - deleting: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
+            loggerMaker.infoAndAddToDb(paramStr, LogDb.DASHBOARD);
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq("url", paramId.getUrl()));
+            filters.add(Filters.eq("method", paramId.getMethod()));
+            filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
+            filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
+            filters.add(Filters.eq("param", paramId.getParam()));
+            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+
+            bulkUpdatesForSingleTypeInfo.add(new DeleteOneModel<>(Filters.and(filters)));
+        }
+
+        if (!bulkUpdatesForSingleTypeInfo.isEmpty()) {
+            if (!isDryRun) {
+                BulkWriteResult bwr =
+                        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo, new BulkWriteOptions().ordered(false));
+
+                loggerMaker.infoAndAddToDb("PII cleaner - deleted " + bwr.getDeletedCount() + " from STI", LogDb.DASHBOARD);
+            }
+        }
+
+    }
+
+    private static final Gson gson = new Gson();
+
+    private static BasicDBObject extractJsonResponse(String message) {
+        Map<String, Object> json = gson.fromJson(message, Map.class);
+
+        String respPayload = (String) json.get("responsePayload");
+
+        if (respPayload == null || respPayload.isEmpty()) {
+            respPayload = "{}";
+        }
+
+        if(respPayload.startsWith("[")) {
+            respPayload = "{\"json\": "+respPayload+"}";
+        }
+
+        BasicDBObject payload;
+        try {
+            payload = BasicDBObject.parse(respPayload);
+        } catch (Exception e) {
+            payload = BasicDBObject.parse("{}");
+        }
+
+        return payload;
+    }
+
+    private static boolean isSimilar(String param, List<String> commonPayloads) {
+        for(String commonPayload: commonPayloads) {
+//            if (commonPayload.equals(sensitivePayload)) {
+//                continue;
+//            }
+
+            BasicDBObject commonPayloadObj = extractJsonResponse(commonPayload);
+            if (JSONUtils.flatten(commonPayloadObj).containsKey(param)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     static void executePIISourceFetch() {
@@ -925,6 +1085,7 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            setUpPiiCleanerScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
