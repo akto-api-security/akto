@@ -999,7 +999,6 @@ public class InitializerListener implements ServletContextListener {
         logger.info("MONGO URI " + mongoURI);
 
 
-
         executorService.schedule(new Runnable() {
             public void run() {
                 boolean calledOnce = false;

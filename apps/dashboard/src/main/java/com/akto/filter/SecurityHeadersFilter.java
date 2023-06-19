@@ -1,15 +1,11 @@
 package com.akto.filter;
 
+import com.akto.utils.HttpUtils;
+
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-
-import com.akto.dto.User;
-import com.akto.listener.RuntimeListener;
-import com.akto.utils.HttpUtils;
-import org.mortbay.jetty.servlet.AbstractSessionManager;
-
 import java.io.IOException;
 
 

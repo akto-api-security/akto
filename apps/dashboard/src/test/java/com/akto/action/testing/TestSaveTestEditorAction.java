@@ -6,7 +6,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.User;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.mongodb.client.model.Filters;
-import jdk.nashorn.internal.runtime.GlobalConstants;
 import org.junit.Test;
 
 import java.util.HashMap;
