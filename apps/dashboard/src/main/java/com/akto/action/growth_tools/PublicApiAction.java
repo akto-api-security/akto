@@ -37,7 +37,6 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
     private String url;
     private String method;
 
-    private static ObjectMapper mapper = new ObjectMapper();
     private static Gson gson = new Gson();
     private String content;
     private BasicDBObject apiInfoKey;

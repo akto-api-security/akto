@@ -19,11 +19,9 @@
                                     </span>
                                 </div>
 
-                                <v-list dense nav class="tests-list" :style="{ display: !customToggle ? 'none' : '' }">
-                                    <v-list-group v-for="item in selectedTestCategories(customTestObj)"
-                                        :key="item.displayName" class="tests-category-container"
-                                        active-class="tests-category-container-active"
-                                        :value="currentCategory === item.displayName">
+                                <v-list dense nav class="tests-list" :style="{display: !customToggle ? 'none' : ''}">
+                                    <v-list-group v-for="item in selectedTestCategories(customTestObj)" :key="item.displayName"
+                                        class="tests-category-container" active-class="tests-category-container-active" :value="currentCategory === item.displayName">
                                         <template v-slot:prependIcon>
                                             <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
                                         </template>
@@ -41,17 +39,16 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
-                                            class="test-container" @click="setSelectedMethod(test.value)">
-                                            <v-list-item-content
-                                                :class="test.label === defaultTestName ? 'test-container-active' : ''">
+                                            class="test-container"  @click="setSelectedMethod(test.value)">
+                                            <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
                                                 <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
-                                                            <span v-bind="attrs" v-on="on">
-                                                                {{ test.label }}
+                                                            <span v-bind="attrs" v-on="on" >
+                                                                {{test.label}}
                                                             </span>
                                                         </template>
-                                                        <span>{{ test.label }}</span>
+                                                        <span>{{test.label}}</span>
                                                     </v-tooltip>
                                                 </div>
                                             </v-list-item-content>
@@ -70,10 +67,9 @@
                                         {{ totalAktoTests }}
                                     </span>
                                 </div>
-                                <v-list dense nav class="tests-list" :style="{ display: !aktoToggle ? 'none' : '' }">
+                                <v-list dense nav class="tests-list" :style="{display: !aktoToggle ? 'none' : ''}">
                                     <v-list-group v-for="item in selectedTestCategories(testsObj)" :key="item.displayName"
-                                        class="tests-category-container" active-class="tests-category-container-active"
-                                        :value="currentCategory === item.displayName">
+                                        class="tests-category-container" active-class="tests-category-container-active" :value="currentCategory === item.displayName">
                                         <template v-slot:prependIcon>
                                             <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
                                         </template>
@@ -92,16 +88,15 @@
 
                                         <v-list-item v-for="(test, index) in testsObj[item.name].all" :key="index"
                                             class="test-container">
-                                            <v-list-item-content
-                                                :class="test.label === defaultTestName ? 'test-container-active' : ''">
+                                            <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
                                                 <div class="test-name show-tooltip" @click="setSelectedMethod(test.value)">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
-                                                            <span v-bind="attrs" v-on="on">
-                                                                {{ test.label }}
+                                                            <span v-bind="attrs" v-on="on" >
+                                                                {{test.label}}
                                                             </span>
                                                         </template>
-                                                        <span>{{ test.label }}</span>
+                                                        <span>{{test.label}}</span>
                                                     </v-tooltip>
                                                 </div>
                                             </v-list-item-content>
@@ -115,9 +110,13 @@
                         <div class="editor-header-container">
                             <div class="d-flex fd-column">
                                 <div class="file-name show-overflow mb-1">
-                                    {{ defaultTestName || "Test editor" }}
-                                    <v-icon v-if="!allCustomTests[defaultTestName]" :style="{ 'cursor': 'pointer' }" size=14
-                                        @click='openGithubLink' :ripple="false">
+                                    {{defaultTestName || "Test editor"}}
+                                    <v-icon v-if="!allCustomTests[defaultTestName]"
+                                        :style="{ 'cursor': 'pointer' }"
+                                        size=14
+                                        @click='openGithubLink'
+                                        :ripple="false"
+                                    >
                                         $githubIcon
                                     </v-icon>
                                 </div>
@@ -126,6 +125,7 @@
                                 </div>
                                 <div v-else>
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
+
                                 </div>
                             </div>
                             <v-menu left v-if="isAnonymousPage" offset-y rounded="lg">
@@ -163,13 +163,13 @@
                         </div>
                         <div ref="editor" style="height: calc(100vh - 120px);" class="monaco-editor"></div>
                         <selector-modal :show-dialog="showDialogBox" :title="titleBox" @closeDialog="closeDialog"
-                            :currentParam="currentParam" :test-categories="testCategories" @get_form_values="getFormValues"
-                            :custom-test="setTextId" />
+                            :currentParam="currentParam" :test-categories="testCategories"
+                            @get_form_values="getFormValues" :custom-test="setTextId" />
                     </div>
                     <div class="req-resp-col">
                         <div class="req-box-container" v-if="messageJson.message">
                             <sample-data :json="json" requestTitle="Request" responseTitle="Response" :tabularDisplay="true"
-                                @run_tests="runTestForGivenTemplate()" :isLoading="runTestObj.isLoading" />
+                                @run_tests="runTestForGivenTemplate()" :isLoading="runTestObj.isLoading"/>
                         </div>
                         <div class="empty-container" v-else>
                             No Values Yet !!
@@ -233,7 +233,8 @@
                                 </div>
                                 <div class="vulnerable-container">
                                     <span>
-                                        <v-icon size=14 :style="{ cursor: 'pointer' }"
+                                        <v-icon size=14
+                                            :style="{cursor: 'pointer' }"
                                             @click="showAllDetails = !showAllDetails">
                                             {{ showdetailsIcon }}
                                         </v-icon>
@@ -241,6 +242,7 @@
                                         <span>Vulnerability Found</span>
                                     </span>
                                     <span class="show-side">
+
                                         <v-icon size=16>$far_clock</v-icon>
                                         <span>{{ runTestObj.runTime }}</span>
                                     </span>
@@ -251,8 +253,9 @@
                 </div>
             </template>
         </simple-layout>
-        <issues-dialog :openDetailsDialog="dialogBox" :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap"
-            :issue="dialogBoxIssue" @closeDialogBox="(dialogBox = false)">
+        <issues-dialog :openDetailsDialog="dialogBox"
+            :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
+            @closeDialogBox="(dialogBox = false)">
         </issues-dialog>
         <simple-modal :class='["arrow-up", "mlp-74"]' :parentDialog="simpleModalDialogBox"
             title="Get started with API Testing today" body="Our API test templates can help you save time and effort for
@@ -333,7 +336,7 @@ export default {
             businessLogicSubcategories: [],
             vulnerableRequests: [],
             mapTestToYaml: {},
-            mapTestToStamp: {},
+            mapTestToStamp:{},
             totalAktoTests: 0,
             aktoToggle: false,
             customToggle: false,
@@ -385,8 +388,8 @@ export default {
             this.selectedAnonymousOption = 'Copy/paste data'
         },
         findTestLabelFromTestValue(testValue) {
-            let aktoTest = Object.values(this.testsObj).map(x => x.all).flat().find(x => x.value === testValue)
-            let customTest = Object.values(this.customTestObj).map(x => x.all).flat().find(x => x.value === testValue)
+            let aktoTest = Object.values(this.testsObj).map (x => x.all).flat().find(x=>x.value === testValue)
+            let customTest = Object.values(this.customTestObj).map (x => x.all).flat().find(x=>x.value === testValue)
 
             if (aktoTest) {
                 this.aktoToggle = true
@@ -416,7 +419,7 @@ export default {
                 }
                 this.makeJson()
             } else if (param === 'save') {
-                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp) => {
+                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp)=>{
                     window._AKTO.$emit('SHOW_SNACKBAR', {
                         show: true,
                         text: "Test template added successfully!",
@@ -583,20 +586,20 @@ export default {
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
         },
         findSuffixForNewTest(testId) {
-            let aktoTests = Object.values(this.testsObj).map(x => x.all).flat().filter(x => x.value.indexOf(testId) == 0)
-            let customTests = Object.values(this.testsObj).map(x => x.all).flat().filter(x => x.value.indexOf(testId) == 0)
+            let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)
+            let customTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)
 
-            let currMaxIndex = Math.max(0, ...[...aktoTests, ...customTests].map(x => +(x.value.replace(testId + "_CUSTOM_", ""))).filter(isFinite))
+            let currMaxIndex = Math.max(0, ...[...aktoTests, ...customTests].map(x=>+(x.value.replace(testId+"_CUSTOM_", ""))).filter(isFinite))
 
 
 
-            return currMaxIndex + 1
+            return currMaxIndex+1
         },
         changeValue(testName) {
             this.setTextId = {}
             this.lastEdited = -1
             this.defaultTestName = testName
-            if (this.allCustomTests[testName]) {
+            if(this.allCustomTests[testName]){
                 this.setTextId = this.allCustomTests[testName]
             }
             if (!this.mapTestToYaml[testName]) {
@@ -614,16 +617,16 @@ export default {
             this.totalCustomTests = this.searchObjects(this.customTestObj, val.toLowerCase())
             this.totalAktoTests = this.searchObjects(this.testsObj, val.toLowerCase())
         },
-        searchObjects(objects, searchString) {
+        searchObjects(objects,searchString) {
             let totalTests = 0
             for (let key in objects) {
                 if (objects.hasOwnProperty(key)) {
                     let obj = objects[key]
-                    let arr = obj.all.filter((test) => {
+                    let arr = obj.all.filter((test)=>{
                         let name = test.label.toString().toLowerCase().replace(/ /g, "")
                         let category = test.category.toString().toLowerCase().replace(/ /g, "")
                         let content = this.mapTestToYaml[test.label].toString().toLowerCase();
-                        if (name.includes(searchString) || category.includes(searchString) || content.includes(searchString)) {
+                        if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
                             totalTests++
                             return true
                         }
@@ -635,7 +638,7 @@ export default {
         },
         populateMapCategoryToSubcategory() {
             let ret = {}
-            this.customTestObj = {}
+            this.customTestObj={}
             this.mapTestToYaml = {}
             this.totalCustomTests = 0
             this.allCustomTests = {}
@@ -651,7 +654,7 @@ export default {
                 }
                 this.mapTestToYaml[x.testName] = x.content
                 this.mapTestToStamp[x.testName] = func.prettifyEpoch(x.updatedTs)
-                if (x.templateSource._name === "CUSTOM") {
+                if(x.templateSource._name === "CUSTOM"){
                     let customVal = {
                         name: x._name,
                         category: x.superCategory.name
@@ -662,7 +665,7 @@ export default {
                         this.customTestObj[x.superCategory.name] = { all: [] }
                     }
                     this.customTestObj[x.superCategory.name].all.push(obj)
-                } else {
+                }else{
                     ret[x.superCategory.name].all.push(obj)
                 }
                 this.copyCustomObj = JSON.parse(JSON.stringify(this.customTestObj))
@@ -737,10 +740,10 @@ export default {
                 "highlightPaths": this.messageJson["highlightPaths"],
             }
         },
-        showSelector() {
+        showSelector(){
             return this.defaultValue.length > 0
         },
-        showdetailsIcon() {
+        showdetailsIcon(){
             return this.showAllDetails ? "$fas_angle-double-down" : "$fas_angle-double-up"
         },
         getTextColor() {
@@ -762,7 +765,8 @@ export default {
 </script>
 
 <style scoped>
-.tests-category-container.v-list-group--active>>>.v-list-group__header__prepend-icon {
+
+.tests-category-container.v-list-group--active >>> .v-list-group__header__prepend-icon {
     transform: rotate(90deg);
 }
 .req-resp-col >>> .copy-icon {
@@ -777,7 +781,7 @@ export default {
   background: #FFFFFF;
 }
 
-.test-editor-panel>>>.akto-left-pane {
+.test-editor-panel >>> .akto-left-pane {
     padding-left: 4px;
     padding-right: 4px;
 }
@@ -808,9 +812,10 @@ export default {
     overflow-y: auto;
 }
 
-.test-editor-panel>>>.akto-left-pane {
+.test-editor-panel >>> .akto-left-pane {
     border: none !important;
 }
+
 </style>
 
 <style lang="scss" scoped>
@@ -941,8 +946,7 @@ export default {
     gap: 2px;
     align-items: center;
     cursor: pointer;
-
-    .shift-right {
+    .shift-right{
         position: absolute;
         right: 20px;
     }
@@ -1028,7 +1032,6 @@ export default {
         word-break: break-all;
     }
 }
-
 .show-overflow {
     overflow: hidden;
     white-space: nowrap;
