@@ -33,7 +33,6 @@
             title: obj.strN,
             description: obj.strN,
             version: obj.strN,
-            isAnonymousPage: obj.boolN
         }
     }
 
@@ -66,10 +65,5 @@
     border-radius: 4px
     padding: 0 4px
     font-weight: 500
-
-.white-color
-    color: var(--white) !important
-    font-weight: 600
-
     
 </style>
