@@ -10,7 +10,7 @@ public class StrategyParser {
         Map<String, Object> metadataMap = (Map) metadataObj;
         Strategy strategy = new Strategy();
 
-        Object val = metadataMap.containsKey("run_once");
+        Object val = metadataMap.get("run_once");
         if (val != null) {
             strategy.setRunOnce(val.toString());
         }
