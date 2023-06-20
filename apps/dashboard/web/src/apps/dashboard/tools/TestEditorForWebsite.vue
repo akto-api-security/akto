@@ -79,6 +79,12 @@
                 </custom-sample-data-api-modal>
             </template>
         </text-editor>
+        <div class="akto-external-links">
+            <v-btn primary dark depressed class="white-color" color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
+                Try on your APIs
+                <v-icon size="11">$fas_external-link-alt</v-icon>
+            </v-btn>
+        </div>
     </div>
 </template>
 <script>
@@ -254,4 +260,13 @@ export default {
     color: var(--white) !important;
 }
 
+.akto-external-links {
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    padding: 24px 32px;
+    display: flex;
+    gap: 8px;
+
+}
 </style>
