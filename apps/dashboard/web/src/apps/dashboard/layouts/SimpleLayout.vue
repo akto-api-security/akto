@@ -1,25 +1,17 @@
 <template>
     <div>
         <div class="layout-border pl-8" style="padding-bottom: 12px">
-            <div v-if="title" class="d-flex jc-sb">
-                <div :class="['pt-6', version && version.length > 0 ? 'version-class' : '']">
-                    <div>
-                        <span class="board-name">{{ title || 'Loading...' }}</span>
-                    </div>
-
-                    <div v-if="description">
-                        <span class="board-description">{{description}}</span>
-                    </div>
-
-                    <div v-if="version && version.length > 0" class="version-name">
-                        {{ version }}
-                    </div>
+            <div v-if="title" :class="['pt-6', version && version.length > 0 ? 'version-class': '']">
+                <div>
+                    <span class="board-name">{{ title || 'Loading...' }}</span>
                 </div>
-                <div v-if="isAnonymousPage" class="mt-6 pr-8">
-                    <v-btn primary dark depressed class="white-color" color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
-                        Try on your APIs
-                        <v-icon size="11">$fas_external-link-alt</v-icon>
-                    </v-btn>
+
+                <div v-if="description">
+                    <span class="board-description">{{description}}</span>
+                </div>
+
+                <div v-if="version && version.length > 0" class="version-name">
+                    {{ version }}
                 </div>
             </div>
             <div v-else>

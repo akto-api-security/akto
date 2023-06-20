@@ -1,6 +1,6 @@
 <template>
     <div>
-        <simple-layout title="Test editor" version="Beta" :isAnonymousPage="isAnonymousPage">
+        <simple-layout title="Test editor" version="Beta">
             <template>
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
@@ -247,7 +247,6 @@ export default {
     },
     props: {
         defaultTestId: obj.strN,
-        isAnonymousPage: obj.boolN,
         refreshTestTemplatesApiCall: {
             type: Function,
             required: false,
