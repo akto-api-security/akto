@@ -1,0 +1,41 @@
+id: STRUTS_DEBUG_MODE_ENABLED
+info:
+  name: Struts Debug Mode Enabled 
+  description: "The error response contains information related to urls which may help in more sophisticated attacks"
+  details: >
+            "The endpoint appears to be give out information related to endpoints existing in the application, on trying an invalid request, possibly due to DJANGO DEBUG mode being enabled. The original request
+            was replayed by modifying the url with an invalid value.
+            "<b>Background:</b> Inconsistencies in error messages can reveal important clues on how a site works, 
+            and what information is present under the covers.
+  impact: "This information can be used to facilitate more sophisticated attacks on your application"
+  category:
+    name: 
+    shortName: VEM
+    displayName: Verbose Error Messages (VEM)
+  subCategory: DJANGO_URL_EXPOSED
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-community/Improper_Error_Handling"
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/08-Testing_for_Error_Handling/01-Testing_For_Improper_Error_Handling"
+    - "https://hackerone.com/reports/1033423"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}testInvalidUrl
+
+validate:
+  response_payload:
+    contains_either: "Django tried these url patterns"
