@@ -25,6 +25,7 @@ const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState"
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
+const TestEditorForWebsite = () => import("@/apps/dashboard/tools/TestEditorForWebsite.vue")
 
 Vue.use(Router)
 
@@ -59,7 +60,7 @@ const router =  new Router({
         {
             path: '/tools/test-editor/:toolsTestId',
             name: 'tools-test-editor-id',
-            component: TextEditor,
+            component: TestEditorForWebsite,
             props: route => ({
                 defaultTestId: decodeURIComponent(route.params.toolsTestId),
                 isAnonymousPage: true

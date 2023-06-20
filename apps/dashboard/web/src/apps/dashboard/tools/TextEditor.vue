@@ -120,46 +120,17 @@
                                         $githubIcon
                                     </v-icon>
                                 </div>
-                                <div v-if="isAnonymousPage">
-                                    <span class="unsaved-changes" v-if="IsEdited">unsaved changes</span>
-                                </div>
-                                <div v-else>
+                                <slot name="unsavedChanges" :IsEdited="IsEdited">
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
-
+                                </slot>
+                            </div>
+                            <slot name="saveEditedTemplate" :IsEdited="IsEdited">
+                                <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
+                                    @click="saveTestTemplate">
+                                    <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
+                                    <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
                                 </div>
-                            </div>
-                            <v-menu left v-if="isAnonymousPage" offset-y rounded="lg">
-                                <template v-slot:activator="{ on, attrs }">
-                                    <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }" v-on="on"
-                                        v-bind="attrs">
-                                        <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
-                                        <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
-                                    </div>
-                                </template>
-                                <v-card>
-                                    <v-list class="pa-0" >
-                                        <v-list-item  class="save-option-class">
-                                                <div class="d-flex flex-column">
-                                                    <v-list-item-content class="d-flex flex-column" >
-                                                        <v-list-item-subtitle>In order to unlock the </v-list-item-subtitle>
-                                                        <v-list-item-subtitle>power to save your tests.</v-list-item-subtitle>
-                                                    </v-list-item-content>
-                                                    <v-list-item-action class="ml-0">
-                                                        <v-btn width="100%" class="white-color" primary dark depressed color="var(--themeColor)"
-                                                            href="https://app.akto.io/login" target="_blank">
-                                                            Sign-up now
-                                                        </v-btn>
-                                                    </v-list-item-action>
-                                                </div>
-                                            </v-list-item>
-                                    </v-list>
-                                </v-card>
-                            </v-menu>
-                            <div v-else class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
-                                @click="saveTestTemplate">
-                                <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
-                                <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
-                            </div>
+                            </slot>
                         </div>
                         <div ref="editor" style="height: calc(100vh - 120px);" class="monaco-editor"></div>
                         <selector-modal :show-dialog="showDialogBox" :title="titleBox" @closeDialog="closeDialog"
@@ -174,44 +145,13 @@
                         <div class="empty-container" v-else>
                             No Values Yet !!
                         </div>
-
-                        <v-menu offset-y rounded="lg" nudge-bottom="12" nudge-left="100" v-if="isAnonymousPage">
-                                <template v-slot:activator="{ on, attrs }">
-
-                                    <div class="d-flex jc-sb select-url" v-on="on" v-bind="attrs">
-                                        <span class="file-name url-name show-overflow ml-2">{{ selectedAnonymousOption }}</span>
-                                        <v-icon size=12>$fas_angle-down</v-icon>
-                                    </div>
-                                </template>
-                                <v-list class="pa-0">
-                                    <v-list-item @click="resetSampleData()">
-                                        <v-list-item-title>
-                                            <div class="d-flex jc-sb">
-                                                <span class="menu-list-font">Sample data</span>
-                                                <v-icon v-if="selectedAnonymousOption == 'Sample data'">$fas_check</v-icon>
-                                            </div>
-                                            </v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="(customSampleDataDialogBox = true)">
-                                        <v-list-item-title>
-                                            <div class="d-flex jc-sb">
-                                                <span class="menu-list-font">Use custom API</span>
-                                                <v-icon v-if="selectedAnonymousOption == 'Copy/paste data'">$fas_check</v-icon>
-                                            </div>
-                                        </v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item class="theme-color" href="https://app.akto.io/login" target="_blank">
-                                        <v-list-item-title><span class="menu-list-font">Add automated collection</span><v-icon class="white-color">$fas_arrow-right</v-icon></v-list-item-title>
-
-                                    </v-list-item>
-                                </v-list>
-                            </v-menu>
-                        <div v-else>
+                        <slot name="sampleDataSelector" :resetSelectedURL="resetSelectedURL" :selectedUrl="selectedUrl"
+                            :setMessageJson="setMessageJson">
                             <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
                                 <v-icon size=12>$fas_check</v-icon>
                                 <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
                             </div>
-                        </div>
+                        </slot>
                         <div class="footer-div">
                             <div class="show-run-test" v-if="!runTest">
                                 Run test to see results
@@ -253,17 +193,12 @@
                 </div>
             </template>
         </simple-layout>
+        <slot name="modalsOverTestEditor" :setMessageJson="setMessageJson">
+        </slot>
         <issues-dialog :openDetailsDialog="dialogBox"
             :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
             @closeDialogBox="(dialogBox = false)">
         </issues-dialog>
-        <simple-modal :class='["arrow-up", "mlp-74"]' :parentDialog="simpleModalDialogBox"
-            title="Get started with API Testing today" body="Our API test templates can help you save time and effort for
-         testing your APIs. Sign up for Akto today and start using them!"
-            @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal>
-        <custom-sample-data-api-modal title="Add your own API" :parentDialog="customSampleDataDialogBox"
-            @closeCustomSampleDataDialog="(customSampleDataDialogBox = false)" @setSampleDataApi="setSampleDataApi">
-        </custom-sample-data-api-modal>
     </div>
 </template>
 
@@ -276,8 +211,6 @@ import SampleData from '../shared/components/SampleData.vue';
 import SimpleLayout from '../layouts/SimpleLayout.vue';
 import SelectorModal from './SelectorModal.vue';
 import IssuesDialog from '../../dashboard/views/issues/components/IssuesDialog'
-import SimpleModal from './SimpleModal.vue'
-import CustomSampleDataApiModal from "./CustomSampleDataApiModal.vue";
 
 import issuesApi from "../views/issues/api"
 import inventoryApi from "../views/observe/inventory/api"
@@ -285,7 +218,6 @@ import testingApi from "../views/testing/api"
 
 import func from "@/util/func"
 import obj from "@/util/obj"
-import request from '@/util/request'
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -311,13 +243,45 @@ export default {
         SampleData,
         SimpleLayout,
         SelectorModal,
-        IssuesDialog,
-        SimpleModal,
-        CustomSampleDataApiModal
+        IssuesDialog
     },
     props: {
         defaultTestId: obj.strN,
-        isAnonymousPage: obj.boolN
+        isAnonymousPage: obj.boolN,
+        refreshTestTemplatesApiCall: {
+            type: Function,
+            required: false,
+            default: async function() {
+                let result = {}
+                await issuesApi.fetchAllSubCategories().then(resp => {
+                    result = resp
+                })
+                return result
+            }
+            
+        },
+        runTestForGivenTemplateApiCall: {
+            type: Function,
+            required: false,
+            default: async function(textEditor, selectedUrl, sampleDataListForTestRun) {
+                let result = {}
+                await testingApi.runTestForTemplate(textEditor, selectedUrl, sampleDataListForTestRun).then(resp => {
+                    result = resp
+                })
+                return result
+            }
+        },
+        makeJsonApiCall: {
+            type: Function,
+            required: false,
+            default: async function(selectedUrl) {
+                let result = {}
+                await inventoryApi.fetchSampleData(selectedUrl.url, selectedUrl.apiCollectionId, selectedUrl.method).then(resp => {
+                    result = resp
+                })
+                return result
+            }
+        }
     },
     data() {
         return {
@@ -351,7 +315,6 @@ export default {
             showAllDetails: false,
             mapRequestsToId: {},
             selectedUrl: {},
-            selectedAnonymousOption: "Sample data",
             runTestObj: {
                 isLoading: false,
                 totalAttempts: 16,
@@ -372,21 +335,10 @@ export default {
             allCustomTests: {},
             setTextId: {},
             subCatogoryMap: {},
-            sampleDataListForTestRun: null,
-            simpleModalDialogBox: false,
-            customSampleDataDialogBox: false
+            sampleDataListForTestRun: null
         }
     },
     methods: {
-        async setSampleDataApi(test) {
-            await testingApi.setCustomSampleApi(test.requestValue, test.responseValue).then((resp) => {
-                if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
-                    this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
-                    this.sampleDataListForTestRun = resp.sampleDataList
-                }
-            })
-            this.selectedAnonymousOption = 'Copy/paste data'
-        },
         findTestLabelFromTestValue(testValue) {
             let aktoTest = Object.values(this.testsObj).map (x => x.all).flat().find(x=>x.value === testValue)
             let customTest = Object.values(this.customTestObj).map (x => x.all).flat().find(x=>x.value === testValue)
@@ -430,6 +382,20 @@ export default {
                 })
             }
         },
+        resetSelectedURL() {
+            this.selectedUrl = {}
+            this.messageJson = {}
+            let testId = this.defaultTest
+            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0]) {
+                let obj = {
+                    apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
+                    url: this.mapRequestsToId[testId][0].url,
+                    method: this.mapRequestsToId[testId][0].method._name
+                }
+                this.selectedUrl = obj
+            }
+            return
+        },
         resetSampleData() {
             this.selectedUrl = {}
             this.messageJson = {}
@@ -446,11 +412,12 @@ export default {
             }
             this.selectedAnonymousOption = 'Sample data'
         },
-        setSelectedMethod(testId, isCalledFromMounted) {
-            if (this.isAnonymousPage && !isCalledFromMounted) {
-                this.simpleModalDialogBox = true
-                return
-            }
+        setMessageJson(result) {
+            debugger
+            this.messageJson = result.messageJson
+            this.sampleDataListForTestRun = result.sampleDataListForTestRun
+        },
+        setSelectedMethod(testId) {
             let testName = this.findTestLabelFromTestValue(testId)
             this.changeValue(testName)
             this.defaultTest = testId
@@ -458,11 +425,11 @@ export default {
             this.selectedUrl = {}
             this.messageJson = {}
             this.runTest = false
-            if (this.isAnonymousPage) {
-                window.history.pushState({ urlPath: '/tools/test-editor/' + testId }, "", '/tools/test-editor/' + testId)
-            } else {
-                window.history.pushState({ urlPath: '/dashboard/test-editor/' + testId }, "", '/dashboard/test-editor/' + testId)
-            }
+
+            let pathname = window.location.pathname
+            pathname = pathname.slice(0, pathname.lastIndexOf('/') + 1)
+            window.history.pushState({ urlPath: pathname + testId }, "", pathname + testId)
+
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
@@ -479,67 +446,30 @@ export default {
             }
         },
         async makeJson() {
-            if (this.isAnonymousPage) {
-                await request({
-                    url: '/tools/fetchSampleData',
-                    method: 'POST',
-                    data: {
-                        url: this.selectedUrl.url,
-                        apiCollectionId: this.selectedUrl.apiCollectionId,
-                        method: this.selectedUrl.method
-                    }
-                }).then((resp) => {
-                    if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
-                        this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
-                        this.sampleDataListForTestRun = resp.sampleDataList
-                    }
-                })
-            } else {
-                await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
-                    if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
-                        this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
-                        this.sampleDataListForTestRun = resp.sampleDataList
-                    }
-                })
+            let resp = await this.makeJsonApiCall(this.selectedUrl)
+            if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
+                this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
+                this.sampleDataListForTestRun = resp.sampleDataList
             }
         },
         async runTestForGivenTemplate() {
             this.runTest = true
             let testStartTime = new Date()
             this.runTestObj.isLoading = true
-            if (this.isAnonymousPage) {
-                await testingApi.runTestForTemplateAnonymous(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
-                    this.testingRunResult = resp["testingRunResult"]
-                    this.testingRunHexId = resp["testingRunHexId"]
-                    this.dialogBoxIssue = resp["testingRunIssues"]
-                    this.subCatogoryMap = resp["subCategoryMap"]
+            let resp = await this.runTestForGivenTemplateApiCall(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun)
+            this.testingRunResult = resp["testingRunResult"]
+            this.testingRunHexId = resp["testingRunHexId"]
+            this.dialogBoxIssue = resp["testingRunIssues"]
+            this.subCatogoryMap = resp["subCategoryMap"]
 
-                    if (this.dialogBoxIssue) {
-                        this.runTestObj.vulnerability = this.dialogBoxIssue.severity
-                        this.runTestObj.isLoading = false
-                    } else {//No issues found
-                        this.runTestObj.vulnerability = "No "
-                        this.runTestObj.isLoading = false
-                    }
-                    this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
-                })
-            } else {
-                await testingApi.runTestForTemplate(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
-                    this.testingRunResult = resp["testingRunResult"]
-                    this.testingRunHexId = resp["testingRunHexId"]
-                    this.dialogBoxIssue = resp["testingRunIssues"]
-                    this.subCatogoryMap = resp["subCategoryMap"]
-
-                    if (this.dialogBoxIssue) {
-                        this.runTestObj.vulnerability = this.dialogBoxIssue.severity
-                        this.runTestObj.isLoading = false
-                    } else {//No issues found
-                        this.runTestObj.vulnerability = "No "
-                        this.runTestObj.isLoading = false
-                    }
-                    this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
-                })
+            if (this.dialogBoxIssue) {
+                this.runTestObj.vulnerability = this.dialogBoxIssue.severity
+                this.runTestObj.isLoading = false
+            } else {//No issues found
+                this.runTestObj.vulnerability = "No "
+                this.runTestObj.isLoading = false
             }
+            this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
         },
         showAllAttempts() {
             this.dialogBox = true
@@ -697,37 +627,20 @@ export default {
         },
         async refreshTestTemplates() {
             let _this = this
-            if (this.isAnonymousPage) {
-                await request({
-                    url: '/tools/fetchAllSubCategories',
-                    method: 'POST',
-                    data: {}
-                }).then(resp => {
-                    _this.testCategories = resp.categories
-                    _this.businessLogicSubcategories = resp.subCategories
-                    _this.vulnerableRequests = resp.vulnerableRequests
-                    _this.testsObj = _this.populateMapCategoryToSubcategory()
-                    _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
-                    _this.mapRequests()
-                })
-            } else {
-                await issuesApi.fetchAllSubCategories().then(resp => {
-                    _this.testCategories = resp.categories
-                    _this.businessLogicSubcategories = resp.subCategories
-                    _this.vulnerableRequests = resp.vulnerableRequests
-                    _this.testsObj = _this.populateMapCategoryToSubcategory()
-                    _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
-                    _this.mapRequests()
-                })
-            }
-
+            let resp = await this.refreshTestTemplatesApiCall()
+            _this.testCategories = resp.categories
+            _this.businessLogicSubcategories = resp.subCategories
+            _this.vulnerableRequests = resp.vulnerableRequests
+            _this.testsObj = _this.populateMapCategoryToSubcategory()
+            _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
+            _this.mapRequests()
         }
     },
     async mounted() {
         this.createEditor()
         let _this = this
         await this.refreshTestTemplates()
-        this.setSelectedMethod(this.defaultTest, true)
+        this.setSelectedMethod(this.defaultTest)
         _this.textEditor.onDidChangeModelContent(() => {
             _this.IsEdited = _this.textEditor.getValue() !== _this.defaultValue
         })
@@ -841,14 +754,6 @@ export default {
             display: flex;
             gap: 4px;
             align-items: center;
-        }
-
-        .unsaved-changes {
-            background: var(--warning);
-            font-size: 12px;
-            border-radius: 4px;
-            color: var(--white);
-            padding: 1px 8px 1px 8px;
         }
 
         .last-edited {
@@ -1044,27 +949,5 @@ export default {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-}
-
-.white-color {
-    color: var(--white) !important;
-}
-
-.theme-color {
-    background-color: var(--themeColor) !important;
-    color: var(--white) !important;
-}
-
-.menu-list-font {
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    margin: auto 0px;
-}
-
-.save-option-class {
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    color: var(--themeColorDark) !important;
-    background-color: var(--hexColor29) !important;
 }
 </style>
