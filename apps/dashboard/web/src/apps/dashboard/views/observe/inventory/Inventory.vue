@@ -9,7 +9,7 @@
                         <v-breadcrumbs-item
                             @click="navigateFromBreadcrumb(item)"
                             :disabled="item.disabled"
-                            :class="item.disabled ? '' : 'clickable'"
+                        :class="item.disabled ? '' : 'clickable-crumb'"
                         >
                             <span>{{ item.text }}</span>
                         </v-breadcrumbs-item>
@@ -145,4 +145,7 @@ export default {
 .api-breadcrumbs
     padding-left: 0px 
     padding-bottom: 0px
+.clickable-crumb
+    cursor: pointer
+    padding: 0 5px 0 5px
 </style>>
