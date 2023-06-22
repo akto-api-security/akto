@@ -215,7 +215,7 @@ public class SaveTestEditorAction extends UserAction {
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(0),
-                    Collections.singletonList("Request API failed to satisfy test criteria, skipping execution"),
+                    Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
                     Context.now(), new ObjectId()
