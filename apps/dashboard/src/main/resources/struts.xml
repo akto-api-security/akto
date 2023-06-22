@@ -940,7 +940,7 @@
             </result>
         </action>
 
-        <action name="tools/fetchAllSubCategories" class="com.akto.action.growth_tools.PublicApiAction" method="fetchAllSubCategories">
+        <action name="tools/fetchAllSubCategories" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllSubCategories">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
@@ -951,7 +951,7 @@
             </result>
         </action>
 
-        <action name="tools/fetchSampleData" class="com.akto.action.growth_tools.PublicApiAction" method="fetchSampleData">
+        <action name="tools/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>
@@ -1806,7 +1806,18 @@
             </result>
         </action>
 
-        <action name="tools/runTestForGivenTemplate" class="com.akto.action.growth_tools.PublicApiAction" method="runTestForGivenTemplate">
+<!--        <action name="tools/runTestForGivenTemplate" class="com.akto.action.growth_tools.PublicApiAction" method="runTestForGivenTemplate">-->
+<!--            <interceptor-ref name="json"/>-->
+<!--            <interceptor-ref name="defaultStack" />-->
+<!--            <result name="SUCCESS" type="json"/>-->
+<!--            <result name="ERROR" type="json">-->
+<!--                <param name="statusCode">422</param>-->
+<!--                <param name="ignoreHierarchy">false</param>-->
+<!--                <param name="includeProperties">^actionErrors.*</param>-->
+<!--            </result>-->
+<!--        </action>-->
+
+        <action name="tools/runTestForGivenTemplate" class="com.akto.action.test_editor.SaveTestEditorAction" method="runTestForGivenTemplate">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
