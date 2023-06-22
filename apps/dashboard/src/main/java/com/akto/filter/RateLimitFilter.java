@@ -67,7 +67,6 @@ public class RateLimitFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) request;
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
-
         String requestURI = httpServletRequest.getRequestURI();
         String ip = httpServletRequest.getRemoteAddr();
 

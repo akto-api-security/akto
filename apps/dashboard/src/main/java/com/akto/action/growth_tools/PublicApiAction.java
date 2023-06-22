@@ -1,21 +1,11 @@
 package com.akto.action.growth_tools;
 
-import com.akto.action.TrafficAction;
-import com.akto.action.test_editor.SaveTestEditorAction;
-import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.demo.VulnerableRequestForTemplate;
-import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.util.enums.GlobalEnums;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import org.apache.struts2.interceptor.ServletRequestAware;
@@ -23,27 +13,17 @@ import org.apache.struts2.interceptor.ServletResponseAware;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class PublicApiAction extends ActionSupport implements Action, ServletResponseAware, ServletRequestAware {
     protected HttpServletRequest request;
     protected HttpServletResponse response;
-    private ArrayList<BasicDBObject> subCategories;
-    private GlobalEnums.TestCategory[] categories;
-    private List<TestSourceConfig> testSourceConfigs;
-    private List<VulnerableRequestForTemplate> vulnerableRequests;
     private List<SampleData> sampleDataList;
-    private int apiCollectionId;
-    private String url;
-    private String method;
 
     private static Gson gson = new Gson();
-    private String content;
-    private BasicDBObject apiInfoKey;
-    private TestingRunResult testingRunResult;
-    private TestingRunIssues testingRunIssues;
-    private Map<String, BasicDBObject> subCategoryMap;
-
     private String sampleRequestString;
     private String sampleResponseString;
 
@@ -60,54 +40,6 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
 
     @Override
     public String execute() throws Exception {
-        return SUCCESS.toUpperCase();
-    }
-
-    public String runTestForGivenTemplate() {
-        Context.accountId.set(1_000_000);
-        SaveTestEditorAction testingAction = new SaveTestEditorAction();
-        testingAction.setContent(content);
-        testingAction.setSampleDataList(sampleDataList);
-        testingAction.setApiInfoKey(apiInfoKey);
-        String runResult = testingAction.runTestForGivenTemplate();
-        if(runResult == ERROR.toUpperCase()) {
-            for (String error : testingAction.getActionErrors()) {
-                addActionError(error);
-            }
-            return ERROR.toUpperCase();
-        }
-        testingRunResult = testingAction.getTestingRunResult();
-        testingRunIssues = testingAction.getTestingRunIssues();
-        subCategoryMap = testingAction.getSubCategoryMap();
-        return SUCCESS.toUpperCase();
-    }
-    public String fetchAllSubCategories() {
-        Context.accountId.set(1_000_000);
-        IssuesAction issuesAction = new IssuesAction();
-        String runResult = issuesAction.fetchAllSubCategories();
-        if(runResult == ERROR.toUpperCase()) {
-            for (String error : issuesAction.getActionErrors()) {
-                addActionError(error);
-            }
-            return ERROR.toUpperCase();
-        }
-
-        subCategories = issuesAction.getSubCategories();
-        testSourceConfigs = issuesAction.getTestSourceConfigs();
-        vulnerableRequests = issuesAction.getVulnerableRequests();
-        categories = GlobalEnums.TestCategory.values();
-        return SUCCESS.toUpperCase();
-    }
-
-    public String fetchSampleData() {
-        Context.accountId.set(1_000_000);
-        TrafficAction trafficAction = new TrafficAction();
-        trafficAction.setApiCollectionId(apiCollectionId);
-        trafficAction.setUrl(url);
-        trafficAction.setMethod(method);
-        trafficAction.fetchSampleData();
-
-        sampleDataList = trafficAction.getSampleDataList();
         return SUCCESS.toUpperCase();
     }
 
@@ -223,38 +155,6 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
         this.response = response;
     }
 
-    public ArrayList<BasicDBObject> getSubCategories() {
-        return subCategories;
-    }
-
-    public void setSubCategories(ArrayList<BasicDBObject> subCategories) {
-        this.subCategories = subCategories;
-    }
-
-    public GlobalEnums.TestCategory[] getCategories() {
-        return categories;
-    }
-
-    public void setCategories(GlobalEnums.TestCategory[] categories) {
-        this.categories = categories;
-    }
-
-    public List<TestSourceConfig> getTestSourceConfigs() {
-        return testSourceConfigs;
-    }
-
-    public void setTestSourceConfigs(List<TestSourceConfig> testSourceConfigs) {
-        this.testSourceConfigs = testSourceConfigs;
-    }
-
-    public List<VulnerableRequestForTemplate> getVulnerableRequests() {
-        return vulnerableRequests;
-    }
-
-    public void setVulnerableRequests(List<VulnerableRequestForTemplate> vulnerableRequests) {
-        this.vulnerableRequests = vulnerableRequests;
-    }
-
     public List<SampleData> getSampleDataList() {
         return sampleDataList;
     }
@@ -263,29 +163,6 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
         this.sampleDataList = sampleDataList;
     }
 
-    public int getApiCollectionId() {
-        return apiCollectionId;
-    }
-
-    public void setApiCollectionId(int apiCollectionId) {
-        this.apiCollectionId = apiCollectionId;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public String getMethod() {
-        return method;
-    }
-
-    public void setMethod(String method) {
-        this.method = method;
-    }
 
     public void setSampleRequestString(String sampleRequestString) {
         this.sampleRequestString = sampleRequestString;
@@ -301,45 +178,5 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
 
     public String getSampleResponseString() {
         return sampleResponseString;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public BasicDBObject getApiInfoKey() {
-        return apiInfoKey;
-    }
-
-    public void setApiInfoKey(BasicDBObject apiInfoKey) {
-        this.apiInfoKey = apiInfoKey;
-    }
-
-    public TestingRunResult getTestingRunResult() {
-        return testingRunResult;
-    }
-
-    public void setTestingRunResult(TestingRunResult testingRunResult) {
-        this.testingRunResult = testingRunResult;
-    }
-
-    public TestingRunIssues getTestingRunIssues() {
-        return testingRunIssues;
-    }
-
-    public void setTestingRunIssues(TestingRunIssues testingRunIssues) {
-        this.testingRunIssues = testingRunIssues;
-    }
-
-    public Map<String, BasicDBObject> getSubCategoryMap() {
-        return subCategoryMap;
-    }
-
-    public void setSubCategoryMap(Map<String, BasicDBObject> subCategoryMap) {
-        this.subCategoryMap = subCategoryMap;
     }
 }
