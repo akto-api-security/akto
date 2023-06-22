@@ -37,7 +37,7 @@ execute:
   requests:
     - req:
         - modify_query_param:
-            queryKey: ${'7' * 7}
+            queryKey: '%24%7B%277%27%20*%207%7D'
         - modify_body_param:
             payloadKey: ${'7'*7}
 

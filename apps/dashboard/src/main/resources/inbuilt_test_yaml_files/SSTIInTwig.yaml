@@ -37,7 +37,7 @@ execute:
   requests:
     - req:
         - modify_query_param:
-            queryKey: '{{89 * 91}}'
+            queryKey: '%7B%7B89%20*%2091%7D%7D'
         - modify_body_param:
             payloadKey: '{{89 * 91}}'
 
