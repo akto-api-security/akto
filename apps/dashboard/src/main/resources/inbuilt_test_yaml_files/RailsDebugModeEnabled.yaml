@@ -12,7 +12,7 @@ info:
           level. Disabling debug mode in production environments is essential to prevent information 
           disclosure and enhance the application's security posture.
   impact: "Enabling Rails debug mode can expose sensitive information, increasing the risk of security vulnerabilities and potential attacks."
- category:
+  category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
