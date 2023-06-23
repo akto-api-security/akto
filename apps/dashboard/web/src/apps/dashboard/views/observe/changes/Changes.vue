@@ -52,7 +52,7 @@
                     :headers="endpointHeaders" 
                     :items="newEndpoints" 
                     name="New endpoints" 
-                    sortKeyDefault="added" 
+                    sortKeyDefault="detectedTs" 
                     :sortDescDefault="true" 
                     @rowClicked="goToEndpoint"
                 >
@@ -443,6 +443,7 @@ export default {
             this.$router.push(routeObj)
         },
         refreshPage(hardRefresh) {
+            debugger;
             if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('changes/loadRecentEndpoints', {startTimestamp: this.startTimestamp, endTimestamp: this.endTimestamp})
                 api.fetchNewParametersTrend(this.startTimestamp, this.endTimestamp).then(resp => {
