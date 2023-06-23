@@ -39,7 +39,7 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
-                                            class="test-container"  @click="setSelectedMethod(test.value)">
+                                            class="test-container"  @click="setSelectedMethodOnClick(test.value)">
                                             <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
                                                 <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
@@ -89,7 +89,7 @@
                                         <v-list-item v-for="(test, index) in testsObj[item.name].all" :key="index"
                                             class="test-container">
                                             <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
-                                                <div class="test-name show-tooltip" @click="setSelectedMethod(test.value)">
+                                                <div class="test-name show-tooltip" @click="setSelectedMethodOnClick(test.value)">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
                                                             <span v-bind="attrs" v-on="on" >
@@ -280,6 +280,13 @@ export default {
                 })
                 return result
             }
+        },
+        setSelectedMethodOnClick: {
+            type: Function,
+            required: false,
+            default: function(testId) {
+                this.setSelectedMethod(testId)
+            }
         }
     },
     data() {
@@ -467,6 +474,7 @@ export default {
             } else {//No issues found
                 this.runTestObj.vulnerability = "No "
                 this.runTestObj.isLoading = false
+                this.dialogBoxIssue = {}
             }
             this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
         },
