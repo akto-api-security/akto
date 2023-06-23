@@ -50,11 +50,12 @@ execute:
   requests:
     - req:
       - modify_query_param:
-          payload_location_key: evil.com/?p=${payload_location_value}
+          payload_location_key: http://evil.com/?p=${payload_location_value}
       - modify_body_param:
-          payload_location_key: evil.com/?p=${payload_location_value}
+          payload_location_key: http://evil.com/?p=${payload_location_value}
       - modify_header:
-          payload_location_key: evil.com/?p=${payload_location_value}
+          payload_location_key: http://evil.com/?p=${payload_location_value}
+      - follow_redirect: false
 
 
 validate:

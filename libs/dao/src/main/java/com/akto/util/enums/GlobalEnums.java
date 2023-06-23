@@ -36,7 +36,8 @@ public class GlobalEnums {
         UHM("UHM", Severity.LOW, "Unnecessary HTTP Methods (UHM)", "Unnecessary HTTP Methods"),
         VEM("VEM", Severity.LOW, "Verbose Error Messages (VEM)", "Verbose Error Messages"),
         MHH("MHH", Severity.LOW, "Misconfigured HTTP Headers (MHH)", "Misconfigured HTTP Headers"),
-        SVD("SVD", Severity.LOW, "Server Version Disclosure (SVD)", "Server Version Disclosure");
+        SVD("SVD", Severity.LOW, "Server Version Disclosure (SVD)", "Server Version Disclosure"),
+        CORS("CORS", Severity.HIGH, "Cross-Origin Resource Sharing (CORS)", "CORS Misconfiguration");
 
         private final String name;
         private final Severity severity;

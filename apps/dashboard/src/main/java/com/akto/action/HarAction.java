@@ -4,19 +4,16 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiToken.Utility;
 import com.akto.har.HAR;
+import com.akto.log.LoggerMaker;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
-import com.sun.jna.Library;
-import com.sun.jna.Native;
-import com.sun.jna.Structure;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.sun.jna.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,11 +31,12 @@ public class HarAction extends UserAction {
 
     private boolean skipKafka = DashboardMode.isLocalDeployment();
     private byte[] tcpContent;
-    private static final Logger logger = LoggerFactory.getLogger(HarAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HarAction.class);
 
     @Override
     public String execute() throws IOException {
         ApiCollection apiCollection = null;
+        loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             if (apiCollection == null) {
@@ -96,12 +94,13 @@ public class HarAction extends UserAction {
 
         try {
             HAR har = new HAR();
-            logger.info("Har file upload processing for collectionId : {}", apiCollectionId);
+            loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
+            loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
-            logger.error("Exception while parsing harString");
+            loggerMaker.errorAndAddToDb("Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
             return SUCCESS.toUpperCase();
         }
