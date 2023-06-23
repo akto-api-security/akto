@@ -12,8 +12,10 @@ import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.CookieTransformer;
 
 public class AuthValidator {
     
@@ -34,8 +36,9 @@ public class AuthValidator {
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         boolean contains;
         boolean res;
+        List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
         for (String header: headerKeys) {
-            contains = headers.containsKey(header);
+            contains = headers.containsKey(header) || CookieTransformer.isKeyPresentInCookie(cookieList, header);
             res = auth.getAuthenticated() && contains;
             if (!res) {
                 return res;
@@ -66,7 +69,7 @@ public class AuthValidator {
 
     }
     
-    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi) {
+    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig) {
 
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (String header : auth.getHeaders()) {
@@ -87,7 +90,7 @@ public class AuthValidator {
 
         OriginalHttpResponse testResponse;
         try {
-            testResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true);
+            testResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true, testingRunConfig);
         } catch(Exception e) {
             return new ExecutionResult(false, "error running check auth " + e.getMessage(), rawApi.getRequest(), null);
         }

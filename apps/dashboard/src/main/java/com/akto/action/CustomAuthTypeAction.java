@@ -9,6 +9,8 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
+import com.akto.log.LoggerMaker;
+import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -27,6 +29,7 @@ public class CustomAuthTypeAction extends UserAction{
     private CustomAuthType customAuthType;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthTypeAction.class);
 
     public String fetchCustomAuthTypes(){
         customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
@@ -123,6 +126,25 @@ public class CustomAuthTypeAction extends UserAction{
         SingleTypeInfo.fetchCustomAuthTypes(accountId);
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String resetAllCustomAuthTypes() {
+        try {
+            CustomAuthUtil.resetAllCustomAuthTypes();
+            SingleTypeInfo.fetchCustomAuthTypes();
+            int accountId = Context.accountId.get();
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
+                }
+            }, 5 , TimeUnit.SECONDS);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
     }
 
     public void setName(String name) {

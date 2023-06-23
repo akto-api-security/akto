@@ -76,6 +76,9 @@ public class TrafficAction {
         );
 
         for (SensitiveSampleData sensitiveSampleData: sensitiveSampleDataList) {
+            if (sensitiveSampleData.getInvalid()) {
+                continue;
+            }
             for (String data: sensitiveSampleData.getSampleData()) {
                 List<SingleTypeInfo.ParamId> s = this.sensitiveSampleData.getOrDefault(data, new ArrayList<>());
                 s.add(sensitiveSampleData.getId());
