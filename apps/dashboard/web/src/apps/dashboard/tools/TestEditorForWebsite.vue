@@ -26,7 +26,7 @@
                                     <v-list-item-action class="ml-0">
                                         <v-btn width="100%" class="white-color" primary dark depressed
                                             color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
-                                            Sign-up now
+                                            Sign up now
                                         </v-btn>
                                     </v-list-item-action>
                                 </div>

@@ -11,7 +11,7 @@
                 </v-btn>
                 <v-btn primary dark depressed width="45%" :ripple="false" color="var(--themeColor)" class="white-color button-border-class" @click="dialog = false"
                     href="https://app.akto.io/login" target="_blank">
-                    Sign-up now
+                    Sign up now
                 </v-btn>
             </v-card-actions>
         </v-card>
