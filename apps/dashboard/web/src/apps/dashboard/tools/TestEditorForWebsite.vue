@@ -1,7 +1,7 @@
 <template>
     <div>
         <text-editor :defaultTestId="defaultTestId" :isAnonymousPage="true" :refreshTestTemplatesApiCall="refreshTestTemplatesApiCall" 
-        :makeJsonApiCall="makeJsonApiCall" :runTestForGivenTemplateApiCall="runTestForGivenTemplateApiCall">
+        :makeJsonApiCall="makeJsonApiCall" :runTestForGivenTemplateApiCall="runTestForGivenTemplateApiCall" :setSelectedMethodOnClick="setSelectedMethodOnClick">
             <template #unsavedChanges="{ IsEdited }">
                 <div>
                     <span v-if="IsEdited" class="unsaved-changes">unsaved changes</span>
@@ -70,10 +70,10 @@
                 </v-menu>
             </template>
             <template #modalsOverTestEditor="{setMessageJson}">
-                <!-- <simple-modal :parentDialog="simpleModalDialogBox" title="Get started with API Testing today" body="Our API test templates can help you save time and effort for
+                <simple-modal :parentDialog="simpleModalDialogBox" title="Get started with API Testing today" body="Our API test templates can help you save time and effort for
                      testing your APIs. Sign up for Akto today a
                      nd start using them!"
-                    @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal> -->
+                    @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal>
                 <custom-sample-data-api-modal title="Add your own API" :parentDialog="customSampleDataDialogBox"
                     @closeCustomSampleDataDialog="(customSampleDataDialogBox = false)" @setSampleDataApi="(values) => {setSampleDataApi(values).then(resp => {setMessageJson(resp)})}">
                 </custom-sample-data-api-modal>
@@ -144,11 +144,12 @@ export default {
                 })
                 return result
             }
-
-
         }
     },
     methods: {
+        setSelectedMethodOnClick(testId) {
+            this.simpleModalDialogBox = true
+        },
         setSelectedAnomymousOption(text) {
             this.selectedAnonymousOption = text
         },
