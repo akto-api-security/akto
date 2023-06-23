@@ -515,10 +515,10 @@ public class InitializerListener implements ServletContextListener {
         
                     for(SlackWebhook slackWebhook: listWebhooks) {
                         int now =Context.now();
-
-                        if (slackWebhook.getFrequencyInSeconds() == 0) {
-                            slackWebhook.setFrequencyInSeconds(24 * 60 * 60);
-                        }
+                        slackWebhook.setFrequencyInSeconds(60);
+//                        if (slackWebhook.getFrequencyInSeconds() == 0) {
+//                            slackWebhook.setFrequencyInSeconds(24 * 60 * 60);
+//                        }
 
                         boolean shouldSend = (slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds()) <= now;
 
@@ -563,7 +563,7 @@ public class InitializerListener implements ServletContextListener {
                 } catch (Exception ex) {
                 }
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.MINUTES);
 
     }
 
