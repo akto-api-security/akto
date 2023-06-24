@@ -1,6 +1,7 @@
 package com.akto.filter;
 
 import com.akto.dao.context.Context;
+import com.akto.utils.DashboardMode;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
@@ -18,7 +19,8 @@ public class GrowthToolsFilter implements Filter {
         HttpServletRequest httpServletRequest = (HttpServletRequest) request;
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
         String url = httpServletRequest.getRequestURL().toString();
-        if (!url.startsWith("https://app.akto.io/") && !url.startsWith("https://flash.staging.akto.io/")) {
+        boolean isSaasDeployment = DashboardMode.isSaasDeployment();
+        if (!isSaasDeployment && !url.startsWith("https://flash.staging.akto.io/")) {
             httpServletResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
             return;
         }
