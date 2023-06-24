@@ -113,18 +113,6 @@
         background-color: var(--themeColorDark17);
     }
 
-    .v-card {
-      font-family: Poppins, sans-serif !important;
-      color: var(--themeColorDark) !important;
-      letter-spacing: unset !important;
-    }
-
-    .v-list-item {
-      font-family: Poppins, sans-serif !important;
-      color: var(--themeColorDark) !important;
-      letter-spacing: unset !important;
-    }
-
 </style>
 
 <style lang="sass">
