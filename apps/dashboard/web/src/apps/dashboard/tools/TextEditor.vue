@@ -87,9 +87,9 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in testsObj[item.name].all" :key="index"
-                                            class="test-container">
+                                            class="test-container" @click="setSelectedMethodOnClick(test.value)">
                                             <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
-                                                <div class="test-name show-tooltip" @click="setSelectedMethodOnClick(test.value)">
+                                                <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
                                                             <span v-bind="attrs" v-on="on" >
@@ -112,9 +112,9 @@
                                 <div class="file-name show-overflow mb-1">
                                     {{defaultTestName || "Test editor"}}
                                     <v-icon v-if="!allCustomTests[defaultTestName]"
-                                        :style="{ 'cursor': 'pointer' }"
-                                        size=14
-                                        @click='openGithubLink'
+                                        :style="{ 'cursor': 'pointer' }" 
+                                        size=14 
+                                        @click='openGithubLink' 
                                         :ripple="false"
                                     >
                                         $githubIcon
@@ -257,7 +257,7 @@ export default {
                 })
                 return result
             }
-            
+
         },
         runTestForGivenTemplateApiCall: {
             type: Function,
@@ -523,12 +523,12 @@ export default {
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
         },
         findSuffixForNewTest(testId) {
-            let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)
-            let customTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)
+            let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            
+            let customTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            
 
             let currMaxIndex = Math.max(0, ...[...aktoTests, ...customTests].map(x=>+(x.value.replace(testId+"_CUSTOM_", ""))).filter(isFinite))
 
-
+            
 
             return currMaxIndex+1
         },
