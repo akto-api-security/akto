@@ -25,7 +25,7 @@
                                     </v-list-item-content>
                                     <v-list-item-action class="ml-0">
                                         <v-btn width="100%" class="white-color" primary dark depressed
-                                            color="var(--themeColor)" href="https://app.akto.io/dashboard/test-editor" target="_blank">
+                                            color="var(--themeColor)" :href="getRedirectPath()" target="_blank">
                                             Sign up now
                                         </v-btn>
                                     </v-list-item-action>
@@ -62,7 +62,7 @@
                                 </div>
                             </v-list-item-title>
                         </v-list-item>
-                        <v-list-item class="theme-color" href="https://app.akto.io/dashboard/test-editor" target="_blank">
+                        <v-list-item class="theme-color" :href="getRedirectPath()" target="_blank">
                             <v-list-item-title><span class="menu-list-font">Add automated collection</span><v-icon
                                     class="white-color">$fas_arrow-right</v-icon></v-list-item-title>
                         </v-list-item>
@@ -73,14 +73,14 @@
                 <simple-modal :parentDialog="simpleModalDialogBox" title="Get started with API Testing today" body="Our API test templates can help you save time and effort for
                      testing your APIs. Sign up for Akto today a
                      nd start using them!"
-                    @closeSimpleDialog="(simpleModalDialogBox = false)"></simple-modal>
+                    @closeSimpleDialog="(simpleModalDialogBox = false)" :redirectPath="getRedirectPath()"></simple-modal>
                 <custom-sample-data-api-modal title="Add your own API" :parentDialog="customSampleDataDialogBox"
                     @closeCustomSampleDataDialog="(customSampleDataDialogBox = false)" @setSampleDataApi="(values) => {setSampleDataApi(values).then(resp => {setMessageJson(resp)})}">
                 </custom-sample-data-api-modal>
             </template>
         </text-editor>
         <div class="akto-external-links">
-            <v-btn primary dark depressed class="white-color" color="var(--themeColor)" href="https://app.akto.io/dashboard/test-editor" target="_blank">
+            <v-btn primary dark depressed class="white-color" color="var(--themeColor)" :href="getRedirectPath()" target="_blank">
                 Try on your APIs
                 <v-icon size="11">$fas_external-link-alt</v-icon>
             </v-btn>
@@ -152,6 +152,12 @@ export default {
         },
         setSelectedAnomymousOption(text) {
             this.selectedAnonymousOption = text
+        },
+        getRedirectPath () {
+            let pathname = window.location.pathname
+            pathname = pathname.replace("tools","dashboard")
+            debugger
+            return "https://app.akto.io" + pathname
         },
         async makeJSONWithSelectedURL(selectedUrl) {
             let result = {}
