@@ -1,6 +1,7 @@
 package com.akto.filter;
 
 import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.akto.utils.HttpUtils;
@@ -17,8 +18,11 @@ public class SecurityHeadersFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
+        HttpServletRequest httpServletRequest = (HttpServletRequest) request;
 
-        httpServletResponse.addHeader("X-Frame-Options", "deny");
+        if (!httpServletRequest.getRequestURI().startsWith("/tools/")) {
+            httpServletResponse.addHeader("X-Frame-Options", "deny");
+        }
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");

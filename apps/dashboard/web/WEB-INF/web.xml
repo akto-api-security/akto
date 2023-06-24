@@ -64,8 +64,17 @@
         <filter-name>RateLimitFilter</filter-name>
         <url-pattern>/auth/login</url-pattern>
         <url-pattern>/api/inviteUsers</url-pattern>
+        <url-pattern>/tools/*</url-pattern>
     </filter-mapping>
 
+    <filter>
+        <filter-name>GrowthToolsFilter</filter-name>
+        <filter-class>com.akto.filter.GrowthToolsFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>GrowthToolsFilter</filter-name>
+        <url-pattern>/tools/*</url-pattern>
+    </filter-mapping>
 
     <filter>
         <filter-name>UserDetailsFilter</filter-name>
