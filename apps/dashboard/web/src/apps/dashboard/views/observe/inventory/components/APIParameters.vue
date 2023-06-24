@@ -3,12 +3,12 @@
         <spinner/>
     </div>
     <div v-else>
-        <v-row>
-            <v-col md="6">
+        <v-row class="mt-4">
+            <v-col md="6" class="pt-0">
                 <sensitive-params-card title="Sensitive parameters" :sensitiveParams="sensitiveParamsForChart"/>
             </v-col>
             
-            <v-col md="6">
+            <v-col md="6" class="pt-0">
                 <a-card title="Traffic" icon="$fas_chart-line" style="height: 330px">
                     <spinner v-if="loadingTrafficData"/>
                     <line-chart
