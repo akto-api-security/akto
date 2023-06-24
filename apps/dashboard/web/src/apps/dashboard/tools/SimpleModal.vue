@@ -10,7 +10,7 @@
                     Cancel
                 </v-btn>
                 <v-btn primary dark depressed width="45%" :ripple="false" color="var(--themeColor)" class="white-color button-border-class" @click="dialog = false"
-                    href="https://app.akto.io/dashboard/test-editor" target="_blank">
+                    :href="redirectPath" target="_blank">
                     Sign up now
                 </v-btn>
             </v-card-actions>
@@ -20,14 +20,19 @@
 
 <script>
 
-
+import obj from "@/util/obj"
 export default {
     name: "SimpleModal",
     props: {
         title: "",
         body: "",
         parentDialog: { default: false },
-        width: { default: "410px" }
+        width: { default: "410px" },
+        redirectPath: {
+            type: String,
+            required: false,
+            default: "https://app.akto.io/dashboard/test-editor"
+        }
     },
     data() {
         return {
