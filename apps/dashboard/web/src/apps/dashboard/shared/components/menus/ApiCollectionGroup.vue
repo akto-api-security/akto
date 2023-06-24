@@ -29,7 +29,14 @@
             >
             
                 <v-list-item-content>
-                    <v-list-item-title v-text="child.title" class="menu-item-text"></v-list-item-title>
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{on, attrs}">
+                            <div v-on="on" v-bind="attrs">
+                                <v-list-item-title v-text="child.title" class="menu-item-text"></v-list-item-title>
+                            </div>
+                        </template>
+                        <span>{{child.title}}</span>
+                    </v-tooltip>
                 </v-list-item-content>
             </v-list-item>
         </v-list-group>
