@@ -1,0 +1,83 @@
+id: INVALID_COUNTRY_CODE_TEST
+info:
+  name: Invalid country code test
+  description: Attacker can change the data type to cause unintended behaviors or unhandled edge cases
+  details: >
+    Parameters in a different data type than found/expected were send in
+    the attack request and the server responded with 2XX [valid request] or 500
+    [Internal server error] response.The 2XX response in an invalid request
+    signifies that the server accepts the request in an unexpected format, such
+    as an array, null values or values in a different data type (integer to
+    string).  An attacker can exploit this behavior by sending multiple values,
+    including the attacker's values, which may then be processed by the server.
+    The 500 response suggests that the server had not expected these values and
+    has encountered an unhandled error. This is significant since these requests
+    may lead to a possible DOS or unexpected downtime since they essentially
+    break the server and force it to restart. Ideally, in such a scenario, the
+    server should respond with a 4XX error code. This signifies that the server
+    handles the unexpected types gracefully. <br><br>
+  impact: Server accepting invalid types may lead the hacker to pass their own
+    values leading to parameter pollution type of attack and the server not
+    handling invalid types may lead it to break thus resulting in possible DOS.
+  category:
+    name: RPM
+    shortName: RPM
+    displayName: Request parameter modification (RPM)
+  subCategory: INVALID_COUNTRY_CODE_TEST
+  severity: LOW
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - https://hackerone.com/reports/326639
+    - https://hackerone.com/reports/334709
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - country
+              - code
+            extract: keyVar
+          value:
+            regex: "[A-Z]{2}"
+            extract: valueVar
+    - query_param:
+        for_one:
+          key:
+            contains_either:
+              - country
+              - code
+            extract: keyVar
+          value:
+            regex: "[A-Z]{2}"
+            extract: valueVar
+wordLists:
+  valueVars:
+    - ${valueVar} , ${valueVar}
+    - -1
+    - - ES 
+    - - ES
+      - US
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_body_param:
+            keyVar: ${valueVars}
+        - modify_query_param:
+            keyVar: ${valueVars}
+validate:
+  or:
+    - response_code:
+        eq: 500
+    - response_code:
+        gte: 200
+        lt: 300
