@@ -16,11 +16,9 @@ public class GrowthToolsFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        HttpServletRequest httpServletRequest = (HttpServletRequest) request;
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
-        String url = httpServletRequest.getRequestURL().toString();
         boolean isSaasDeployment = DashboardMode.isSaasDeployment();
-        if (!isSaasDeployment && !url.startsWith("https://flash.staging.akto.io/")) {
+        if (!isSaasDeployment) {
             httpServletResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
             return;
         }
