@@ -15,7 +15,7 @@ info:
       name: SM
       shortName: Misconfiguration
       displayName: Security Misconfiguration (SM)
-  subCategory: STRUTS_OGNL_CONSOLE_ENABLED
+  subCategory: Server Misconfiguration
   severity: LOW
   tags: 
     - Business logic

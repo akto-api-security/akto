@@ -16,7 +16,7 @@ info:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: RAILS_DEBUG_MODE_ENABLED
+  subCategory: Server Misconfiguration
   severity: LOW
   tags: 
     - Rails
