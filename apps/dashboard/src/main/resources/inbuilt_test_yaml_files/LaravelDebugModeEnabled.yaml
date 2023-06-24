@@ -19,11 +19,13 @@ info:
   subCategory: LARAVEL_DEBUG_MODE_ENABLED
   severity: LOW
   tags: 
+    - Laravel
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://laravel.com/docs/10.x/deployment#debug-mode"
 
 api_selection_filters:
   response_code:
@@ -36,11 +38,13 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}_ignition/health-chec
+      - modify_method: DELETE
+      - modify_url: ${urlVar}
 
 validate:
-  response_code:
-    eq: 200
   response_payload:
     contains_all: 
-      - "can_execute_commands"
+      - "laravel"
+      - "debug"
+      - "stack"
+      - "trace"
