@@ -15,7 +15,7 @@ info:
       name: SM
       shortName: Misconfiguration
       displayName: Security Misconfiguration (SM)
-  subCategory: SPRING_BOOT_ENV_ACTUATOR_EXPOSED
+  subCategory: Server Misconfiguration
   severity: LOW
   tags: 
     - Spring Boot

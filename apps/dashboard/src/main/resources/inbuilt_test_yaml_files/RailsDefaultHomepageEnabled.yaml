@@ -15,7 +15,7 @@ info:
       name: SM
       shortName: Misconfiguration
       displayName: Security Misconfiguration (SM)
-  subCategory: RAILS_DEFAULT_HOMEPAGE_ENABLED
+  subCategory: Server Misconfiguration
   severity: LOW
   tags: 
     - Rails
