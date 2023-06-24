@@ -156,7 +156,6 @@ export default {
         getRedirectPath () {
             let pathname = window.location.pathname
             pathname = pathname.replace("tools","dashboard")
-            debugger
             return "https://app.akto.io" + pathname
         },
         async makeJSONWithSelectedURL(selectedUrl) {
