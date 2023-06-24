@@ -25,7 +25,7 @@
                                     </v-list-item-content>
                                     <v-list-item-action class="ml-0">
                                         <v-btn width="100%" class="white-color" primary dark depressed
-                                            color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
+                                            color="var(--themeColor)" href="https://app.akto.io/dashboard/test-editor" target="_blank">
                                             Sign up now
                                         </v-btn>
                                     </v-list-item-action>
@@ -62,7 +62,7 @@
                                 </div>
                             </v-list-item-title>
                         </v-list-item>
-                        <v-list-item class="theme-color" href="https://app.akto.io/login" target="_blank">
+                        <v-list-item class="theme-color" href="https://app.akto.io/dashboard/test-editor" target="_blank">
                             <v-list-item-title><span class="menu-list-font">Add automated collection</span><v-icon
                                     class="white-color">$fas_arrow-right</v-icon></v-list-item-title>
                         </v-list-item>
@@ -80,7 +80,7 @@
             </template>
         </text-editor>
         <div class="akto-external-links">
-            <v-btn primary dark depressed class="white-color" color="var(--themeColor)" href="https://app.akto.io/login" target="_blank">
+            <v-btn primary dark depressed class="white-color" color="var(--themeColor)" href="https://app.akto.io/dashboard/test-editor" target="_blank">
                 Try on your APIs
                 <v-icon size="11">$fas_external-link-alt</v-icon>
             </v-btn>
