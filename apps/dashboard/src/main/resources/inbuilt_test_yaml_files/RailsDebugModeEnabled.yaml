@@ -19,6 +19,7 @@ info:
   subCategory: RAILS_DEBUG_MODE_ENABLED
   severity: LOW
   tags: 
+    - Rails
     - Business logic
     - OWASP top 10
     - HackerOne top 10
