@@ -37,10 +37,10 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}cy8Ku20LH6V6Yc0q0pJX
+      - modify_url: ${urlVar}/cy8Ku20LH6V6Yc0q0pJX
 
 validate:
   response_payload:
     contains_all: 
       - "Rails.root:"
-      - "Action Controller: Exception caught"
+      - "Trace"
