@@ -419,7 +419,6 @@ export default {
             this.selectedAnonymousOption = 'Sample data'
         },
         setMessageJson(result) {
-            debugger
             this.messageJson = result.messageJson
             this.sampleDataListForTestRun = result.sampleDataListForTestRun
         },
