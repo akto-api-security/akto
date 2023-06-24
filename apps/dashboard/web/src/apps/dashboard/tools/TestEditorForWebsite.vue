@@ -36,7 +36,7 @@
                 </v-menu>
             </template>
             <template #sampleDataSelector="{ resetSelectedURL, selectedUrl, setMessageJson }">
-                <v-menu offset-y rounded="lg" nudge-bottom="12" nudge-left="100">
+                <v-menu offset-y rounded="lg" nudge-bottom="12" nudge-left="100" class="options-menu">
                     <template v-slot:activator="{ on, attrs }">
                         <div class="d-flex jc-sb select-url" v-on="on" v-bind="attrs">
                             <span class="file-name url-name show-overflow ml-2">{{ selectedAnonymousOption }}</span>
@@ -63,7 +63,7 @@
                             </v-list-item-title>
                         </v-list-item>
                         <v-list-item class="theme-color" :href="getRedirectPath()" target="_blank">
-                            <v-list-item-title><span class="menu-list-font">Add automated collection</span><v-icon
+                            <v-list-item-title><span class="menu-list-font" style="color: #FFFFFF !important">Add automated collection</span><v-icon
                                     class="white-color">$fas_arrow-right</v-icon></v-list-item-title>
                         </v-list-item>
                     </v-list>
@@ -260,6 +260,7 @@ export default {
     font-size: 14px !important;
     font-weight: 500 !important;
     margin: auto 0px;
+    color: var(--themeColorDark) !important;
 }
 
 .theme-color {

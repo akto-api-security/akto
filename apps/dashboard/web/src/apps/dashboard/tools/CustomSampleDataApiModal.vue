@@ -118,6 +118,7 @@ export default {
 .modal-title {
     font-weight: 600 !important;
     font-size: 18px !important;
+    color: var(--themeColorDark);
 }
 
 .monaco-editor {
