@@ -15,7 +15,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -327,7 +327,7 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-                info.setPolicy(new AktoPolicy(callParser.apiCatalogSync, false));
+                info.setPolicy(new AktoPolicyNew(false));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 

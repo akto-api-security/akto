@@ -298,8 +298,7 @@ public class Main {
                     }
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
-                        APICatalogSync apiCatalogSync = httpCallParserMap.get(accountId).apiCatalogSync;
-                        AktoPolicies aktoPolicy = new AktoPolicies(apiCatalogSync, fetchAllSTI);
+                        AktoPolicies aktoPolicy = new AktoPolicies(fetchAllSTI);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 

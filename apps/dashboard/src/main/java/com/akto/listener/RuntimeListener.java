@@ -19,9 +19,9 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.util.AccountTask;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -35,7 +35,7 @@ import java.util.function.Consumer;
 public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
-    public static AktoPolicy aktoPolicy = null;
+    public static AktoPolicyNew aktoPolicyNew = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
@@ -52,7 +52,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-                info.setPolicy(new AktoPolicy(callParser.apiCatalogSync, false));
+                info.setPolicy(new AktoPolicyNew(false));
                 accountHTTPParserMap.put(account.getId(), info);
 
                 try {
