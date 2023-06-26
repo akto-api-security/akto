@@ -164,13 +164,19 @@ public class AktoPolicyNew {
             boolean saveSample = false;
             switch (useCase) {
                 case AUTH_TYPE:
-                    saveSample = AuthPolicy.findAuthType(httpResponseParams, apiInfo, filter, customAuthTypes);
+                    try {
+                        saveSample = AuthPolicy.findAuthType(httpResponseParams, apiInfo, filter, customAuthTypes);
+                    } catch (Exception ignored) {}
                     break;
                 case SET_CUSTOM_FIELD:
-                    saveSample = SetFieldPolicy.setField(httpResponseParams, apiInfo, filter);
+                    try {
+                        saveSample = SetFieldPolicy.setField(httpResponseParams, apiInfo, filter);
+                    } catch (Exception ignored) {}
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
-                    saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                    try {
+                        saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                    } catch (Exception ignored) {}
                     break;
                 default:
                     throw new Exception("Function for use case not defined");
