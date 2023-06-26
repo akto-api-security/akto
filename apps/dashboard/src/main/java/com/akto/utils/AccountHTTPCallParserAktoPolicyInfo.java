@@ -1,11 +1,11 @@
 package com.akto.utils;
 
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicyNew;
 
 public class AccountHTTPCallParserAktoPolicyInfo {
     private HttpCallParser httpCallParser;
-    private AktoPolicy policy;
+    private AktoPolicyNew policy;
 
     public HttpCallParser getHttpCallParser() {
         return httpCallParser;
@@ -15,11 +15,11 @@ public class AccountHTTPCallParserAktoPolicyInfo {
         this.httpCallParser = httpCallParser;
     }
 
-    public AktoPolicy getPolicy() {
+    public AktoPolicyNew getPolicy() {
         return policy;
     }
 
-    public void setPolicy(AktoPolicy policy) {
+    public void setPolicy(AktoPolicyNew policy) {
         this.policy = policy;
     }
 }

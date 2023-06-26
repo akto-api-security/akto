@@ -14,26 +14,20 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.TestExecutor;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
 
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.sql.Timestamp;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.mongodb.client.model.Filters;
-import org.apache.commons.lang3.StringUtils;
 
 import static com.akto.utils.RedactSampleData.convertHeaders;
 
@@ -331,8 +325,8 @@ public class Utils {
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-            APICatalogSync apiCatalogSync = info.getHttpCallParser().syncFunction(responses, true, false);
-            info.getPolicy().main(responses, apiCatalogSync, false);
+            info.getHttpCallParser().syncFunction(responses, true, false);
+            info.getPolicy().main(responses, true, false);
         }
     }
 
