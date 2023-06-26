@@ -33,9 +33,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class RuntimeListener extends AfterMongoConnectListener {
-
-    public static HttpCallParser httpCallParser = null;
-    public static AktoPolicyNew aktoPolicyNew = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
@@ -43,8 +40,6 @@ public class RuntimeListener extends AfterMongoConnectListener {
     private static final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
     @Override
     public void runMainFunction() {
-        //todo create map and fill
-
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account account) {
