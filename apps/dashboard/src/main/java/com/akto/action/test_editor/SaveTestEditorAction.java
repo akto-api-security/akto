@@ -223,7 +223,7 @@ public class SaveTestEditorAction extends UserAction {
         }
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
-            TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getInfo().getSubCategory(), null);
+            TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
             testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null);
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
