@@ -15,7 +15,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -314,7 +313,7 @@ public class Utils {
         if(skipKafka) {
             SingleTypeInfo.fetchCustomDataTypes(); //todo:
             APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
+            RuntimeListener.aktoPolicyNew.main(responses,true, false);
         }
     }
 
