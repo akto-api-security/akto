@@ -78,6 +78,12 @@ public class SampleMessageStore {
         return ret;
     }
 
+    public static SampleMessageStore createWithSampleDataMap(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
+        SampleMessageStore ret = new SampleMessageStore();
+        ret.sampleDataMap = sampleDataMap;
+        return ret;
+    }
+
     public List<TestRoles> fetchTestRoles() {
         return TestRolesDao.instance.findAll(new BasicDBObject());
     }
