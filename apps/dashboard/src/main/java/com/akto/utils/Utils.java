@@ -17,7 +17,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -274,7 +273,7 @@ public class Utils {
             SingleTypeInfo.fetchCustomDataTypes(); //todo:
             responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses,true, false);
+            RuntimeListener.aktoPolicyNew.main(responses,true, false);
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
                 RuntimeListener.resourceAnalyser.analyse(responseParams);

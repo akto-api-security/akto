@@ -90,7 +90,7 @@ public class AktoPolicyNew {
     public void syncWithDb(boolean initialising, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
         if (!initialising) {
-            AktoPolicy.UpdateReturn updateReturn = AktoPolicy.getUpdates(apiInfoCatalogMap);
+            UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap);
             List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
             List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
             loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
@@ -241,7 +241,7 @@ public class AktoPolicyNew {
         return newPolicyCatalog;
     }
 
-    public static AktoPolicy.UpdateReturn getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {
+    public static UpdateReturn getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {
         List<ApiInfo> apiInfoList = new ArrayList<>();
         List<FilterSampleData> filterSampleDataList = new ArrayList<>();
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
@@ -268,7 +268,7 @@ public class AktoPolicyNew {
         List<WriteModel<ApiInfo>> updatesForApiInfo = getUpdatesForApiInfo(apiInfoList);
         List<WriteModel<FilterSampleData>> updatesForSampleData = getUpdatesForSampleData(filterSampleDataList);
 
-        return new AktoPolicy.UpdateReturn(updatesForApiInfo, updatesForSampleData);
+        return new UpdateReturn(updatesForApiInfo, updatesForSampleData);
     }
 
     public static class UpdateReturn {
