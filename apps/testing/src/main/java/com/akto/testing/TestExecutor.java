@@ -22,7 +22,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.*;
-import com.akto.rules.SSRFOnAwsMetadataEndpoint;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -58,7 +57,7 @@ public class TestExecutor {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
         } else {
-            workflowInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+            workflowInit(testingRun, summaryId);
         }
     }
 

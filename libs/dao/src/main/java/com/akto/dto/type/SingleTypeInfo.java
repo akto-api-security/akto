@@ -40,6 +40,14 @@ public class SingleTypeInfo {
         }
     }
 
+    public static List<CustomAuthType> getCustomAuthType (int accountId) {
+        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes.get(accountId);
+        if (customAuthTypes == null) {
+            customAuthTypes = new ArrayList<>();
+        }
+        return customAuthTypes;
+    }
+
     public static Map<String, AktoDataType> getAktoDataTypeMap(int accountId) {
         if (accountToDataTypesInfo.containsKey(accountId)) {
             return accountToDataTypesInfo.get(accountId).getAktoDataTypeMap();

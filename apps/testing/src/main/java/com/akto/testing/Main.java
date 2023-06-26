@@ -142,9 +142,6 @@ public class Main {
                     AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
                     sampleMessageStore.fetchSampleMessages();
 
-                    if (runStatusCodeAnalyser) {
-                        StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore);
-                    }
 
                     TestExecutor testExecutor = new TestExecutor();
                     long timestamp = testingRun.getId().getTimestamp();
@@ -158,6 +155,9 @@ public class Main {
                         }else {
                             loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
                         }
+                    }
+                    if (runStatusCodeAnalyser) {
+                        StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore, testingRun.getTestingRunConfig());
                     }
 
             ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
