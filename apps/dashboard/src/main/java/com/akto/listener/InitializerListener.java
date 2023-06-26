@@ -327,7 +327,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.infoAndAddToDb(paramStr + url, LogDb.DASHBOARD);
 
             if (!whiteListCollectionSet.contains(paramId.getApiCollectionId())) continue;
-            System.out.println("***********************" + paramId.getApiCollectionId());
 
             List<Bson> filters = new ArrayList<>();
             filters.add(Filters.eq("url", paramId.getUrl()));
@@ -356,8 +355,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.infoAndAddToDb(paramStr, LogDb.DASHBOARD);
 
             if (!whiteListCollectionSet.contains(paramId.getApiCollectionId())) continue;
-
-            System.out.println("***********************" + paramId.getApiCollectionId());
 
             List<Bson> filters = new ArrayList<>();
             filters.add(Filters.eq("url", paramId.getUrl()));
