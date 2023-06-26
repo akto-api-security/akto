@@ -81,7 +81,7 @@ public class FuzzingTest extends TestPlugin {
 
     @Override
     public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig) {
-        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         RawApi rawApi;
         if (messages.isEmpty()) {
             OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(

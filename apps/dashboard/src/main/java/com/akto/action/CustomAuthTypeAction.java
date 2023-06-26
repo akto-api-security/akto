@@ -11,6 +11,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -59,11 +60,7 @@ public class CustomAuthTypeAction extends UserAction{
         executorService.schedule( new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes.get(accountId);
-                if (customAuthTypes == null) {
-                    customAuthTypes = new ArrayList<>();
-                }
-
+                List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
                 CustomAuthUtil.customAuthTypeUtil(customAuthTypes);
             }
         }, 5 , TimeUnit.SECONDS);
@@ -95,12 +92,7 @@ public class CustomAuthTypeAction extends UserAction{
         executorService.schedule( new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes.get(accountId);
-                if (customAuthTypes == null) {
-                    customAuthTypes = new ArrayList<>();
-                }
-
-                CustomAuthUtil.customAuthTypeUtil(customAuthTypes);
+                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
             }
         }, 5 , TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
@@ -130,16 +122,18 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String resetAllCustomAuthTypes() {
         try {
-            CustomAuthUtil.resetAllCustomAuthTypes();
-            SingleTypeInfo.fetchCustomAuthTypes();
-            int accountId = Context.accountId.get();
-            executorService.schedule( new Runnable() {
-                public void run() {
-                    Context.accountId.set(accountId);
-                    CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
-                }
-            }, 5 , TimeUnit.SECONDS);
+            AccountTask.instance.executeTask(task -> {
+                CustomAuthUtil.resetAllCustomAuthTypes();
+                int accountId = Context.accountId.get();
+                SingleTypeInfo.fetchCustomAuthTypes(accountId);
+                executorService.schedule( new Runnable() {
+                    public void run() {
+                        Context.accountId.set(accountId);
+                        CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
+                    }
+                }, 5 , TimeUnit.SECONDS);
 
+            },"reset-all-custom-auth-types");
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
