@@ -113,6 +113,7 @@ public class InitializerListener implements ServletContextListener {
 
     public void setUpPiiCleanerScheduler(){
         Set<Integer> whiteListCollectionSet = new HashSet<>();
+        whiteListCollectionSet.add(-122281555);
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
