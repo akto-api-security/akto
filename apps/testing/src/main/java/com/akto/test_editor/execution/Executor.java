@@ -287,7 +287,7 @@ public class Executor {
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                 boolean removed = false;
                 for (String header: authHeaders) {
-                    removed = removed || Operations.deleteHeader(rawApi, header).getErrMsg().isEmpty();
+                    removed = Operations.deleteHeader(rawApi, header).getErrMsg().isEmpty() || removed;
                 }
                 removed = removeCustomAuth(rawApi) || removed ;
                 if (removed) {
