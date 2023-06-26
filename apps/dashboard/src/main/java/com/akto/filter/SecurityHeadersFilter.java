@@ -1,6 +1,7 @@
 package com.akto.filter;
 
 import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.akto.dao.context.Context;
@@ -17,10 +18,12 @@ public class SecurityHeadersFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        Context.accountId.remove();
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
+        HttpServletRequest httpServletRequest = (HttpServletRequest) request;
 
-//        httpServletResponse.addHeader("Content-Security-Policy", "frame-ancestors 'self' akto.io https://dazzled-choices-451983.framer.app *.akto.io  *.framer.*;");
+        if (!httpServletRequest.getRequestURI().startsWith("/tools/")) {
+            httpServletResponse.addHeader("X-Frame-Options", "deny");
+        }
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
