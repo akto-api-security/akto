@@ -11,7 +11,6 @@ import com.akto.har.HAR;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.type.SingleTypeInfo;
