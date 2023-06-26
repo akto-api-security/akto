@@ -32,7 +32,7 @@ public class VariableResolver {
                 match = match.substring(2, match.length());
                 match = match.substring(0, match.length() - 1);
                 Object val = getValue(varMap, match);
-                if (val instanceof String) {
+                if (!(val instanceof ArrayList)) {
                     String valString = val.toString();
                     return expression.replaceAll("(\\$\\{[^}]*\\})", valString);
                 } else {

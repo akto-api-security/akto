@@ -45,9 +45,13 @@ public class Executor {
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
             List<RawApi> sampleRawApis = new ArrayList<>();
-            sampleRawApis.add(sampleRawApi);
+            List<Boolean> modifiedSampleRawApis = new ArrayList<>();
+            for (int i =0; i < 50; i++) {
+                sampleRawApis.add(sampleRawApi.copy());
+                modifiedSampleRawApis.add(false);
+            }
 
-            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, sampleRawApi.copy());
+            singleReq = buildTestRequestNew(reqNode, null, sampleRawApis, modifiedSampleRawApis, varMap, authMechanism, sampleRawApi.copy());
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
             if (testRawApis == null) {
@@ -181,6 +185,135 @@ public class Executor {
 
     }
 
+
+    public ExecutorSingleRequest buildTestRequestNew(ExecutorNode node, String operation, List<RawApi> rawApis, List<Boolean> modifiedRawApis, Map<String, Object> varMap, AuthMechanism authMechanism, RawApi baseRawApi) {
+
+        List<ExecutorNode> childNodes = node.getChildNodes();
+        TestEditorEnums testEditorEnums = new TestEditorEnums();
+
+        if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
+            operation = node.getOperationType();
+        }
+
+        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
+            return new ExecutorSingleRequest(true, "", rawApis, true);
+        }
+
+        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
+            return new ExecutorSingleRequest(true, "", rawApis, false);
+        }
+        Boolean followRedirect = true;
+
+        if (childNodes.size() == 0) {
+            Object key = node.getOperationType();
+            Object value = node.getValues();
+            if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
+                if (node.getValues() instanceof Boolean) {
+                    key = Boolean.toString((Boolean) node.getValues());
+                } else if (node.getValues() instanceof String) {
+                    key = (String) node.getValues();
+                } else {
+                    key = (Map) node.getValues();
+                }
+                value = null;
+            }
+
+            Object expandedKey = expandKey(varMap, key, value);
+            Object expandedVal = expandValue(varMap, value);
+
+            int index = 0;
+            while(index < rawApis.size()) {
+
+                if (expandedVal != null && (expandedVal instanceof ArrayList)) {
+                    ArrayList<Object> valArr = (ArrayList<Object>) expandedVal;
+
+                    if (expandedKey != null && (expandedKey instanceof ArrayList)) {
+                        ArrayList<String> keyArr = (ArrayList<String>) expandedKey;
+                        
+                        for (Object v: valArr) {
+                            for (String k: keyArr) {
+                                if (index >= rawApis.size()) {
+                                    break;
+                                }
+                                RawApi rApi = rawApis.get(index);
+                                ExecutorSingleOperationResp resp = invokeOperation(operation, k, v, rApi, varMap, authMechanism);
+                                
+                                if (resp.getSuccess() && resp.getErrMsg().length() == 0) {
+                                    modifiedRawApis.set(index, true);
+                                    if (testEditorEnums.isOperandTypePermute(operation.toLowerCase())) {
+                                        index++;
+                                    }
+                                }
+                            }
+                            if (!testEditorEnums.isOperandTypePermute(operation.toLowerCase())) {
+                                index++;
+                            }
+                        }
+
+                    } else {
+                        for (Object v: valArr) {
+                            if (index >= rawApis.size()) {
+                                break;
+                            }
+                            RawApi rApi = rawApis.get(index);
+                            ExecutorSingleOperationResp resp = invokeOperation(operation, key, v, rApi, varMap, authMechanism);
+                            
+                            if (resp.getSuccess() && resp.getErrMsg().length() == 0) {
+                                modifiedRawApis.set(index, true);
+                            }
+                            index++;
+                        }
+                    }
+
+                } else {
+                    if (expandedKey != null && (expandedKey instanceof ArrayList)) {
+                        ArrayList<String> keyArr = (ArrayList<String>) expandedKey;
+                        for (String k: keyArr) {
+                            if (index >= rawApis.size()) {
+                                break;
+                            }
+                            RawApi rApi = rawApis.get(index);
+                            ExecutorSingleOperationResp resp = invokeOperation(operation, k, value, rApi, varMap, authMechanism);                            
+                            if (resp.getSuccess() && resp.getErrMsg().length() == 0) {
+                                modifiedRawApis.set(index, true);
+                            }
+                            if (testEditorEnums.isOperandTypePermute(operation.toLowerCase())) {
+                                index++;
+                            }
+                        }
+                        if (!testEditorEnums.isOperandTypePermute(operation.toLowerCase())) {
+                            index++;
+                        }
+                    } else {
+                        RawApi rApi = rawApis.get(index);
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rApi, varMap, authMechanism);
+                        if (resp.getSuccess() && resp.getErrMsg().length() == 0) {
+                            modifiedRawApis.set(index, true);
+                        }
+                        index++;
+                    }
+                }
+
+            }
+        }
+
+
+        ExecutorNode childNode;
+        for (int i = 0; i < childNodes.size(); i++) {
+            childNode = childNodes.get(i);
+            ExecutorSingleRequest executionResult = buildTestRequestNew(childNode, operation, rawApis, modifiedRawApis, varMap, authMechanism, baseRawApi);
+            rawApis = executionResult.getRawApis();
+            if (!executionResult.getSuccess()) {
+                return executionResult;
+            }
+            followRedirect = followRedirect && executionResult.getFollowRedirect();
+        }
+
+        return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
+
+    }
+
+
     public Object expandKey(Map<String, Object> varMap, Object key, Object value) {
 
         if (key == null || !(key instanceof String)) {
@@ -268,22 +401,31 @@ public class Executor {
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism) {
         switch (operationType.toLowerCase()) {
             case "add_body_param":
+            case "add_body_param_permute":
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
+            case "modify_body_param_permute":
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_body_param":
+            case "delete_body_param_permute":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "add_header":
+            case "add_header_permute":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
+            case "modify_header_permute":
                 return Operations.modifyHeader(rawApi, key.toString(), value.toString());
             case "delete_header":
+            case "delete_header_permute":
                 return Operations.deleteHeader(rawApi, key.toString());
             case "add_query_param":
+            case "add_query_param_permute":
                 return Operations.addQueryParam(rawApi, key.toString(), value);
             case "modify_query_param":
+            case "modify_query_param_permute":
                 return Operations.modifyQueryParam(rawApi, key.toString(), value);
             case "delete_query_param":
+            case "delete_query_param_permute":
                 return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
                 String newUrl = null;

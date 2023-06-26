@@ -193,6 +193,9 @@ public class TestEditorEnums {
         DELETE_HEADER,
         DELETE_BODY_PARAM,
         DELETE_QUERY_PARAM,
+        DELETE_HEADER_PERMUTE,
+        DELETE_BODY_PARAM_PERMUTE,
+        DELETE_QUERY_PARAM_PERMUTE,
         MODIFY_URL,
         MODIFY_METHOD,
         FOLLOW_REDIRECT,
@@ -206,7 +209,25 @@ public class TestEditorEnums {
         ADD_QUERY_PARAM,
         MODIFY_HEADER,
         MODIFY_BODY_PARAM,
-        MODIFY_QUERY_PARAM
+        MODIFY_QUERY_PARAM,
+        ADD_HEADER_PERMUTE,
+        ADD_BODY_PARAM_PERMUTE,
+        ADD_QUERY_PARAM_PERMUTE,
+        MODIFY_HEADER_PERMUTE,
+        MODIFY_BODY_PARAM_PERMUTE,
+        MODIFY_QUERY_PARAM_PERMUTE
+    }
+
+    public enum ExecutorPermuteDataOperands {
+        DELETE_HEADER_PERMUTE,
+        DELETE_BODY_PARAM_PERMUTE,
+        DELETE_QUERY_PARAM_PERMUTE,
+        ADD_HEADER_PERMUTE,
+        ADD_BODY_PARAM_PERMUTE,
+        ADD_QUERY_PARAM_PERMUTE,
+        MODIFY_HEADER_PERMUTE,
+        MODIFY_BODY_PARAM_PERMUTE,
+        MODIFY_QUERY_PARAM_PERMUTE
     }
 
     public enum ExecutorOperandTypes {
@@ -267,6 +288,17 @@ public class TestEditorEnums {
         }
 
         return "data";
+    }
+
+    public boolean isOperandTypePermute(String key) {
+
+        for (ExecutorPermuteDataOperands operand: ExecutorPermuteDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }
