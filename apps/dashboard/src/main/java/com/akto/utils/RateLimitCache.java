@@ -18,10 +18,11 @@ public class RateLimitCache {
         cacheMap = new HashMap<>();
         cacheMap.put(CACHE_TYPE.SIGN_IN, new ConcurrentHashMap<>());
         cacheMap.put(CACHE_TYPE.SEND_EMAIL, new ConcurrentHashMap<>());
+        cacheMap.put(CACHE_TYPE.ANONYMOUS_LOGIN, new ConcurrentHashMap<>());
     }
 
     public enum CACHE_TYPE {
-        SIGN_IN, SEND_EMAIL
+        SIGN_IN, SEND_EMAIL, ANONYMOUS_LOGIN
     }
     public static class IpInfo {
         public Bucket bucket;

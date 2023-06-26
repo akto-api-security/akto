@@ -2,29 +2,35 @@ package com.akto.action.test_editor;
 
 import com.akto.DaoInit;
 import com.akto.action.UserAction;
-import com.akto.action.testing.StartTestAction;
+import com.akto.action.testing_issues.IssuesAction;
+import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
-import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.store.TestingUtil;
+import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
@@ -48,7 +54,9 @@ public class SaveTestEditorAction extends UserAction {
     private TestingRunResult testingRunResult;
     private String originalTestId;
     private String finalTestId;
-
+    private List<SampleData> sampleDataList;
+    private TestingRunIssues testingRunIssues;
+    private Map<String, BasicDBObject> subCategoryMap;
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -163,6 +171,7 @@ public class SaveTestEditorAction extends UserAction {
     }
 
     public String runTestForGivenTemplate() {
+        TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
         try {
             testConfig = TestConfigYamlParser.parseTemplate(content);
@@ -182,48 +191,44 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        String id = testConfig.getId();
-        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));
-        if (template == null) {
-            addActionError("template does not exists");
+        if (sampleDataList == null || sampleDataList.isEmpty()) {
+            addActionError("sampleDataList is empty");
             return ERROR.toUpperCase();
         }
 
-//        int createdAt = Context.now();
-//        int updatedAt = Context.now();
-//        String author = getSUser().getLogin();
-//
-//
-//        //todo: @shivam modify this part when yaml template is bootstrapped via script in RuntimeInitializer
-//        YamlTemplateSource source = templateSource == null? YamlTemplateSource.AKTO_TEMPLATES : YamlTemplateSource.valueOf(templateSource);
-//        if (template == null || template.getSource() == YamlTemplateSource.CUSTOM || source == YamlTemplateSource.AKTO_TEMPLATES) {
-//            YamlTemplateDao.instance.updateOne(
-//                    Filters.eq("_id", id),
-//                    Updates.combine(
-//                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-//                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-//                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-//                            Updates.set(YamlTemplate.CONTENT, content),
-//                            Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-//                            Updates.set(YamlTemplate.SOURCE, source)
-//                    )
-//            );
-//        }
+        try {
+            GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+        } catch (Exception e) {
+            addActionError("invalid severity, please choose from " + Arrays.toString(GlobalEnums.Severity.values()));
+            return ERROR.toUpperCase();
+        }
 
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
-        StartTestAction testAction = new StartTestAction();
-        testAction.setTriggeredBy("test_editor");
-        testAction.setSession(getSession());
-        testAction.setRecurringDaily(false);
-        testAction.setApiInfoKeyList(Collections.singletonList(infoKey));//default id
-        testAction.setType(TestingEndpoints.Type.CUSTOM);
-        List<String> idList = new ArrayList<>();
-        idList.add(id);
-        testAction.setSelectedTests(idList);
-        testAction.startTest();
-        this.setTestingRunHexId(testAction.getTestingRunHexId());
+
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
+        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleDataMap, null, null);
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
+        if (testingRunResult == null) {
+            testingRunResult = new TestingRunResult(
+                    new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(0),
+                    Collections.singletonList("failed to execute test"),
+                    0, false, TestResult.Confidence.HIGH, null)),
+                    false,null,0,Context.now(),
+                    Context.now(), new ObjectId()
+            );
+        }
+        testingRunResult.setId(new ObjectId());
+        if (testingRunResult.isVulnerable()) {
+            TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
+            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null);
+        }
+        BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
+        subCategoryMap = new HashMap<>();
+        subCategoryMap.put(testConfig.getId(), infoObj);
         return SUCCESS.toUpperCase();
     }
 
@@ -298,5 +303,29 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setFinalTestId(String finalTestId) {
         this.finalTestId = finalTestId;
+    }
+
+    public List<SampleData> getSampleDataList() {
+        return sampleDataList;
+    }
+
+    public void setSampleDataList(List<SampleData> sampleDataList) {
+        this.sampleDataList = sampleDataList;
+    }
+
+    public TestingRunIssues getTestingRunIssues() {
+        return testingRunIssues;
+    }
+
+    public void setTestingRunIssues(TestingRunIssues testingRunIssues) {
+        this.testingRunIssues = testingRunIssues;
+    }
+
+    public Map<String, BasicDBObject> getSubCategoryMap() {
+        return subCategoryMap;
+    }
+
+    public void setSubCategoryMap(Map<String, BasicDBObject> subCategoryMap) {
+        this.subCategoryMap = subCategoryMap;
     }
 }
