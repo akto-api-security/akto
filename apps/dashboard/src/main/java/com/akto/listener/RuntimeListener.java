@@ -18,7 +18,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -30,7 +30,7 @@ import java.util.*;
 public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
-    public static AktoPolicy aktoPolicy = null;
+    public static AktoPolicyNew aktoPolicyNew = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
 
     private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
@@ -40,7 +40,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         Context.accountId.set(1_000_000);
         Main.initializeRuntime();
         httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-        aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
+        aktoPolicyNew = new AktoPolicyNew(false);
 
         try {
             initialiseDemoCollections();
