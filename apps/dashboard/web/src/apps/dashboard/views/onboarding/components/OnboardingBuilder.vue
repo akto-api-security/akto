@@ -123,7 +123,7 @@ export default {
                     } else {
                         marketplaceApi.searchTestResults("").then((resp) => {
                             // we wait for atleast 100 tests to be downloaded before we run tests.
-                            if (resp.searchResults && resp.searchResults.length > 100) {
+                            if (resp.searchResults && resp.searchResults.length > 50) {
                                 foundTests = true;
                             }
                         })
