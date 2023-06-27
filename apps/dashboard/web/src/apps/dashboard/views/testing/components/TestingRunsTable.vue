@@ -29,9 +29,12 @@ export default {
     data() {
         return {
             testingRunsHeaders: [
-               
                 {
-                    text: "Api collection",
+                    text: 'color',
+                    value: ''
+                },
+                {
+                    text: "Test name",
                     value: "apiCollectionName"
                 },
                 {
