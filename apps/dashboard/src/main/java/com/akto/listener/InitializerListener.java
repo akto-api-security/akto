@@ -960,6 +960,18 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void enableMergeAsyncOutside(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getEnableMergeAsyncOutside()== 0) {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.set(AccountSettings.MERGE_ASYNC_OUTSIDE, true));
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ENABLE_ASYNC_MERGE_OUTSIDE, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -1069,6 +1081,7 @@ public class InitializerListener implements ServletContextListener {
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
             enableNewMerging(backwardCompatibility);
+            enableMergeAsyncOutside(backwardCompatibility);
 
             SingleTypeInfo.init();
 
