@@ -1,6 +1,7 @@
 package com.akto.filter;
 
 import com.akto.dao.context.Context;
+import com.akto.listener.InitializerListener;
 import com.akto.utils.DashboardMode;
 
 import javax.servlet.*;
@@ -17,7 +18,7 @@ public class GrowthToolsFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
-        boolean isSaasDeployment = DashboardMode.isSaasDeployment();
+        boolean isSaasDeployment = InitializerListener.isSaas;
         if (!isSaasDeployment) {
             httpServletResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
             return;
