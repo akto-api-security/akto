@@ -38,10 +38,13 @@ public class BackwardCompatibility {
     public static final String ENABLE_NEW_MERGING = "enableNewMerging";
     private int enableNewMerging;
 
+    public static final String ENABLE_ASYNC_MERGE_OUTSIDE = "enableMergeAsyncOutside";
+    private int enableMergeAsyncOutside;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues, int enableNewMerging) {
+                                 int deleteNullSubCategoryIssues, int enableNewMerging, int enableMergeAsyncOutside) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -54,6 +57,7 @@ public class BackwardCompatibility {
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
+        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
     }
 
     public BackwardCompatibility() {
@@ -163,4 +167,11 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
     }
 
+    public int getEnableMergeAsyncOutside() {
+        return enableMergeAsyncOutside;
+    }
+
+    public void setEnableMergeAsyncOutside(int enableMergeAsyncOutside) {
+        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
+    }
 }
