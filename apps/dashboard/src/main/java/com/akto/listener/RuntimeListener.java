@@ -31,7 +31,7 @@ import java.util.*;
 public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
-    public static AktoPolicyNew aktoPolicy = null;
+    public static AktoPolicyNew aktoPolicyNew = null;
     public static ResourceAnalyser resourceAnalyser = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
 
@@ -42,7 +42,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         Context.accountId.set(1_000_000);
         Main.initializeRuntime();
         httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-        aktoPolicy = new AktoPolicyNew(false);
+        aktoPolicyNew = new AktoPolicyNew(false);
         resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
 
         try {

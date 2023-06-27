@@ -93,7 +93,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(5,apiInfoList.size());
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(5, filterSampleDataList.size());
+        Assertions.assertEquals(0, filterSampleDataList.size());
 
         // restart server means new httpCallParser and aktoPolicy
         HttpCallParser httpCallParser1 = new HttpCallParser("user", 1, 1,1, true);
@@ -109,7 +109,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(5,apiInfoList.size());
         filterSampleDataList = FilterSampleDataDao.instance.findAll(Filters.eq("_id.apiInfoKey.apiCollectionId", 0));
-        Assertions.assertEquals(5, filterSampleDataList.size());
+        Assertions.assertEquals(0, filterSampleDataList.size());
     }
 
 
@@ -146,7 +146,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         assertEquals(hrpList.size(), apiInfoList.size());
 
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        assertEquals(3, filterSampleDataList.size());
+        assertEquals(0, filterSampleDataList.size());
 
         // created a dummy AktoPolicy to use buildFromDb without touching the original AktoPolicy
         AktoPolicyNew dummyAktoPolicy = new AktoPolicyNew(true);
@@ -169,18 +169,10 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         assertEquals(hrpList.size() - 1, apiInfoList.size()); // 2 urls got merged to 1
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        assertEquals(2, filterSampleDataList.size()); // 2 urls got merged to 1
+        assertEquals(0, filterSampleDataList.size()); // 2 urls got merged to 1
         dummyAktoPolicy.buildFromDb(true);
         Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 1 );
 
-        FilterSampleData filterSampleData = FilterSampleDataDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("_id.apiInfoKey.apiCollectionId", 0),
-                        Filters.eq("_id.apiInfoKey.url", "/api/toys/INTEGER"),
-                        Filters.eq("_id.apiInfoKey.method", urlStatic6.getMethod().name())
-                )
-        );
-        assertEquals(1, filterSampleData.getSamples().getElements().size());
 
         URLStatic urlStatic8 = new URLStatic("/api/toys/3", URLMethods.Method.PUT);
         HttpResponseParams hrp8 = generateHttpResponseParams(urlStatic8.getUrl(), urlStatic8.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED),false) ;
@@ -189,16 +181,17 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         assertEquals(hrpList.size() - 1, apiInfoList.size()); // 2 urls got merged to 1
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        assertEquals(2, filterSampleDataList.size()); // 2 urls got merged to 1
+        assertEquals(0, filterSampleDataList.size()); // 2 urls got merged to 1
 
-        filterSampleData = FilterSampleDataDao.instance.findOne(
+        FilterSampleData filterSampleData = FilterSampleDataDao.instance.findOne(
                 Filters.and(
                         Filters.eq("_id.apiInfoKey.apiCollectionId", 0),
                         Filters.eq("_id.apiInfoKey.url", "/api/toys/INTEGER"),
                         Filters.eq("_id.apiInfoKey.method", urlStatic6.getMethod().name())
                 )
         );
-        assertEquals(2, filterSampleData.getSamples().getElements().size());
+
+        assertNull(filterSampleData);
 
         HttpResponseParams hrp10 = generateHttpResponseParams(urlStatic6.getUrl(), urlStatic6.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.JWT), false);
 

@@ -17,7 +17,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -109,7 +108,7 @@ public class Utils {
             result.put("requestHeaders", requestHeadersString);
 
             JsonNode bodyNode = request.get("body");
-            String requestPayload = bodyNode != null ?  bodyNode.asText() : "";
+            String requestPayload = extractRequestPayload(bodyNode);
             requestPayload = replaceVariables(requestPayload, variables);
 
             JsonNode responseNode = apiInfo.get("response");
@@ -170,6 +169,49 @@ public class Utils {
             loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
             return null;
         }
+    }
+
+    public static String extractRequestPayload(JsonNode bodyNode) {
+        if(bodyNode == null || bodyNode.isNull()){
+            return "";
+        }
+        String mode = bodyNode.get("mode").asText();
+        if(mode.equals("none")){
+            return "";
+        }
+        if(mode.equals("raw")){
+            return bodyNode.get("raw").asText();
+        }
+        if(mode.equals("formdata")){
+            ArrayNode formdata = (ArrayNode) bodyNode.get("formdata");
+            StringBuilder sb = new StringBuilder();
+            for(JsonNode node : formdata){
+                String type = node.get("type").asText();
+                if(type.equals("file")){
+                    sb.append(node.get("key").asText()).append("=").append(node.get("src").asText()).append("&");
+                } else if(type.equals("text")){
+                    sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
+                }
+            }
+            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
+            return sb.toString();
+        }
+        if(mode.equals("urlencoded")){
+            ArrayNode urlencoded = (ArrayNode) bodyNode.get("urlencoded");
+            StringBuilder sb = new StringBuilder();
+            for(JsonNode node : urlencoded){
+                sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
+            }
+            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
+            return sb.toString();
+        }
+        if(mode.equals("graphql")){
+            return bodyNode.get("graphql").toPrettyString();
+        }
+        if(mode.equals("file")){
+            return bodyNode.get("file").get("src").asText();
+        }
+        return bodyNode.toPrettyString();
     }
 
     private static String getContentType(JsonNode request, JsonNode response, Map<String, String> responseHeadersMap) {
@@ -274,7 +316,7 @@ public class Utils {
             SingleTypeInfo.fetchCustomDataTypes(); //todo:
             responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses,true, false);
+            RuntimeListener.aktoPolicyNew.main(responses,true, false);
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
                 RuntimeListener.resourceAnalyser.analyse(responseParams);

@@ -75,11 +75,16 @@ public class Executor {
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutorSingleRequest(true, "", null, false);
+            return new ExecutorSingleRequest(true, "", null, true);
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
-            return new ExecutorSingleRequest(true, "", null, true);
+            boolean redirect = true;
+            try {
+                redirect = Boolean.valueOf(node.getValues().toString());
+            } catch (Exception e) {
+            }
+            return new ExecutorSingleRequest(true, "", rawApis, redirect);
         }
         Boolean followRedirect = true;
         List<RawApi> newRawApis = new ArrayList<>();
@@ -173,7 +178,7 @@ public class Executor {
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
-            followRedirect = followRedirect || executionResult.getFollowRedirect();
+            followRedirect = followRedirect && executionResult.getFollowRedirect();
         }
 
         if (newRawApis.size() > 0) {
@@ -227,6 +232,22 @@ public class Executor {
         
     }
     
+    private static boolean removeCustomAuth(RawApi rawApi) {
+        boolean removed = false;
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+        for (CustomAuthType customAuthType : customAuthTypes) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            for (String headerAuthKey: customAuthTypeHeaderKeys) {
+                removed = Operations.deleteHeader(rawApi, headerAuthKey).getErrMsg().isEmpty() || removed;
+            }
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            for (String payloadAuthKey: customAuthTypePayloadKeys) {
+                removed = Operations.deleteBodyParam(rawApi, payloadAuthKey).getErrMsg().isEmpty() || removed;
+            }
+        }
+        return removed;
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism) {
         switch (operationType.toLowerCase()) {
             case "add_body_param":
@@ -235,6 +256,8 @@ public class Executor {
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
+            case "replace_body":
+                return Operations.replaceBody(rawApi, key, value);
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
@@ -266,26 +289,16 @@ public class Executor {
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                 boolean removed = false;
                 for (String header: authHeaders) {
-
-                    removed = removed || Operations.deleteHeader(rawApi, header).getErrMsg().isEmpty();
+                    removed = Operations.deleteHeader(rawApi, header).getErrMsg().isEmpty() || removed;
                 }
-                List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-                for (CustomAuthType customAuthType : customAuthTypes) {
-                    List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
-                    for (String headerAuthKey: customAuthTypeHeaderKeys) {
-                        removed = removed || Operations.deleteHeader(rawApi, headerAuthKey).getErrMsg().isEmpty();
-                    }
-                    List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
-                    for (String payloadAuthKey: customAuthTypePayloadKeys) {
-                        removed = removed || Operations.deleteBodyParam(rawApi, payloadAuthKey).getErrMsg().isEmpty();
-                    }
-                }
+                removed = removeCustomAuth(rawApi) || removed ;
                 if (removed) {
                     return new ExecutorSingleOperationResp(true, "");
                 } else {
                     return new ExecutorSingleOperationResp(false, "header key not present");
                 }
             case "replace_auth_header":
+                removeCustomAuth(rawApi);
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
                 if (authHeaders == null) {
