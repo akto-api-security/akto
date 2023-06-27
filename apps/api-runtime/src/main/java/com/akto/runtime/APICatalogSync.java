@@ -1031,9 +1031,8 @@ public class APICatalogSync {
 
             update = Updates.inc("count", inc);
 
-            if (oldTs == 0) {
-                update = Updates.combine(update, Updates.setOnInsert("timestamp", now));
-            }
+            int timestamp = deltaInfo.getTimestamp() > 0 ? deltaInfo.getTimestamp() : now;
+            update = Updates.combine(update, Updates.setOnInsert("timestamp", timestamp));
 
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
