@@ -48,3 +48,6 @@ validate:
     contains_either:
       - "stack" 
       - "exception"
+
+strategy:
+  run_once: /

@@ -43,3 +43,6 @@ validate:
     contains_all: 
       - "data"
       - "__type"
+
+strategy:
+  run_once: /
