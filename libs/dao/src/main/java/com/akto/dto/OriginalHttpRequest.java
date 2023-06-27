@@ -309,6 +309,14 @@ public class OriginalHttpRequest {
         return true;
     }
 
+    public String getPath(){
+        String path = URI.create(this.url).getPath();
+        if (path == null || path.isEmpty()) {
+            return "/";
+        }
+        return path;
+    }
+
     @Override
     public String toString() {
         return "OriginalHttpRequest{" +

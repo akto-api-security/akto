@@ -39,9 +39,17 @@ const data_types = {
             state.data_type = {
                 "name": "",
                 "operator": "OR",
-                "keyConditions": {"operator": "AND", "predicates": [{}]},
+                "keyConditions": {"operator": "AND", "predicates":[
+                    {
+                        "type": "EQUALS_TO",
+                        "value": null
+                    }
+                ]},
                 "sensitiveAlways": true,
-                "valueConditions": {"operator": "AND", "predicates": [{}]},
+                "valueConditions": {"operator": "AND", "predicates": [{
+                    "type": "EQUALS_TO",
+                    "value": null
+                }]},
                 "active": true,
                 "sensitivePosition": [],
                 "createNew": true
