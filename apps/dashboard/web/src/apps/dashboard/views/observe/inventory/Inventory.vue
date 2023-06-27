@@ -7,11 +7,11 @@
                 > 
                     <template v-slot:item="{ item }">
                         <v-breadcrumbs-item
-                            @click="navigateFromBreadcrumb(item)"
                             :disabled="item.disabled"
-                            :class="item.disabled ? '' : 'clickable'"
+                            :class="item.disabled ? '' : 'clickable-crumb'"
+                            @click="navigateFromBreadcrumb(item)"
                         >
-                            <span>{{ item.text }}</span>
+                            <span class="px-2 py-1 clickable">{{ item.text }}</span>
                         </v-breadcrumbs-item>
                     </template>
                     <template v-slot:divider>
@@ -145,4 +145,13 @@ export default {
 .api-breadcrumbs
     padding-left: 0px 
     padding-bottom: 0px
+
+.clickable-crumb
+    cursor: pointer
+    padding: 0 5px 0 5px
+
+    &:hover 
+        text-decoration: underline      
+        text-decoration-color: var(--themeColorDark)      
+    
 </style>>

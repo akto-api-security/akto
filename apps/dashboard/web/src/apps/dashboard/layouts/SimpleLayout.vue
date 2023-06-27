@@ -5,7 +5,7 @@
                 <div>
                     <span class="board-name">{{ title || 'Loading...' }}</span>
                 </div>
-    
+
                 <div v-if="description">
                     <span class="board-description">{{description}}</span>
                 </div>
