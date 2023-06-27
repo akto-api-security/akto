@@ -199,7 +199,7 @@ public class AktoPolicyNew {
             }
         }
 
-        apiInfo.setLastSeen(Context.now());
+        apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
     }
 
