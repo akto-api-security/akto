@@ -42,3 +42,6 @@ validate:
     contains_either:
       - "Did you mean" 
       - "Expected value of type"
+
+strategy:
+  run_once: /

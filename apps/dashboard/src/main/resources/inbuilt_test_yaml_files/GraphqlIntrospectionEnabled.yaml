@@ -44,3 +44,6 @@ validate:
     contains_all: 
       - "data"
       - "__schema"
+
+strategy:
+  run_once: /

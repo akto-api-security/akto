@@ -46,3 +46,6 @@ validate:
       - "GraphQL Playground"
       - "GraphQL Console"
       - "graphql-playground"
+
+strategy:
+  run_once: /
