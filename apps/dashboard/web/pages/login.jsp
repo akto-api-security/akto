@@ -15,7 +15,7 @@
 
             <body>
                 <noscript>To run this application, JavaScript is required to be enabled.</noscript>
-                <!-- <script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js">
+                <script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js">
                 </script>
                 <script src="https://apis.google.com/js/client:platform.js?onload=start" async defer>
                 </script>
@@ -90,7 +90,7 @@
                         lazy: true
                     };
                 </script>
-                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                 -->
+                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
                 <div id="root"></div>
                 <script src="/dist/main.js"></script>
             </body>
