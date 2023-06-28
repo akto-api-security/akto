@@ -77,7 +77,7 @@ public class ProfileAction extends UserAction {
         }
 
         userDetails.append("accounts", accounts)
-                .append("username",user.getName())
+                .append("username",user.getLogin())
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
