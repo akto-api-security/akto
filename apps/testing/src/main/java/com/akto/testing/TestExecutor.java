@@ -95,8 +95,8 @@ public class TestExecutor {
         );
     }
 
-    private List<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
-        List<Integer> ret = new ArrayList<>();
+    private Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        Set<Integer> ret = new HashSet<>();
         for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             ret.add(apiInfoKey.getApiCollectionId());
         }
@@ -117,7 +117,7 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
 
-        List<Integer> apiCollectionIds = extractApiCollectionIds(apiInfoKeyList);
+        Set<Integer> apiCollectionIds = extractApiCollectionIds(apiInfoKeyList);
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages(apiCollectionIds);
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();

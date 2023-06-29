@@ -77,7 +77,7 @@ public class SampleMessageStore {
     }
 
 
-    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages(List<Integer> apiCollectionIds) {
+    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages(Set<Integer> apiCollectionIds) {
         Bson filterQ = Filters.in("_id.apiCollectionId", apiCollectionIds);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null);
         System.out.println("SampleDataSize " + sampleDataList.size());
