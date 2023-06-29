@@ -20,8 +20,8 @@ jobs:
           import requests
           
           github_token = os.getenv('GITHUB_TOKEN')
-          repo_owner = 'solankirishav21'
-          repo_name = 'published_test'
+          repo_owner = 'akto-api-security'
+          repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
           url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest'
           response = requests.get(url, headers=headers)
@@ -76,7 +76,7 @@ jobs:
             --header "Content-Type: application/json" \
             --header "Beamer-Api-Key: $BEAMER_API_TOKEN" \
             --data "{
-              \"title\": [ \"New Release: $RELEASE_TAG\" ],
+              \"title\": [ \"Release $RELEASE_TAG\" ],
               \"content\": [ \"$RELEASE_NOTES\" ],
               \"category\": \"new\",
               \"publish\": true
