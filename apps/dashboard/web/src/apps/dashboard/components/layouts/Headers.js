@@ -1,7 +1,6 @@
-import {TopBar, ActionList, Icon, Frame, Text} from '@shopify/polaris';
-import {ArrowLeftMinor, NotificationMajor} from '@shopify/polaris-icons';
+import {TopBar, Icon, Text, Button} from '@shopify/polaris';
+import {NotificationMajor} from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
-
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -16,26 +15,17 @@ export default function Header() {
         () => setIsSecondaryMenuOpen((isSecondaryMenuOpen) => !isSecondaryMenuOpen),
         [],
     );
-    const logo = {
-        width: 124,
-        topBarSource:
-        '/public/akto_name_with_logo.svg',
-        url: '#',
-        accessibilityLabel: 'Jaded Pixel',
-    };
 
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
                 {
-                    items: [{content: 'Back', icon: ArrowLeftMinor}],
+                    items: [{content: 'Manage Account'}, {content: 'Log out'}],
                 },
                 {
-                    items: [{content: 'Community forums'}],
+                    items: [{content: 'Documentation'},{content: 'Tutorials'},{content: 'Changelog'},{content: 'Discord Support'},{content: 'Star On Github'}],
                 },
             ]}
-            name=""
-            detail=""
             initials="AK"
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
@@ -64,7 +54,7 @@ export default function Header() {
             onClose={toggleIsSecondaryMenuOpen}
             actions={[
                 {
-                items: [{content: 'Community forums'}],
+                    items: [{content: 'Community forums'}],
                 },
             ]}
         />
@@ -80,8 +70,6 @@ export default function Header() {
     );
 
     return (
-        <div style={{height: '0px'}}>
-            <Frame topBar={topBarMarkup} logo={logo} />
-        </div>
+        topBarMarkup
     );
 }

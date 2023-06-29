@@ -1,4 +1,4 @@
-import HomePage from "../dashboard/pages/HomePage";
+import HomePage from "../dashboard/pages/home/HomePage"
 import {AppProvider} from "@shopify/polaris"
 import {
   createBrowserRouter,
