@@ -5,10 +5,6 @@ import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
@@ -27,9 +23,14 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -346,10 +347,7 @@ public class StartTestAction extends UserAction {
 
     public String stopAllTests() {
         // stop all the scheduled and running tests
-        Bson filter = Filters.or(
-            Filters.eq(TestingRun.STATE, State.SCHEDULED),
-            Filters.eq(TestingRun.STATE, State.RUNNING)
-        );
+        Bson filter = TestingRunDao.instance.getTestRunningOrScheduledFilter();
 
         TestingRunDao.instance.getMCollection().updateMany(filter,Updates.set(TestingRun.STATE, State.STOPPED));
         testingRuns = TestingRunDao.instance.findAll(filter);
@@ -358,25 +356,27 @@ public class StartTestAction extends UserAction {
     }
 
     public String stopTest() {
-        // stop only scheduled and running tests
+        Bson filter = TestingRunDao.instance.getTestRunningOrScheduledFilter();
 
-        Bson filter = Filters.or(
-            Filters.eq(TestingRun.STATE, State.SCHEDULED),
-            Filters.eq(TestingRun.STATE, State.RUNNING)
-        );
-        if(this.testingRunHexId!=null){
-            try{
+        if (StringUtils.isNotBlank(this.testingRunHexId)) {
+            try {
+                UpdateOptions updateOptions = new UpdateOptions();
+                updateOptions.upsert(false);
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
-                TestingRunDao.instance.updateOne(
-                    Filters.and(filter, Filters.eq(Constants.ID,testingId)),
-                Updates.set(TestingRun.STATE, State.STOPPED));
-                return SUCCESS.toUpperCase();
-            } catch (Exception e){    
+                UpdateResult updateResult = TestingRunDao.instance.getMCollection().updateOne(
+                        Filters.and(filter, Filters.eq(Constants.ID, testingId)),
+                        Updates.set(TestingRun.STATE, State.STOPPED),
+                        updateOptions);
+                if(updateResult.getModifiedCount()==1){
+                    return SUCCESS.toUpperCase();
+                }
+                addActionError("Test is not running or scheduled");
+            } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             }
-        }
+        } 
 
-        addActionError("Unable to stop test run");
+        addActionError("Invalid testing run Id");
         return ERROR.toLowerCase();
     }
 
