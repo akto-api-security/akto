@@ -19,7 +19,7 @@ export default function Header() {
     const logo = {
         width: 124,
         topBarSource:
-        'https://cdn.shopify.com/s/files/1/0446/6937/files/jaded-pixel-logo-color.svg?6215648040070010999',
+        '/public/akto_name_with_logo.svg',
         url: '#',
         accessibilityLabel: 'Jaded Pixel',
     };
@@ -34,8 +34,8 @@ export default function Header() {
                     items: [{content: 'Community forums'}],
                 },
             ]}
-            name="Aryan Khandelwal"
-            detail="Intern at Akto"
+            name=""
+            detail=""
             initials="AK"
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
