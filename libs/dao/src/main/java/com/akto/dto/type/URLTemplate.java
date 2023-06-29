@@ -96,7 +96,7 @@ public class URLTemplate {
     }
 
     public String getTemplateString() {
-        String str = "";
+        String str = "/";
         for(int i = 0;i < tokens.length; i++) {
             if (i > 0) {
                 str += "/";
