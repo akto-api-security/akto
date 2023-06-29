@@ -20,7 +20,18 @@ const SignUpCard = () => {
       setPassword(inputPassword)
     } 
   
-    const handleContinueWithEmail = () => {
+    const handleContinueWithEmail = async () => {
+      try {
+        const res = await axios.post("/auth/login", {
+          username: email,
+          password: password
+        })
+      } catch(err) {
+        console.log(res)
+      }
+      
+
+      if (loginReq)
       navigate("/")
     }
   
