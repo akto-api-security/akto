@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.NucleiExecutor;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +77,9 @@ public class SampleMessageStore {
     }
 
 
-    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages() {
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject(), 0, 10_000, null);
+    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages(List<Integer> apiCollectionIds) {
+        Bson filterQ = Filters.in("_id.apiCollectionId", apiCollectionIds);
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null);
         System.out.println("SampleDataSize " + sampleDataList.size());
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {

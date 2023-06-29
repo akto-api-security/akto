@@ -95,6 +95,15 @@ public class TestExecutor {
         );
     }
 
+    private List<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        List<Integer> ret = new ArrayList<>();
+        for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            ret.add(apiInfoKey.getApiCollectionId());
+        }
+
+        return ret;
+    }
+
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
@@ -102,7 +111,15 @@ public class TestExecutor {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
+        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+
+
+        List<Integer> apiCollectionIds = extractApiCollectionIds(apiInfoKeyList);
+
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages(apiCollectionIds);
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
@@ -124,10 +141,6 @@ public class TestExecutor {
             loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
             return;
         }
-
-        List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
-        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
