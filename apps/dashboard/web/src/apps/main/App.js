@@ -1,4 +1,5 @@
 import HomePage from "../dashboard/pages/home/HomePage"
+import SignUp from "../signup/pages/SignUp"
 import {AppProvider} from "@shopify/polaris"
 import {
   createBrowserRouter,
@@ -9,6 +10,10 @@ const router = createBrowserRouter([
   {
     path:"/",
     element: <HomePage/>,
+  },
+  {
+    path:"/signup",
+    element: <SignUp/>,
   },
 ])
 
