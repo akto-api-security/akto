@@ -8,6 +8,20 @@ let store = (set)=>({
     },
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
+    toastConfig: {
+        isActive: false,
+        isError: false,
+        message: ""
+    },
+    setToastConfig: (updateToastConfig) => {
+        set({
+            toastConfig: {
+                isActive: updateToastConfig.isActive,
+                isError: updateToastConfig.isError,
+                message: updateToastConfig.message
+            }
+        })
+    }
 })
 
 store = devtools(store)

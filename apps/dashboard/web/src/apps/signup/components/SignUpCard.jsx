@@ -7,16 +7,35 @@ import { TextField, Button, Box, Text, HorizontalStack, Divider, VerticalStack, 
 import AktoLogo from "../images/akto_logo.png"
 import AktoLogoText from "../images/akto_logo_text.png"
 import GoogleIcon from "../images/google.png"
+import Store from "../../dashboard/store"
 
 const SignUpCard = () => {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  const toggleActive = useCallback((errorMsg) => {
-    setActive((active) => !active)
-    setErrorMsg(errorMsg)
-  }, []);
+  const toastConfig = Store(state => state.toastConfig)
+  const setToastConfig = Store(state => state.setToastConfig)
+
+  const setLoginErrorToast = () => {
+      setToastConfig({
+        isActive: true,
+        isError: true,
+        message: "Please, Log in Again"
+      })
+  }
+
+  const disableLoginErrorToast = () => {
+    setToastConfig({
+      isActive: false,
+      isError: false,
+      message: ""
+    })
+  }
+
+  const loginToastMarkup = toastConfig.isActive ? (
+    <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableLoginErrorToast} duration={1500} />
+  ) : null;
 
   const handleEmailChange = (inputEmail) => {
     setEmail(inputEmail)
@@ -37,19 +56,13 @@ const SignUpCard = () => {
       localStorage.setItem("access_token", ACCESS_TOKEN)
       navigate("/")
     } catch (err) {
-      alert("Please, Log in again!")
+      setLoginErrorToast()
     }
   }
 
-  // const toastMarkup = active ? (
-  //   <Toast content={errorMsg} error onDismiss={toggleActive} />
-  // ) : null;
-
   return (
-    <Frame>
-      <div style={{background: "#0f0f0f", height: "100vh"}}>
       <Box background="bg">
-        <div style={{ width: "30vw", margin: "10vh auto " }}>
+        <div style={{ width: "30vw", margin: "10vh auto" }}>
           <VerticalStack gap="5">
             <span>
               <img src={AktoLogo} />
@@ -92,13 +105,11 @@ const SignUpCard = () => {
           </VerticalStack>
           <div style={{width: "0px", height: "0px"}}>
             <Frame>
-              
+              {loginToastMarkup}
             </Frame>
           </div>
         </div>
       </Box>
-      </div>
-    </Frame>
   )
 }
 
