@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import axios from "axios"
+import { ToastContainer, toast } from 'react-toastify';
 
-import { TextField, Button, Box, Text, HorizontalStack, Divider, VerticalStack} from "@shopify/polaris"
+import { TextField, Button, Box, Text, HorizontalStack, Divider, VerticalStack, Toast} from "@shopify/polaris"
 
 import AktoLogo from "../images/akto_logo.png"
 import AktoLogoText from "../images/akto_logo_text.png"
@@ -26,17 +28,17 @@ const SignUpCard = () => {
           username: email,
           password: password
         })
-      } catch(err) {
-        console.log(res)
-      }
-      
+        const ACCESS_TOKEN = res.headers["access-token"]
 
-      if (loginReq)
-      navigate("/")
+        localStorage.setItem("access_token", ACCESS_TOKEN)
+        navigate("/")
+      } catch(err) {
+        alert("Please, Log in again!")
+      }
     }
   
     return (
-      <Box background="bg">
+        <Box background="bg">
         <div style={{width: "30vw", margin: "10vh auto "}}>
           <VerticalStack gap="5">
             <span>
@@ -76,7 +78,7 @@ const SignUpCard = () => {
               <Button plain monochrome removeUnderline>Help</Button>
               <Button plain monochrome removeUnderline>Privacy</Button>
               <Button plain monochrome removeUnderline>Terms</Button>
-            </HorizontalStack>  
+            </HorizontalStack> 
           </VerticalStack>
         </div>
       </Box>

@@ -1,10 +1,15 @@
 import {TopBar, Icon, Text, Button} from '@shopify/polaris';
 import {NotificationMajor} from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Store from '../../store';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
+    
+    const storeAccessToken = Store(state => state.storeAccessToken)
+    const navigate = useNavigate()
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -16,11 +21,17 @@ export default function Header() {
         [],
     );
 
+    const handleLogOut = () => {
+        storeAccessToken(null)
+        localStorage.removeItem("access_token")
+        navigate("/login")
+    }
+
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
                 {
-                    items: [{content: 'Manage Account'}, {content: 'Log out'}],
+                    items: [{content: 'Manage Account'}, {content: 'Log out', onAction: handleLogOut}],
                 },
                 {
                     items: [{content: 'Documentation'},{content: 'Tutorials'},{content: 'Changelog'},{content: 'Discord Support'},{content: 'Star On Github'}],
