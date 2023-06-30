@@ -1,49 +1,59 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
-import { ToastContainer, toast } from 'react-toastify';
 
-import { TextField, Button, Box, Text, HorizontalStack, Divider, VerticalStack, Toast} from "@shopify/polaris"
+import { TextField, Button, Box, Text, HorizontalStack, Divider, VerticalStack, Toast, Frame } from "@shopify/polaris"
 
 import AktoLogo from "../images/akto_logo.png"
 import AktoLogoText from "../images/akto_logo_text.png"
 import GoogleIcon from "../images/google.png"
 
 const SignUpCard = () => {
-    const navigate = useNavigate()
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-  
-    const handleEmailChange = (inputEmail) => {
-      setEmail(inputEmail)
-    } 
-  
-    const handlePasswordChange = (inputPassword) => {
-      setPassword(inputPassword)
-    } 
-  
-    const handleContinueWithEmail = async () => {
-      try {
-        const res = await axios.post("/auth/login", {
-          username: email,
-          password: password
-        })
-        const ACCESS_TOKEN = res.headers["access-token"]
+  const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
-        localStorage.setItem("access_token", ACCESS_TOKEN)
-        navigate("/")
-      } catch(err) {
-        alert("Please, Log in again!")
-      }
+  const toggleActive = useCallback((errorMsg) => {
+    setActive((active) => !active)
+    setErrorMsg(errorMsg)
+  }, []);
+
+  const handleEmailChange = (inputEmail) => {
+    setEmail(inputEmail)
+  }
+
+  const handlePasswordChange = (inputPassword) => {
+    setPassword(inputPassword)
+  }
+
+  const handleContinueWithEmail = async () => {
+    try {
+      const res = await axios.post("/auth/login", {
+        username: email,
+        password: password
+      })
+      const ACCESS_TOKEN = res.headers["access-token"]
+
+      localStorage.setItem("access_token", ACCESS_TOKEN)
+      navigate("/")
+    } catch (err) {
+      alert("Please, Log in again!")
     }
-  
-    return (
-        <Box background="bg">
-        <div style={{width: "30vw", margin: "10vh auto "}}>
+  }
+
+  // const toastMarkup = active ? (
+  //   <Toast content={errorMsg} error onDismiss={toggleActive} />
+  // ) : null;
+
+  return (
+    <Frame>
+      <div style={{background: "#0f0f0f", height: "100vh"}}>
+      <Box background="bg">
+        <div style={{ width: "30vw", margin: "10vh auto " }}>
           <VerticalStack gap="5">
             <span>
-              <img src={AktoLogo}/>
-              <img src={AktoLogoText} style={{paddingLeft: "5px"}}/>
+              <img src={AktoLogo} />
+              <img src={AktoLogoText} style={{ paddingLeft: "5px" }} />
             </span>
             <div>
               <Text variant="headingXl">Getting started</Text>
@@ -51,11 +61,11 @@ const SignUpCard = () => {
             </div>
 
             <Button size="large" fullWidth="true" icon={GoogleIcon}>Continue with Google</Button>
-            
-            <Divider/>
+
+            <Divider />
             <Text variant="bodySm" alignment="center">or</Text>
             <Divider />
-  
+
             <TextField
               label="Email"
               type="email"
@@ -73,17 +83,23 @@ const SignUpCard = () => {
               autoComplete="password"
             />
             <Button size="large" fullWidth primary onClick={handleContinueWithEmail}>Continue with Email</Button>
-  
-            <HorizontalStack gap="3" align="end"> 
+
+            <HorizontalStack gap="3" align="end">
               <Button plain monochrome removeUnderline>Help</Button>
               <Button plain monochrome removeUnderline>Privacy</Button>
               <Button plain monochrome removeUnderline>Terms</Button>
-            </HorizontalStack> 
+            </HorizontalStack>
           </VerticalStack>
+          <div style={{width: "0px", height: "0px"}}>
+            <Frame>
+              
+            </Frame>
+          </div>
         </div>
       </Box>
-    )
-  }
+      </div>
+    </Frame>
+  )
+}
 
 export default SignUpCard
-  

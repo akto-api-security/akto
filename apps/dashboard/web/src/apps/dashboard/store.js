@@ -7,7 +7,7 @@ let store = (set)=>({
         set((state)=> ({tableItems: items}))
     },
     accessToken: null,
-    storeAccessToken: (accessToken) => set({ accessToken: accessToken })
+    storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
 })
 
 store = devtools(store)
