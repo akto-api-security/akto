@@ -3,54 +3,6 @@
         <div v-if="isLocalDeploy && !isSaas">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
-
-        <v-dialog v-model="showInviteCodeDialog" width="500" persistent>
-            <v-card>
-                <v-card-title class="">
-                Copy invite link
-                </v-card-title>
-
-                <v-card-text style="font-size: 14px;">
-                    <div v-if="isSaas">
-                    You can copy the links provided and share them with your invitees.
-                    </div>
-                    <div v-else>
-                    Your invitation emails have been successfully sent. Alternatively, you can copy the links provided and share them directly with your invitees.
-                    </div>
-                </v-card-text>
-
-                <div style="padding: 8px 24px 0px 24px">
-                    <div v-for="(inviteCode, email)  in inviteCodes" :key="email">
-                        <div class="invitation-text">
-                            <v-text-field
-                                :label="email"
-                                dense
-                                readonly
-                                outlined
-                                :value="inviteCode"
-                            >
-                                <template v-slot:append>
-                                    <v-icon @click="copyInviteCode(inviteCode)">$fas_copy</v-icon>
-                                </template>
-                            </v-text-field>
-                        </div>
-                    </div>
-                </div>
-
-                <v-card-actions>
-                    <v-spacer></v-spacer>
-                    <v-btn
-                        color="primary"
-                        text
-                        @click="showInviteCodeDialog = false"
-                    >
-                        Done
-                    </v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-
         <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
             <div v-if="isAdmin && !(isLocalDeploy && !isSaas)" class="email-invite-container">
                 <v-combobox
@@ -174,17 +126,12 @@
                 ],
                 isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
                 isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
-                inviteCodes: {},
-                showInviteCodeDialog: false
             }
         },
         mounted() {
             this.$store.dispatch('team/getTeamData')
         },
         methods: {
-            copyInviteCode(inviteCode) {
-                this.copyToClipboard(inviteCode)
-            },
             inviteNewMember(email) {
                 let spec = {
                     inviteeName: "there",
@@ -194,19 +141,14 @@
                 return api.inviteUsers(spec)
             },
             async sendInvitationEmails () {
-                this.inviteCodes = {}
-                this.showInviteCodeDialog = false
-
                 let _inviteNewMember = this.inviteNewMember
                 let countEmails = 0
-                this.allEmails ? this.allEmails : []
+                this.allEmails = this.allEmails ? this.allEmails : []
                 if (this.allEmails.length == 0) return
                 for (const email of this.allEmails) {
                     if (this.usernameRules[0](email)) {
                         let resp = await _inviteNewMember(email)
                         console.log(resp.finalInviteCode);
-                        this.inviteCodes[email] = resp.finalInviteCode
-                        this.inviteCodes = {...this.inviteCodes}
                         countEmails++;
                     }
 
@@ -229,7 +171,6 @@
                         })
                     }
                         this.$store.dispatch('team/getTeamData')
-                        this.showInviteCodeDialog = true
                     }
                     this.allEmails = []
                 }
@@ -251,17 +192,6 @@
                     color: 'red'
                 })
             },
-            copyToClipboard(text) {
-                    navigator.clipboard.writeText(text)
-                        .then(() => {
-                            window._AKTO.$emit('SHOW_SNACKBAR', {
-                                show: true,
-                                text: `Copied to clipboard`,
-                                color: 'green'
-                            })
-                        })
-                        .catch(err => console.error('Failed to copy text: ', err));
-            }
         },
         computed: {
             ...mapState('team', ['users']),
@@ -415,10 +345,4 @@
     padding: 8px 16px !important
     margin: auto
 
-</style>
-
-<style scoped>
-.invitation-text >>> .v-text-field input {
-    font-size: 16px !important;
-}
 </style>

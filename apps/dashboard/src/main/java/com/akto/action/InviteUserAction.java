@@ -1,18 +1,15 @@
 package com.akto.action;
 
 import com.akto.dao.PendingInviteCodesDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
+import com.akto.notifications.email.SendgridEmail;
 import com.akto.utils.JWT;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 
@@ -87,11 +84,14 @@ public class InviteUserAction extends UserAction{
         }
 
         // to get expiry date
+
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
             PendingInviteCodesDao.instance.insertOne(
                     new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get())
             );
+
+
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -99,6 +99,14 @@ public class InviteUserAction extends UserAction{
 
         finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
 
+        String inviteFrom = getSUser().getName();
+        Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
+        try {
+            SendgridEmail.getInstance().send(email);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

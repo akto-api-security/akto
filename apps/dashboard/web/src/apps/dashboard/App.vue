@@ -236,11 +236,6 @@ export default {
         title: 'Tests library',
         icon: '$bookBookmark',
         link: '/dashboard/library'
-      },
-      {
-        title: 'Test Editor',
-        icon: '$testEditorIcon',
-        link: '/dashboard/test-editor'
       }
     ]
 
@@ -263,6 +258,7 @@ export default {
       renderAktoButton:false,
       apiCollectionId:-1,
       isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
       myAccountLocalItems:[
       ...listAccounts,
         {
@@ -394,6 +390,13 @@ export default {
     }
   },
   async mounted() {
+    if (!this.isSaas) {
+      this.myItems.push({
+        title: 'Test Editor',
+        icon: '$testEditorIcon',
+        link: '/dashboard/test-editor'
+      })
+    }
     this.myAccountItems.unshift(... ( this.isLocalDeploy ? this.myAccountLocalItems : [] ))
     window.Beamer.init();
     let i = setInterval(() => {
