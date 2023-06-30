@@ -96,18 +96,18 @@ public class URLTemplate {
     }
 
     public String getTemplateString() {
-        String str = "";
+        StringBuilder stringBuilder = tokens[0].contains("http") ? new StringBuilder() : new StringBuilder("/");
         for(int i = 0;i < tokens.length; i++) {
             if (i > 0) {
-                str += "/";
+                stringBuilder.append("/");
             }
             if (tokens[i] == null) {
-                str += types[i].name();
+                stringBuilder.append(types[i].name());
             } else {
-                str += tokens[i];
+                stringBuilder.append(tokens[i]);
             }
         }
-        return str;
+        return stringBuilder.toString();
     }
     
     public String[] getTokens() {

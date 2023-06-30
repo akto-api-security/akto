@@ -225,7 +225,7 @@ public class TestDump2 {
 
     @Test
     public void testParameterizedURLsTest() {
-        String url = "link/";
+        String url = "/link/";
         HttpResponseParams resp = createSampleParams("user1", url+1);
         URLAggregator aggr = new URLAggregator();
         resp.requestParams.getHeaders().put("newHeader", new ArrayList<String>());
