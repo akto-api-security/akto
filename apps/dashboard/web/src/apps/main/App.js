@@ -5,28 +5,11 @@ import {
   createBrowserRouter,
   RouterProvider,
 } from "react-router-dom";
-import Store from "../dashboard/store";
-
-const TestToast = () => {
-  const setToastConfig = Store(state => state.setToastConfig)
-
-  return (
-    <Button onClick={() => setToastConfig({isActive: true, isError: true, message: "This is a test"})}>
-      Show Toast
-    </Button>
-  )
-}
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <HomePage />,
-    children: [
-      {
-        path: "/test",
-        element: <TestToast/>
-      }
-    ]
+    element: <HomePage />
   },
   {
     path:"/login",
