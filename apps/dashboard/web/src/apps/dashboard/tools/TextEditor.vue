@@ -5,7 +5,7 @@
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
                         <layout-with-left-pane>
-                            <search class="py-2 pr-2" placeholder="Search Tests" @changed="setSearchText" />
+                            <search class="py-2 pr-2" placeholder="Search Tests" @onKeystroke="setSearchText" />
                             <div class="tests-container">
                                 <div class="main-list-title" @click="toggleListDisplay('custom')">
                                     <v-icon size=18

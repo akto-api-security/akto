@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID;
     }
 
     ConfigType configType;
@@ -67,6 +67,21 @@ public abstract class Config {
             this.configType = ConfigType.SLACK;
             this.id = configType.name()+"-ankush";
         }
+    }
+
+    @BsonDiscriminator
+    public static class SendgridConfig extends Config {
+        String sendgridSecretKey;
+        public static final String CONFIG_ID = ConfigType.SENDGRID.name() + CONFIG_SALT;
+
+        public SendgridConfig() {
+            this.configType = ConfigType.SENDGRID;
+            this.id = CONFIG_ID;
+        }
+
+        public String getSendgridSecretKey() {return this.sendgridSecretKey;}
+
+        public void setSendgridSecretKey(String sendgridSecretKey) {this.sendgridSecretKey = sendgridSecretKey;}
     }
 
     @BsonDiscriminator
