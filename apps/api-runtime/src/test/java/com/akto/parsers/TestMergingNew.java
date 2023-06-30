@@ -333,7 +333,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "api/";
+        String url = "/api/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 50; i++) {
@@ -360,7 +360,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         boolean merged = true;
         for (SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.findAll(new BasicDBObject())) {
-            if (!singleTypeInfo.getUrl().equals("api/STRING")) {
+            if (!singleTypeInfo.getUrl().equals("/api/STRING")) {
                 merged = false;
                 break;
             }

@@ -107,7 +107,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testImmediateSync() {
         testInitializer();
-        String url = "immediate/";
+        String url = "/immediate/";
 
         List<HttpResponseParams> responseParams = new ArrayList<>();
 
@@ -133,7 +133,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
 
-        SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
+        SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "/immediate/INTEGER"));
         assertEquals(10, sd.getSamples().size());
 
     }  

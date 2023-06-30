@@ -97,6 +97,9 @@ public class URLTemplate {
 
     public String getTemplateString() {
         String str = "/";
+        if(tokens[0].contains("http")) {
+            str = "";
+        }
         for(int i = 0;i < tokens.length; i++) {
             if (i > 0) {
                 str += "/";
