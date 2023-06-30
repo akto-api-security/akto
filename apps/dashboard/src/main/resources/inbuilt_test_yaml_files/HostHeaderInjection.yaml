@@ -1,0 +1,38 @@
+id: HOST_HEADER_INJECTION
+info:
+  name: "Host header injection"
+  description: ""
+  details: >
+            ""
+  impact: >
+    ""
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: REPLACE_CSRF
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - ""
+
+api_selection_filters:
+  request_headers:
+    for_one:
+      key:
+        eq: host
+        extract: host_key
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_header:
+          host: evil.com
+
+validate:
+  response_payload:
+    contains_either: evil.com
