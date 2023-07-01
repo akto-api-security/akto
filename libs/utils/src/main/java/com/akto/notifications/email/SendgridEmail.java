@@ -27,7 +27,7 @@ public class SendgridEmail {
     private int lastRefreshTs = 0;
     public Config.SendgridConfig getSendgridConfig() {
         int now = Context.now();
-        if (sendgridConfig == null || now - lastRefreshTs > 60 * 60) {
+        if (sendgridConfig == null || now - lastRefreshTs > 1 * 60) {
             synchronized (this) {
                 if (sendgridConfig == null) {
                     Config config = ConfigsDao.instance.findOne(Filters.eq(ConfigsDao.ID, Config.SendgridConfig.CONFIG_ID));
