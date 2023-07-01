@@ -1,4 +1,4 @@
-import { Frame, Page } from "@shopify/polaris"
+import { Frame, Page, Toast } from "@shopify/polaris"
 import Header from "../../components/layouts/Headers"
 import LeftNav from "../../components/layouts/LeftNav"
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
@@ -23,6 +23,21 @@ function HomePage() {
 
   }, [])
 
+  const toastConfig = Store(state => state.toastConfig)
+  const setToastConfig = Store(state => state.setToastConfig)
+  
+  const disableToast = () => {
+    setToastConfig({
+      isActive: false,
+      isError: false,
+      message: ""
+    })
+  }
+
+  const toastMarkup = toastConfig.isActive ? (
+    <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={1500} />
+  ) : null;
+
   const logo = {
     width: 124,
     topBarSource:
@@ -35,6 +50,7 @@ function HomePage() {
     <Page fullWidth={true}>
       <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
         <Outlet />
+        {toastMarkup}
       </Frame>
       {/* <LayoutWithTabs tabs={tabs} /> */}
     </Page>

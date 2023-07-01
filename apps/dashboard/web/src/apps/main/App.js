@@ -1,7 +1,6 @@
-import { ToastContainer } from "react-toastify";
 import HomePage from "../dashboard/pages/home/HomePage"
 import SignUp from "../signup/pages/SignUp"
-import {AppProvider} from "@shopify/polaris"
+import {AppProvider, Button} from "@shopify/polaris"
 import {
   createBrowserRouter,
   RouterProvider,
