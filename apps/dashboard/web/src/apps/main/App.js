@@ -1,5 +1,6 @@
 import HomePage from "../dashboard/pages/home/HomePage"
-import {AppProvider} from "@shopify/polaris"
+import TestRunsPage from "../dashboard/pages/testing/TestRunsPage";
+import { AppProvider } from "@shopify/polaris"
 import {
   createBrowserRouter,
   RouterProvider,
@@ -7,9 +8,15 @@ import {
 
 const router = createBrowserRouter([
   {
-    path:"/",
-    element: <HomePage/>,
-  },
+    path: "/",
+    element: <HomePage />,
+    children: [
+      {
+        path: "/tests/result",
+        element: <TestRunsPage/>
+      }
+    ]
+  }
 ])
 
 function App() {
