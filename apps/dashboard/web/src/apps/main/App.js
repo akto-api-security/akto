@@ -1,7 +1,7 @@
-import { ToastContainer } from "react-toastify";
 import HomePage from "../dashboard/pages/home/HomePage"
+import TestRunsPage from "../dashboard/pages/testing/TestRunsPage";
+import { AppProvider } from "@shopify/polaris"
 import SignUp from "../signup/pages/SignUp"
-import {AppProvider} from "@shopify/polaris"
 import {
   createBrowserRouter,
   RouterProvider,
@@ -10,7 +10,13 @@ import {
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <HomePage />
+    element: <HomePage />,
+    children: [
+      {
+        path: "/tests/result",
+        element: <TestRunsPage/>
+      }
+    ]
   },
   {
     path:"/login",

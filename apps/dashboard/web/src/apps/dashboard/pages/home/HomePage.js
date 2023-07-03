@@ -1,10 +1,8 @@
-import { Frame, Page } from "@shopify/polaris"
-import Header from "../../components/layouts/Headers"
-import LeftNav from "../../components/layouts/LeftNav"
-import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
-import { Outlet } from "react-router-dom";
+import { Frame, Toast} from "@shopify/polaris"
+import Header from "../../components/layouts/header/Headers"
+import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet } from "react-router-dom";
 import { useEffect } from "react";
 
 function HomePage() {
@@ -23,6 +21,21 @@ function HomePage() {
 
   }, [])
 
+  const toastConfig = Store(state => state.toastConfig)
+  const setToastConfig = Store(state => state.setToastConfig)
+  
+  const disableToast = () => {
+    setToastConfig({
+      isActive: false,
+      isError: false,
+      message: ""
+    })
+  }
+
+  const toastMarkup = toastConfig.isActive ? (
+    <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={1500} />
+  ) : null;
+
   const logo = {
     width: 124,
     topBarSource:
@@ -32,12 +45,10 @@ function HomePage() {
   };
 
   return (
-    <Page fullWidth={true}>
       <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
         <Outlet />
+        {toastMarkup}
       </Frame>
-      {/* <LayoutWithTabs tabs={tabs} /> */}
-    </Page>
   );
 }
 
