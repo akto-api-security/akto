@@ -1,0 +1,11 @@
+.Polaris-TopBar__Logo{
+    width: 70px !important;
+    margin-left: 48px;
+}
+.collapse_btn {
+    position: absolute;
+    top: 18px;
+    z-index: 1;
+    left: 20px;
+    cursor: pointer;
+}
