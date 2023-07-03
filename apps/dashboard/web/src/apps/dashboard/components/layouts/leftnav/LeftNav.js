@@ -88,13 +88,13 @@ export default function LeftNav(){
                     {
                       label: 'Create Tests',
                       onClick: ()=>{
-                        navigate('/tests/create')
+                        navigate('/dashboard/testing')
                       }
                     },
                     {
                       label: 'Results',
                       onClick: ()=>{
-                        navigate('/tests/result')
+                        navigate('/dashboard/testing')
                       }
                     }
                   ],

@@ -5,15 +5,16 @@ import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
+  Navigate
 } from "react-router-dom";
 
 const router = createBrowserRouter([
   {
-    path: "/",
+    path: "/dashboard",
     element: <HomePage />,
     children: [
       {
-        path: "/tests/result",
+        path: "/dashboard/testing",
         element: <TestRunsPage/>
       }
     ]
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
     path:"/login",
     element: <SignUp/>,
   },
+  {
+    path:"/",
+    element:<Navigate to="/login" />,
+  }
 ])
 
 function App() {
