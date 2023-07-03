@@ -137,6 +137,7 @@ export default function LeftNav(){
           <Navigation.Section 
               items={[
                 {
+                  url: '#',
                   label: collapse? (
                     <Tooltip content="Settings" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={SettingsMinor} />
@@ -146,10 +147,53 @@ export default function LeftNav(){
                   onClick: ()=>{
                     if(!collapse){
                       handleSelect("settings")
-                      navigate("/dashboard/settings")
                     }
                   },
                   selected: selected === 'settings',
+                  subNavigationItems:[
+                    {
+                      label: 'Accounts',
+                      onClick: ()=>{
+                        navigate('/settings/accounts')
+                      }
+                    },
+                    {
+                      label: 'Users',
+                      onClick: ()=>{
+                        navigate('/settings/Users')
+                      }
+                    },
+                    {
+                      label: 'Alerts',
+                      onClick: ()=>{
+                        navigate('/settings/alerts')
+                      }
+                    },
+                    {
+                      label: 'CI/CD',
+                      onClick: ()=>{
+                        navigate('/settings/ci-cd')
+                      }
+                    },
+                    {
+                      label: 'Integrations',
+                      onClick: ()=>{
+                        navigate('/settings/integrations')
+                      }
+                    },
+                    {
+                      label: 'Health',
+                      onClick: ()=>{
+                        navigate('/settings/health')
+                      }
+                    },
+                    {
+                      label: 'Metrics',
+                      onClick: ()=>{
+                        navigate('/settings/metrics')
+                      }
+                    }
+                  ],
                   key: '7',
                 }
               ]}
