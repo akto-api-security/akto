@@ -8,7 +8,6 @@ import {
 } from "react-router-dom";
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/Users";
-import Integrations from "../dashboard/pages/settings/Integrations";
 
 const router = createBrowserRouter([
   {

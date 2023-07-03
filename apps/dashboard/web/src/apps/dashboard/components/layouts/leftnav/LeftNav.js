@@ -62,10 +62,9 @@ export default function LeftNav(){
                   ) : 'API Inventory',
                   icon: collapse ? '' : ProductsMinor,
                   onClick: ()=>{
-                    if(!collapse){
-                        handleSelect("inventory")
-                        navigate("/dashboard/observe/inventory")
-                      }
+                      handleSelect("inventory")
+                      navigate("/dashboard/observe/inventory")
+                      
                     },
                     selected: selected === 'inventory',
                     key: '3',
@@ -137,7 +136,7 @@ export default function LeftNav(){
           <Navigation.Section 
               items={[
                 {
-                  url: '#',
+                  url: '',
                   label: collapse? (
                     <Tooltip content="Settings" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={SettingsMinor} />
@@ -147,53 +146,10 @@ export default function LeftNav(){
                   onClick: ()=>{
                     if(!collapse){
                       handleSelect("settings")
+                      navigate("/settings/about")
                     }
                   },
                   selected: selected === 'settings',
-                  subNavigationItems:[
-                    {
-                      label: 'Accounts',
-                      onClick: ()=>{
-                        navigate('/settings/accounts')
-                      }
-                    },
-                    {
-                      label: 'Users',
-                      onClick: ()=>{
-                        navigate('/settings/Users')
-                      }
-                    },
-                    {
-                      label: 'Alerts',
-                      onClick: ()=>{
-                        navigate('/settings/alerts')
-                      }
-                    },
-                    {
-                      label: 'CI/CD',
-                      onClick: ()=>{
-                        navigate('/settings/ci-cd')
-                      }
-                    },
-                    {
-                      label: 'Integrations',
-                      onClick: ()=>{
-                        navigate('/settings/integrations')
-                      }
-                    },
-                    {
-                      label: 'Health',
-                      onClick: ()=>{
-                        navigate('/settings/health')
-                      }
-                    },
-                    {
-                      label: 'Metrics',
-                      onClick: ()=>{
-                        navigate('/settings/metrics')
-                      }
-                    }
-                  ],
                   key: '7',
                 }
               ]}
