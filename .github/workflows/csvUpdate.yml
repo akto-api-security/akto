@@ -26,13 +26,13 @@ jobs:
           python3 -m pip install PyGithub==1.59.0
           python3 -m pip install aiohttp==3.8.1
           python3 - <<EOF
+
           import os
           import csv
           import requests
           import yaml
-          from github import Github
-
           import smtplib
+          from github import Github
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
           from email.mime.application import MIMEApplication
@@ -44,11 +44,10 @@ jobs:
           FOLDER_PATH = 'apps/dashboard/src/main/resources/inbuilt_test_yaml_files'
           FILE_EXTENSION = '.yaml'
 
-          CSV_FILE_PATH = 'test.csv'
-
           EMAIL_RECIPIENT = os.getenv("EMAIL_RECIPIENT")
-          EMAIL_SUBJECT = 'CSV Report'
+          EMAIL_SUBJECT = f'CSV Report of {REPOSITORY_OWNER}/{REPOSITORY_NAME}'
 
+          CSV_FILE_PATH = f'{REPOSITORY_OWNER}__{REPOSITORY_NAME}.csv'
 
           def fetch_yaml_data(access_token, yaml_url):
               g = Github(access_token)
