@@ -2,13 +2,9 @@ name: Python Script Runner with CSV Report
 description: Runs a Python script, generates a CSV report and sends the report via email using Docker.
 
 on:
-  push:
-    branches: [ master, develop ]
-  pull_request:
-    branches: [ master, develop ]
+  workflow_dispatch
 
   # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch
 
 jobs:
   push-release-notes:
