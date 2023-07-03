@@ -1,26 +1,25 @@
 import {Icon, Navigation, Tooltip} from "@shopify/polaris"
-import {HomeMinor,OrdersMinor, CustomersMinor,AnalyticsMinor,DiscountsMinor,ProductsMinor} from "@shopify/polaris-icons"
-import {useState,useCallback} from "react"
+import {HomeMinor,OrdersMinor, CustomersMinor,AnalyticsMinor,DiscountsMinor,ProductsMinor,SettingsMinor} from "@shopify/polaris-icons"
+import {useState} from "react"
 import {useNavigate} from "react-router-dom"
+
+import './LeftNav.css'
+import Store from "../../../store"
 
 export default function LeftNav(){
 
   const [selected, setSelected] = useState('');
-  const [collapse, setCollapse] = useState(true);
   const navigate = useNavigate();
+  const collapse = Store((state) => state.hideFullNav)
 
 
   const handleSelect = (selectedId) => {
     setSelected(selected => selected === selectedId ? null : selectedId);
   };
 
-  const toggleCollapse = useCallback(
-    () => setCollapse((collapse) => !collapse),
-    [],
-  );
-
     const navigationMarkup = (
-        <Navigation location="/">
+      <div className={collapse ? 'collapse' : ''}>
+        <Navigation location="/"> 
           <Navigation.Section
             items={[
                 {
@@ -31,9 +30,7 @@ export default function LeftNav(){
                   ) : 'Quick Start',
                   icon: collapse ? '' : HomeMinor,
                   onClick: ()=>{
-                    if(collapse){
-                      toggleCollapse()
-                    }else{
+                    if(!collapse){
                       handleSelect("quick_start")
                       navigate("/dashboard/quick-start")
                     }
@@ -49,9 +46,7 @@ export default function LeftNav(){
                   ) : 'Dashboard',
                   icon: collapse ? '' : OrdersMinor,
                   onClick: ()=>{
-                    if(collapse){
-                      toggleCollapse()
-                    }else{
+                    if(!collapse){
                       handleSelect("dashboard")
                       navigate("/dashboard")
                     }
@@ -67,9 +62,7 @@ export default function LeftNav(){
                   ) : 'API Inventory',
                   icon: collapse ? '' : ProductsMinor,
                   onClick: ()=>{
-                    if(collapse){
-                      toggleCollapse()
-                    }else{
+                    if(!collapse){
                         handleSelect("inventory")
                         navigate("/dashboard/observe/inventory")
                       }
@@ -86,10 +79,9 @@ export default function LeftNav(){
                   ) : 'Testing',
                   icon: collapse ? '' : CustomersMinor,
                   onClick: ()=>{
-                    if(collapse){
-                      toggleCollapse()
+                    if(!collapse){
+                      handleSelect('testing')
                     }
-                    handleSelect('testing')
                   },
                   selected: selected === 'testing',
                   subNavigationItems:[
@@ -116,9 +108,7 @@ export default function LeftNav(){
                   ) : 'Test Editor',
                   icon: collapse ? '' : DiscountsMinor,
                   onClick: ()=>{
-                    if(collapse){
-                      toggleCollapse()
-                    }else{
+                    if(!collapse){
                       handleSelect("test-editor")
                       navigate("/dashboard/test-editor")
                     }
@@ -134,9 +124,7 @@ export default function LeftNav(){
                     ) : 'Issues',
                   icon: collapse ? '' : AnalyticsMinor,
                   onClick: ()=>{
-                      if(collapse){
-                        toggleCollapse()
-                      }else{
+                      if(!collapse){
                         handleSelect("issues")
                         navigate("/dashboard/issues")
                       }
@@ -146,7 +134,72 @@ export default function LeftNav(){
                 },
               ]}
           />
+          <Navigation.Section 
+              items={[
+                {
+                  url: '#',
+                  label: collapse? (
+                    <Tooltip content="Settings" preferredPosition="bottom" dismissOnMouseOut>
+                      <Icon source={SettingsMinor} />
+                    </Tooltip>
+                  ) : 'Settings',
+                  icon: collapse ? '' : SettingsMinor,
+                  onClick: ()=>{
+                    if(!collapse){
+                      handleSelect("settings")
+                    }
+                  },
+                  selected: selected === 'settings',
+                  subNavigationItems:[
+                    {
+                      label: 'Accounts',
+                      onClick: ()=>{
+                        navigate('/settings/accounts')
+                      }
+                    },
+                    {
+                      label: 'Users',
+                      onClick: ()=>{
+                        navigate('/settings/Users')
+                      }
+                    },
+                    {
+                      label: 'Alerts',
+                      onClick: ()=>{
+                        navigate('/settings/alerts')
+                      }
+                    },
+                    {
+                      label: 'CI/CD',
+                      onClick: ()=>{
+                        navigate('/settings/ci-cd')
+                      }
+                    },
+                    {
+                      label: 'Integrations',
+                      onClick: ()=>{
+                        navigate('/settings/integrations')
+                      }
+                    },
+                    {
+                      label: 'Health',
+                      onClick: ()=>{
+                        navigate('/settings/health')
+                      }
+                    },
+                    {
+                      label: 'Metrics',
+                      onClick: ()=>{
+                        navigate('/settings/metrics')
+                      }
+                    }
+                  ],
+                  key: '7',
+                }
+              ]}
+          />
         </Navigation>
+        </div>
       );
 
     return(

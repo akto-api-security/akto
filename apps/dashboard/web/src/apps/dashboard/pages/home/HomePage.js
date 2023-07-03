@@ -1,10 +1,8 @@
-import { Frame, Page, Toast } from "@shopify/polaris"
-import Header from "../../components/layouts/Headers"
-import LeftNav from "../../components/layouts/LeftNav"
-import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
-import { Outlet } from "react-router-dom";
+import { Frame, Toast} from "@shopify/polaris"
+import Header from "../../components/layouts/header/Headers"
+import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet } from "react-router-dom";
 import { useEffect } from "react";
 
 function HomePage() {
@@ -47,13 +45,10 @@ function HomePage() {
   };
 
   return (
-    <Page fullWidth={true}>
       <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
         <Outlet />
         {toastMarkup}
       </Frame>
-      {/* <LayoutWithTabs tabs={tabs} /> */}
-    </Page>
   );
 }
 
