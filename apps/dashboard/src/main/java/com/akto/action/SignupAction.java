@@ -394,7 +394,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             } else {
                 LoginAction.loginUser(user, servletResponse, true, servletRequest);
-//                servletResponse.sendRedirect("/dashboard/observe/inventory");
+                servletResponse.sendRedirect("/dashboard/observe/inventory");
                 return;
             }
 
