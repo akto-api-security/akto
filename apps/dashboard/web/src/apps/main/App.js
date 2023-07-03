@@ -6,6 +6,8 @@ import {
   createBrowserRouter,
   RouterProvider,
 } from "react-router-dom";
+import BurpSuite from "../dashboard/components/settings/BurpSuite";
+import Integrations from "../dashboard/components/settings/Integrations";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +24,14 @@ const router = createBrowserRouter([
     path:"/login",
     element: <SignUp/>,
   },
+  {
+    path: "/settings/integrations",
+    element: <Integrations />
+  },
+  {
+    path:"/settings/integrations/burp",
+    element: <BurpSuite />,
+  }
 ])
 
 function App() {

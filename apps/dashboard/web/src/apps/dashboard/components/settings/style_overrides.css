@@ -1,0 +1,6 @@
+.Polaris-HorizontalStack {
+    align-items: center !important;
+}
+.Polaris-ResourceItem__Actions {
+    display: flex !important;
+}
