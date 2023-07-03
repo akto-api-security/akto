@@ -179,8 +179,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         details.setTokenUri(aktoGoogleConfig.getTokenURI());
         clientSecrets.setWeb(details);
 
-        GoogleTokenResponse tokenResponse =
-                null;
+        GoogleTokenResponse tokenResponse;
         try {
             tokenResponse = new GoogleAuthorizationCodeTokenRequest(
                     new NetHttpTransport(),
@@ -395,7 +394,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             } else {
                 LoginAction.loginUser(user, servletResponse, true, servletRequest);
-                servletResponse.sendRedirect("/dashboard/observe/inventory");
+//                servletResponse.sendRedirect("/dashboard/observe/inventory");
                 return;
             }
 
@@ -403,7 +402,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
-            new LoginAction().loginUser(user, servletResponse, true, servletRequest);
+            LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletResponse.sendRedirect("/dashboard/onboarding");
         }
     }
