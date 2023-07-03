@@ -6,6 +6,8 @@ import {
   createBrowserRouter,
   RouterProvider,
 } from "react-router-dom";
+import Settings from "../dashboard/pages/settings/Settings";
+import Users from "../dashboard/pages/settings/Users";
 
 const router = createBrowserRouter([
   {
@@ -15,6 +17,16 @@ const router = createBrowserRouter([
       {
         path: "/tests/result",
         element: <TestRunsPage/>
+      },
+      {
+        path: "/settings",
+        element: <Settings/>,
+        children: [
+          {
+            path: "/settings/users",
+            element: <Users/>
+          }
+        ]
       }
     ]
   },
