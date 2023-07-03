@@ -14,7 +14,7 @@ jobs:
         id: run_script
         run: |
           python3 -m pip install --upgrade pip
-          
+
           python3 -m pip install requests==2.31.0
           python3 -m pip install requests-oauthlib==1.3.1
           python3 -m pip install requests-toolbelt==1.0.0
@@ -24,6 +24,7 @@ jobs:
           python3 -m pip install GitPython==3.1.31
           python3 -m pip install PyGithub==1.59.0
           python3 -m pip install aiohttp==3.8.1
+
           python3 - <<EOF
 
           import os
@@ -47,6 +48,7 @@ jobs:
           EMAIL_SUBJECT = f'CSV Report of {REPOSITORY_OWNER}/{REPOSITORY_NAME}'
 
           CSV_FILE_PATH = f'{REPOSITORY_OWNER}__{REPOSITORY_NAME}.csv'
+
 
           def fetch_yaml_data(access_token, yaml_url):
               g = Github(access_token)
@@ -119,6 +121,7 @@ jobs:
                               write_to_csv(writer, yaml_data, yaml_content)
                   print(f"CSV file '{csv_file_path}' has been generated successfully.")
                   send_email(csv_file_path)
+
 
           def send_email(csv_file_path):
               msg = MIMEMultipart()
