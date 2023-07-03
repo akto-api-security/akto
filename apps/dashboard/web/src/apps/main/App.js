@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/Users";
+import Integrations from "../dashboard/pages/settings/Integrations";
 
 const router = createBrowserRouter([
   {
@@ -25,7 +26,7 @@ const router = createBrowserRouter([
           {
             path: "/settings/users",
             element: <Users/>
-          }
+          },
         ]
       }
     ]
@@ -33,7 +34,7 @@ const router = createBrowserRouter([
   {
     path:"/login",
     element: <SignUp/>,
-  },
+  }
 ])
 
 function App() {

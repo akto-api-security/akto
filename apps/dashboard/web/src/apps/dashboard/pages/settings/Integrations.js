@@ -1,9 +1,8 @@
 import { Button, Modal, TextContainer } from "@shopify/polaris"
 import { useCallback, useState } from "react";
 import { Outlet } from "react-router-dom"
-import './style_overrides.css'
 
-const Settings = () => {
+const Integrations = () => {
     const [active, setActive] = useState(true);
 
     const handleChange = useCallback(() => setActive(!active), [active]);
@@ -12,9 +11,9 @@ const Settings = () => {
 
 
     return (
-        <div className="settings-modal">
+        <div className="integrations-modal">
             <Modal
-                large
+                fullScreen
                 activator={activator}
                 open={active}
                 onClose={handleChange}
@@ -45,4 +44,4 @@ const Settings = () => {
     )
 }
 
-export default Settings
+export default Integrations
