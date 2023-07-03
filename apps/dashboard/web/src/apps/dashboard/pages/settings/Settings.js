@@ -1,46 +1,71 @@
-import { Button, Modal, TextContainer } from "@shopify/polaris"
+import { Button, Modal, Navigation, TextContainer } from "@shopify/polaris"
+import { HomeMinor, OrdersMinor, ProductsMinor } from '@shopify/polaris-icons';
+
+import { tokens } from "@shopify/polaris-tokens"
 import { useCallback, useState } from "react";
-import { Outlet } from "react-router-dom"
-import './style_overrides.css'
+import { Outlet, useNavigate } from "react-router-dom"
+import './settings.css'
 
 const Settings = () => {
+    const navigate = useNavigate();
     const [active, setActive] = useState(true);
 
-    const handleChange = useCallback(() => setActive(!active), [active]);
+    const handleChange = useCallback(() => navigate("/"));
 
     const activator = <Button onClick={handleChange}>Open</Button>;
 
-
     return (
-        <div className="container">
-            <Modal
-                fullScreen
-                activator={activator}
-                open={active}
-                onClose={handleChange}
-                title="Reach more shoppers with Instagram product tags"
-                primaryAction={{
-                    content: 'Add Instagram',
-                    onAction: handleChange,
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Learn more',
-                        onAction: handleChange,
-                    },
-                ]}
-            >
-                <Modal.Section>
-                    <TextContainer>
-                        <p>
-                            Use Instagram posts to share your products with millions of
-                            people. Let shoppers buy from your store without leaving
-                            Instagram.
-                        </p>
-                    </TextContainer>
-                </Modal.Section>
-            </Modal>
-        </div>
+        <Modal
+            fullScreen
+            open
+            onClose={handleChange}
+            noScroll
+            title="Settings"
+        >
+            <div style={{background: tokens.color["color-bg-subdued"], display: "grid", gridTemplateColumns: "1fr 1.33fr" }}>
+                <div>
+                    <Navigation location="/">
+                        <Navigation.Section
+                            items={[
+                                {
+                                    label: 'About',
+                                    icon: HomeMinor,
+                                    onClick: () => navigate("/settings/about")
+                                },
+                                {
+                                    url: 'users',
+                                    label: 'Users',
+                                    icon: HomeMinor,
+                                },
+                                {
+                                    url: 'alerts',
+                                    label: 'Alerts',
+                                    icon: HomeMinor,
+                                },
+                                {
+                                    url: 'cicd',
+                                    label: 'CI/CD',
+                                    icon: HomeMinor,
+                                },
+                                {
+                                    url: 'health-logs',
+                                    label: 'Health & Logs',
+                                    icon: HomeMinor,
+                                },
+                                {
+                                    url: 'metrics',
+                                    label: 'Metrics',
+                                    icon: HomeMinor,
+                                },
+                            ]}
+                        />
+                    </Navigation>
+                </div>
+                <div>
+                    Hello
+                </div>
+            </div>
+        </Modal>
     )
 }
 

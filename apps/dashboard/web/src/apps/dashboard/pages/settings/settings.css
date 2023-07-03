@@ -1,3 +1,6 @@
 .Polaris-Modal-Dialog__Modal.Polaris-Modal-Dialog--fullScreen {
+    margin-top: 10vh;
     max-width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
 }
