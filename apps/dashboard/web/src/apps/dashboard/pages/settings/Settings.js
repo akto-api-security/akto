@@ -12,9 +12,9 @@ const Settings = () => {
 
 
     return (
-        <div className="settings-modal">
+        <div className="container">
             <Modal
-                large
+                fullScreen
                 activator={activator}
                 open={active}
                 onClose={handleChange}
@@ -40,7 +40,6 @@ const Settings = () => {
                     </TextContainer>
                 </Modal.Section>
             </Modal>
-
         </div>
     )
 }

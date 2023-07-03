@@ -1,3 +1,3 @@
-.Polaris-Modal-Dialog__Modal.Polaris-Modal-Dialog--sizeLarge {
-    width: 100% !important;
+.Polaris-Modal-Dialog__Modal.Polaris-Modal-Dialog--fullScreen {
+    max-width: 100% !important;
 }
