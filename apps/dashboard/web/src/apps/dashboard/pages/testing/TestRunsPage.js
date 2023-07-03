@@ -206,6 +206,31 @@ function disambiguateLabel(key, value) {
   }
 }
 
+let actionsList = [
+  {
+      content: 'Schedule test',
+      icon: CalendarMinor,
+      onAction: () => {console.log("this.scheduleTest()")},
+  },
+  {
+      content: 'Re-run',
+      icon: MagicMinor,
+      onAction: () => {console.log("this.reRunTest()")},
+  },
+  {
+      content: 'Add to CI/CD pipeline',
+      icon: PlayMinor,
+      onAction: () => {console.log("this.addToCiCd()")},
+  },
+  {
+      content: 'Stop',
+      icon: CircleCancelMinor,
+      destructive:true,
+      onAction: () => {console.log("this.stopTest()")},
+      disabled: true,
+  }
+]
+
 function TestRunsPage() {
   return (
     <VerticalStack gap="4">
@@ -215,7 +240,15 @@ function TestRunsPage() {
         </Text>
         <Button primary>New test run</Button>
       </HorizontalStack>
-      <GithubTable testRuns={testRuns} sortOptions={sortOptions} resourceName={resourceName} filters={filters} disambiguateLabel={disambiguateLabel} headers={headers} />
+      <GithubTable 
+        testRuns={testRuns} 
+        sortOptions={sortOptions} 
+        resourceName={resourceName} 
+        filters={filters} 
+        disambiguateLabel={disambiguateLabel} 
+        headers={headers}
+        actionsList={actionsList} 
+      />
     </VerticalStack>
   );
 }
