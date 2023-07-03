@@ -1,5 +1,4 @@
 name: Python Script Runner with CSV Report
-description: Runs a Python script, generates a CSV report and sends the report via email using Docker.
 
 on:
   workflow_dispatch
