@@ -5,17 +5,18 @@ import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
+  Navigate
 } from "react-router-dom";
 import BurpSuite from "../dashboard/components/settings/BurpSuite";
 import Integrations from "../dashboard/components/settings/Integrations";
 
 const router = createBrowserRouter([
   {
-    path: "/",
+    path: "/dashboard",
     element: <HomePage />,
     children: [
       {
-        path: "/tests/result",
+        path: "/dashboard/testing",
         element: <TestRunsPage/>
       }
     ]
@@ -31,6 +32,10 @@ const router = createBrowserRouter([
   {
     path:"/settings/integrations/burp",
     element: <BurpSuite />,
+  },
+  {
+    path:"/",
+    element:<Navigate to="/login" />,
   }
 ])
 
