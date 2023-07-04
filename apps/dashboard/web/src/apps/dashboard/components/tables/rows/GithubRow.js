@@ -13,11 +13,12 @@ import {
 import {
     HorizontalDotsMinor
 } from '@shopify/polaris-icons';
+import { useNavigate } from "react-router-dom";
 
 import { useState, useCallback } from 'react';
 
 function GithubRow(props) {
-
+    const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const togglePopoverActive = (index) =>useCallback(
         () => setPopoverActive(index),
@@ -25,14 +26,18 @@ function GithubRow(props) {
     );
 
     function getStatus(item) {
-        switch (item.confidence) {
-            case 'High': return 'critical';
-            case 'Medium': return 'warning';
-            case 'Low': return 'neutral';
+        let confidence = item.confidence.toUpperCase();
+        switch (confidence) {
+            case 'HIGH': return 'critical';
+            case 'MEDIUM': return 'warning';
+            case 'LOW': return 'neutral';
         }
-    }     
+    }
 
-    
+    function navigateToTest(hexId){
+        console.log(hexId);
+        navigate("/dashboard/testing/"+hexId)
+    }
 
     return (
         <IndexTable.Row
@@ -49,7 +54,7 @@ function GithubRow(props) {
                 <HorizontalStack align='space-between'>
                     {/* <div> */}
                     {/* <Link url={"testing/" + props.data.hexId} monochrome={true} removeUnderline={true} > */}
-                    <div onClick={()=>{console.log("something")}} style={{cursor: 'pointer'}}>
+                    <div onClick={() => (navigateToTest(props.data.hexId))} style={{cursor: 'pointer'}}>
                     <HorizontalStack gap="1">
                         {/* <VerticalStack align="start" inlineAlign="start" gap="1"> */}
                         {/* <HorizontalStack gap="2" align='center'> */}
@@ -72,7 +77,7 @@ function GithubRow(props) {
                                 {
                                     props?.headers[1]?.severityList &&
                                         props.data[props?.headers[1]?.severityList['value']] ? props.data[props?.headers[1]?.severityList['value']].map((item) =>
-                                            <Badge key={item.confidence} status={getStatus(item)}>{item.confidence} {item.count}</Badge>) :
+                                            <Badge key={item.confidence} status={getStatus(item)}>{item.confidence} {item.count ? item.count: ""}</Badge>) :
                                         []}
                             </HorizontalStack>
                             {/* <div style={{width: 'fit-content'}}> */}
@@ -102,6 +107,8 @@ function GithubRow(props) {
                     </div>
                     {/* </div> */}
                     <VerticalStack align="center">
+                    {
+                        props.hasRowActions &&
                         <Popover
                             active={popoverActive == props.data.hexId}
                             activator={<Button onClick={togglePopoverActive(props.data.hexId)} plain icon={HorizontalDotsMinor} />}
@@ -113,6 +120,7 @@ function GithubRow(props) {
                                 sections={props.getActions(props.data)}
                             />
                         </Popover>
+                    }
                     </VerticalStack>
                 </HorizontalStack>
 

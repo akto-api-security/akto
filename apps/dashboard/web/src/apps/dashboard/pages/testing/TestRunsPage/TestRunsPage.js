@@ -1,4 +1,4 @@
-import GithubTable from "../../components/tables/GithubTable"
+import GithubTable from "../../../components/tables/GithubTable"
 import {
   Text,
   Button,
@@ -13,7 +13,10 @@ import {
   PlayMinor,
   ClockMinor
 } from '@shopify/polaris-icons';
-import api from "./api";
+import api from "../api";
+import func from "../../../utils/func"
+
+import { useState, useCallback, useEffect } from 'react';
 
 let headers = [
   {
@@ -66,11 +69,89 @@ let headers = [
   }
 ]
 
-let testRuns = []
+const MAX_SEVERITY_THRESHOLD = 100000;
 
-api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
-  console.log(testingRuns, latestTestingRunResultSummaries)
-})
+function getOrderPriority(state){
+    switch(state._name){
+        case "RUNNING": return 1;
+        case "SCHEDULED": return 2;
+        case "STOPPED": return 4;
+        default: return 3;
+    }
+}
+
+function getTestingRunIcon(state){
+    switch(state._name){
+        case "RUNNING": return ClockMinor;
+        case "SCHEDULED": return CalendarMinor;
+        case "STOPPED": return CircleCancelMinor;
+        default: return ClockMinor;
+    }
+}
+
+function getTestingRunType(testingRun, testingRunResultSummary){
+    if(testingRunResultSummary.metadata!=null){
+        return 'CI/CD';
+    }
+    if(testingRun.periodInSeconds==0){
+        return 'One-time'
+    }
+    return 'Recurring';
+}
+
+function getTotalSeverity(countIssues){
+    let ts = 0;
+    if(countIssues==null){
+        return 0;
+    }
+    ts = MAX_SEVERITY_THRESHOLD*(countIssues['High']*MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
+    return ts;
+}
+
+function getRuntime(scheduleTimestamp ,endTimestamp, state){
+    if(state._name=='RUNNING'){
+        return "Currently running";
+    }
+    const currTime = Date.now();
+    if(endTimestamp == -1){
+      if(currTime > scheduleTimestamp){
+        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+    } else {
+        return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+    }
+}
+return 'Last run ' + func.prettifyEpoch(endTimestamp);
+}
+
+function getAlternateTestsInfo(state){
+    switch(state._name){
+        case "RUNNING": return "Tests are still running";
+        case "SCHEDULED": return "Tests have been scheduled";
+        case "STOPPED": return "Tests have been stopper";
+        default: return "Information unavailable";
+    }
+}
+
+function getTestsInfo(testResultsCount, state){
+    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
+}
+
+function getSeverity(countIssues){
+  return Object.keys(countIssues).filter((key) => {
+    return (countIssues[key]>0)
+  }).map((key) => {
+    return {
+      confidence : key,
+      count:countIssues[key]
+    }
+  })
+}
+
+function getSeverityStatus(countIssues){
+  return Object.keys(countIssues).filter((key) => {
+    return (countIssues[key]>0)
+  })
+}
 
 // let testRuns = [
 //   {
@@ -166,26 +247,20 @@ const resourceName = {
   plural: 'Test runs',
 };
 
-const filters = [
+let filters = [
   {
     key: 'severityStatus',
     label: 'Severity',
     title: 'Severity',
-    choices: [
-      { label: 'High', value: 'High' },
-      { label: 'Medium', value: 'Medium' },
-      { label: 'Low', value: 'Low' },
-    ]
+    choices: [],
+    availableChoices: new Set()
   },
   {
     key: 'runTypeStatus',
     label: 'Run type',
     title: 'Run type',
-    choices: [
-      { label: 'CI/CD', value: 'CI/CD' },
-      { label: 'One-time', value: 'One-time' },
-      { label: 'Recurring', value: 'Recurring' },
-    ]
+    choices: [],
+    availableChoices: new Set()
   }
 ]
 
@@ -254,6 +329,62 @@ function getActions(item){
 }
 
 function TestRunsPage() {
+
+  const [testRuns, setTestRuns] = useState([])
+
+useEffect(()=>{
+  api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
+    // console.log(testingRuns, latestTestingRunResultSummaries)
+    let testRuns = []
+    testingRuns.forEach((data)=>{
+      let obj={};
+      let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']];
+      if(testingRunResultSummary==null){
+          testingRunResultSummary = {};
+      }
+      if(testingRunResultSummary.countIssues!=null){
+          testingRunResultSummary.countIssues['High'] = testingRunResultSummary.countIssues['HIGH']
+          testingRunResultSummary.countIssues['Medium'] = testingRunResultSummary.countIssues['MEDIUM']
+          testingRunResultSummary.countIssues['Low'] = testingRunResultSummary.countIssues['LOW']
+          delete testingRunResultSummary.countIssues['HIGH']
+          delete testingRunResultSummary.countIssues['MEDIUM']
+          delete testingRunResultSummary.countIssues['LOW']
+      }
+      obj['hexId'] = data.hexId;
+      obj['orderPriority'] = getOrderPriority(data.state)
+      obj['icon'] = getTestingRunIcon(data.state);
+      obj['name'] = data.name
+      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
+      obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
+      obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
+      obj['scheduleTimestamp'] = data.scheduleTimestamp
+      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
+      obj['severity'] = getSeverity(testingRunResultSummary.countIssues)
+      obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
+      obj['severityStatus'] = getSeverityStatus(testingRunResultSummary.countIssues)
+      obj['runTypeStatus'] = [obj['run_type']]
+      filters.forEach((filter, index) => {
+      let key = filter["key"]
+        switch(key){
+          case 'severityStatus' : obj["severityStatus"].map((item) => filter.availableChoices.add(item)); break;
+          case 'runTypeStatus' : obj["runTypeStatus"].map((item) => filter.availableChoices.add(item)); 
+        }
+        filters[index] = filter
+      })
+      testRuns.push(obj);
+  })
+  setTestRuns(testRuns);
+  filters.forEach((filter, index) => {
+      let choiceList = []
+      filter.availableChoices.forEach((choice) => {
+        choiceList.push({label:choice, value:choice})
+      })
+      filters[index].choices = choiceList
+    })  
+  })
+  
+}, [])
+
   return (
     <VerticalStack gap="4">
       <HorizontalStack align="space-between" blockAlign="center">
@@ -266,10 +397,12 @@ function TestRunsPage() {
         data={testRuns} 
         sortOptions={sortOptions} 
         resourceName={resourceName} 
-        filters={filters} 
+        filters={filters}
         disambiguateLabel={disambiguateLabel} 
         headers={headers}
         getActions = {getActions}
+        hasRowActions={true}
+        // func={pull_data}
       />
     </VerticalStack>
   );

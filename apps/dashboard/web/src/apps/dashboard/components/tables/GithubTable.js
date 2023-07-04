@@ -5,10 +5,11 @@ import {
   useSetIndexFiltersMode,
   IndexFiltersMode,
   useIndexResourceState,
-  ChoiceList} from '@shopify/polaris';
+  Pagination} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
+import CustomChoiceList from './filterChoices/ChoiceList';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 function GithubTable(props) {
 
@@ -18,15 +19,6 @@ function GithubTable(props) {
   const [data, setData] = useState(props.data);
   const [appliedFilters, setAppliedFilters] = useState([]);
   const [queryValue, setQueryValue] = useState('');
-
-  let filterObject = props.filters.map((filter) => { return filter.key })
-  let obj = {}
-  filterObject.forEach((filter) => {
-    obj[filter] = []
-  })
-  const [filterStatus, setFilterStatus] = useState(
-    obj
-  );
 
   useEffect(() => {
     let tempData = props.data;
@@ -52,22 +44,29 @@ function GithubTable(props) {
       return (sortDirection == 'asc' ? -1 : 1) * (a[sortKey] - b[sortKey]);
     })
     setData([...tempData])
-  }, [sortSelected, appliedFilters, queryValue])
+  }, [sortSelected, appliedFilters, queryValue, props.data])
 
-  const changeAppliedFilters = () => {
-    // setAppliedFilters([]);
-    let temp = []
-    let filterKeys = Object.keys(filterStatus);
-    filterKeys.forEach((filterKey) => {
-      if (!isEmpty(filterStatus[filterKey])) {
-        temp.push({
-          key: filterKey,
-          label: props.disambiguateLabel(filterKey, filterStatus[filterKey]),
-          onRemove: handleFilterStatusRemove,
-          value: filterStatus[filterKey]
-        });
-      }
+  const handleRemoveAppliedFilter = (key) => {
+    let temp = appliedFilters
+    temp = temp.filter((filter) => {
+      return filter.key != key
     })
+    setAppliedFilters(temp);
+  }
+
+  const changeAppliedFilters = (key, value) => {
+    let temp = appliedFilters
+    temp = temp.filter((filter) => {
+      return filter.key != key
+    })
+    if(value.length>0){
+      temp.push({
+        key: key,
+        label: props.disambiguateLabel(key, value),
+        onRemove: handleRemoveAppliedFilter,
+        value: value
+      })
+    }
     setAppliedFilters(temp);
   };
 
@@ -79,54 +78,41 @@ function GithubTable(props) {
     () => setQueryValue(""),
     [],
   );
-  const handleFilterStatusChange = (key) => useCallback(
-    (value) => {
-      let tempFilter = filterStatus;
-      tempFilter[key] = value
-      setFilterStatus({ ...tempFilter })
-      changeAppliedFilters(tempFilter)
-    },
-    [],
-  );
-  const filters = props.filters.map((filter) => {
-    return {
-      key: filter.key,
-      label: filter.label,
-      filter: (
-        <ChoiceList
-          title={filter.title}
-          titleHidden
-          choices={filter.choices}
-          selected={filterStatus[filter.key] || []}
-          onChange={handleFilterStatusChange(filter.key)}
-          allowMultiple
-        />
-      ),
-      // shortcut: true,
-      pinned: true
-    }
-  })
-  const handleFilterStatusRemove = useCallback((...keys) => {
-    let tempFilter = filterStatus;
-    keys.forEach((key) => {
-      if (key in tempFilter) {
-        tempFilter[key] = []
-      }
-    })
-    setFilterStatus({ ...tempFilter })
-    changeAppliedFilters(tempFilter)
-  }, []);
+
+  const selectedFilters = (key) =>(value) => {
+    changeAppliedFilters(key, value);
+  }
+  let filters = formatFilters(props.filters)
+  function formatFilters(filters) {
+    return filters
+      .filter((filter) => {
+        return filter.availableChoices!=undefined ? filter.availableChoices.size > 0 : false;
+      })
+      .map((filter) => {
+        return {
+          key: filter.key,
+          label: filter.label,
+          filter: (
+            <CustomChoiceList 
+              filter={filter} 
+              selectedFilters={selectedFilters(filter.key)}
+              appliedFilters={
+                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ? 
+                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : []} />
+          ),
+          // shortcut: true,
+          pinned: true
+
+        }
+      })
+  }
 
   const handleFiltersClearAll = useCallback(() => {
-    let filterKeys = Object.keys(filterStatus);
-    handleFilterStatusRemove(...filterKeys);
-  }, [
-    handleFilterStatusRemove
-  ]);
+    setAppliedFilters([])
+  }, []);
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(data);
-
 
   const fun = () => {
     console.log("func", sortSelected)
@@ -143,7 +129,8 @@ function GithubTable(props) {
         index={index} 
         getActions={props.getActions} 
         selectedResources={selectedResources}
-        headers={props.headers}/>
+        headers={props.headers}
+        hasRowActions={props.hasRowActions || false}/>
     ),
   );
 
@@ -154,7 +141,7 @@ function GithubTable(props) {
           sortOptions={props.sortOptions}
           sortSelected={sortSelected}
           queryValue={queryValue}
-          queryPlaceholder={`Searching in ${data.length} test runs`}
+          queryPlaceholder={`Searching in ${data.length} test run${data.length==1 ? '':'s'}`}
           onQueryChange={handleFiltersQueryChange}
           onQueryClear={handleFiltersQueryClear}
           onSort={setSortSelected}
@@ -181,7 +168,7 @@ function GithubTable(props) {
             allResourcesSelected ? 'All' : selectedResources.length
           }
           // condensed
-          selectable={false}
+          selectable={props.selectable || false}
           onSelectionChange={handleSelectionChange}
           headings={[
             {
@@ -194,16 +181,19 @@ function GithubTable(props) {
           {rowMarkup}
         </IndexTable>
       </LegacyCard>
+      {/* <Pagination
+      hasPrevious
+      onPrevious={() => {
+        console.log('Previous');
+      }}
+      hasNext
+      onNext={() => {
+        console.log('Next');
+      }}
+    /> */}
     </div>
   );
 
-  function isEmpty(value) {
-    if (Array.isArray(value)) {
-      return value.length === 0;
-    } else {
-      return value === '' || value == null;
-    }
-  }
 }
 
 export default GithubTable
