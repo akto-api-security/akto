@@ -10,6 +10,7 @@ import {
 import BurpSuite from "../dashboard/pages/settings/integrations/BurpSuite";
 import Integrations from "../dashboard/pages/settings/integrations/Integrations";
 import Settings from "../dashboard/pages/settings/Settings";
+import Users from "../dashboard/pages/settings/users/Users";
 
 const router = createBrowserRouter([
   {
@@ -24,6 +25,10 @@ const router = createBrowserRouter([
         path: "/dashboard/settings",
         element: <Settings/>,
         children: [
+          {
+            path: "/dashboard/settings/users",
+            element: <Users/>
+          },
           {
             path: "/dashboard/settings/integrations",
             element: <Integrations/>,
