@@ -1,0 +1,34 @@
+id: AIRFLOW_CONFIGURATION_EXPOSURE
+info:
+  name: 
+  description:
+  details:
+  impact:
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: AIRFLOW_CONFIGURATION_EXPOSURE
+  severity: MEDIUM
+
+api_selections_filter:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/airflow.cfg
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    contains_all:
+      - '[core]'
+      - '[api]'

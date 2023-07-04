@@ -1,0 +1,48 @@
+id: DOCKER_COMPOSE_CONFIG
+info:
+  name: 
+  description:
+  details:
+  impact:
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: DOCKER_COMPOSE_CONFIG
+  severity: MEDIUM
+
+api_selections_filter:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/docker-compose.yml
+    - ${urlVar}/docker-compose.prod.yml
+    - ${urlVar}/docker-compose.production.yml
+    - ${urlVar}/docker-compose.staging.yml
+    - ${urlVar}/docker-compose.dev.yml
+    - ${urlVar}/docker-compose-dev.yml
+    - ${urlVar}/docker-compose.override.yml
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+        stop_at_first_match: true
+        patterns:
+          - ${urlPaths}
+      - follow_redirect: true
+      - max_redirects: 3
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - regex: "^version: "
+      - regex: "services:"
