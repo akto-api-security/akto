@@ -9,8 +9,8 @@ import {
     Badge,
   } from '@shopify/polaris';
 import {useState} from 'react';
-import './style_overrides.css'
-import LayoutWithTabs from '../layouts/LayoutWithTabs';
+import '../settings.css'
+import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 
 function Integrations() {
     const [sortValue, setSortValue] = useState('DATE_MODIFIED_DESC');
