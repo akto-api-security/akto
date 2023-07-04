@@ -1,0 +1,36 @@
+id: CGI_PRINTENV
+info:
+  name: 
+  description:
+  details:
+  impact:
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: CGI_PRINTENV
+  severity: MEDIUM
+
+api_selections_filter:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/cgi-bin/printenv.pl
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - 'MYSQL_HOME'
+      - 'OPENSSL_CONF'
+      - 'REMOTE_ADDR'
+      - 'SERVER_ADMIN'
+      - 'Environment Variables:'

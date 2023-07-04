@@ -1,0 +1,42 @@
+id: CONFIG_RUBY
+info:
+  name: 
+  description:
+  details:
+  impact:
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: CONFIG_RUBY
+  severity: MEDIUM
+
+api_selections_filter:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/config.rb
+    - ${urlVar}/.chef/config.rb
+    - ${urlVar}/assets/config.rb
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+        stop_at_first_match: true
+        patterns:
+          - ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'images_dir'
+      - 'css_dir'
