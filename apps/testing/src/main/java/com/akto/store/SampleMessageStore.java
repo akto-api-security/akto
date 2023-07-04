@@ -78,7 +78,7 @@ public class SampleMessageStore {
         return ret;
     }
 
-    public static SampleMessageStore createWithSampleDataMap(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
+    public static SampleMessageStore create(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
         SampleMessageStore ret = new SampleMessageStore();
         ret.sampleDataMap = sampleDataMap;
         return ret;

@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -8,31 +9,25 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
 import kotlin.Pair;
 import okhttp3.*;
-import okhttp3.OkHttpClient.Builder;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 import java.util.*;
-
-import javax.net.ssl.*;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
 
     private static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
-        while (RateLimitHandler.getInstance().shouldWait(request)) {
-            Thread.sleep(1000);
+        Integer accountId = Context.accountId.get();
+        if (accountId != null) {
+            while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
+                Thread.sleep(1000);
+            }
         }
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);

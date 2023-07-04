@@ -75,7 +75,8 @@ public class Main {
                             return;
                         }
                         int globalRateLimit = settings.getGlobalRateLimit();
-                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance().getRateLimitsMap();
+                        int accountId = t.getId();
+                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
                         rateLimitMap.clear();
                         rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
                     }
@@ -140,7 +141,6 @@ public class Main {
 
                     SampleMessageStore sampleMessageStore = SampleMessageStore.create();
                     AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-                    sampleMessageStore.fetchSampleMessages();
 
 
                     TestExecutor testExecutor = new TestExecutor();
