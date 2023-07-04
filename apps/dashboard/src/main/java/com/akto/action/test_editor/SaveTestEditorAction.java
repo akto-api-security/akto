@@ -211,7 +211,7 @@ public class SaveTestEditorAction extends UserAction {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
-        SampleMessageStore messageStore = SampleMessageStore.createWithSampleDataMap(sampleDataMap);
+        SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null);
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
         if (testingRunResult == null) {
