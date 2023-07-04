@@ -34,23 +34,23 @@ api_selection_filters:
             contains_either:
                 - .xml
           key:
-            extract: csv_key
+            extract: xml_key
     - query_param:
         for_one:
           value:
             contains_either:
                 - .xml
           key:
-            extract: csv_key
+            extract: xml_key
 
 execute:
   type: single
   requests:
     - req:
         - modify_query_param:
-            csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
+            xml_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
         - modify_body_param:
-            csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
+            xml_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
 
 validate:
   response_code:
