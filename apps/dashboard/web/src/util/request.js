@@ -55,13 +55,13 @@ service.interceptors.response.use((response) => {
   }
 
   if (['put', 'post', 'delete', 'patch'].includes(response.method) && response.data.meta) {
-    window._AKTO.$emit('SHOW_SNACKBAR', {
-      text: response.data.meta.message,
-      color: 'success'
-    })
+    // window._AKTO.$emit('SHOW_SNACKBAR', {
+    //   text: response.data.meta.message,
+    //   color: 'success'
+    // })
   }
   if (response.data.error !== undefined) {
-    window._AKTO.$emit('API_FAILED', response.data.error)
+    // window._AKTO.$emit('API_FAILED', response.data.error)
   } else {
     if (window.mixpanel && window.mixpanel.track && response.config && response.config.url){
         raiseMixpanelEvent(response.config.url);

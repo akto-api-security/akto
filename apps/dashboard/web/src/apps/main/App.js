@@ -5,8 +5,11 @@ import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
-  Navigate
+  Navigate,
 } from "react-router-dom";
+import BurpSuite from "../dashboard/pages/settings/integrations/BurpSuite";
+import Integrations from "../dashboard/pages/settings/integrations/Integrations";
+import Settings from "../dashboard/pages/settings/Settings";
 
 const router = createBrowserRouter([
   {
@@ -15,11 +18,28 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/dashboard/testing",
-        element: <TestRunsPage/>
-      },
+        element: <TestRunsPage />,
+        children: [
+          {
+            path: "/dashboard/testing/:hexId",
+            element: <TestRunsPage />
+          }
+        ]
+
+      }, 
       {
-        path: "/dashboard/testing/:hexId",
-        element: <TestRunsPage/>
+        path: "/dashboard/settings",
+        element: <Settings/>,
+        children: [
+          {
+            path: "/dashboard/settings/integrations",
+            element: <Integrations/>,
+          },
+          {
+            path: "/dashboard/settings/integrations/burp",
+            element: <BurpSuite/>,
+          }
+        ]
       }
     ]
   },
@@ -33,7 +53,7 @@ const router = createBrowserRouter([
   }
 ])
 
-function App() {
+function App() {  
   return (
     <AppProvider>
       <RouterProvider router={router} />

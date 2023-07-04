@@ -1,0 +1,15 @@
+.Polaris-HorizontalStack {
+    align-items: center !important;
+}
+.Polaris-ResourceItem__Actions {
+    display: flex !important;
+}
+.Polaris-Modal-Dialog__Modal.Polaris-Modal-Dialog--fullScreen {
+    margin-top: 10vh;
+    max-width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+}
+.Polaris-Modal-Dialog__Container {
+    z-index: 1000 !important;
+}

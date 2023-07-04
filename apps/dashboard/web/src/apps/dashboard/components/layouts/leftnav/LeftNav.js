@@ -10,8 +10,13 @@ export default function LeftNav(){
 
   const [selected, setSelected] = useState('');
   const navigate = useNavigate();
-  const collapse = Store((state) => state.hideFullNav)
+  let collapse = Store((state) => state.hideFullNav)
+  const toggleNavbar = Store(state => state.toggleLeftNav)
 
+  const toggleLeftBar = () =>{
+    collapse = !collapse
+    toggleNavbar(collapse)
+}
 
   const handleSelect = (selectedId) => {
     setSelected(selected => selected === selectedId ? null : selectedId);
@@ -33,6 +38,8 @@ export default function LeftNav(){
                     if(!collapse){
                       handleSelect("quick_start")
                       navigate("/dashboard/quick-start")
+                    }else{
+                      toggleLeftBar()
                     }
                   },
                   selected: selected === 'quick_start',
@@ -49,6 +56,8 @@ export default function LeftNav(){
                     if(!collapse){
                       handleSelect("dashboard")
                       navigate("/dashboard")
+                    }else{
+                      toggleLeftBar()
                     }
                   },
                   selected: selected === 'dashboard',
@@ -65,6 +74,8 @@ export default function LeftNav(){
                     if(!collapse){
                         handleSelect("inventory")
                         navigate("/dashboard/observe/inventory")
+                      }else{
+                        toggleLeftBar()
                       }
                     },
                     selected: selected === 'inventory',
@@ -81,6 +92,9 @@ export default function LeftNav(){
                   onClick: ()=>{
                     if(!collapse){
                       handleSelect('testing')
+                    }else{
+                      handleSelect('testing')
+                      toggleLeftBar()
                     }
                   },
                   selected: selected === 'testing',
@@ -111,6 +125,8 @@ export default function LeftNav(){
                     if(!collapse){
                       handleSelect("test-editor")
                       navigate("/dashboard/test-editor")
+                    }else{
+                      toggleLeftBar()
                     }
                   },
                   selected: selected === 'test-editor',
@@ -127,6 +143,8 @@ export default function LeftNav(){
                       if(!collapse){
                         handleSelect("issues")
                         navigate("/dashboard/issues")
+                      }else{
+                        toggleLeftBar()
                       }
                     },
                     selected: selected === 'issues',
@@ -135,9 +153,9 @@ export default function LeftNav(){
               ]}
           />
           <Navigation.Section 
-              items={[
+               items={[
                 {
-                  url: '#',
+                  url: '',
                   label: collapse? (
                     <Tooltip content="Settings" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={SettingsMinor} />
@@ -147,53 +165,12 @@ export default function LeftNav(){
                   onClick: ()=>{
                     if(!collapse){
                       handleSelect("settings")
+                      navigate("/dashboard/settings/integrations")
+                    }else{
+                      toggleLeftBar()
                     }
                   },
                   selected: selected === 'settings',
-                  subNavigationItems:[
-                    {
-                      label: 'Accounts',
-                      onClick: ()=>{
-                        navigate('/settings/accounts')
-                      }
-                    },
-                    {
-                      label: 'Users',
-                      onClick: ()=>{
-                        navigate('/settings/Users')
-                      }
-                    },
-                    {
-                      label: 'Alerts',
-                      onClick: ()=>{
-                        navigate('/settings/alerts')
-                      }
-                    },
-                    {
-                      label: 'CI/CD',
-                      onClick: ()=>{
-                        navigate('/settings/ci-cd')
-                      }
-                    },
-                    {
-                      label: 'Integrations',
-                      onClick: ()=>{
-                        navigate('/settings/integrations')
-                      }
-                    },
-                    {
-                      label: 'Health',
-                      onClick: ()=>{
-                        navigate('/settings/health')
-                      }
-                    },
-                    {
-                      label: 'Metrics',
-                      onClick: ()=>{
-                        navigate('/settings/metrics')
-                      }
-                    }
-                  ],
                   key: '7',
                 }
               ]}
