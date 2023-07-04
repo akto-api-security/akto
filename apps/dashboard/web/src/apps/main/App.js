@@ -16,6 +16,10 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/testing",
         element: <TestRunsPage/>
+      },
+      {
+        path: "/dashboard/testing/:hexId",
+        element: <TestRunsPage/>
       }
     ]
   },

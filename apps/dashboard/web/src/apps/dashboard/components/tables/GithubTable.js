@@ -5,97 +5,57 @@ import {
   useSetIndexFiltersMode,
   IndexFiltersMode,
   useIndexResourceState,
-  Text,
-  ChoiceList,
-  Badge,
-  VerticalStack,
-  HorizontalStack,
-  ButtonGroup,
-  Icon,
-  Box,
-  Button, Popover, ActionList
-} from '@shopify/polaris';
-import {
-  HorizontalDotsMinor,ImportMinor
-} from '@shopify/polaris-icons';
+  ChoiceList} from '@shopify/polaris';
+import GithubRow from './rows/GithubRow';
 
 import { useState, useCallback, useEffect } from 'react';
 
 function GithubTable(props) {
 
-  const [popoverActive, setPopoverActive] = useState(-1);
-
-  const togglePopoverActive = (index) => useCallback(
-    () => setPopoverActive(index),
-    [],
-  );
-
-  const activator = (index) =>  (
-    <Button onClick={togglePopoverActive(index)} plain>
-      <Icon source={HorizontalDotsMinor} color="base" />
-    </Button>
-  );
-
+  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
   const [selected, setSelected] = useState(0);
   const [sortSelected, setSortSelected] = useState([props.sortOptions[0].value]);
-  const [data, setData] = useState(props.testRuns);
-  const [dataCopy, setDataCopy] = useState(props.testRuns);
-
-  useEffect(() => {
-    let sortKey = props.sortOptions.filter(value => {
-      return (value.value === sortSelected[0])
-    })[0].sortKey;
-    let sortDirection = sortSelected[0].split(" ")[1];
-    let tempData = data;
-    tempData.sort((a, b) => {
-      return (sortDirection == 'asc' ? -1 : 1) * (a[sortKey] - b[sortKey]);
-    })
-    setData([...tempData])
-  }, [sortSelected])
-
-  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
-
+  const [data, setData] = useState(props.data);
   const [appliedFilters, setAppliedFilters] = useState([]);
   const [queryValue, setQueryValue] = useState('');
-  const handleFiltersQueryChange = useCallback(
-    (value) => setQueryValue(value),
-    [],
-  );
-  const handleFiltersQueryClear = useCallback(
-    () => setQueryValue(""),
-    [],
-  );
-  useEffect(() => {
-    let tempDataCopy = dataCopy;
-    let singleFilterData = tempDataCopy
-    appliedFilters.map((filter) => {
-      singleFilterData = dataCopy;
-      let filterSet = new Set(filter.value);
-      singleFilterData = singleFilterData.filter((value) => {
-        return [...value[filter.key]].filter(v => filterSet.has(v)).length > 0
-      })
-      tempDataCopy = tempDataCopy.filter(value => singleFilterData.includes(value));
-    })
-    tempDataCopy = tempDataCopy.filter((value) => {
-      return value.name.toLowerCase().includes(queryValue.toLowerCase());
-    })
-    setData(tempDataCopy);
-  }, [appliedFilters, queryValue])
 
   let filterObject = props.filters.map((filter) => { return filter.key })
-  // console.log(filterObject);
   let obj = {}
   filterObject.forEach((filter) => {
     obj[filter] = []
   })
-  // console.log(obj)
-
   const [filterStatus, setFilterStatus] = useState(
     obj
   );
 
   useEffect(() => {
-    setAppliedFilters([]);
+    let tempData = props.data;
+    let singleFilterData = tempData
+    appliedFilters.map((filter) => {
+      singleFilterData = props.data;
+      let filterSet = new Set(filter.value);
+      singleFilterData = singleFilterData.filter((value) => {
+        return [...value[filter.key]].filter(v => filterSet.has(v)).length > 0
+      })
+      tempData = tempData.filter(value => singleFilterData.includes(value));
+    })
+
+    tempData = tempData.filter((value) => {
+      return value.name.toLowerCase().includes(queryValue.toLowerCase());
+    })
+
+    let sortKey = props.sortOptions.filter(value => {
+      return (value.value === sortSelected[0])
+    })[0].sortKey;
+    let sortDirection = sortSelected[0].split(" ")[1];
+    tempData.sort((a, b) => {
+      return (sortDirection == 'asc' ? -1 : 1) * (a[sortKey] - b[sortKey]);
+    })
+    setData([...tempData])
+  }, [sortSelected, appliedFilters, queryValue])
+
+  const changeAppliedFilters = () => {
+    // setAppliedFilters([]);
     let temp = []
     let filterKeys = Object.keys(filterStatus);
     filterKeys.forEach((filterKey) => {
@@ -109,34 +69,25 @@ function GithubTable(props) {
       }
     })
     setAppliedFilters(temp);
-  }, [filterStatus])
+  };
 
+  const handleFiltersQueryChange = useCallback(
+    (value) => setQueryValue(value),
+    [],
+  );
+  const handleFiltersQueryClear = useCallback(
+    () => setQueryValue(""),
+    [],
+  );
   const handleFilterStatusChange = (key) => useCallback(
     (value) => {
       let tempFilter = filterStatus;
       tempFilter[key] = value
       setFilterStatus({ ...tempFilter })
+      changeAppliedFilters(tempFilter)
     },
     [],
   );
-
-  const handleFilterStatusRemove = useCallback((...keys) => {
-    let tempFilter = filterStatus;
-    keys.forEach((key) => {
-      if (key in tempFilter) {
-        tempFilter[key] = []
-      }
-    })
-    setFilterStatus({ ...tempFilter })
-  }, []);
-
-  const handleFiltersClearAll = useCallback(() => {
-    let filterKeys = Object.keys(filterStatus);
-    handleFilterStatusRemove(...filterKeys);
-  }, [
-    handleFilterStatusRemove
-  ]);
-
   const filters = props.filters.map((filter) => {
     return {
       key: filter.key,
@@ -151,144 +102,51 @@ function GithubTable(props) {
           allowMultiple
         />
       ),
-      // onAction: () => { console.log("hello") },
       // shortcut: true,
       pinned: true
     }
   })
+  const handleFilterStatusRemove = useCallback((...keys) => {
+    let tempFilter = filterStatus;
+    keys.forEach((key) => {
+      if (key in tempFilter) {
+        tempFilter[key] = []
+      }
+    })
+    setFilterStatus({ ...tempFilter })
+    changeAppliedFilters(tempFilter)
+  }, []);
+
+  const handleFiltersClearAll = useCallback(() => {
+    let filterKeys = Object.keys(filterStatus);
+    handleFilterStatusRemove(...filterKeys);
+  }, [
+    handleFilterStatusRemove
+  ]);
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(data);
 
-  function getStatus(item) {
-    switch (item.confidence) {
-      case 'High': return 'critical';
-      case 'Medium': return 'warning';
-      case 'Low': return 'neutral';
-    }
+
+  const fun = () => {
+    console.log("func", sortSelected)
   }
-
-  function getActions(item){
-      let arr = []
-      let section1 = {items:[]}
-      if(item['run_type'] === 'One-time'){
-        section1.items.push(props.actionsList[0])
-      }else{
-        section1.items.push(props.actionsList[1])
-      }
-
-      if(item['run_type'] === 'CI/CD'){
-        section1.items.push(props.actionsList[0])
-      }else{
-        section1.items.push(props.actionsList[2])
-      }
-      
-      if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-          props.actionsList[3].disabled = false
-      }else{
-          props.actionsList[3].disabled = true
-      }
-
-      arr.push(section1)
-      let section2 = {items:[]}
-      section2.items.push(props.actionsList[3]);
-      arr.push(section2);
-      return arr
-  }
-
+  
   let rowMarkup = data.map(
     (
       data,
       index,
     ) => (
-
-      <IndexTable.Row
-        id={data.hexId}
+      <GithubRow 
         key={data.hexId}
-        selected={selectedResources.includes(data.hexId)}
-        position={index}
-      >
-        <IndexTable.Cell>
-          {/* <div style={{ padding: '12px 16px', width: '100%' }}> */}
-          <HorizontalStack align='space-between'>
-            <HorizontalStack gap="1">
-              {/* <VerticalStack align="start" inlineAlign="start" gap="1"> */}
-              {/* <HorizontalStack gap="2" align='center'> */}
-              <Box padding="1">
-                {
-                  props?.headers[0]?.icon &&
-                  <Icon source={data[props?.headers[0]?.icon['value']]} color="primary" />
-                }
-              </Box>
-              {/* </HorizontalStack> */}
-              {/* </VerticalStack> */}
-              <VerticalStack gap="2">
-                <HorizontalStack gap="2" align='start'>
-                  <Text as="span" variant="headingMd">
-                    {
-                      props?.headers[0]?.name &&
-                      data[props?.headers[0]?.name['value']]
-                    }
-                  </Text>
-                  {
-                    props?.headers[1]?.severityList &&
-                      data[props?.headers[1]?.severityList['value']] ? data[props?.headers[1]?.severityList['value']].map((item) =>
-                        <Badge key={item.confidence} status={getStatus(item)}>{item.confidence} {item.count}</Badge>) :
-                      []}
-                </HorizontalStack>
-                {/* <div style={{width: 'fit-content'}}> */}
-                <HorizontalStack gap='2' align="start" >
-                  {/* {
-                    props?.headers[2]?.icon &&
-                    <Icon source={props?.headers[2]?.icon['value']} color="primary" />
-                  } */}
-                  {
-                    props?.headers[2]?.details &&
-                    props?.headers[2]?.details.map((detail) => {
-                      return (
-                        <ButtonGroup key={detail.value}>
-                          <Icon source={detail.icon} color="subdued" />
-                          <Text as="span" variant="bodySm" color="subdued">
-                            {data[detail.value]}
-                          </Text>
-                        </ButtonGroup>
-                      )
-                    })
-                  }
-                </HorizontalStack>
-                {/* </div> */}
-              </VerticalStack>
-            </HorizontalStack>
-            <VerticalStack align="center">
-              <Popover
-                active={popoverActive===index}
-                activator={activator(index)}
-                autofocusTarget="first-node"
-                onClose={togglePopoverActive(popoverActive)}
-              >
-                <ActionList
-                  actionRole="menuitem"
-                  sections={getActions(data)}
-                />
-              </Popover>
-            </VerticalStack>
-          </HorizontalStack>
-
-          {/* ) */}
-
-          {/* }) */}
-
-          {/* } */}
-
-          {/* </div> */}
-        </IndexTable.Cell>
-      </IndexTable.Row>
+        data={data} 
+        index={index} 
+        getActions={props.getActions} 
+        selectedResources={selectedResources}
+        headers={props.headers}/>
     ),
   );
 
-  const fun = () => {
-    console.log("func", sortSelected)
-  }
   return (
     <div>
       <LegacyCard>

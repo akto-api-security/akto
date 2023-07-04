@@ -1,23 +1,10 @@
 import GithubTable from "../../components/tables/GithubTable"
 import {
-  IndexTable,
-  LegacyCard,
-  IndexFilters,
-  useSetIndexFiltersMode,
-  IndexFiltersMode,
-  useIndexResourceState,
   Text,
-  ChoiceList,
-  Badge,
   Button,
   VerticalStack,
-  HorizontalStack,
-  ButtonGroup,
-  Icon,
-  Box
-} from '@shopify/polaris';
+  HorizontalStack} from '@shopify/polaris';
 import {
-  HorizontalDotsMinor,
   CircleCancelMinor,
   CircleTickMinor,
   CalendarMinor,
@@ -26,6 +13,7 @@ import {
   PlayMinor,
   ClockMinor
 } from '@shopify/polaris-icons';
+import api from "./api";
 
 let headers = [
   {
@@ -78,87 +66,93 @@ let headers = [
   }
 ]
 
-let testRuns = [
-  {
-    hexId: "something",
-    icon: CircleTickMinor,
-    orderPriority: 1,
-    name: 'Bola on Login',
-    number_of_tests_str: '10 Tests',
-    run_type: 'One time',
-    run_time: "Next run in 2 days",
-    run_time_epoch: 140,
-    scheduleTimestamp: 100,
-    severity: [
-      {
-        confidence: 'High',
-        count: '12'
-      },
-      {
-        confidence: 'Medium',
-        count: '12'
-      },
-      {
-        confidence: 'Low',
-        count: '12'
-      }
-    ],
-    total_severity: 4500,
-    severityStatus: ["High", "Medium", "Low"],
-    runTypeStatus: ["One-time"],
-    severityTags: new Set(["High", "Medium"]),
-  },
-  {
-    hexId: "somethingElse",
-    icon: CircleTickMinor,
-    orderPriority: 2,
-    name: 'All OWASP in staging',
-    number_of_tests_str: '100 Tests',
-    run_type: 'CI/CD',
-    run_time: "Last run 10 mins ago",
-    run_time_epoch: 20,
-    scheduleTimestamp: 200,
-    severity: [
-      {
-        confidence: 'High',
-        count: '12'
-      },
-      {
-        confidence: 'Low',
-        count: '12'
-      }
-    ],
-    total_severity: 720,
-    severityStatus: ["High", "Low"],
-    runTypeStatus: ["CI/CD"],
-    severityTags: new Set(["High", "Medium", "Low"]),
-  },
-  {
-    hexId: "somethingElse2",
-    icon: CircleTickMinor,
-    orderPriority: 2,
-    name: 'NoAuth',
-    number_of_tests_str: '100 Tests',
-    run_type: 'CI/CD',
-    run_time: "Last ran 120 mins ago",
-    run_time_epoch: 20,
-    scheduleTimestamp: 300,
-    severity: [
-      {
-        confidence: 'High',
-        count: '12'
-      },
-      {
-        confidence: 'Medium',
-        count: '12'
-      }
-    ],
-    total_severity: 1000,
-    severityStatus: ["High", "Medium"],
-    runTypeStatus: ["CI/CD"],
-    severityTags: new Set(["High", "Medium", "Low"]),
-  },
-]
+let testRuns = []
+
+api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
+  console.log(testingRuns, latestTestingRunResultSummaries)
+})
+
+// let testRuns = [
+//   {
+//     hexId: "something",
+//     icon: CircleTickMinor,
+//     orderPriority: 1,
+//     name: 'Bola on Login',
+//     number_of_tests_str: '10 Tests',
+//     run_type: 'One time',
+//     run_time: "Next run in 2 days",
+//     run_time_epoch: 140,
+//     scheduleTimestamp: 100,
+//     severity: [
+//       {
+//         confidence: 'High',
+//         count: '12'
+//       },
+//       {
+//         confidence: 'Medium',
+//         count: '12'
+//       },
+//       {
+//         confidence: 'Low',
+//         count: '12'
+//       }
+//     ],
+//     total_severity: 4500,
+//     severityStatus: ["High", "Medium", "Low"],
+//     runTypeStatus: ["One-time"],
+//     severityTags: new Set(["High", "Medium"]),
+//   },
+//   {
+//     hexId: "somethingElse",
+//     icon: CircleTickMinor,
+//     orderPriority: 2,
+//     name: 'All OWASP in staging',
+//     number_of_tests_str: '100 Tests',
+//     run_type: 'CI/CD',
+//     run_time: "Last run 10 mins ago",
+//     run_time_epoch: 20,
+//     scheduleTimestamp: 200,
+//     severity: [
+//       {
+//         confidence: 'High',
+//         count: '12'
+//       },
+//       {
+//         confidence: 'Low',
+//         count: '12'
+//       }
+//     ],
+//     total_severity: 720,
+//     severityStatus: ["High", "Low"],
+//     runTypeStatus: ["CI/CD"],
+//     severityTags: new Set(["High", "Medium", "Low"]),
+//   },
+//   {
+//     hexId: "somethingElse2",
+//     icon: CircleTickMinor,
+//     orderPriority: 2,
+//     name: 'NoAuth',
+//     number_of_tests_str: '100 Tests',
+//     run_type: 'CI/CD',
+//     run_time: "Last ran 120 mins ago",
+//     run_time_epoch: 20,
+//     scheduleTimestamp: 300,
+//     severity: [
+//       {
+//         confidence: 'High',
+//         count: '12'
+//       },
+//       {
+//         confidence: 'Medium',
+//         count: '12'
+//       }
+//     ],
+//     total_severity: 1000,
+//     severityStatus: ["High", "Medium"],
+//     runTypeStatus: ["CI/CD"],
+//     severityTags: new Set(["High", "Medium", "Low"]),
+//   },
+// ]
 
 const sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
@@ -231,6 +225,34 @@ let actionsList = [
   }
 ]
 
+function getActions(item){
+  let arr = []
+  let section1 = {items:[]}
+  if(item['run_type'] === 'One-time'){
+    section1.items.push(actionsList[0])
+  }else{
+    section1.items.push(actionsList[1])
+  }
+
+  if(item['run_type'] === 'CI/CD'){
+    section1.items.push(actionsList[0])
+  }else{
+    section1.items.push(actionsList[2])
+  }
+  
+  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
+      actionsList[3].disabled = false
+  }else{
+      actionsList[3].disabled = true
+  }
+
+  arr.push(section1)
+  let section2 = {items:[]}
+  section2.items.push(actionsList[3]);
+  arr.push(section2);
+  return arr
+}
+
 function TestRunsPage() {
   return (
     <VerticalStack gap="4">
@@ -241,13 +263,13 @@ function TestRunsPage() {
         <Button primary>New test run</Button>
       </HorizontalStack>
       <GithubTable 
-        testRuns={testRuns} 
+        data={testRuns} 
         sortOptions={sortOptions} 
         resourceName={resourceName} 
         filters={filters} 
         disambiguateLabel={disambiguateLabel} 
         headers={headers}
-        actionsList={actionsList} 
+        getActions = {getActions}
       />
     </VerticalStack>
   );

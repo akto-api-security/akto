@@ -17,15 +17,15 @@ const usePathname = () => {
   return location.pathname;
 }
 
-const err = async(error) => {
-      const { status, data } = error.response
-  const { errors } = data
-  const { actionErrors } = data
-  let message = "OOPS! Something went wrong"
-  if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
+const err = async (error) => {
+    const { status, data } = error.response
+    const { errors } = data
+    const { actionErrors } = data
+    let message = "OOPS! Something went wrong"
+    if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
         message = actionErrors[0]
-      }
-    return Promise.reject(error) 
+    }
+    return Promise.reject(error)
 }
 
 // request interceptor
