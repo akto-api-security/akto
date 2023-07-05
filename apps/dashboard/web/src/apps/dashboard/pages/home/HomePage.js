@@ -8,18 +8,20 @@ import { useEffect } from "react";
 function HomePage() {
   const navigate = useNavigate();
   const storeAccessToken = Store(state => state.storeAccessToken)
+  const accessToken = Store(state => state.accessToken);
+  useEffect(() => {
+    const access_token = accessToken
+    // localStorage.getItem("access_token")
 
-  // useEffect(() => {
-  //   const access_token = localStorage.getItem("access_token")
+    if (!access_token) {
+      console.log("navigate")
+      navigate("/login")  
+    } 
+    // else  {
+    //   storeAccessToken(access_token)
+    // }
 
-  //   if (!access_token) {
-  //     console.log("navigate")
-  //     navigate("/login")  
-  //   } else  {
-  //     storeAccessToken(access_token)
-  //   }
-
-  // }, [])
+  }, [])
 
   const toastConfig = Store(state => state.toastConfig)
   const setToastConfig = Store(state => state.setToastConfig)

@@ -41,7 +41,14 @@ const globalFunctions = {
         var plural = count <= 1 ? '' : 's'
 
         return count + ' ' + unit + plural + ' ago'
-    }
+    },
+    testingResultType(){
+        return {
+            BURP:"BURP",
+            CICD:"CICD",
+            EXTERNAL_API:"EXTERNAL_API"
+        }
+    },
 }
 
 export default globalFunctions
