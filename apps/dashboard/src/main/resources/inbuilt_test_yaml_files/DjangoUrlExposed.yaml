@@ -10,7 +10,7 @@ info:
   impact: "This information can be used to facilitate more sophisticated attacks on your application"
   category:
     name: VEM
-    shortName: VEM
+    shortName: Verbose Error Messages
     displayName: Verbose Error Messages (VEM)
   subCategory: DJANGO_URL_EXPOSED
   severity: LOW
