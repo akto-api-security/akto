@@ -100,7 +100,7 @@ jobs:
           import os
           import requests
           import json
-          
+
           github_token = os.getenv('GITHUB_TOKEN')
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
@@ -108,22 +108,19 @@ jobs:
           url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest'
           response = requests.get(url, headers=headers)
           data = response.json()
-
           tag = data.get('tag_name')
           description = data.get('body')
-
           # Replace anything after "by" in each line with a "."
           if description:
               description_lines = description.split('\n')
               for i in range(len(description_lines)):
                   if 'by' in description_lines[i]:
                       description_lines[i] = description_lines[i].split('by', 1)[0].strip() + '.'
-
+                  if "'" in description_lines[i]:
+                      description_lines[i] = description_lines[i].replace("'", "''")
               # Remove the last line from the description
               description_lines = description_lines[:-1]
-
-              description = '\n'.join(description_lines)
-
+              description = '\n'.join(description_lines) 
           print(f"::set-output name=tag::{tag}")
           print(f"::set-output name=description::{json.dumps(description)}")
           EOF
