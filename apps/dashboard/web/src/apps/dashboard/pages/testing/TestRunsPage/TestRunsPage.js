@@ -8,7 +8,7 @@ import {
   CircleCancelMinor,
   CircleTickMinor,
   CalendarMinor,
-  MagicMinor,
+  ReplayMinor,
   FraudProtectMinor,
   PlayMinor,
   ClockMinor
@@ -314,7 +314,7 @@ const getActionsList = (hexId) => {
   },
   {
       content: 'Re-run',
-      icon: MagicMinor,
+      icon: ReplayMinor,
       onAction: () => {rerunTest(hexId || "")},
   },
   {

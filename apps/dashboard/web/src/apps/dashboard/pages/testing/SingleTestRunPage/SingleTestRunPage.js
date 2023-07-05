@@ -12,12 +12,10 @@ import {
 } from '@shopify/polaris';
 import { saveAs } from 'file-saver'
 import {
-  CircleCancelMinor,
-  CalendarMinor,
-  MagicMinor,
+  MobileBackArrowMajor,
+  SearchMinor,
   FraudProtectMinor,
-  PlayMinor,
-  ClockMinor
+  LinkMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import globalFunctions from '@/util/func';
@@ -54,19 +52,19 @@ let headers = [
         text: "Detected time",
         value: "detected_time",
         item_order: 2,
-        icon: FraudProtectMinor,
+        icon: SearchMinor,
       },
       {
         text: 'Test category',
         value: 'testCategory',
         item_order: 2,
-        icon: PlayMinor
+        icon: FraudProtectMinor
       },
       {
         text: 'url',
         value: 'url',
         item_order: 2,
-        icon: ClockMinor
+        icon: LinkMinor
       },
     ]
   }
@@ -276,7 +274,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         <HorizontalStack gap="4">
           <HorizontalStack blockAlign="start">
             <Box>
-          <Button icon={MagicMinor} onClick={navigateBack}></Button>
+          <Button icon={MobileBackArrowMajor} onClick={navigateBack}></Button>
           </Box>
           </HorizontalStack>
           <VerticalStack gap="3">
