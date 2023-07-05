@@ -1,4 +1,11 @@
 const globalFunctions = {
+    toDateStr (date, needYear) {
+        var strArray=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var d = date.getDate();
+        var m = strArray[date.getMonth()];
+        var y = date.getFullYear();
+        return m + ' ' + d + (needYear ? ' ' + y: '' );
+    },
     prettifyEpoch(epoch) {
         var diffSeconds = (+Date.now())/1000 - epoch
 
