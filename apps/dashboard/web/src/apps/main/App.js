@@ -20,24 +20,24 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/testing",
         element: <TestRunsPage/>
+      }
+    ]
+  },
+  {
+    path: "/dashboard/settings",
+    element: <Settings/>,
+    children: [
+      {
+        path: "/dashboard/settings/users",
+        element: <Users/>
       },
       {
-        path: "/dashboard/settings",
-        element: <Settings/>,
-        children: [
-          {
-            path: "/dashboard/settings/users",
-            element: <Users/>
-          },
-          {
-            path: "/dashboard/settings/integrations",
-            element: <Integrations/>,
-          },
-          {
-            path: "/dashboard/settings/integrations/burp",
-            element: <BurpSuite/>,
-          }
-        ]
+        path: "/dashboard/settings/integrations",
+        element: <Integrations/>,
+      },
+      {
+        path: "/dashboard/settings/integrations/burp",
+        element: <BurpSuite/>,
       }
     ]
   },
