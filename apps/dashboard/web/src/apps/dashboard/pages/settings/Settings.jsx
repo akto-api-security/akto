@@ -11,7 +11,7 @@ const Settings = () => {
     return (
         <Frame>
             <Card>
-                <div style={{ display: "grid", gridTemplateColumns: "4vw auto 1vw" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "4vw auto 1vw"}}>
                     <Icon source={SettingsMinor} color="base" />
                     <Text variant="headingLg">
                         Settings

@@ -49,6 +49,15 @@ const globalFunctions = {
             EXTERNAL_API:"EXTERNAL_API"
         }
     },
+    initials(str) {
+        let ret = str.split(" ").map((n)=>n[0]).slice(0,2).join("").toUpperCase()
+
+        if (ret.length == 1) {
+            return str.replaceAll(" ","").slice(0,2).toUpperCase()
+        } else {
+            return ret
+        }
+    }
 }
 
 export default globalFunctions
