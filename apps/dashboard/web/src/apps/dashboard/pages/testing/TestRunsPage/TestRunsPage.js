@@ -15,6 +15,7 @@ import {
 } from '@shopify/polaris-icons';
 import api from "../api";
 import globalFunctions from '@/util/func';
+import Store from "../../../store";
 
 import { useState, useCallback, useEffect } from 'react';
 
@@ -275,34 +276,65 @@ function disambiguateLabel(key, value) {
   }
 }
 
-let actionsList = [
+function TestRunsPage() {
+
+  const [testRuns, setTestRuns] = useState([])
+
+  const setToastConfig = Store(state => state.setToastConfig)
+  const setToast = (isActive, isError, message) => {
+      setToastConfig({
+        isActive: isActive,
+        isError: isError,
+        message: message
+      })
+  }
+
+  const stopTest = (hexId) =>{
+    api.stopTest(hexId).then((resp) => {
+      setToast(true, false, "Test run stopped")
+    }).catch((resp) => {
+      setToast(true, true, "Unable to stop test run")
+    });
+  }
+
+  const rerunTest = (hexId) =>{
+    api.rerunTest(hexId).then((resp) => {
+      setToast(true, false, "Test re-run")
+    }).catch((resp) => {
+      setToast(true, true, "Unable to re-run test")
+    });
+  }
+
+const getActionsList = (hexId) => {
+  return [
   {
       content: 'Schedule test',
       icon: CalendarMinor,
-      onAction: () => {console.log("this.scheduleTest()")},
+      onAction: () => {console.log("schedule test function")},
   },
   {
       content: 'Re-run',
       icon: MagicMinor,
-      onAction: () => {console.log("this.reRunTest()")},
+      onAction: () => {rerunTest(hexId || "")},
   },
   {
       content: 'Add to CI/CD pipeline',
       icon: PlayMinor,
-      onAction: () => {console.log("this.addToCiCd()")},
+      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
   },
   {
       content: 'Stop',
       icon: CircleCancelMinor,
       destructive:true,
-      onAction: () => {console.log("this.stopTest()")},
+      onAction: () => {stopTest(hexId || "")},
       disabled: true,
   }
-]
+]}
 
 function getActions(item){
   let arr = []
   let section1 = {items:[]}
+  let actionsList = getActionsList(item.hexId);
   if(item['run_type'] === 'One-time'){
     section1.items.push(actionsList[0])
   }else{
@@ -327,10 +359,6 @@ function getActions(item){
   arr.push(section2);
   return arr
 }
-
-function TestRunsPage() {
-
-  const [testRuns, setTestRuns] = useState([])
 
 useEffect(()=>{
   api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {

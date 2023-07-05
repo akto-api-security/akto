@@ -34,5 +34,21 @@ export default {
             method: 'post',
             data: {}
         })
-    }
+    },
+    async stopTest(testingRunHexId) {
+        const resp = await request({
+            url: '/api/stopTest',
+            method: 'post',
+            data: { testingRunHexId }
+        })
+        return resp        
+    },
+    async rerunTest(testingRunHexId){
+        const resp = await request({
+            url: '/api/startTest',
+            method: 'post',
+            data: { testingRunHexId }
+        })
+        return resp        
+    },
 }

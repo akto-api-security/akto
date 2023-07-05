@@ -154,23 +154,6 @@ function GithubTable(props) {
     setPage((page) => (page-1));
   }
 
-  const promotedBulkActions = [
-    {
-      content: 'Export',
-      onAction: () => console.log('Todo: implement bulk edit'),
-    },
-  ];
-  const bulkActions = [
-    {
-      content: 'Edit tests',
-      onAction: () => console.log('Todo: Edit tests'),
-    },
-    {
-      content: 'Slack alert',
-      onAction: () => console.log('Todo: Slack alert'),
-    }
-  ];
-
 
   return (
     <div>
@@ -215,8 +198,8 @@ function GithubTable(props) {
               flush: true
             }
           ]}
-          bulkActions={bulkActions}
-          promotedBulkActions={promotedBulkActions}
+          bulkActions={props.bulkActions || []}
+          promotedBulkActions={props.selectable ? props.promotedBulkActions(selectedResources) : []}
 
         >
           {rowMarkup}
@@ -225,7 +208,10 @@ function GithubTable(props) {
           <HorizontalStack
             align="center">
             <Pagination
-              label={`Showing ${page*pageLimit+1}-${Math.min((page+1)*pageLimit, data.length)} of ${data.length}`}
+              label={
+                data.length==0 ? 'No test runs found' :
+                `Showing ${page*pageLimit+Math.min(1,data.length)}-${Math.min((page+1)*pageLimit, data.length)} of ${data.length}`
+              }
               hasPrevious = {page > 0}
               previousKeys={[Key.LeftArrow]}
               onPrevious={onPagePrevious}

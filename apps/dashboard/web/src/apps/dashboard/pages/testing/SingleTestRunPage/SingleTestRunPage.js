@@ -10,6 +10,7 @@ import {
   Popover,
   ActionList
 } from '@shopify/polaris';
+import { saveAs } from 'file-saver'
 import {
   CircleCancelMinor,
   CalendarMinor,
@@ -139,6 +140,38 @@ let filters = [
   }
 ]
 
+function valToString(val) {
+  if (val instanceof Set) {
+      return [...val].join(" & ")
+  } else {
+      return val || "-"
+  }
+}
+
+const downloadAsCSV = (data, trss) => {
+  let headerTextToValueMap = Object.keys(data[0])
+
+  let csv = headerTextToValueMap.join(",")+"\r\n"
+  data.forEach(i => {
+      csv += Object.values(headerTextToValueMap).map(h => valToString(i[h])).join(",") + "\r\n"
+  })
+  let blob = new Blob([csv], {
+      type: "application/csvcharset=UTF-8"
+  });
+  saveAs(blob, (trss.hexId || "file") + ".csv");
+}
+
+const bulkActions = [
+  {
+    content: 'Edit tests',
+    onAction: () => console.log('Todo: Edit tests'),
+  },
+  {
+    content: 'Slack alert',
+    onAction: () => console.log('Todo: Slack alert'),
+  }
+];
+
 function SingleTestRunPage() {
 
   const [testRunResult, setTestRunResult] = useState([])
@@ -173,6 +206,7 @@ useEffect(()=>{
           testingRunResults.forEach((data) => {
             let obj = {};
             obj['hexId'] = data.hexId;
+            // change this logic. breaks for fuzzing/nuclei tests.
             obj['name'] = subCategoryMap[data.testSubType].testName
             obj['detected_time'] = "Detected " + globalFunctions.prettifyEpoch(data.endTimestamp)
             obj["endTimestamp"] = data.endTimestamp
@@ -226,6 +260,16 @@ function navigateBack(){
   navigate("/dashboard/testing/")
 }
 
+const promotedBulkActions = (selectedDataHexIds) => { 
+  return [
+  {
+    content: 'Export',
+    onAction: () => {
+      downloadAsCSV(testRunResult.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), testingRunResultSummary)
+    },
+  },
+]};
+
   return (
     <VerticalStack gap="4">
       <HorizontalStack align="space-between" blockAlign="center">
@@ -278,6 +322,8 @@ function navigateBack(){
     headers={headers}
     getActions = {() => {}}
     selectable = {true}
+    promotedBulkActions = {promotedBulkActions}
+    bulkActions = {bulkActions}
   />
   </VerticalStack>
   );

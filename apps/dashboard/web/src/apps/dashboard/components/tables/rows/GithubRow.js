@@ -35,7 +35,6 @@ function GithubRow(props) {
     }
 
     function navigateToTest(hexId){
-        console.log(hexId);
         navigate("/dashboard/testing/"+hexId)
     }
 
