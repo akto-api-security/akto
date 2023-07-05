@@ -1,6 +1,6 @@
 <template>
     <div>
-        <simple-layout title="Test Editor" version="Beta">
+        <simple-layout title="Test editor" version="Beta">
             <template>
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
@@ -39,7 +39,7 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
-                                            class="test-container"  @click="setSelectedMethod(test.value)">
+                                            class="test-container"  @click="setSelectedMethodOnClick(test.value)">
                                             <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
                                                 <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
@@ -87,7 +87,7 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in testsObj[item.name].all" :key="index"
-                                            class="test-container" @click="setSelectedMethod(test.value)">
+                                            class="test-container" @click="setSelectedMethodOnClick(test.value)">
                                             <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
                                                 <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
@@ -109,7 +109,7 @@
                     <div class="editor-col">
                         <div class="editor-header-container">
                             <div class="d-flex fd-column">
-                                <div class="file-name show-overflow">
+                                <div class="file-name show-overflow mb-1">
                                     {{defaultTestName || "Test editor"}}
                                     <v-icon v-if="!allCustomTests[defaultTestName]"
                                         :style="{ 'cursor': 'pointer' }" 
@@ -120,16 +120,17 @@
                                         $githubIcon
                                     </v-icon>
                                 </div>
-                                <div>
+                                <slot name="unsavedChanges" :IsEdited="IsEdited">
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
-
+                                </slot>
+                            </div>
+                            <slot name="saveEditedTemplate" :IsEdited="IsEdited">
+                                <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
+                                    @click="saveTestTemplate">
+                                    <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
+                                    <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
                                 </div>
-                            </div>
-                            <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
-                                @click="saveTestTemplate">
-                                <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
-                                <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
-                            </div>
+                            </slot>
                         </div>
                         <div ref="editor" style="height: calc(100vh - 120px);" class="monaco-editor"></div>
                         <selector-modal :show-dialog="showDialogBox" :title="titleBox" @closeDialog="closeDialog"
@@ -144,13 +145,16 @@
                         <div class="empty-container" v-else>
                             No Values Yet !!
                         </div>
-                        <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
-                            <v-icon size=12>$fas_check</v-icon>
-                            <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
-                        </div>
+                        <slot name="sampleDataSelector" :resetSelectedURL="resetSelectedURL" :selectedUrl="selectedUrl"
+                            :setMessageJson="setMessageJson">
+                            <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
+                                <v-icon size=12>$fas_check</v-icon>
+                                <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
+                            </div>
+                        </slot>
                         <div class="footer-div">
                             <div class="show-run-test" v-if="!runTest">
-                                Run test to see Results
+                                Run test to see results
                             </div>
                             <div class="show-run-test" v-else-if="runTestObj.isLoading">
                                 Running tests...
@@ -189,7 +193,9 @@
                 </div>
             </template>
         </simple-layout>
-        <issues-dialog :similarlyAffectedIssues="similarlyAffectedIssues" :openDetailsDialog="dialogBox"
+        <slot name="modalsOverTestEditor" :setMessageJson="setMessageJson">
+        </slot>
+        <issues-dialog :openDetailsDialog="dialogBox"
             :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
             @closeDialogBox="(dialogBox = false)">
         </issues-dialog>
@@ -240,7 +246,48 @@ export default {
         IssuesDialog
     },
     props: {
-        defaultTestId: obj.strN
+        defaultTestId: obj.strN,
+        refreshTestTemplatesApiCall: {
+            type: Function,
+            required: false,
+            default: async function() {
+                let result = {}
+                await issuesApi.fetchAllSubCategories().then(resp => {
+                    result = resp
+                })
+                return result
+            }
+
+        },
+        runTestForGivenTemplateApiCall: {
+            type: Function,
+            required: false,
+            default: async function(textEditor, selectedUrl, sampleDataListForTestRun) {
+                let result = {}
+                await testingApi.runTestForTemplate(textEditor, selectedUrl, sampleDataListForTestRun).then(resp => {
+                    result = resp
+                })
+                return result
+            }
+        },
+        makeJsonApiCall: {
+            type: Function,
+            required: false,
+            default: async function(selectedUrl) {
+                let result = {}
+                await inventoryApi.fetchSampleData(selectedUrl.url, selectedUrl.apiCollectionId, selectedUrl.method).then(resp => {
+                    result = resp
+                })
+                return result
+            }
+        },
+        setSelectedMethodOnClick: {
+            type: Function,
+            required: false,
+            default: function(testId) {
+                this.setSelectedMethod(testId)
+            }
+        }
     },
     data() {
         return {
@@ -281,7 +328,6 @@ export default {
                 runTime: "",
                 vulnerability: "",
             },
-            similarlyAffectedIssues: [],
             dialogBoxIssue: {},
             dialogBox: false,
             testingRunResult: {},
@@ -294,6 +340,8 @@ export default {
             currentCategory: '',
             allCustomTests: {},
             setTextId: {},
+            subCatogoryMap: {},
+            sampleDataListForTestRun: null
         }
     },
     methods: {
@@ -340,6 +388,40 @@ export default {
                 })
             }
         },
+        resetSelectedURL() {
+            this.selectedUrl = {}
+            this.messageJson = {}
+            let testId = this.defaultTest
+            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0]) {
+                let obj = {
+                    apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
+                    url: this.mapRequestsToId[testId][0].url,
+                    method: this.mapRequestsToId[testId][0].method._name
+                }
+                this.selectedUrl = obj
+            }
+            return
+        },
+        resetSampleData() {
+            this.selectedUrl = {}
+            this.messageJson = {}
+            let testId = this.defaultTest
+            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0]) {
+
+                let obj = {
+                    apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
+                    url: this.mapRequestsToId[testId][0].url,
+                    method: this.mapRequestsToId[testId][0].method._name
+                }
+                this.selectedUrl = obj
+                this.makeJson()
+            }
+            this.selectedAnonymousOption = 'Sample data'
+        },
+        setMessageJson(result) {
+            this.messageJson = result.messageJson
+            this.sampleDataListForTestRun = result.sampleDataListForTestRun
+        },
         setSelectedMethod(testId) {
             let testName = this.findTestLabelFromTestValue(testId)
             this.changeValue(testName)
@@ -348,7 +430,11 @@ export default {
             this.selectedUrl = {}
             this.messageJson = {}
             this.runTest = false
-            window.history.pushState({urlPath:'/dashboard/test-editor/'+testId},"",'/dashboard/test-editor/'+testId)
+
+            let pathname = window.location.pathname
+            pathname = pathname.slice(0, pathname.lastIndexOf('/') + 1)
+            window.history.pushState({ urlPath: pathname + testId }, "", pathname + testId)
+
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
@@ -359,71 +445,53 @@ export default {
                     apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
                     url: this.mapRequestsToId[testId][0].url,
                     method: this.mapRequestsToId[testId][0].method._name
-                }    
+                }
                 this.selectedUrl = obj
                 this.makeJson()
             }
         },
         async makeJson() {
-            await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
-                if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
-                    this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
-                }
-            })
+            let resp = await this.makeJsonApiCall(this.selectedUrl)
+            if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
+                this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
+                this.sampleDataListForTestRun = resp.sampleDataList
+            }
         },
         async runTestForGivenTemplate() {
             this.runTest = true
             let testStartTime = new Date()
             this.runTestObj.isLoading = true
-            await testingApi.runTestForTemplate(this.textEditor.getValue(), this.selectedUrl).then(resp => {
-                this.testingRunHexId = resp["testingRunHexId"]
-                let __topThis = this
-                if (this.testingRunHexId) {//Test run started
-                    let stopInterval = false
-                    let interval = setInterval(async () => {
-                        if (stopInterval) {
-                            clearInterval(interval)
-                        } else {
-                            let _this = this
-                            await testingApi.fetchTestingRunResultFromTestingRun(__topThis.testingRunHexId).then(async respResult => {
-                                let run = respResult["testingRunResult"]
-                                if (run) {
-                                    _this.testingRunResult = run
-                                    stopInterval = true
-                                    __topThis.runTestObj.runTime =  Math.round((new Date().getTime() - testStartTime.getTime())/1000) + " seconds"
-                                    await testingApi.fetchIssueFromTestRunResultDetailsForTestEditor(_this.testingRunResult.hexId, "true").then(async respIssue => {
-                                        __topThis.dialogBoxIssue = respIssue['runIssues']
-                                        if (__topThis.dialogBoxIssue) {
-                                            await issuesApi.fetchAffectedEndpoints(__topThis.dialogBoxIssue.id).then(affectedResp => {
-                                                __topThis.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
-                                                __topThis.runTestObj.vulnerability = "HIGH"
-                                                __topThis.runTestObj.isLoading = false
-                                            })
-                                        } else {//No issues found
-                                            __topThis.runTestObj.vulnerability = "No "
-                                            __topThis.runTestObj.isLoading = false
-                                        }
-                                    })
-                                }
-                            })
-                        }
-                    }, 2000)
-                }
-            })
+            let resp = await this.runTestForGivenTemplateApiCall(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun)
+            this.testingRunResult = resp["testingRunResult"]
+            this.testingRunHexId = resp["testingRunHexId"]
+            this.dialogBoxIssue = resp["testingRunIssues"]
+            this.subCatogoryMap = resp["subCategoryMap"]
+
+            if (this.dialogBoxIssue) {
+                this.runTestObj.vulnerability = this.dialogBoxIssue.severity
+                this.runTestObj.isLoading = false
+            } else {//No issues found
+                this.runTestObj.vulnerability = "No "
+                this.runTestObj.isLoading = false
+                this.dialogBoxIssue = {}
+            }
+            this.runTime = Math.round((new Date().getTime() - testStartTime.getTime()) / 1000) + " seconds"
         },
         showAllAttempts() {
             this.dialogBox = true
         },
         saveTestTemplate() {
-            this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp)=>{
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: "Test template added successfully!",
-                    color: 'green'
-                });
-                await this.refreshTestTemplates()
-                this.setSelectedMethod(resp.finalTestId)
-            })
+            if (this.IsEdited) {
+                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), originalTestId: this.defaultTest }).then(async (resp) => {
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: "Test template added successfully!",
+                        color: 'green'
+                    });
+                    await this.refreshTestTemplates()
+                    this.setSelectedMethod(resp.finalTestId)
+                })
+            }
         },
         openDialogBox(param) {
             this.currentParam = param
@@ -564,17 +632,15 @@ export default {
             return arr
         },
         async refreshTestTemplates() {
-            await this.$store.dispatch('issues/fetchAllSubCategories')
             let _this = this
-            await issuesApi.fetchAllSubCategories().then(resp => {
-                _this.testCategories = resp.categories
-                _this.businessLogicSubcategories = resp.subCategories
-                _this.vulnerableRequests = resp.vulnerableRequests
-                _this.testsObj = _this.populateMapCategoryToSubcategory()
-                _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
-                _this.mapRequests()
-            })
-        }        
+            let resp = await this.refreshTestTemplatesApiCall()
+            _this.testCategories = resp.categories
+            _this.businessLogicSubcategories = resp.subCategories
+            _this.vulnerableRequests = resp.vulnerableRequests
+            _this.testsObj = _this.populateMapCategoryToSubcategory()
+            _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
+            _this.mapRequests()
+        }
     },
     async mounted() {
         this.createEditor()
@@ -586,11 +652,6 @@ export default {
         })
     },
     computed: {
-        subCatogoryMap: {
-            get() {
-                return this.$store.state.issues.subCatogoryMap
-            }
-        },
         json() {
             return {
                 "message": JSON.parse(this.messageJson["message"]),
@@ -606,6 +667,7 @@ export default {
         },
         getTextColor() {
             switch (this.runTestObj.vulnerability) {
+                case 'CRITICAL':
                 case 'HIGH':
                     return 'var(--hexColor3)';
                 case 'MEDIUM':
@@ -625,6 +687,17 @@ export default {
 
 .tests-category-container.v-list-group--active >>> .v-list-group__header__prepend-icon {
     transform: rotate(90deg);
+}
+.req-resp-col >>> .copy-icon {
+  display: none;
+}
+
+.req-resp-col >>> .sample-data-title {
+  display: none;
+}
+
+.req-resp-col >>> .sample-data-container {
+  background: #FFFFFF;
 }
 
 .test-editor-panel >>> .akto-left-pane {
@@ -681,6 +754,7 @@ export default {
         display: flex;
         padding: 4px 24px;
         justify-content: space-between;
+        height: 48px;
 
         .file-title {
             display: flex;
@@ -729,7 +803,7 @@ export default {
             border-top: 1px solid var(--hexColor44);
             width: -webkit-fill-available;
             font-weight: 500;
-            font-size: 16px;
+            font-size: 14px;
             color: var(--themeColorDark);
         }
 
@@ -785,7 +859,7 @@ export default {
     cursor: pointer;
     .shift-right{
         position: absolute;
-        right: 20px; 
+        right: 20px;
     }
 }
 

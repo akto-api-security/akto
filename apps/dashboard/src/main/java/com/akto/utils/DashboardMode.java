@@ -19,7 +19,10 @@ public enum DashboardMode {
         if("stairway".equalsIgnoreCase(dashboardMode)){
             return STAIRWAY;
         }
-        return ON_PREM;
+        if("saas".equalsIgnoreCase(dashboardMode)){
+            return SAAS;
+        }
+        return LOCAL_DEPLOY;
     }
 
     public static boolean isLocalDeployment(){
@@ -32,4 +35,8 @@ public enum DashboardMode {
         return dashboardMode.equals(ON_PREM);
     }
 
+    public static boolean isSaasDeployment(){
+        DashboardMode dashboardMode = DashboardMode.getDashboardMode();
+        return dashboardMode.equals(SAAS);
+    }
 }
