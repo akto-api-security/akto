@@ -4,17 +4,17 @@ import {
     Badge,
     VerticalStack,
     HorizontalStack,
-    ButtonGroup,
     Icon,
     Box,
-    Link,
-    Button, Popover, ActionList
+    Button, 
+    Popover, 
+    ActionList
 } from '@shopify/polaris';
 import {
     HorizontalDotsMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-
+import func from '@/util/func';
 import { useState, useCallback } from 'react';
 
 function GithubRow(props) {
@@ -24,15 +24,6 @@ function GithubRow(props) {
         () => setPopoverActive(index),
         [],
     );
-
-    function getStatus(item) {
-        let confidence = item.confidence.toUpperCase();
-        switch (confidence) {
-            case 'HIGH': return 'critical';
-            case 'MEDIUM': return 'warning';
-            case 'LOW': return 'neutral';
-        }
-    }
 
     function navigateToTest(hexId){
         navigate("/dashboard/testing/"+hexId)
@@ -44,27 +35,20 @@ function GithubRow(props) {
             key={props.data.hexId}
             selected={props.selectedResources.includes(props.data.hexId)}
             position={props.index}
-            // onClick={()=>{console.log("something")}}
-        // onClick={fun}
         >
-            <IndexTable.Cell
-            onClick={()=>{console.log("something")}}>
+            <IndexTable.Cell>
                 {/* <div style={{ padding: '12px 16px', width: '100%' }}> */}
                 <HorizontalStack align='space-between'>
-                    {/* <div> */}
-                    {/* <Link url={"testing/" + props.data.hexId} monochrome={true} removeUnderline={true} > */}
                     <div onClick={() => (props.nextPage && props.nextPage=='singleTestRunPage' ? navigateToTest(props.data.hexId) : {})} style={{cursor: 'pointer'}}>
                     <HorizontalStack gap="1">
-                        {/* <VerticalStack align="start" inlineAlign="start" gap="1"> */}
-                        {/* <HorizontalStack gap="2" align='center'> */}
-                        <Box padding="1">
-                            {
-                                props?.headers[0]?.icon &&
+                        {
+                            props?.headers[0]?.icon &&
+                            <div style={{marginBottom:"auto"}}>
+                            <Box padding="05">
                                 <Icon source={props.data[props?.headers[0]?.icon['value']]} color="primary" />
-                            }
-                        </Box>
-                        {/* </HorizontalStack> */}
-                        {/* </VerticalStack> */}
+                            </Box>
+                            </div>
+                        }
                         <VerticalStack gap="2">
                             <HorizontalStack gap="2" align='start'>
                                 <Text as="span" variant="headingMd">
@@ -76,35 +60,29 @@ function GithubRow(props) {
                                 {
                                     props?.headers[1]?.severityList &&
                                         props.data[props?.headers[1]?.severityList['value']] ? props.data[props?.headers[1]?.severityList['value']].map((item) =>
-                                            <Badge key={item.confidence} status={getStatus(item)}>{item.count ? item.count: ""} {item.confidence}</Badge>) :
+                                            <Badge key={item.confidence} status={func.getStatus(item)}>{item.count ? item.count: ""} {item.confidence}</Badge>) :
                                         []}
                             </HorizontalStack>
-                            {/* <div style={{width: 'fit-content'}}> */}
                             <HorizontalStack gap='2' align="start" >
-                                {/* {
-            props?.headers[2]?.icon &&
-            <Icon source={props?.headers[2]?.icon['value']} color="primary" />
-          } */}
                                 {
                                     props?.headers[2]?.details &&
                                     props?.headers[2]?.details.map((detail) => {
                                         return (
-                                            <ButtonGroup key={detail.value}>
-                                                <Icon source={detail.icon} color="subdued" />
-                                                <Text as="span" variant="bodySm" color="subdued">
+                                            <HorizontalStack key={detail.value} gap="1">
+                                                <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                                                    <Icon source={detail.icon} color="subdued" />
+                                                </div>
+                                                <Text as="div" variant="bodySm" color="subdued">
                                                     {props.data[detail.value]}
                                                 </Text>
-                                            </ButtonGroup>
+                                            </HorizontalStack>
                                         )
                                     })
                                 }
                             </HorizontalStack>
-                            {/* </div> */}
                         </VerticalStack>
                     </HorizontalStack>
-                    {/* </Link> */}
                     </div>
-                    {/* </div> */}
                     <VerticalStack align="center">
                     {
                         props.hasRowActions &&
@@ -122,13 +100,6 @@ function GithubRow(props) {
                     }
                     </VerticalStack>
                 </HorizontalStack>
-
-                {/* ) */}
-
-                {/* }) */}
-
-                {/* } */}
-
                 {/* </div> */}
             </IndexTable.Cell>
         </IndexTable.Row>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {EmptyState, LegacyCard} from '@shopify/polaris';
 import settingFunctions from '../module';
-import globalFunctions from '@/util/func';
+import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 
@@ -34,7 +34,7 @@ function TokensLayout(props) {
     tokenList.map((item,index) =>(
       <LegacyCard.Section title={`Token ${index + 1}`} key={index} 
         actions={[{ content: 'Delete', destructive: true, onAction: () => deleteToken(item.id)}]}>
-        <p>{globalFunctions.prettifyEpoch(item.timestamp)}</p>
+        <p>{func.prettifyEpoch(item.timestamp)}</p>
         <PasswordTextField field={item.key} />
       </LegacyCard.Section>     
     ))
