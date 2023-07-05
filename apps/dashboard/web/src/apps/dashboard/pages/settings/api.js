@@ -9,6 +9,24 @@ const settingRequests = {
         })
         return resp
     },
+    addApiToken(tokenUtility) {
+        return request({
+            url: '/api/addApiToken',
+            method: 'post',
+            data: {tokenUtility}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    deleteApiToken(apiTokenId) {
+        return request({
+            url: '/api/deleteApiToken',
+            method: 'post',
+            data: {apiTokenId}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }
 
 export default settingRequests

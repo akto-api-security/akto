@@ -1,4 +1,4 @@
-import {TopBar, Icon, Text, Tooltip} from '@shopify/polaris';
+import {TopBar, Icon, Text, Tooltip, Button} from '@shopify/polaris';
 import {NotificationMajor, CircleChevronRightMinor,CircleChevronLeftMinor} from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +26,7 @@ export default function Header() {
 
     const handleLogOut = () => {
         storeAccessToken(null)
-        localStorage.removeItem("access_token")
+        // localStorage.removeItem("access_token")
         navigate("/login")
     }
 
@@ -80,6 +80,8 @@ export default function Header() {
             ]}
         />
     );
+
+    let icon = hideFullNav ? CircleChevronRightMinor : CircleChevronLeftMinor
 
     const topBarMarkup = (
         <div className='topbar'>

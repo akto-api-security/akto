@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useLocation } from 'react-router-dom';
 // import store from "@/apps/main/store/module";
 // import router from "@/apps/main/router";
-// import Store from "../apps/dashboard/store";
+import Store from "../apps/dashboard/store";
 
 // create axios
 const service = axios.create({
@@ -24,8 +24,25 @@ const err = async (error) => {
     let message = "OOPS! Something went wrong"
     if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
         message = actionErrors[0]
-    }
-    return Promise.reject(error)
+      }
+
+
+      switch(status){
+        case 403:
+          const originalRequest = error.config;
+          if (originalRequest._retry) {
+            console.log("access token error");
+          }
+          originalRequest._retry = true
+          await service({
+            url: '/dashboard/accessToken',
+            method: 'get',
+          })
+          return service(originalRequest)
+        default:
+          break;
+      }
+    return Promise.reject(error) 
 }
 
 // request interceptor
@@ -34,8 +51,9 @@ service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
 //   config.headers["access-token"] = store.getters["auth/getAccessToken"]
-//   config.headers["access-token"] = Store.getState().accessToken
-    config.headers["access-token"] = localStorage.getItem("access_token")
+  config.headers["access-token"] = Store.getState().accessToken
+    // config.headers["access-token"] = localStorage.getItem("access_token")
+
 
   if (window.ACTIVE_ACCOUNT) {
     config.headers['account'] = window.ACTIVE_ACCOUNT
@@ -49,8 +67,8 @@ service.interceptors.request.use((config) => {
 service.interceptors.response.use((response) => {
   if (response.headers["access-token"] != null) {
     // store.commit('auth/SET_ACCESS_TOKEN',response.headers["access-token"])
-    localStorage.setItem("access_token", response.headers["access-token"])
-    // Store.getState().storeAccessToken(response.headers["access-token"])
+    // localStorage.setItem("access_token", response.headers["access-token"])
+    Store.getState().storeAccessToken(response.headers["access-token"])
     
   }
 
