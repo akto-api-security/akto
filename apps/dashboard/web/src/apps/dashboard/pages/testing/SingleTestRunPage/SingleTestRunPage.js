@@ -245,7 +245,7 @@ function navigateBack(){
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
   {
-    content: 'Export',
+    content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length==1 ? '' : 's'}`,
     onAction: () => {
       downloadAsCSV(testRunResults.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), testingRunResultSummary)
     },
