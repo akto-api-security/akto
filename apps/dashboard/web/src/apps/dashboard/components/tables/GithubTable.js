@@ -5,11 +5,13 @@ import {
   useSetIndexFiltersMode,
   IndexFiltersMode,
   useIndexResourceState,
-  Pagination, Box, Card, HorizontalStack, Key} from '@shopify/polaris';
+  Pagination,  
+  Card, 
+  HorizontalStack, 
+  Key, 
+  ChoiceList} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
-import CustomChoiceList from './filterChoices/ChoiceList';
-
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 function GithubTable(props) {
 
@@ -81,9 +83,10 @@ function GithubTable(props) {
     [],
   );
 
-  const selectedFilters = (key) =>(value) => {
+  const handleFilterStatusChange = (key) => (value) =>{
     changeAppliedFilters(key, value);
   }
+
   let filters = formatFilters(props.filters)
   function formatFilters(filters) {
     return filters
@@ -95,16 +98,20 @@ function GithubTable(props) {
           key: filter.key,
           label: filter.label,
           filter: (
-            <CustomChoiceList 
-              filter={filter} 
-              selectedFilters={selectedFilters(filter.key)}
-              appliedFilters={
+            <ChoiceList
+              title={filter.title}
+              titleHidden
+              choices={filter.choices}
+              selected={
                 appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ? 
-                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : []} />
+                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : []
+                }
+              onChange={handleFilterStatusChange(filter.key)}
+              allowMultiple
+            />
           ),
           // shortcut: true,
           pinned: true
-
         }
       })
   }
@@ -146,14 +153,12 @@ function GithubTable(props) {
   );
 
   const onPageNext = () =>{
-    console.log(data.length , page*pageLimit);
     setPage((page) => (page+1));
   }
 
   const onPagePrevious = () =>{
     setPage((page) => (page-1));
   }
-
 
   return (
     <div>

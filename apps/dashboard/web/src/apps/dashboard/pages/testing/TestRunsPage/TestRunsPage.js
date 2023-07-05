@@ -81,15 +81,6 @@ function getOrderPriority(state){
     }
 }
 
-function getTestingRunIcon(state){
-    switch(state._name){
-        case "RUNNING": return ClockMinor;
-        case "SCHEDULED": return CalendarMinor;
-        case "STOPPED": return CircleCancelMinor;
-        default: return ClockMinor;
-    }
-}
-
 function getTestingRunType(testingRun, testingRunResultSummary){
     if(testingRunResultSummary.metadata!=null){
         return 'CI/CD';
@@ -135,23 +126,6 @@ function getAlternateTestsInfo(state){
 
 function getTestsInfo(testResultsCount, state){
     return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
-}
-
-function getSeverity(countIssues){
-  return Object.keys(countIssues).filter((key) => {
-    return (countIssues[key]>0)
-  }).map((key) => {
-    return {
-      confidence : key,
-      count:countIssues[key]
-    }
-  })
-}
-
-function getSeverityStatus(countIssues){
-  return Object.keys(countIssues).filter((key) => {
-    return (countIssues[key]>0)
-  })
 }
 
 // let testRuns = [
@@ -380,16 +354,16 @@ useEffect(()=>{
       }
       obj['hexId'] = data.hexId;
       obj['orderPriority'] = getOrderPriority(data.state)
-      obj['icon'] = getTestingRunIcon(data.state);
+      obj['icon'] = globalFunctions.getTestingRunIcon(data.state);
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
       obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
-      obj['severity'] = getSeverity(testingRunResultSummary.countIssues)
+      obj['severity'] = globalFunctions.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
-      obj['severityStatus'] = getSeverityStatus(testingRunResultSummary.countIssues)
+      obj['severityStatus'] = globalFunctions.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       filters.forEach((filter, index) => {
       let key = filter["key"]

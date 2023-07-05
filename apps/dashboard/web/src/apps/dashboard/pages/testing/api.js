@@ -9,14 +9,15 @@ export default {
         })
         return resp
     },
-    fetchTestingRunResultSummaries(testingRunHexId) {
-        return request({
+    async fetchTestingRunResultSummaries(testingRunHexId) {
+        const resp = await request({
             url: '/api/fetchTestingRunResultSummaries',
             method: 'post',
             data: {
                 testingRunHexId
             }
         })
+        return resp
     },
     async fetchTestingRunResults(testingRunResultSummaryHexId) {
         const resp = await request({
@@ -28,12 +29,13 @@ export default {
         })
         return resp        
     },
-    fetchAllSubCategories () {
-        return request({
+    async fetchAllSubCategories () {
+        const resp = await request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
             data: {}
         })
+        return resp
     },
     async stopTest(testingRunHexId) {
         const resp = await request({

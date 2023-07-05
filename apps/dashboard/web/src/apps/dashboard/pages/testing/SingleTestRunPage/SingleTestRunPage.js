@@ -7,8 +7,6 @@ import {
   Icon,
   Badge,
   Box,
-  Popover,
-  ActionList
 } from '@shopify/polaris';
 import { saveAs } from 'file-saver'
 import {
@@ -19,11 +17,9 @@ import {
 } from '@shopify/polaris-icons';
 import api from "../api";
 import globalFunctions from '@/util/func';
-import { useNavigate, Outlet } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 import { useParams } from 'react-router';
-import { useState, useCallback, useEffect } from 'react';
-import testingFunc from "../util/func";
+import { useState, useEffect } from 'react';
 
 let headers = [
   {
@@ -159,27 +155,19 @@ const downloadAsCSV = (data, trss) => {
   saveAs(blob, (trss.hexId || "file") + ".csv");
 }
 
-const bulkActions = [
-  {
-    content: 'Edit tests',
-    onAction: () => console.log('Todo: Edit tests'),
-  },
-  {
-    content: 'Slack alert',
-    onAction: () => console.log('Todo: Slack alert'),
-  }
-];
-
 function SingleTestRunPage() {
 
-  const [testRunResult, setTestRunResult] = useState([])
+  const [testRunResults, setTestRunResults] = useState([])
   const [testingRunResultSummary, setTestingRunResultSummary] = useState({});
   const params= useParams()
 
 useEffect(()=>{
 
     const hexId = params.hexId;
-
+    filters.forEach((filter, index) => {
+      filters[index].availableChoices = new Set()
+      filters[index].choices = []
+    })
     api.fetchAllSubCategories().then((resp) => {
       let subCategoryMap = {}
       resp.subCategories.forEach((x) => {
@@ -199,25 +187,25 @@ useEffect(()=>{
 
         api.fetchTestingRunResults(testingRunResultSummaries[0].hexId).then(({ testingRunResults }) => {
           // console.log(testingRunResults)
+          // console.log(testCategoryMap)
           // console.log(subCategoryMap)
-          let testRunResult = []
+          let testRunResults = []
           testingRunResults.forEach((data) => {
             let obj = {};
             obj['hexId'] = data.hexId;
             // change this logic. breaks for fuzzing/nuclei tests.
-            obj['name'] = subCategoryMap[data.testSubType].testName || "Test"
+            obj['name'] = globalFunctions.getRunResultSubCategory (data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
             obj['detected_time'] = "Detected " + globalFunctions.prettifyEpoch(data.endTimestamp)
             obj["endTimestamp"] = data.endTimestamp
-            obj['testCategory'] = testCategoryMap[data.testSuperType].shortName || "Unknown test"
+            obj['testCategory'] = globalFunctions.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
             obj['url'] = "Detected in " + data.apiInfoKey.method + " " + data.apiInfoKey.url 
-            // make Sentence case.
-            obj['severity'] = data.vulnerable ? [{confidence : globalFunctions.toSentenceCase(testCategoryMap[data.testSuperType].severity._name)}] : []
+            obj['severity'] = data.vulnerable ? [{confidence : globalFunctions.toSentenceCase(globalFunctions.getRunResultSeverity(data, subCategoryMap))}] : []
             obj['total_severity'] = getTotalSeverity(obj['severity'])
             obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
             obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
-            obj['categoryFilter'] = [testCategoryMap[data.testSuperType].shortName || "Unknown test"]
-            obj['testFilter'] = [subCategoryMap[data.testSubType].testName || "Test"]
-            testRunResult.push(obj);
+            obj['categoryFilter'] = [obj['testCategory']]
+            obj['testFilter'] = [obj['name']]
+            testRunResults.push(obj);
             filters.forEach((filter, index) => {
               let key = filter["key"]
                 switch(key){
@@ -231,7 +219,7 @@ useEffect(()=>{
               })
 
           })
-          setTestRunResult(testRunResult);
+          setTestRunResults(testRunResults);
           filters.forEach((filter, index) => {
             let choiceList = []
             filter.availableChoices.forEach((choice) => {
@@ -247,12 +235,6 @@ useEffect(()=>{
   
 }, [])
 
-const [popoverActive, setPopoverActive] = useState(false);
-const togglePopoverActive = useCallback(
-    () => setPopoverActive((popoverActive) => !popoverActive),
-    [],
-);
-
 const navigate = useNavigate();
 function navigateBack(){
   navigate("/dashboard/testing/")
@@ -263,7 +245,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   {
     content: 'Export',
     onAction: () => {
-      downloadAsCSV(testRunResult.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), testingRunResultSummary)
+      downloadAsCSV(testRunResults.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), testingRunResultSummary)
     },
   },
 ]};
@@ -272,22 +254,20 @@ const promotedBulkActions = (selectedDataHexIds) => {
     <VerticalStack gap="10">
       <HorizontalStack align="space-between" blockAlign="center">
         <HorizontalStack gap="4">
-          <HorizontalStack blockAlign="start">
-            <Box>
-          <Button icon={MobileBackArrowMajor} onClick={navigateBack}></Button>
-          </Box>
-          </HorizontalStack>
+          <div style={{marginBottom:"auto"}}>
+          <Button icon={MobileBackArrowMajor} onClick={navigateBack} textAlign="start" />
+          </div>
           <VerticalStack gap="3">
             <HorizontalStack gap="2" align="start">
               <Box>
-              <Icon color="primary" source={testingFunc.getTestingRunIcon(testingRunResultSummary.state) }></Icon>
+              <Icon color="primary" source={globalFunctions.getTestingRunIcon(testingRunResultSummary.state) }></Icon>
               </Box>
               <Text variant='headingLg'>
                 Test run name
               </Text>
-              {testingFunc.getSeverity(testingRunResultSummary.countIssues)
+              {globalFunctions.getSeverity(testingRunResultSummary.countIssues)
               .map((item) =>
-                <Badge key={item.confidence} status={testingFunc.getStatus(item)}>{item.count ? item.count : ""} {globalFunctions.toSentenceCase(item.confidence)}</Badge>
+                <Badge key={item.confidence} status={globalFunctions.getStatus(item)}>{item.count ? item.count : ""} {globalFunctions.toSentenceCase(item.confidence)}</Badge>
                 )}
             </HorizontalStack>
             <Text color="subdued">
@@ -297,22 +277,11 @@ const promotedBulkActions = (selectedDataHexIds) => {
           </VerticalStack>
         </HorizontalStack>
         <HorizontalStack gap="2">
-        <Popover
-          active={popoverActive}
-          activator={<Button onClick={togglePopoverActive} monochrome removeUnderline plain disclosure>Actions</Button>}
-          autofocusTarget="first-node"
-          onClose={togglePopoverActive}
-        >
-        <ActionList
-            actionRole="menuitem"
-            items={[{content: 'Import'}, {content: 'Export'}]}
-        />
-      </Popover>
-        <Button monochrome removeUnderline plain>Export</Button>
+        <Button monochrome removeUnderline plain onClick={() => downloadAsCSV(testRunResults, testingRunResultSummary)}>Export</Button>
         </HorizontalStack>
       </HorizontalStack>
     <GithubTable 
-    data={testRunResult} 
+    data={testRunResults} 
     sortOptions={sortOptions} 
     resourceName={resourceName} 
     filters={filters} 
@@ -321,7 +290,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
     getActions = {() => {}}
     selectable = {true}
     promotedBulkActions = {promotedBulkActions}
-    bulkActions = {bulkActions}
   />
   </VerticalStack>
   );

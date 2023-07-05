@@ -1,4 +1,10 @@
-const globalFunctions = {
+import {
+    CircleCancelMinor,
+    CalendarMinor,
+    ClockMinor
+} from '@shopify/polaris-icons';
+
+const func = {
     toDateStr (date, needYear) {
         var strArray=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         var d = date.getDate();
@@ -70,7 +76,68 @@ const globalFunctions = {
         } else {
             return ret
         }
-    }
+    },
+    getSeverityStatus(countIssues) {
+        return Object.keys(countIssues).filter((key) => {
+          return (countIssues[key] > 0)
+        })
+      },
+      getTestingRunIcon(state) {
+        switch (state) {
+          case "RUNNING": return ClockMinor;
+          case "SCHEDULED": return CalendarMinor;
+          case "STOPPED": return CircleCancelMinor;
+          default: return ClockMinor;
+        }
+      },
+      getSeverity(countIssues) {
+        if (countIssues == null) {
+          return []
+        }
+        return Object.keys(countIssues).filter((key) => {
+          return (countIssues[key] > 0)
+        }).map((key) => {
+          return {
+            confidence: key,
+            count: countIssues[key]
+          }
+        })
+      },
+      getStatus(item) {
+        let confidence = item.confidence.toUpperCase();
+        switch (confidence) {
+          case 'HIGH': return 'critical';
+          case 'MEDIUM': return 'warning';
+          case 'LOW': return 'neutral';
+        }
+      },
+      getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
+        if (subCategoryMap[runResult.testSubType] === undefined) {
+          let a = subCategoryFromSourceConfigMap[runResult.testSubType]
+          return a ? a.subcategory : null
+        } else {
+          return subCategoryMap[runResult.testSubType][fieldName]
+        }
+      },
+    
+      getRunResultCategory(runResult, subCategoryMap, subCategoryFromSourceConfigMap, fieldName) {
+        if (subCategoryMap[runResult.testSubType] === undefined) {
+          let a = subCategoryFromSourceConfigMap[runResult.testSubType]
+          return a ? a.category.shortName : null
+        } else {
+          return subCategoryMap[runResult.testSubType].superCategory[fieldName]
+        }
+      },
+    
+      getRunResultSeverity(runResult, subCategoryMap) {
+        let testSubType = subCategoryMap[runResult.testSubType]
+        if (!testSubType) {
+          return "HIGH"
+        } else {
+          let a = testSubType.superCategory["severity"]["_name"]
+          return a
+        }
+      }
 }
 
-export default globalFunctions
+export default func
