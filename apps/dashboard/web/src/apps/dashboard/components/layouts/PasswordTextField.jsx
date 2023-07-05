@@ -1,11 +1,16 @@
-import React from 'react'
 import { ResourcesMajor } from '@shopify/polaris-icons';
 import { useState } from 'react';
-import { Button, Icon, TextField } from '@shopify/polaris';
+import { Button, TextField } from '@shopify/polaris';
 
 function PasswordTextField(props) {
 
     const [isTextVisible, setTextVisible] = useState(false);
+
+    const handleValueChange = (val) => {
+        if(props.onFunc){
+            props.setField(val)
+        }   
+    }
 
     const toggleTextVisibility = () => {
         setTextVisible((prevState) => !prevState);
@@ -19,7 +24,9 @@ function PasswordTextField(props) {
     )
 
     return (
-        <TextField suffix={toggleButton} value={props.text} type={type} />
+        <TextField suffix={toggleButton} value={props.field} type={type} helpText={props.helpText} 
+                    onChange={handleValueChange}
+        />
     )
 }
 

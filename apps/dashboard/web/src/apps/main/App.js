@@ -11,6 +11,9 @@ import {
 import BurpSuite from "../dashboard/pages/settings/integrations/BurpSuite";
 import Integrations from "../dashboard/pages/settings/integrations/Integrations";
 import Settings from "../dashboard/pages/settings/Settings";
+import Users from "../dashboard/pages/settings/users/Users";
+import Postman from "../dashboard/pages/settings/integrations/Postman";
+import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 
 const router = createBrowserRouter([
   {
@@ -19,39 +22,59 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/dashboard/testing",
-        element: <TestRunsPage />,
-      }, 
+        element: <TestRunsPage />
+      },
       {
         path: "/dashboard/testing/:hexId",
         element: <SingleTestRunPage />
       },
-      {
-        path: "/dashboard/settings",
-        element: <Settings/>,
-        children: [
-          {
-            path: "/dashboard/settings/integrations",
-            element: <Integrations/>,
-          },
-          {
-            path: "/dashboard/settings/integrations/burp",
-            element: <BurpSuite/>,
-          }
-        ]
-      }
     ]
   },
   {
-    path:"/login",
-    element: <SignUp/>,
+    path: "/dashboard/settings",
+    element: <Settings />,
+    children: [
+      {
+        path: "/dashboard/settings/users",
+        element: <Users />
+      },
+      {
+        path: "/dashboard/settings/integrations",
+        element: <Integrations />,
+      },
+      {
+        path: "/dashboard/settings/integrations/burp",
+        element: <BurpSuite />,
+      },
+      {
+        path: "/dashboard/settings/integrations",
+        element: <Integrations />,
+      },
+      {
+        path: "/dashboard/settings/integrations/burp",
+        element: <BurpSuite />,
+      },
+      {
+        path: "/dashboard/settings/integrations/postman",
+        element: <Postman />,
+      },
+      {
+        path: "/dashboard/settings/integrations/akto_apis",
+        element: <ApiTokens />,
+      }
+  ]
   },
-  {
-    path:"/",
-    element:<Navigate to="/login" />,
+{
+  path: "/login",
+    element: <SignUp />,
+  },
+{
+  path: "/",
+    element: <Navigate to="/login" />,
   }
 ])
 
-function App() {  
+function App() {
   return (
     <AppProvider>
       <RouterProvider router={router} />
