@@ -194,7 +194,7 @@ useEffect(()=>{
             let obj = {};
             obj['hexId'] = data.hexId;
             // change this logic. breaks for fuzzing/nuclei tests.
-            obj['name'] = func.getRunResultSubCategory (data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
+            obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
             obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
             obj["endTimestamp"] = data.endTimestamp
             obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
@@ -205,7 +205,9 @@ useEffect(()=>{
             obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
             obj['categoryFilter'] = [obj['testCategory']]
             obj['testFilter'] = [obj['name']]
-            testRunResults.push(obj);
+            if(obj['name'] && obj['testCategory']){
+              testRunResults.push(obj);
+            }
             filters.forEach((filter, index) => {
               let key = filter["key"]
                 switch(key){
