@@ -16,7 +16,7 @@ info:
           server or compromise its integrity"
   category:
     name: SVD
-    shortName: SVD
+    shortName: Server Version Disclosure
     displayName: Server Version Disclosure (SVD)
   subCategory: SERVER_VERSION_EXPOSED_IN_AN_INVALID_REQUEST
   severity: LOW
