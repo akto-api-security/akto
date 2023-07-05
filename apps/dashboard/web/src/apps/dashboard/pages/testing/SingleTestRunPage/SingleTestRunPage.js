@@ -205,18 +205,18 @@ useEffect(()=>{
             let obj = {};
             obj['hexId'] = data.hexId;
             // change this logic. breaks for fuzzing/nuclei tests.
-            obj['name'] = subCategoryMap[data.testSubType].testName
+            obj['name'] = subCategoryMap[data.testSubType].testName || "Test"
             obj['detected_time'] = "Detected " + globalFunctions.prettifyEpoch(data.endTimestamp)
             obj["endTimestamp"] = data.endTimestamp
-            obj['testCategory'] = testCategoryMap[data.testSuperType].shortName
+            obj['testCategory'] = testCategoryMap[data.testSuperType].shortName || "Unknown test"
             obj['url'] = "Detected in " + data.apiInfoKey.method + " " + data.apiInfoKey.url 
             // make Sentence case.
             obj['severity'] = data.vulnerable ? [{confidence : globalFunctions.toSentenceCase(testCategoryMap[data.testSuperType].severity._name)}] : []
             obj['total_severity'] = getTotalSeverity(obj['severity'])
             obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
             obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
-            obj['categoryFilter'] = [testCategoryMap[data.testSuperType].shortName]
-            obj['testFilter'] = [subCategoryMap[data.testSubType].testName]
+            obj['categoryFilter'] = [testCategoryMap[data.testSuperType].shortName || "Unknown test"]
+            obj['testFilter'] = [subCategoryMap[data.testSubType].testName || "Test"]
             testRunResult.push(obj);
             filters.forEach((filter, index) => {
               let key = filter["key"]

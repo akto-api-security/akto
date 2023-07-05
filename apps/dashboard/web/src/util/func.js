@@ -51,6 +51,7 @@ const globalFunctions = {
     },
 
     toSentenceCase(str){
+        if(str==null) return ""
         return str[0].toUpperCase() + (str.length > 1 ?  str.substring(1).toLowerCase() : "" );
     },
     
