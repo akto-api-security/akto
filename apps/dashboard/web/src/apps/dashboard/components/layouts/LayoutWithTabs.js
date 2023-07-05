@@ -1,10 +1,13 @@
-import {LegacyCard, LegacyTabs} from "@shopify/polaris"
-import { useCallback, useState } from "react"
+import {LegacyTabs} from "@shopify/polaris"
+import { useState } from "react"
 
 export default function LayoutWithTabs(props){
 
     const [current, setCurrent] = useState(0)
-    const setCurrentTab = useCallback((selectedTabIndex)=> setCurrent(selectedTabIndex))
+    const setCurrentTab = (selected) => {
+        setCurrent(selected)
+        props.currTab(props.tabs[selected])
+    }
 
     return(
         <LegacyTabs
@@ -12,7 +15,7 @@ export default function LayoutWithTabs(props){
             onSelect={setCurrentTab}
             tabs={props.tabs}
         >
-            <h1>hey</h1>
+            {props.tabs[current].component }
         </LegacyTabs>
     )
 }

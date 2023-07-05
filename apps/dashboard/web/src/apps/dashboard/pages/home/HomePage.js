@@ -1,4 +1,4 @@
-import { Frame, Toast} from "@shopify/polaris"
+import { Frame, Toast, Box} from "@shopify/polaris"
 import Header from "../../components/layouts/header/Headers"
 import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
@@ -8,16 +8,18 @@ import { useEffect } from "react";
 function HomePage() {
   const navigate = useNavigate();
   const storeAccessToken = Store(state => state.storeAccessToken)
-
+  const accessToken = Store(state => state.accessToken);
   useEffect(() => {
-    const access_token = localStorage.getItem("access_token")
+    const access_token = accessToken
+    // localStorage.getItem("access_token")
 
     if (!access_token) {
       console.log("navigate")
       navigate("/login")  
-    } else  {
-      storeAccessToken(access_token)
-    }
+    } 
+    // else  {
+    //   storeAccessToken(access_token)
+    // }
 
   }, [])
 
@@ -46,7 +48,9 @@ function HomePage() {
 
   return (
       <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
-        <Outlet />
+        <Box padding="8">
+          <Outlet />
+        </Box>
         {toastMarkup}
       </Frame>
   );

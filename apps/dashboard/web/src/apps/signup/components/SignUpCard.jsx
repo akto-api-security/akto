@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import axios from "axios"
+import api from "../api"
 
 import { TextField, Button, Box, Text, HorizontalStack, Divider, VerticalStack, Toast, Frame } from "@shopify/polaris"
 
@@ -46,18 +46,13 @@ const SignUpCard = () => {
   }
 
   const handleContinueWithEmail = async () => {
-    try {
-      const res = await axios.post("/auth/login", {
-        username: email,
-        password: password
-      })
-      const ACCESS_TOKEN = res.headers["access-token"]
 
-      localStorage.setItem("access_token", ACCESS_TOKEN)
-      navigate("/")
-    } catch (err) {
+    api.login(email, password).then((resp)=>{
+      console.log(resp);
+    }).catch((err) => {
+      console.log(err);
       setLoginErrorToast()
-    }
+    })
   }
 
   return (
