@@ -11,9 +11,13 @@ import {
 import {useState} from 'react';
 import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
+import {useNavigate} from 'react-router-dom'
 
 function Integrations() {
+
     const [sortValue, setSortValue] = useState('DATE_MODIFIED_DESC');
+    const navigate = useNavigate()
+
     let burpSuiteObj = {
         id: 'burp',
         name:'Burp Suite',
@@ -118,22 +122,27 @@ function Integrations() {
                 break;
           }
     }
+    const handleTab = (tab)=>{
+        navigate(tab)
+    }
 
     function renderItem(item) {
         const {id, source, name} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
-        const sourceActions = [
-            {
+        const sourceActions = (item) => {
+            return [
+              {
                 content: 'Configure',
-                url: 'integrations/burp'
-            }
-        ]
+                onClick: () => handleTab(item),
+              },
+            ];
+          };
     
         return (
           <ResourceItem
             id={id}
             media={media}
-            shortcutActions={sourceActions}
+            shortcutActions={sourceActions(id)}
             persistActions
           >
             <Text fontWeight="bold" as="h3">
