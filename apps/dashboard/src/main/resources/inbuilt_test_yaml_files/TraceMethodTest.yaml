@@ -11,7 +11,7 @@ info:
   impact: "TRACE method can be used for debugging purposes. It repeats the content of a request, and an attacker could steal credentials by using a client-side attack."
   category:
     name: UHM
-    shortName: UHM
+    shortName: Unnecessary HTTP Methods
     displayName: Unnecessary HTTP Methods (UHM)
   subCategory: TRACE_METHOD_TEST
   severity: LOW
