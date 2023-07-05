@@ -54,7 +54,7 @@ function GithubRow(props) {
                 <HorizontalStack align='space-between'>
                     {/* <div> */}
                     {/* <Link url={"testing/" + props.data.hexId} monochrome={true} removeUnderline={true} > */}
-                    <div onClick={() => (navigateToTest(props.data.hexId))} style={{cursor: 'pointer'}}>
+                    <div onClick={() => (props.nextPage && props.nextPage=='singleTestRunPage' ? navigateToTest(props.data.hexId) : {})} style={{cursor: 'pointer'}}>
                     <HorizontalStack gap="1">
                         {/* <VerticalStack align="start" inlineAlign="start" gap="1"> */}
                         {/* <HorizontalStack gap="2" align='center'> */}
@@ -77,7 +77,7 @@ function GithubRow(props) {
                                 {
                                     props?.headers[1]?.severityList &&
                                         props.data[props?.headers[1]?.severityList['value']] ? props.data[props?.headers[1]?.severityList['value']].map((item) =>
-                                            <Badge key={item.confidence} status={getStatus(item)}>{item.confidence} {item.count ? item.count: ""}</Badge>) :
+                                            <Badge key={item.confidence} status={getStatus(item)}>{item.count ? item.count: ""} {item.confidence}</Badge>) :
                                         []}
                             </HorizontalStack>
                             {/* <div style={{width: 'fit-content'}}> */}

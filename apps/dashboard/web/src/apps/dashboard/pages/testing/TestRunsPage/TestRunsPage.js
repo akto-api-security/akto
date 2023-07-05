@@ -14,7 +14,7 @@ import {
   ClockMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import func from "../../../utils/func"
+import globalFunctions from '@/util/func';
 
 import { useState, useCallback, useEffect } from 'react';
 
@@ -115,12 +115,12 @@ function getRuntime(scheduleTimestamp ,endTimestamp, state){
     const currTime = Date.now();
     if(endTimestamp == -1){
       if(currTime > scheduleTimestamp){
-        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+        return "Was scheduled for " + globalFunctions.prettifyEpoch(scheduleTimestamp)
     } else {
-        return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+        return "Next run in " + globalFunctions.prettifyEpoch(scheduleTimestamp)
     }
 }
-return 'Last run ' + func.prettifyEpoch(endTimestamp);
+return 'Last run ' + globalFunctions.prettifyEpoch(endTimestamp);
 }
 
 function getAlternateTestsInfo(state){
@@ -402,6 +402,7 @@ useEffect(()=>{
         headers={headers}
         getActions = {getActions}
         hasRowActions={true}
+        nextPage={"singleTestRunPage"}
         // func={pull_data}
       />
     </VerticalStack>

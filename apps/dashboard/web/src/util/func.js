@@ -42,6 +42,11 @@ const globalFunctions = {
 
         return count + ' ' + unit + plural + ' ago'
     },
+
+    toSentenceCase(str){
+        return str[0].toUpperCase() + (str.length > 1 ?  str.substring(1).toLowerCase() : "" );
+    },
+    
     testingResultType(){
         return {
             BURP:"BURP",

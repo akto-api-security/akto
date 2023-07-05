@@ -5,7 +5,7 @@ import {
   useSetIndexFiltersMode,
   IndexFiltersMode,
   useIndexResourceState,
-  Pagination} from '@shopify/polaris';
+  Pagination, Box, Card, HorizontalStack, Key} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import CustomChoiceList from './filterChoices/ChoiceList';
 
@@ -17,6 +17,8 @@ function GithubTable(props) {
   const [selected, setSelected] = useState(0);
   const [sortSelected, setSortSelected] = useState([props.sortOptions[0].value]);
   const [data, setData] = useState(props.data);
+  const [page, setPage] = useState(0);
+  const pageLimit = 20;
   const [appliedFilters, setAppliedFilters] = useState([]);
   const [queryValue, setQueryValue] = useState('');
 
@@ -111,28 +113,64 @@ function GithubTable(props) {
     setAppliedFilters([])
   }, []);
 
+  const resourceIDResolver = (data) => {
+    return data.hexId;
+  };
+
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(data);
+    useIndexResourceState(data, {
+      resourceIDResolver,
+    });
 
   const fun = () => {
     console.log("func", sortSelected)
   }
   
-  let rowMarkup = data.map(
+  let rowMarkup = data.slice(page*pageLimit, Math.min((page+1)*pageLimit, data.length)).map(
     (
       data,
       index,
     ) => (
       <GithubRow 
         key={data.hexId}
+        id={data.hexId}
         data={data} 
         index={index} 
         getActions={props.getActions} 
         selectedResources={selectedResources}
         headers={props.headers}
-        hasRowActions={props.hasRowActions || false}/>
+        hasRowActions={props.hasRowActions || false}
+        nextPage={props.nextPage || ""}
+        />
     ),
   );
+
+  const onPageNext = () =>{
+    console.log(data.length , page*pageLimit);
+    setPage((page) => (page+1));
+  }
+
+  const onPagePrevious = () =>{
+    setPage((page) => (page-1));
+  }
+
+  const promotedBulkActions = [
+    {
+      content: 'Export',
+      onAction: () => console.log('Todo: implement bulk edit'),
+    },
+  ];
+  const bulkActions = [
+    {
+      content: 'Edit tests',
+      onAction: () => console.log('Todo: Edit tests'),
+    },
+    {
+      content: 'Slack alert',
+      onAction: () => console.log('Todo: Slack alert'),
+    }
+  ];
+
 
   return (
     <div>
@@ -177,20 +215,27 @@ function GithubTable(props) {
               flush: true
             }
           ]}
+          bulkActions={bulkActions}
+          promotedBulkActions={promotedBulkActions}
+
         >
           {rowMarkup}
         </IndexTable>
+        <Card>
+          <HorizontalStack
+            align="center">
+            <Pagination
+              label={`Showing ${page*pageLimit+1}-${Math.min((page+1)*pageLimit, data.length)} of ${data.length}`}
+              hasPrevious = {page > 0}
+              previousKeys={[Key.LeftArrow]}
+              onPrevious={onPagePrevious}
+              hasNext = {data.length > (page+1) * pageLimit}
+              nextKeys={[Key.RightArrow]}
+              onNext={onPageNext}
+            />
+          </HorizontalStack>
+        </Card>
       </LegacyCard>
-      {/* <Pagination
-      hasPrevious
-      onPrevious={() => {
-        console.log('Previous');
-      }}
-      hasNext
-      onNext={() => {
-        console.log('Next');
-      }}
-    /> */}
     </div>
   );
 

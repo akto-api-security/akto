@@ -23,7 +23,6 @@ export default {
         }
     },
     getSeverity(countIssues){
-      console.log(countIssues)
       if(countIssues ==null ){
         return []
       }

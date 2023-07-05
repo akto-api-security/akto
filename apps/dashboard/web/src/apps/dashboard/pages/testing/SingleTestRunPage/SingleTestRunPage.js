@@ -19,7 +19,7 @@ import {
   ClockMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import func from "../../../utils/func"
+import globalFunctions from '@/util/func';
 import { useNavigate, Outlet } from "react-router-dom";
 
 import { useParams } from 'react-router';
@@ -164,7 +164,7 @@ useEffect(()=>{
       })
       api.fetchTestingRunResultSummaries(hexId).then(({ testingRunResultSummaries }) => {
         setTestingRunResultSummary(testingRunResultSummaries[0])
-        console.log(testingRunResultSummaries[0])
+        // console.log(testingRunResultSummaries[0])
 
         api.fetchTestingRunResults(testingRunResultSummaries[0].hexId).then(({ testingRunResults }) => {
           // console.log(testingRunResults)
@@ -174,12 +174,12 @@ useEffect(()=>{
             let obj = {};
             obj['hexId'] = data.hexId;
             obj['name'] = subCategoryMap[data.testSubType].testName
-            obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
+            obj['detected_time'] = "Detected " + globalFunctions.prettifyEpoch(data.endTimestamp)
             obj["endTimestamp"] = data.endTimestamp
             obj['testCategory'] = testCategoryMap[data.testSuperType].shortName
             obj['url'] = "Detected in " + data.apiInfoKey.method + " " + data.apiInfoKey.url 
             // make Sentence case.
-            obj['severity'] = data.vulnerable ? [{confidence : func.toSentenceCase(testCategoryMap[data.testSuperType].severity._name)}] : []
+            obj['severity'] = data.vulnerable ? [{confidence : globalFunctions.toSentenceCase(testCategoryMap[data.testSuperType].severity._name)}] : []
             obj['total_severity'] = getTotalSeverity(obj['severity'])
             obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
             obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
@@ -230,7 +230,11 @@ function navigateBack(){
     <VerticalStack gap="4">
       <HorizontalStack align="space-between" blockAlign="center">
         <HorizontalStack gap="4">
+          <HorizontalStack blockAlign="start">
+            <Box>
           <Button icon={MagicMinor} onClick={navigateBack}></Button>
+          </Box>
+          </HorizontalStack>
           <VerticalStack gap="3">
             <HorizontalStack gap="2" align="start">
               <Box>
@@ -241,12 +245,12 @@ function navigateBack(){
               </Text>
               {testingFunc.getSeverity(testingRunResultSummary.countIssues)
               .map((item) =>
-                <Badge key={item.confidence} status={testingFunc.getStatus(item)}>{func.toSentenceCase(item.confidence)} {item.count ? item.count : ""}</Badge>
+                <Badge key={item.confidence} status={testingFunc.getStatus(item)}>{item.count ? item.count : ""} {globalFunctions.toSentenceCase(item.confidence)}</Badge>
                 )}
             </HorizontalStack>
             <Text color="subdued">
               {/* make an API call as in the /testing page and use data from there. */}
-            Last scanned {func.prettifyEpoch(testingRunResultSummary.endTimestamp)} for a duration of {testingRunResultSummary.endTimestamp - testingRunResultSummary.startTimestamp} seconds
+            Last scanned {globalFunctions.prettifyEpoch(testingRunResultSummary.endTimestamp)} for a duration of {testingRunResultSummary.endTimestamp - testingRunResultSummary.startTimestamp} seconds
             </Text>
           </VerticalStack>
         </HorizontalStack>

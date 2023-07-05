@@ -1,4 +1,4 @@
-import { Frame, Toast} from "@shopify/polaris"
+import { Frame, Toast, Box} from "@shopify/polaris"
 import Header from "../../components/layouts/header/Headers"
 import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
@@ -48,7 +48,9 @@ function HomePage() {
 
   return (
       <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
-        <Outlet />
+        <Box padding="8">
+          <Outlet />
+        </Box>
         {toastMarkup}
       </Frame>
   );
