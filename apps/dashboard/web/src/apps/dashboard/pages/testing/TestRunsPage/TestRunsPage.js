@@ -381,7 +381,7 @@ useEffect(()=>{
       obj['hexId'] = data.hexId;
       obj['orderPriority'] = getOrderPriority(data.state)
       obj['icon'] = getTestingRunIcon(data.state);
-      obj['name'] = data.name
+      obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
       obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp

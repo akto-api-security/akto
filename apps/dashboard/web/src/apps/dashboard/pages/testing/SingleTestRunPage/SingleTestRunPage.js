@@ -269,7 +269,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
 ]};
 
   return (
-    <VerticalStack gap="4">
+    <VerticalStack gap="10">
       <HorizontalStack align="space-between" blockAlign="center">
         <HorizontalStack gap="4">
           <HorizontalStack blockAlign="start">
