@@ -14,7 +14,7 @@ import {
     HorizontalDotsMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import globalFunctions from '@/util/func';
+import func from '@/util/func';
 import { useState, useCallback } from 'react';
 
 function GithubRow(props) {
@@ -60,7 +60,7 @@ function GithubRow(props) {
                                 {
                                     props?.headers[1]?.severityList &&
                                         props.data[props?.headers[1]?.severityList['value']] ? props.data[props?.headers[1]?.severityList['value']].map((item) =>
-                                            <Badge key={item.confidence} status={globalFunctions.getStatus(item)}>{item.count ? item.count: ""} {item.confidence}</Badge>) :
+                                            <Badge key={item.confidence} status={func.getStatus(item)}>{item.count ? item.count: ""} {item.confidence}</Badge>) :
                                         []}
                             </HorizontalStack>
                             <HorizontalStack gap='2' align="start" >

@@ -16,7 +16,7 @@ import {
   LinkMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import globalFunctions from '@/util/func';
+import func from '@/util/func';
 import { useNavigate } from "react-router-dom";
 import { useParams } from 'react-router';
 import { useState, useEffect } from 'react';
@@ -194,12 +194,12 @@ useEffect(()=>{
             let obj = {};
             obj['hexId'] = data.hexId;
             // change this logic. breaks for fuzzing/nuclei tests.
-            obj['name'] = globalFunctions.getRunResultSubCategory (data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
-            obj['detected_time'] = "Detected " + globalFunctions.prettifyEpoch(data.endTimestamp)
+            obj['name'] = func.getRunResultSubCategory (data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
+            obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
             obj["endTimestamp"] = data.endTimestamp
-            obj['testCategory'] = globalFunctions.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
+            obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
             obj['url'] = "Detected in " + data.apiInfoKey.method + " " + data.apiInfoKey.url 
-            obj['severity'] = data.vulnerable ? [{confidence : globalFunctions.toSentenceCase(globalFunctions.getRunResultSeverity(data, subCategoryMap))}] : []
+            obj['severity'] = data.vulnerable ? [{confidence : func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))}] : []
             obj['total_severity'] = getTotalSeverity(obj['severity'])
             obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
             obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
@@ -260,19 +260,19 @@ const promotedBulkActions = (selectedDataHexIds) => {
           <VerticalStack gap="3">
             <HorizontalStack gap="2" align="start">
               <Box>
-              <Icon color="primary" source={globalFunctions.getTestingRunIcon(testingRunResultSummary.state) }></Icon>
+              <Icon color="primary" source={func.getTestingRunIcon(testingRunResultSummary.state) }></Icon>
               </Box>
               <Text variant='headingLg'>
                 Test run name
               </Text>
-              {globalFunctions.getSeverity(testingRunResultSummary.countIssues)
+              {func.getSeverity(testingRunResultSummary.countIssues)
               .map((item) =>
-                <Badge key={item.confidence} status={globalFunctions.getStatus(item)}>{item.count ? item.count : ""} {globalFunctions.toSentenceCase(item.confidence)}</Badge>
+                <Badge key={item.confidence} status={func.getStatus(item)}>{item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}</Badge>
                 )}
             </HorizontalStack>
             <Text color="subdued">
               {/* make an API call as in the /testing page and use data from there. */}
-            Last scanned {globalFunctions.prettifyEpoch(testingRunResultSummary.endTimestamp)} for a duration of {testingRunResultSummary.endTimestamp - testingRunResultSummary.startTimestamp} seconds
+            Last scanned {func.prettifyEpoch(testingRunResultSummary.endTimestamp)} for a duration of {testingRunResultSummary.endTimestamp - testingRunResultSummary.startTimestamp} seconds
             </Text>
           </VerticalStack>
         </HorizontalStack>

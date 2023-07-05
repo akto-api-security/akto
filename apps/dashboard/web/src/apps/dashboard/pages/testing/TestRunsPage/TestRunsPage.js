@@ -14,7 +14,7 @@ import {
   ClockMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import globalFunctions from '@/util/func';
+import func from '@/util/func';
 import Store from "../../../store";
 
 import { useState, useCallback, useEffect } from 'react';
@@ -107,12 +107,12 @@ function getRuntime(scheduleTimestamp ,endTimestamp, state){
     const currTime = Date.now();
     if(endTimestamp == -1){
       if(currTime > scheduleTimestamp){
-        return "Was scheduled for " + globalFunctions.prettifyEpoch(scheduleTimestamp)
+        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
     } else {
-        return "Next run in " + globalFunctions.prettifyEpoch(scheduleTimestamp)
+        return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
     }
 }
-return 'Last run ' + globalFunctions.prettifyEpoch(endTimestamp);
+return 'Last run ' + func.prettifyEpoch(endTimestamp);
 }
 
 function getAlternateTestsInfo(state){
@@ -127,88 +127,6 @@ function getAlternateTestsInfo(state){
 function getTestsInfo(testResultsCount, state){
     return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
 }
-
-// let testRuns = [
-//   {
-//     hexId: "something",
-//     icon: CircleTickMinor,
-//     orderPriority: 1,
-//     name: 'Bola on Login',
-//     number_of_tests_str: '10 Tests',
-//     run_type: 'One time',
-//     run_time: "Next run in 2 days",
-//     run_time_epoch: 140,
-//     scheduleTimestamp: 100,
-//     severity: [
-//       {
-//         confidence: 'High',
-//         count: '12'
-//       },
-//       {
-//         confidence: 'Medium',
-//         count: '12'
-//       },
-//       {
-//         confidence: 'Low',
-//         count: '12'
-//       }
-//     ],
-//     total_severity: 4500,
-//     severityStatus: ["High", "Medium", "Low"],
-//     runTypeStatus: ["One-time"],
-//     severityTags: new Set(["High", "Medium"]),
-//   },
-//   {
-//     hexId: "somethingElse",
-//     icon: CircleTickMinor,
-//     orderPriority: 2,
-//     name: 'All OWASP in staging',
-//     number_of_tests_str: '100 Tests',
-//     run_type: 'CI/CD',
-//     run_time: "Last run 10 mins ago",
-//     run_time_epoch: 20,
-//     scheduleTimestamp: 200,
-//     severity: [
-//       {
-//         confidence: 'High',
-//         count: '12'
-//       },
-//       {
-//         confidence: 'Low',
-//         count: '12'
-//       }
-//     ],
-//     total_severity: 720,
-//     severityStatus: ["High", "Low"],
-//     runTypeStatus: ["CI/CD"],
-//     severityTags: new Set(["High", "Medium", "Low"]),
-//   },
-//   {
-//     hexId: "somethingElse2",
-//     icon: CircleTickMinor,
-//     orderPriority: 2,
-//     name: 'NoAuth',
-//     number_of_tests_str: '100 Tests',
-//     run_type: 'CI/CD',
-//     run_time: "Last ran 120 mins ago",
-//     run_time_epoch: 20,
-//     scheduleTimestamp: 300,
-//     severity: [
-//       {
-//         confidence: 'High',
-//         count: '12'
-//       },
-//       {
-//         confidence: 'Medium',
-//         count: '12'
-//       }
-//     ],
-//     total_severity: 1000,
-//     severityStatus: ["High", "Medium"],
-//     runTypeStatus: ["CI/CD"],
-//     severityTags: new Set(["High", "Medium", "Low"]),
-//   },
-// ]
 
 const sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
@@ -354,16 +272,16 @@ useEffect(()=>{
       }
       obj['hexId'] = data.hexId;
       obj['orderPriority'] = getOrderPriority(data.state)
-      obj['icon'] = globalFunctions.getTestingRunIcon(data.state);
+      obj['icon'] = func.getTestingRunIcon(data.state);
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
       obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
-      obj['severity'] = globalFunctions.getSeverity(testingRunResultSummary.countIssues)
+      obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
-      obj['severityStatus'] = globalFunctions.getSeverityStatus(testingRunResultSummary.countIssues)
+      obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       filters.forEach((filter, index) => {
       let key = filter["key"]
