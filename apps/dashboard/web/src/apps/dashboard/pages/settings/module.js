@@ -26,9 +26,25 @@ const settingFunctions = {
         return burp_tokens
     },
     deleteToken: async function(tokenId){
-        await settingRequests.deleteApiToken(tokenId).then((resp)=>{
-            console.log(resp)
-        })
+        await settingRequests.deleteApiToken(tokenId)
+    },
+
+    getPostmanCredentials: async function(){
+      let postmanCred = {}
+      await settingRequests.getPostmanCredentials().then((resp)=>{
+        postmanCred = resp
+      })
+      return postmanCred
+    },
+    fetchPostmanWorkspaces: async function(postman_id){
+      let workspaces = []
+      await settingRequests.fetchPostmanWorkspaces(postman_id).then((resp)=>{
+        workspaces = resp.workspaces
+      })  
+      return workspaces
+    },
+    addOrUpdatePostmanCred: async function(postman_id,workspace_id){
+      await settingRequests.addOrUpdatePostmanCred(postman_id,workspace_id)
     }
 }
 

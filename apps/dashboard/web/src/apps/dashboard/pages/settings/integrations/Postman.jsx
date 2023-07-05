@@ -1,0 +1,82 @@
+import React, { useCallback, useEffect, useState } from 'react'
+import {LegacyCard, Select} from '@shopify/polaris';
+import settingFunctions from '../module';
+import IntegrationsLayout from './IntegrationsLayout';
+import PasswordTextField from '../../../components/layouts/PasswordTextField';
+
+function Postman() {
+    
+    const [postmanKey, setPostmanKey] = useState('');
+    const [workspaces, setWorkspaces] = useState([]);
+    const [selected, setSelected] = useState('');
+
+    const handleSelectChange = useCallback(
+        value=> setSelected(value),
+        [],
+    );
+    
+    async function fetchPostmanCred() {
+      let postmanData = await settingFunctions.getPostmanCredentials();
+      let postmanCred = postmanData.postmanCred
+      if (postmanCred['api_key'] && postmanCred['workspace_id']) {
+        setPostmanKey(postmanCred.api_key);
+        setSelected(postmanCred.workspace_id);
+        fetchWorkSpaces();
+      }
+    }
+    
+    async function fetchWorkSpaces() {
+      if (postmanKey !== null && postmanKey.length > 0) {
+        let allWorkSpaces = await settingFunctions.fetchPostmanWorkspaces(postmanKey);
+        let arr = []
+        allWorkSpaces.map((val)=>{
+            let obj = {
+                label: val.name,
+                value: val.id
+            }
+            arr.push(obj)
+        })
+        setWorkspaces(arr);
+      }
+    }
+    
+    
+    useEffect(() => {
+        fetchPostmanCred()
+        fetchWorkSpaces()
+    }, [postmanKey]);
+    
+    const seeWork = () => {
+        console.log("see Working")
+    }
+
+    async function saveCollection(){
+        await settingFunctions.addOrUpdatePostmanCred(postmanKey,selected)
+    }
+    const PostmanCard = (
+        <LegacyCard title="Integrate Postman" 
+            secondaryFooterActions={[{content: 'See how it works',onAction: seeWork}]}
+            primaryFooterAction={{content: 'Save', onAction: saveCollection}}
+        >
+          <LegacyCard.Section title="Postman API key">
+            <PasswordTextField text={postmanKey} helpText="Paste your Postman api key here."
+                                setField={setPostmanKey} onFunc={true} field={postmanKey}
+            />
+          </LegacyCard.Section>    
+          <LegacyCard.Section title="Select Postman workspace">
+            <Select options={workspaces} 
+                    helpText="Select the Postman workspace you wish to import."
+                    onChange={handleSelectChange}
+                    value={selected} 
+            /> 
+          </LegacyCard.Section> 
+        </LegacyCard>
+    )
+
+    let cardContent = "Seamlessly enhance your web application security with Postman integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
+    return (
+        <IntegrationsLayout title= "Postman" cardContent={cardContent} component={PostmanCard} /> 
+    )
+}
+
+export default Postman

@@ -10,6 +10,7 @@ import {
 import BurpSuite from "../dashboard/pages/settings/integrations/BurpSuite";
 import Integrations from "../dashboard/pages/settings/integrations/Integrations";
 import Settings from "../dashboard/pages/settings/Settings";
+import Postman from "../dashboard/pages/settings/integrations/Postman";
 
 const router = createBrowserRouter([
   {
@@ -31,6 +32,10 @@ const router = createBrowserRouter([
           {
             path: "/dashboard/settings/integrations/burp",
             element: <BurpSuite/>,
+          },
+          {
+            path: "/dashboard/settings/integrations/postman",
+            element: <Postman/>,
           }
         ]
       }

@@ -27,6 +27,34 @@ const settingRequests = {
             return resp
         })
     },
+
+    fetchPostmanWorkspaces(api_key) {
+        return request({
+            url: '/api/fetchPostmanWorkspaces',
+            method: 'post',
+            data: {api_key}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    addOrUpdatePostmanCred(api_key, workspace_id) {
+        return request({
+            url: '/api/addOrUpdatePostmanCred',
+            method: 'post',
+            data: {api_key,workspace_id}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    getPostmanCredentials() {
+        return request({
+            url: '/api/getPostmanCredential',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }
 
 export default settingRequests

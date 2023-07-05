@@ -39,7 +39,7 @@ function BurpSuite() {
           <LegacyCard.Section title={`Token ${index + 1}`} key={index} 
             actions={[{ content: 'Delete', destructive: true, onAction: () => deleteToken(item.id)}]}>
             <p>{globalFunctions.prettifyEpoch(item.timestamp)}</p>
-            <PasswordTextField text={item.key} />
+            <PasswordTextField field={item.key} />
           </LegacyCard.Section>     
         ))}
     </LegacyCard>
