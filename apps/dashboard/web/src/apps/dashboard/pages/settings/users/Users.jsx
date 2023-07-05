@@ -8,6 +8,8 @@ const Users = () => {
     const [inviteUserModalActive, setInviteUserModalActive] = useState(false)
     const toggleInviteUserModal = () => setInviteUserModalActive(!inviteUserModalActive)
 
+    const [inviteEmail, setInviteEmail] = useState()
+
     useEffect(() => {
         const getTeamData = async () => {
             const usersResponse = await settingRequests.getTeamData()
@@ -17,8 +19,14 @@ const Users = () => {
         getTeamData();
     }, [])
 
-    const handleSendInvitation = () => {
-        return true;
+    const handleSendInvitation = async () => {
+        const spec = {
+            inviteeName: "there",
+            inviteeEmail: inviteEmail,
+            websiteHostName: window.location.origin
+        }
+        const inviteUsersResponse = await settingRequests.inviteUsers(spec)
+        console.log(inviteUsersResponse)
     }
 
     return (
@@ -226,6 +234,7 @@ const Users = () => {
                 </LegacyCard>
 
                 <Modal
+                    small
                     open={inviteUserModalActive}
                     onClose={toggleInviteUserModal}
                     title="Add team member"
@@ -243,10 +252,14 @@ const Users = () => {
                     <Modal.Section>
                         <TextField
                             label="Account email"
-                            value="test"
-                            onChange={() => {}}
+                            value={inviteEmail}
+                            placeholder="name@workemail.com"
+                            onChange={(email) => setInviteEmail(email)}
                             autoComplete="off"
                         />
+                        <Text variant="bodyMd" color="subdued">
+                            We'll use this address if we need to contact you about your account.
+                        </Text>
                     </Modal.Section>
                 </Modal>
             </div>

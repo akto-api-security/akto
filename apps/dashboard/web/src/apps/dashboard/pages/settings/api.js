@@ -1,8 +1,8 @@
 import request from "@/util/request"
 
 const settingRequests = {
-    inviteUsers: (apiSpec) => {
-        return request({
+    inviteUsers: async (apiSpec) => {
+        const res = request({
             url: '/api/inviteUsers',
             method: 'post',
             data: { 
@@ -12,6 +12,7 @@ const settingRequests = {
 
             }
         })
+        return res
     },
     getTeamData: async () => {
         const res = await request({
