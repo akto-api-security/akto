@@ -1,0 +1,41 @@
+id: PARAMETERS_CONFIG
+info:
+  name: Parameters.yml - File Discovery
+  description: Parameters.yml was discovered.
+  details: ydt
+  impact: tyjdf
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: PARAMETERS_CONFIG
+  severity: HIGH
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/parameters.yml
+    - ${urlVar}/app/config/parameters.yml
+    - ${urlVar}/parameters.yml.dist
+    - ${urlVar}/app/config/parameters.yml.dist
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'parameters:'
+      - 'database_user'
+      - 'database_password'

@@ -1,9 +1,9 @@
 id: CGI_PRINTENV
 info:
-  name: 
-  description:
-  details:
-  impact:
+  name: cgi
+  description: dsytr
+  details: dytr
+  impact: rdts
   category:
     name: SM
     shortName: Misconfiguration
@@ -11,7 +11,7 @@ info:
   subCategory: CGI_PRINTENV
   severity: MEDIUM
 
-api_selections_filter:
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300

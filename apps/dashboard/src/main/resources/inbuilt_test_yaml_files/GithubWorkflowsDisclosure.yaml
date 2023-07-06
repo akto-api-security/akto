@@ -1,0 +1,67 @@
+id: GITHUB_WORKFLOW_DISCLOSURE
+info:
+  name: Github Workflow Disclosure
+  description: UIDGUI GUIHDUG DHIVUD 
+  details: ydt
+  impact: tyjdf
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GITHUB_WORKFLOW_DISCLOSURE
+  severity: MEDIUM
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.github/workflows/ci.yml
+    - ${urlVar}/.github/workflows/ci.yaml
+    - ${urlVar}/.github/workflows/CI.yml
+    - ${urlVar}/.github/workflows/main.yml
+    - ${urlVar}/.github/workflows/main.yaml
+    - ${urlVar}/.github/workflows/build.yml
+    - ${urlVar}/.github/workflows/build.yaml
+    - ${urlVar}/.github/workflows/test.yml
+    - ${urlVar}/.github/workflows/test.yaml
+    - ${urlVar}/.github/workflows/tests.yml
+    - ${urlVar}/.github/workflows/tests.yaml
+    - ${urlVar}/.github/workflows/release.yml
+    - ${urlVar}/.github/workflows/publish.yml
+    - ${urlVar}/.github/workflows/deploy.yml
+    - ${urlVar}/.github/workflows/push.yml
+    - ${urlVar}/.github/workflows/lint.yml
+    - ${urlVar}/.github/workflows/coverage.yml
+    - ${urlVar}/.github/workflows/release.yaml
+    - ${urlVar}/.github/workflows/pr.yml
+    - ${urlVar}/.github/workflows/automerge.yml
+    - ${urlVar}/.github/workflows/docker.yml
+    - ${urlVar}/.github/workflows/ci-generated.yml
+    - ${urlVar}/.github/workflows/ci-push.yml
+    - ${urlVar}/.github/workflows/ci-daily.yml
+    - ${urlVar}/.github/workflows/ci-issues.yml
+    - ${urlVar}/.github/workflows/smoosh-status.yml
+    - ${urlVar}/.github/workflows/snyk.yml
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    regex: ^(?=.*^\\s*\"?on\"?:)(?=.*^\\s*\"?jobs\"?:)(?=.*^\\s*\"?steps\"?:)(?=.*^\\s*- \"?uses\"?:)
+
+
+    # - regex: "(?m)^\\s*\"?on\"?:"
+    # - regex: "(?m)^\\s*\"?jobs\"?:"
+    # - regex: "(?m)^\\s*\"?steps\"?:"
+    # - regex: "(?m)^\\s*- \"?uses\"?:"

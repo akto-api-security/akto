@@ -1,15 +1,15 @@
-id: DOCKERFILE_HIDDEN_DISCLOSURE
+id: MSMTP_CONFIG
 info:
-  name: hidden_docker
-  description: hf
+  name: Msmtp - Config Exposure
+  description: Msmtp configuration was discovered.
   details: ydt
   impact: tyjdf
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: DOCKERFILE_HIDDEN_DISCLOSURE
-  severity: MEDIUM
+  subCategory: MSMTP_CONFIG
+  severity: HIGH
 
 api_selection_filters:
   response_code:
@@ -18,23 +18,25 @@ api_selection_filters:
   url:
     extract: urlVar
 
-wordLists:
-  urlPaths:
-    - ${urlVar}/.dockerfile
-    - ${urlVar}/.Dockerfile
-  
 execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlPaths}
+      - modify_url: ${urlVar}/.msmtprc
       
 validate:
   response_code:
     eq: 200
   response_payload:
-    regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
+    contains_all:
+      - 'account'
+      - 'host'
+      - 'from'
+      - 'auth'
+      - 'tls'
   response_headers:
     for_one:
       value:
-        not_contains: text/html
+        contains_either:
+          - 'text/plain'
+          - 'octet-stream'

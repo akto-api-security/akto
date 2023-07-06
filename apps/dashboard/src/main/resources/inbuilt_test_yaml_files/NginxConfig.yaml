@@ -1,15 +1,15 @@
-id: CONFIGURATION_LISTING
+id: NGINX_CONFIG
 info:
-  name: config_list
-  description: yt
-  details: dyt
-  impact: dyt
+  name: Nginx Config file disclosure
+  description: hhkij
+  details: jhfj
+  impact: fjhfy
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: CONFIGURATION_LISTING
-  severity: MEDIUM
+  subCategory: NGINX_CONFIG
+  severity: LOW
 
 api_selection_filters:
   response_code:
@@ -22,12 +22,15 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}/config/
+      - modify_url: ${urlVar}/nginx.conf
 
 validate:
   response_code:
     eq: 200
   response_payload:
     contains_all:
-      - "Index of /configs"
-      - "Parent Directory"
+      - "server"
+      - "listen"
+      - "server_name"
+    not_contains:
+      - "html>"

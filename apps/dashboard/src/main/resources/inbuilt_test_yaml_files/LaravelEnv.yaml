@@ -1,0 +1,57 @@
+id: LARAVEL_ENV
+info:
+  name: Laravel - Sensitive Information Disclosure
+  description: A Laravel .env file was discovered, which stores sensitive information like database credentials and tokens. It should not be publicly accessible.
+  details: ydt
+  impact: tyjdf
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: LARAVEL_ENV
+  severity: HIGH
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.env
+    - ${urlVar}/.env.bak
+    - ${urlVar}/.env.dev
+    - ${urlVar}/.env.dev.local
+    - ${urlVar}/.env.development.local
+    - ${urlVar}/.env.prod
+    - ${urlVar}/.env.prod.local
+    - ${urlVar}/.env.production
+    - ${urlVar}/.env.production.local
+    - ${urlVar}/.env.local
+    - ${urlVar}/.env.example
+    - ${urlVar}/.env.stage
+    - ${urlVar}/.env.live
+    - ${urlVar}/.env.backup
+    - ${urlVar}/.env.save
+    - ${urlVar}/.env.old
+    - ${urlVar}/.env.www
+    - ${urlVar}/.env_1
+    - ${urlVar}/.env_sample
+    - ${urlVar}/.env.{{DN}}
+    - ${urlVar}/.env.{{SD}}
+    - ${urlVar}/api/.env
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    regex: (?mi)^(APP_(NAME|ENV|KEY|DEBUG|URL|PASSWORD)|DB_(HOST|PASSWORD|DATABASE))=
+

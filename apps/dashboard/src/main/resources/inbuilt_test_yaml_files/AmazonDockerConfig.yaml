@@ -1,9 +1,9 @@
 id: AMAZON_DOCKER_CONFIG
 info:
-  name: 
-  description:
-  details:
-  impact:
+  name: amazon_docker
+  description: erts
+  details: yfguhj
+  impact: dth
   category:
     name: SM
     shortName: Misconfiguration
@@ -11,7 +11,7 @@ info:
   subCategory: AMAZON_DOCKER_CONFIG
   severity: MEDIUM
 
-api_selections_filter:
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300

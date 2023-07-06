@@ -1,14 +1,14 @@
-id: DOCKERFILE_HIDDEN_DISCLOSURE
+id: WGETRC_CONFIG
 info:
-  name: hidden_docker
-  description: hf
-  details: ydt
-  impact: tyjdf
+  name: Wgetrc Configuration File Exposure
+  description: tft tft tfyt 
+  details: jhfj
+  impact: fjhfy
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: DOCKERFILE_HIDDEN_DISCLOSURE
+  subCategory: WGETRC_CONFIG
   severity: MEDIUM
 
 api_selection_filters:
@@ -20,21 +20,24 @@ api_selection_filters:
 
 wordLists:
   urlPaths:
-    - ${urlVar}/.dockerfile
-    - ${urlVar}/.Dockerfile
+    - ${urlVar}/wgetrc
+    - ${urlVar}/.wgetrc
   
 execute:
   type: single
   requests:
     - req:
       - modify_url: ${urlPaths}
-      
+
 validate:
   response_code:
     eq: 200
   response_payload:
-    regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
+    contains_all:
+      - '/etc/wgetrc'
+      - 'wget.info'
   response_headers:
     for_one:
       value:
-        not_contains: text/html
+        contains_all:
+          - 'application/octet-stream'

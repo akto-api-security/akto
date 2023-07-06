@@ -1,15 +1,15 @@
-id: DOCKERFILE_HIDDEN_DISCLOSURE
+id: ESMTPRC_CONFIG
 info:
-  name: hidden_docker
-  description: hf
+  name: eSMTP - Config Discovery
+  description: eSMTP configuration was discovered.
   details: ydt
   impact: tyjdf
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: DOCKERFILE_HIDDEN_DISCLOSURE
-  severity: MEDIUM
+  subCategory: ESMTPRC_CONFIG
+  severity: HIGH
 
 api_selection_filters:
   response_code:
@@ -17,24 +17,23 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
-
-wordLists:
-  urlPaths:
-    - ${urlVar}/.dockerfile
-    - ${urlVar}/.Dockerfile
   
 execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlPaths}
+      - modify_url: ${urlVar}/.esmtprc
       
 validate:
   response_code:
     eq: 200
   response_payload:
-    regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
+    contains_all:
+      - "hostname"
+      - "username"
+      - "password"
   response_headers:
     for_one:
       value:
-        not_contains: text/html
+        contains_all:
+          - text/html

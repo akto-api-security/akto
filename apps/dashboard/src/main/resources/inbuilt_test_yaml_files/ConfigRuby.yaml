@@ -1,9 +1,9 @@
 id: CONFIG_RUBY
 info:
-  name: 
-  description:
-  details:
-  impact:
+  name: ruby_config
+  description: dyjut
+  details: xjyrt
+  impact: srtjyxd
   category:
     name: SM
     shortName: Misconfiguration
@@ -11,7 +11,7 @@ info:
   subCategory: CONFIG_RUBY
   severity: MEDIUM
 
-api_selections_filter:
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300
@@ -28,10 +28,7 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url:
-        stop_at_first_match: true
-        patterns:
-          - ${urlPaths}
+      - modify_url: ${urlPaths}
 
 validate:
   response_code:

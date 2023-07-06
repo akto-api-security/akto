@@ -1,6 +1,6 @@
-id: AIRFLOW_CONFIGURATION_EXPOSURE
+id: PROMETHEUS_METRICS
 info:
-  name: airflow
+  name: Exposed Prometheus metrics
   description: hhkij
   details: jhfj
   impact: fjhfy
@@ -8,8 +8,8 @@ info:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: AIRFLOW_CONFIGURATION_EXPOSURE
-  severity: MEDIUM
+  subCategory: PROMETHEUS_METRICS
+  severity: LOW
 
 api_selection_filters:
   response_code:
@@ -22,13 +22,14 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}/airflow.cfg
+      - modify_url: ${urlVar}/metrics
 
 validate:
   response_code:
-    gte: 200
-    lt: 300
+    eq: 200
   response_payload:
-    contains_all:
-      - '[core]'
-      - '[api]'
+    contains_either:
+      - 'cpu_seconds_total'
+      - 'http_request_duration_seconds'
+      - 'process_virtual_memory_bytes'
+      - 'process_start_time_seconds'
