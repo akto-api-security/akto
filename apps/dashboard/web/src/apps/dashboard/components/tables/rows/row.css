@@ -1,0 +1,4 @@
+/* This overriding works on the code sandbox. */
+a:hover{
+    text-decoration: none !important;
+}

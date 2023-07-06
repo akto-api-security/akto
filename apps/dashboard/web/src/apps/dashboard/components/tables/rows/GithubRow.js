@@ -8,7 +8,8 @@ import {
     Box,
     Button, 
     Popover, 
-    ActionList
+    ActionList,
+    Link
 } from '@shopify/polaris';
 import {
     HorizontalDotsMinor
@@ -16,6 +17,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import func from '@/util/func';
 import { useState, useCallback } from 'react';
+import TestingStore from '../../../pages/testing/testingStore';
+import './row.css'
 
 function GithubRow(props) {
     const navigate = useNavigate();
@@ -25,10 +28,12 @@ function GithubRow(props) {
         [],
     );
 
-    function navigateToTest(hexId){
-        navigate("/dashboard/testing/"+hexId)
+    const setSelectedTestRun = TestingStore(state => state.setSelectedTestRun)
+    function navigateToTest(data){
+        setSelectedTestRun(data)
+        navigate("/dashboard/testing/"+data.hexId)
     }
-
+  
     return (
         <IndexTable.Row
             id={props.data.hexId}
@@ -36,10 +41,17 @@ function GithubRow(props) {
             selected={props.selectedResources.includes(props.data.hexId)}
             position={props.index}
         >
-            <IndexTable.Cell>
                 {/* <div style={{ padding: '12px 16px', width: '100%' }}> */}
-                <HorizontalStack align='space-between'>
-                    <div onClick={() => (props.nextPage && props.nextPage=='singleTestRunPage' ? navigateToTest(props.data.hexId) : {})} style={{cursor: 'pointer'}}>
+                {/* <HorizontalStack align='space-between'> */}
+            <IndexTable.Cell>
+                <div onClick={() => (props.nextPage && props.nextPage=='singleTestRunPage' ? navigateToTest(props.data) : {})} style={{cursor: 'pointer'}}>
+                {/* <Link
+                    monochrome
+                    removeUnderline
+                    // dataPrimaryLink
+                    onClick={() => (props.nextPage && props.nextPage == 'singleTestRunPage' ? navigateToTest(props.data) : {})}
+                > */}
+                    
                     <HorizontalStack gap="1">
                         {
                             props?.headers[0]?.icon &&
@@ -82,8 +94,11 @@ function GithubRow(props) {
                             </HorizontalStack>
                         </VerticalStack>
                     </HorizontalStack>
+                        {/* </Link> */}
                     </div>
-                    <VerticalStack align="center">
+                        </IndexTable.Cell>
+                        <IndexTable.Cell>
+                    <VerticalStack align="center" inlineAlign="center">
                     {
                         props.hasRowActions &&
                         <Popover
@@ -99,7 +114,7 @@ function GithubRow(props) {
                         </Popover>
                     }
                     </VerticalStack>
-                </HorizontalStack>
+                {/* </HorizontalStack> */}
                 {/* </div> */}
             </IndexTable.Cell>
         </IndexTable.Row>

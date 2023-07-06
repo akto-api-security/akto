@@ -12,6 +12,7 @@ import {
   ChoiceList} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
+import func from "@/util/func";
 
 function GithubTable(props) {
 
@@ -37,7 +38,7 @@ function GithubTable(props) {
     })
 
     tempData = tempData.filter((value) => {
-      return value.name.toLowerCase().includes(queryValue.toLowerCase());
+      return func.findInObjectValue(value, queryValue.toLowerCase(), ['hexId', 'time', 'icon', 'order']);
     })
 
     let sortKey = props.sortOptions.filter(value => {
@@ -186,6 +187,7 @@ function GithubTable(props) {
           onClearAll={handleFiltersClearAll}
           mode={mode}
           setMode={setMode}
+          loading={props.loading || false}
         />
         <IndexTable
           resourceName={props.resourceName}

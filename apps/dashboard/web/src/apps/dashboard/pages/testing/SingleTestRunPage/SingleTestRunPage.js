@@ -8,7 +8,6 @@ import {
   Badge,
   Box,
 } from '@shopify/polaris';
-import { saveAs } from 'file-saver'
 import {
   MobileBackArrowMajor,
   SearchMinor,
@@ -20,6 +19,8 @@ import func from '@/util/func';
 import { useNavigate } from "react-router-dom";
 import { useParams } from 'react-router';
 import { useState, useEffect } from 'react';
+import TestingStore from "../testingStore";
+import transform from "../transform";
 
 let headers = [
   {
@@ -65,17 +66,6 @@ let headers = [
     ]
   }
 ]
-
-const MAX_SEVERITY_THRESHOLD = 100000;
-
-function getTotalSeverity(severity){
-    if(severity==null || severity.length==0){
-        return 0;
-    }
-    let ts = MAX_SEVERITY_THRESHOLD*((severity[0].confidence=='High')*MAX_SEVERITY_THRESHOLD + (severity[0].confidence=='Medium')) + (severity[0].confidence=='Low')
-    // console.log(ts);
-    return ts;
-}
 
 const sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
@@ -134,108 +124,35 @@ let filters = [
   }
 ]
 
-function valToString(val) {
-  if (val instanceof Set) {
-      return [...val].join(" & ")
-  } else {
-      return val || "-"
-  }
-}
-
-const downloadAsCSV = (data, trss) => {
-  let headerTextToValueMap = Object.keys(data[0])
-
-  let csv = headerTextToValueMap.join(",")+"\r\n"
-  data.forEach(i => {
-      csv += Object.values(headerTextToValueMap).map(h => valToString(i[h])).join(",") + "\r\n"
-  })
-  let blob = new Blob([csv], {
-      type: "application/csvcharset=UTF-8"
-  });
-  saveAs(blob, (trss.hexId || "file") + ".csv");
-}
-
 function SingleTestRunPage() {
 
   const [testRunResults, setTestRunResults] = useState([])
-  const [testingRunResultSummary, setTestingRunResultSummary] = useState({});
+  const selectedTestRun = TestingStore(state => state.selectedTestRun);
+  const setSelectedTestRun = TestingStore(state => state.setSelectedTestRun);
+  const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
+  const subCategoryMap = TestingStore(state => state.subCategoryMap);
   const params= useParams()
+  const [loading, setLoading] = useState(true);
 
 useEffect(()=>{
-
     const hexId = params.hexId;
-    filters.forEach((filter, index) => {
-      filters[index].availableChoices = new Set()
-      filters[index].choices = []
-    })
-    api.fetchAllSubCategories().then((resp) => {
-      let subCategoryMap = {}
-      resp.subCategories.forEach((x) => {
-        subCategoryMap[x.name] = x
-      })
-      let subCategoryFromSourceConfigMap = {}
-      resp.testSourceConfigs.forEach((x) => {
-        subCategoryFromSourceConfigMap[x.id] = x
-      })
-      let testCategoryMap = {}
-      resp.categories.forEach((x) => {
-        testCategoryMap[x.name] = x
-      })
-      api.fetchTestingRunResultSummaries(hexId).then(({ testingRunResultSummaries }) => {
-        setTestingRunResultSummary(testingRunResultSummaries[0])
-        // console.log(testingRunResultSummaries[0])
-
-        api.fetchTestingRunResults(testingRunResultSummaries[0].hexId).then(({ testingRunResults }) => {
-          // console.log(testingRunResults)
-          // console.log(testCategoryMap)
-          // console.log(subCategoryMap)
-          let testRunResults = []
-          testingRunResults.forEach((data) => {
-            let obj = {};
-            obj['hexId'] = data.hexId;
-            // change this logic. breaks for fuzzing/nuclei tests.
-            obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
-            obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
-            obj["endTimestamp"] = data.endTimestamp
-            obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
-            obj['url'] = "Detected in " + data.apiInfoKey.method + " " + data.apiInfoKey.url 
-            obj['severity'] = data.vulnerable ? [{confidence : func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))}] : []
-            obj['total_severity'] = getTotalSeverity(obj['severity'])
-            obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
-            obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
-            obj['categoryFilter'] = [obj['testCategory']]
-            obj['testFilter'] = [obj['name']]
-            if(obj['name'] && obj['testCategory']){
-              testRunResults.push(obj);
-            }
-            filters.forEach((filter, index) => {
-              let key = filter["key"]
-                switch(key){
-                  case 'severityStatus' : obj["severityStatus"].map((item) => filter.availableChoices.add(item)); break;
-                  case 'apiFilter' : obj['apiFilter'].map((item) => filter.availableChoices.add(item)); break;
-                  case 'categoryFilter' : obj['categoryFilter'].map((item) => filter.availableChoices.add(item)); break;
-                  case 'testFilter' : obj['testFilter'].map((item) => filter.availableChoices.add(item)); break;
-
-                }
-                filters[index] = filter
-              })
-
+    async function fetchData() {
+      if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.hexId != hexId){
+        await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries }) => {
+          let selectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
+            setSelectedTestRun(selectedTestRun);
           })
-          setTestRunResults(testRunResults);
-          filters.forEach((filter, index) => {
-            let choiceList = []
-            filter.availableChoices.forEach((choice) => {
-              choiceList.push({label:choice, value:choice})
-            })
-            filters[index].choices = choiceList
-          })  
+      } else if(Object.keys(subCategoryMap)!=0 && Object.keys(subCategoryFromSourceConfigMap)!=0){
+        await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
+          let testRunResults = transform.prepareTestRunResults(testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+          setTestRunResults(testRunResults)
+          filters = transform.prepareFilters(testRunResults, filters);
+          setLoading(false);
         })
-      })
-    }).catch((err) => {
-      console.log(err);
-})
-  
-}, [])
+      }
+    }
+    fetchData();
+}, [selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
 
 const navigate = useNavigate();
 function navigateBack(){
@@ -247,7 +164,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   {
     content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length==1 ? '' : 's'}`,
     onAction: () => {
-      downloadAsCSV(testRunResults.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), testingRunResultSummary)
+      func.downloadAsCSV(testRunResults.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), selectedTestRun)
     },
   },
 ]};
@@ -262,24 +179,34 @@ const promotedBulkActions = (selectedDataHexIds) => {
           <VerticalStack gap="3">
             <HorizontalStack gap="2" align="start">
               <Box>
-              <Icon color="primary" source={func.getTestingRunIcon(testingRunResultSummary.state) }></Icon>
+                {
+                  selectedTestRun?.icon && 
+                  <Icon color="primary" source={selectedTestRun.icon }></Icon>
+                }
               </Box>
               <Text variant='headingLg'>
-                Test run name
+                {
+                  selectedTestRun?.name || "Test run name"
+                }
               </Text>
-              {func.getSeverity(testingRunResultSummary.countIssues)
-              .map((item) =>
+              {
+                selectedTestRun?.severity && 
+                selectedTestRun.severity
+                .map((item) =>
                 <Badge key={item.confidence} status={func.getStatus(item)}>{item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}</Badge>
                 )}
             </HorizontalStack>
             <Text color="subdued">
-              {/* make an API call as in the /testing page and use data from there. */}
-            Last scanned {func.prettifyEpoch(testingRunResultSummary.endTimestamp)} for a duration of {testingRunResultSummary.endTimestamp - testingRunResultSummary.startTimestamp} seconds
+              {
+                selectedTestRun && 
+                selectedTestRun?.pickedUpTimestamp < selectedTestRun?.run_time_epoch &&
+                `Last scanned ${func.prettifyEpoch(selectedTestRun.run_time_epoch)} for a duration of ${selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp} second${(selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp)==1 ? '':'s'}`
+              }
             </Text>
           </VerticalStack>
         </HorizontalStack>
         <HorizontalStack gap="2">
-        <Button monochrome removeUnderline plain onClick={() => downloadAsCSV(testRunResults, testingRunResultSummary)}>Export</Button>
+        <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button>
         </HorizontalStack>
       </HorizontalStack>
     <GithubTable 
@@ -292,6 +219,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     getActions = {() => {}}
     selectable = {true}
     promotedBulkActions = {promotedBulkActions}
+    loading={loading}
   />
   </VerticalStack>
   );
