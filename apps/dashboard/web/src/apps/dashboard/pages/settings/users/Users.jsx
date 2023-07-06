@@ -1,7 +1,7 @@
 import { Avatar, Button, Card, LegacyCard, Modal, Page, ResourceItem, ResourceList, Scrollable, Text, TextContainer, TextField } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
 import settingRequests from "../api";
-import globalFunctions from "../../../../../util/func";
+import func from "../../../../../util/func";
 
 const Users = () => {
     const [users, setUsers] = useState([]);
@@ -212,7 +212,7 @@ const Users = () => {
                         renderItem={(item) => {
                             const { id, login, role } = item;
                             
-                            const initials = globalFunctions.initials(login)
+                            const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />;
                             const shortcutActions =
                                 [
