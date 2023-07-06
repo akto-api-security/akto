@@ -24,7 +24,7 @@ const Settings = () => {
 
             <div style={{ background: tokens.color["color-bg-subdued"], display: "grid", gridTemplateColumns: "max-content auto" }}>
                 <SettingsLeftNav />
-                <div style={{ height: "100%" }}>
+                <div style={{ minHeight: "100vh" }}>
                     <Outlet />
                 </div>
             </div>
