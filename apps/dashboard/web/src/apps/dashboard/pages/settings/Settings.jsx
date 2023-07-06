@@ -8,10 +8,26 @@ import SettingsLeftNav from "./nav/SettingsLeftNav";
 
 const Settings = () => {
     const navigate = useNavigate();
+    
+    const toastConfig = Store(state => state.toastConfig)
+    const setToastConfig = Store(state => state.setToastConfig)
+
+    const disableToast = () => {
+        setToastConfig({
+            isActive: false,
+            isError: false,
+            message: ""
+        })
+    }
+
+    const toastMarkup = toastConfig.isActive ? (
+        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={1500} />
+    ) : null;
+
     return (
         <Frame>
             <Card>
-                <div style={{ display: "grid", gridTemplateColumns: "4vw auto 1vw"}}>
+                <div style={{ display: "grid", gridTemplateColumns: "4vw auto 1vw" }}>
                     <Icon source={SettingsMinor} color="base" />
                     <Text variant="headingLg">
                         Settings
@@ -28,6 +44,7 @@ const Settings = () => {
                     <Outlet />
                 </div>
             </div>
+            {toastMarkup}
         </Frame>
     )
 }

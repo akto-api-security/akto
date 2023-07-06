@@ -2,43 +2,45 @@ import { Avatar, Banner, Button, Card, LegacyCard, Modal, Page, ResourceItem, Re
 import { useCallback, useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "../../../../../util/func";
+import InviteUserModal from "./InviteUserModal";
 
 const Users = () => {
-    const [users, setUsers] = useState([])
-
-    const isLocalDeploy = false;
-    //const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
-
-    const [inviteUserModalActive, setInviteUserModalActive] = useState(false)
-    const toggleInviteUserModal = () => setInviteUserModalActive(!inviteUserModalActive)
-
-    const [inviteEmail, setInviteEmail] = useState()
-    const [inviteSuccess, setInviteSuccess] = useState({
-        status: "", // loading, success
-
-
+    const [inviteUser, setInviteUser] = useState({
+        isActive: false,
+        state: "initial", // initial, loading, success
+        email: "",
+        inviteLink: "",
     })
+
+    const [loading, setLoading] = useState(false)
+    const [users, setUsers] = useState([])
 
     useEffect(() => {
         const getTeamData = async () => {
+            await new Promise(r => setTimeout(r, 10000));
+
             const usersResponse = await settingRequests.getTeamData()
             setUsers(usersResponse.users)
+            setLoading(false)
         };
 
+        setLoading(true);
         getTeamData();
     }, [])
 
-    const handleSendInvitation = async () => {
-        const spec = {
-            inviteeName: "there",
-            inviteeEmail: inviteEmail,
-            websiteHostName: window.location.origin
-        }
-        const inviteUsersResponse = await settingRequests.inviteUsers(spec)
-        setInviteUserSuccess({
+    const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
 
+    const toggleInviteUserModal = () => {
+        setInviteUser({
+            isActive: !inviteUser.isActive,
+            state: "initial",
+            email: "",
+            inviteLink: ""
         })
-        console.log(inviteUsersResponse)
+    }
+
+    const handleRemoveUser = async (login) => {
+        const removeUsersResponse = await settingRequests.removeUser(login)
     }
 
     return (
@@ -51,12 +53,12 @@ const Users = () => {
             }}
             divider
         >
-            {isLocalDeploy && 
+            {isLocalDeploy &&
                 <Banner
                     title="Invite new members"
-                    action={{ 
-                        content: 'Go to docs', 
-                        url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud' ,
+                    action={{
+                        content: 'Go to docs',
+                        url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud',
                         target: "_blank"
                     }}
                     status="info"
@@ -64,7 +66,7 @@ const Users = () => {
                     <p>Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</p>
                 </Banner>
             }
-            <br/>   
+            <br />
             <Text variant="headingMd">Team details</Text>
             <Text variant="bodyMd">Find and manage your team permissions here</Text>
             <div style={{ paddingTop: "5vh" }}>
@@ -81,8 +83,7 @@ const Users = () => {
                                 [
                                     {
                                         content: 'Remove User',
-                                        disabled: true,
-                                        onAction: () => { console.log("remove user") }
+                                        onAction: () => {handleRemoveUser(login)}
                                     }
                                 ]
 
@@ -96,46 +97,22 @@ const Users = () => {
                                     <Text variant="bodyMd" fontWeight="bold" as="h3">
                                         {login}
                                     </Text>
-                                    <Text variant="bodyMd"  >
+                                    <Text variant="bodyMd">
                                         {role}
                                     </Text>
                                 </ResourceItem>
                             );
                         }}
-                        totalItemsCount={1}
+                        headerContent={`Showing ${users.length} team member${users.length > 1 ? 's': ''}`}
+                        showHeader
+                        loading={loading}
                     />
                 </LegacyCard>
-
-                <Modal
-                    small
-                    open={inviteUserModalActive}
-                    onClose={toggleInviteUserModal}
-                    title="Add team member"
-                    primaryAction={{
-                        loading: true,
-                        content: 'Send invitation',
-                        onAction: handleSendInvitation,
-                    }}
-                    secondaryActions={[
-                        {
-                            content: 'Cancel',
-                            onAction: toggleInviteUserModal,
-                        },
-                    ]}
-                >
-                    <Modal.Section>
-                        <TextField
-                            label="Account email"
-                            value={inviteEmail}
-                            placeholder="name@workemail.com"
-                            onChange={(email) => setInviteEmail(email)}
-                            autoComplete="off"
-                        />
-                        <Text variant="bodyMd" color="subdued">
-                            We'll use this address if we need to contact you about your account.
-                        </Text>
-                    </Modal.Section>
-                </Modal>
+                <InviteUserModal
+                    inviteUser={inviteUser} 
+                    setInviteUser={setInviteUser}
+                    toggleInviteUserModal={toggleInviteUserModal}
+                />
             </div>
 
         </Page>
