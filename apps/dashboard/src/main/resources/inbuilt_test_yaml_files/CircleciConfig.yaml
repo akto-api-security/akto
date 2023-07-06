@@ -1,9 +1,9 @@
 id: CIRCLECI_CONFIG
 info:
-  name: 
-  description:
-  details:
-  impact:
+  name: circleci
+  description: xrs
+  details: fjhdyc
+  impact: cueyt
   category:
     name: SM
     shortName: Misconfiguration
@@ -11,7 +11,7 @@ info:
   subCategory: CIRCLECI_CONFIG
   severity: LOW
 
-api_selections_filter:
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300
@@ -24,12 +24,9 @@ execute:
     - req:
       - modify_url: ${urlVar}/.circleci/config.yml
       - follow_redirect: true
-      - max_redirects: 3
 
 validate:
   response_code:
     eq: 200
   response_payload:
-    contains_all:
-      - regex: "^version: "
-      - regex: "jobs:"
+    regex: ^(?=.*^version:.*)(?=.*jobs:.*)

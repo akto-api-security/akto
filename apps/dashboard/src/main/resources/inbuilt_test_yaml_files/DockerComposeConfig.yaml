@@ -1,9 +1,9 @@
 id: DOCKER_COMPOSE_CONFIG
 info:
-  name: 
-  description:
-  details:
-  impact:
+  name: docker
+  description: gdr
+  details: uyfg
+  impact: kfjuy
   category:
     name: SM
     shortName: Misconfiguration
@@ -11,7 +11,7 @@ info:
   subCategory: DOCKER_COMPOSE_CONFIG
   severity: MEDIUM
 
-api_selections_filter:
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300
@@ -32,17 +32,11 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url:
-        stop_at_first_match: true
-        patterns:
-          - ${urlPaths}
+      - modify_url: ${urlPaths}
       - follow_redirect: true
-      - max_redirects: 3
 
 validate:
   response_code:
     eq: 200
   response_payload:
-    contains_all:
-      - regex: "^version: "
-      - regex: "services:"
+    regex: ^(?=.*^version:.*)(?=.*services:.*)

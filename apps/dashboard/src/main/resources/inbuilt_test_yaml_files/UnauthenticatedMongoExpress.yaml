@@ -1,0 +1,39 @@
+id: UNAUTHENTICATED_MONGO_EXPRESS
+info:
+  name: Mongo Express - Unauthenticated Access
+  description: Mongo Express was able to be access with no authentication requirements in place.
+  details: jhfj
+  impact: fjhfy
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: UNAUTHENTICATED_MONGO_EXPRESS
+  severity: HIGH
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}
+    - ${urlVar}/mongo-express/
+    - ${urlVar}/db/admin/system.users
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - '<title>Home - Mongo Express</title>'
+      - '<title>system.users - Mongo Express</title>'

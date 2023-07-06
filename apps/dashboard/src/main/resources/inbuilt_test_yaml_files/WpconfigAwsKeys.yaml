@@ -1,15 +1,15 @@
-id: APPSPEC_YML_DISCLOSURE
+id: WPCONFIG_AWS_KEY
 info:
-  name: apsec
-  description: hftdt
-  details: erfsa
-  impact: khni
+  name: AWS S3 keys Leak
+  description: tft tft tfyt 
+  details: jhfj
+  impact: fjhfy
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: APPSPEC_YML_DISCLOSURE
-  severity: MEDIUM
+  subCategory: WPCONFIG_AWS_KEY
+  severity: HIGH
 
 api_selection_filters:
   response_code:
@@ -19,22 +19,20 @@ api_selection_filters:
     extract: urlVar
 
 wordLists:
-  urlPaths: 
-    - ${urlVar}/appspec.yml
-    - ${urlVar}/appspec.yaml
-
+  urlPaths:
+    - ${urlVar}/wp-config.php-backup
+    - ${urlVar}/%c0
+  
 execute:
   type: single
   requests:
     - req:
       - modify_url: ${urlPaths}
-    
 
 validate:
-  response_code:
-    eq: 200
   response_payload:
     contains_all:
-      - "version:"
-      - "os:"
-      - "files:"
+      - 'access-key-id'
+      - 'secret-access-key'
+      - 'DB_NAME'
+      - 'DB_PASSWORD'

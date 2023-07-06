@@ -1,14 +1,14 @@
-id: DOCKERFILE_HIDDEN_DISCLOSURE
+id: REDIS_CONFIG
 info:
-  name: hidden_docker
-  description: hf
-  details: ydt
-  impact: tyjdf
+  name: Redis Configuration File Exposure
+  description: hhkij
+  details: jhfj
+  impact: fjhfy
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: DOCKERFILE_HIDDEN_DISCLOSURE
+  subCategory: REDIS_CONFIG
   severity: MEDIUM
 
 api_selection_filters:
@@ -17,24 +17,23 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
-
-wordLists:
-  urlPaths:
-    - ${urlVar}/.dockerfile
-    - ${urlVar}/.Dockerfile
   
 execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlPaths}
-      
+      - modify_url: ${urlVar}/redis.conf
+
 validate:
   response_code:
     eq: 200
   response_payload:
-    regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
+    contains_all:
+      - "bind"
+      - "protected-mode"
+      - "port "
   response_headers:
     for_one:
       value:
-        not_contains: text/html
+        contains_all:
+          - "application/octet-stream"

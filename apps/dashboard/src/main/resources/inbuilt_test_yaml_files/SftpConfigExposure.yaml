@@ -1,15 +1,15 @@
-id: CONFIGURATION_LISTING
+id: SFTP_CONFIG_EXPOSURE
 info:
-  name: config_list
-  description: yt
-  details: dyt
-  impact: dyt
+  name: SFTP Config File Disclosure
+  description: hhkij
+  details: jhfj
+  impact: fjhfy
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: CONFIGURATION_LISTING
-  severity: MEDIUM
+  subCategory: SFTP_CONFIG_EXPOSURE
+  severity: HIGH
 
 api_selection_filters:
   response_code:
@@ -22,12 +22,14 @@ execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}/config/
+      - modify_url: ${urlVar}/sftp-config.json
 
 validate:
   response_code:
     eq: 200
   response_payload:
     contains_all:
-      - "Index of /configs"
-      - "Parent Directory"
+      - '"host":'
+      - '"user":'
+      - '"password":'
+      - '"remote_path":'

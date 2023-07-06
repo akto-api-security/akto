@@ -1,15 +1,15 @@
-id: DOCKERFILE_HIDDEN_DISCLOSURE
+id: FIREBASE_CONFIG_EXPOSURE
 info:
-  name: hidden_docker
-  description: hf
+  name: Firebase Config Exposure
+  description: UIDGUI GUIHDUG DHIVUD 
   details: ydt
   impact: tyjdf
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
-  subCategory: DOCKERFILE_HIDDEN_DISCLOSURE
-  severity: MEDIUM
+  subCategory: FIREBASE_CONFIG_EXPOSURE
+  severity: LOW
 
 api_selection_filters:
   response_code:
@@ -20,9 +20,10 @@ api_selection_filters:
 
 wordLists:
   urlPaths:
-    - ${urlVar}/.dockerfile
-    - ${urlVar}/.Dockerfile
-  
+    - ${urlVar}
+    - ${urlVar}/public/config.js
+    - ${urlVar}/config.js
+
 execute:
   type: single
   requests:
@@ -33,8 +34,8 @@ validate:
   response_code:
     eq: 200
   response_payload:
-    regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
-  response_headers:
-    for_one:
-      value:
-        not_contains: text/html
+    contains_all:
+      - "apiKey:"
+      - "authDomain:"
+      - "databaseURL:"
+      - "storageBucket:"

@@ -1,0 +1,39 @@
+id: GIT_CONFIG
+info:
+  name: Git Config Disclosure
+  description: Searches for the pattern /.git/config and log file on passed URLs.
+  details: ydt
+  impact: tyjdf
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GIT_CONFIG
+  severity: MEDIUM
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/.git/config
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - "[core]"
+    not_contains:
+      - '<html'
+      - '<body'
+      - '<HTML'
+      - '<BODY'
+      - '<Html'
+      - '<Body'
