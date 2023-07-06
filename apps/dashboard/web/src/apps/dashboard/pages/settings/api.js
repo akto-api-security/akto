@@ -22,16 +22,16 @@ const settingRequests = {
         })
         return res
     },
-    removeUser: (email) => {
-        return request({
+    removeUser: async (email) => {
+        const res = await request({
             url: '/api/removeUser',
             method: 'post',
             data: {
                 email: email
             }
-        }).then((resp) => {
-            return resp
         })
+        
+        return res
     },
     fetchApiTokens: async function() {
         const resp = await request({

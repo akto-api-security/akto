@@ -1,0 +1,129 @@
+import { Modal, Text, TextField } from "@shopify/polaris"
+import { useState } from "react"
+import func from "../../../../../util/func"
+
+const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) => {
+    const setToastConfig = Store(state => state.setToastConfig)
+    
+    const disableToast = () => {
+        setToastConfig({
+        isActive: false,
+        isError: false,
+        message: ""
+        })
+    }
+
+    const [inviteEmail, setInviteEmail] = useState()
+
+    const handleSendInvitation = async () => {
+        setInviteUser(previousState => ({
+            ...previousState,
+            state: "loading",
+            email: inviteEmail
+        }
+        ))
+
+        const spec = {
+            inviteeName: "there",
+            inviteeEmail: inviteEmail,
+            websiteHostName: window.location.origin
+        }
+
+        const inviteUsersResponse = await settingRequests.inviteUsers(spec)
+
+        setInviteUser(previousState => ({
+            ...previousState,
+            state: "success",
+            inviteLink: inviteUsersResponse.finalInviteCode
+        }
+        ))
+
+        setToastConfig({
+            isActive: true,
+            isError: false,
+            message: "User invitation sent successfully"
+        })
+    }
+
+    const handleCopyInvitation = () => {
+        func.copyToClipboard(inviteUser.inviteLink)
+        setToastConfig({
+            isActive: true,
+            isError: false,
+            message: "Invitation link copied to clipboard"
+        })
+    }
+
+    if (inviteUser.state !== "success") {
+        return (
+            <Modal
+                small
+                open={inviteUser.isActive}
+                onClose={toggleInviteUserModal}
+                title="Add team member"
+                primaryAction={{
+                    loading: inviteUser.state === "loading",
+                    content: 'Send invitation',
+                    onAction: handleSendInvitation,
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: toggleInviteUserModal,
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <TextField
+                        label="Account email"
+                        value={inviteEmail}
+                        placeholder="name@workemail.com"
+                        onChange={(email) => setInviteEmail(email)}
+                        autoComplete="off"
+                    />
+                    <Text variant="bodyMd" color="subdued">
+                        We'll use this address if we need to contact you about your account.
+                    </Text>
+
+                </Modal.Section>
+            </Modal>
+        )
+    } else {
+        return (
+            <Modal
+                small
+                open={inviteUser.isActive}
+                onClose={toggleInviteUserModal}
+                title="Add team member"
+                primaryAction={{
+                    content: 'Copy invitation',
+                    onAction: handleCopyInvitation,
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: toggleInviteUserModal,
+                    },
+                ]}
+            >
+
+                <Modal.Section>
+                    <Text variant="bodyMd">
+                        Your invitation email has been successfully sent.
+                    </Text>
+                    <br />
+                    <Text variant="bodyMd" color="subdued">
+                        Alternatively, you can copy the invite link and share it with your invitee directly.
+                    </Text>
+                    <TextField
+                        label="Invite link"
+                        disabled={true}
+                        value={inviteUser.inviteLink}
+                    />
+                </Modal.Section>
+            </Modal>
+        )
+    }
+}
+
+export default InviteUserModal
