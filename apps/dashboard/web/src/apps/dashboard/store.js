@@ -21,6 +21,10 @@ let store = (set)=>({
                 message: updateToastConfig.message
             }
         })
+    },
+    allCollections: [],
+    setAllCollections:(allCollections)=>{
+        set({allCollections: allCollections})
     }
 })
 

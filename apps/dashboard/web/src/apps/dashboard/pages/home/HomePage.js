@@ -4,22 +4,26 @@ import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
 import { useNavigate, Outlet } from "react-router-dom";
 import { useEffect } from "react";
+import homeFunctions from "./module";
 
 function HomePage() {
   const navigate = useNavigate();
-  const storeAccessToken = Store(state => state.storeAccessToken)
   const accessToken = Store(state => state.accessToken);
+  const setAllCollections = Store(state => state.setAllCollections)
+
+  const fetchAllCollections = async()=>{
+    let apiCollections = await homeFunctions.getAllCollections()
+    setAllCollections(apiCollections)
+  }
   useEffect(() => {
     const access_token = accessToken
-    // localStorage.getItem("access_token")
-
     if (!access_token) {
       console.log("navigate")
       navigate("/login")  
     } 
-    // else  {
-    //   storeAccessToken(access_token)
-    // }
+    else  {
+      fetchAllCollections()
+    }
 
   }, [])
 
