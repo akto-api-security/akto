@@ -218,6 +218,7 @@ import testingApi from "../views/testing/api"
 
 import func from "@/util/func"
 import obj from "@/util/obj"
+import editorSetup from "./func"
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -233,7 +234,6 @@ import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 
-import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 
 export default {
     name: "TextEditor",
@@ -292,13 +292,19 @@ export default {
     data() {
         return {
             editorOptions: {
-                language: "yaml",
+                language: "custom_yaml",
                 minimap: { enabled: false },
                 wordWrap: true,
                 automaticLayout: true,
                 colorDecorations: true,
-                scrollBeyondLastLine: false
+                scrollBeyondLastLine: false,
+                theme: "customTheme"
             },
+            keywords: [
+                "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", "regex", "eq", "neq", "gt", "gte", "lt", "lte", "not_contains", "not_contains_either", "contains_jwt", "contains_all", "contains_either", "for_one", "or", "and", "add_body_param", "modify_body_param", "delete_body_param", "add_query_param", "modify_query_param", "delete_query_param", "modify_url", "modify_method", "replace_body", "add_header", "modify_header", "delete_header", "remove_auth_header", "follow_redirect"
+
+            ],
+            symbols:  /[=><!~?:&|+\-*\/\^%]+/,
             textEditor: null,
             testCategories: [],
             testsObj: {},
@@ -519,6 +525,10 @@ export default {
             }
         },
         createEditor() {
+            editorSetup.registerLanguage()
+            editorSetup.setTokenizer(this.keywords,this.symbols)
+            editorSetup.setEditorTheme()
+            editorSetup.setAutoComplete(this.keywords)
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
             this.textEditor.addAction({
                 id: "giveTypingEffect",
@@ -528,7 +538,7 @@ export default {
                     this.giveTypingEffect(false, true);
                 },
             });
-
+            // editorSetup.findErrors(this.textEditor,this.keywords)
         },
         giveTypingEffect() {
             let str = this.textEditor.getValue()
