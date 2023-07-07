@@ -664,6 +664,37 @@ public class APICatalogSync {
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
+
+        String deletedStaticUrlsString = "";
+        int counter = 0;
+        if (result.deleteStaticUrls != null) {
+            for (String dUrl: result.deleteStaticUrls) {
+                if (counter >= 50) break;
+                if (dUrl == null) continue;
+                deletedStaticUrlsString += dUrl + ", ";
+                counter++;
+            }
+        }
+        loggerMaker.debugInfoAddToDb("deleteStaticUrls: " + deletedStaticUrlsString, LogDb.RUNTIME);
+
+        loggerMaker.debugInfoAddToDb("merged URLs: ", LogDb.RUNTIME);
+        if (result.templateToStaticURLs != null) {
+            for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
+                String tempUrl = urlTemplate.getTemplateString() + " : ";
+                counter = 0;
+                if (result.templateToStaticURLs == null) continue;
+                for (String url: result.templateToStaticURLs.get(urlTemplate)) {
+                    if (counter >= 5) break;
+                    if (url == null) continue;
+                    tempUrl += url + ", ";
+                    counter++;
+                }
+
+                loggerMaker.debugInfoAddToDb( tempUrl, LogDb.RUNTIME);
+            }
+        }
+
+
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
@@ -762,15 +793,27 @@ public class APICatalogSync {
         }
 
         if (bulkUpdatesForSti.size() > 0) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+            try {
+                SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("STI bulkWrite error: " + e.getMessage(),LogDb.RUNTIME);
+            }
         }
 
         if (bulkUpdatesForSampleData.size() > 0) {
-            SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
+            try {
+                SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("SampleData bulkWrite error: " + e.getMessage(),LogDb.RUNTIME);
+            }
         }
 
         if (bulkUpdatesForApiInfo.size() > 0) {
-            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            try {
+                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("ApiInfo bulkWrite error: " + e.getMessage(),LogDb.RUNTIME);
+            }
         }
     }
 
@@ -1193,8 +1236,12 @@ public class APICatalogSync {
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
-                            mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
-                            loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                            try {
+                                mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
+                                loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
+                            }
                         }
                     } catch (Exception e) {
                         String err = e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : e.getMessage() ;
