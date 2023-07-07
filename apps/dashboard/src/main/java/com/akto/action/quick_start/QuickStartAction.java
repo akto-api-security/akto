@@ -412,7 +412,7 @@ public class QuickStartAction extends UserAction {
         this.aktoDashboardStackName = aktoDashboardStackName;
     }
     // Convert a stream into a single, newline separated string
-    private static String convertStreamToString(InputStream in) throws Exception {
+    public static String convertStreamToString(InputStream in) throws Exception {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();
