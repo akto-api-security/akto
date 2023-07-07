@@ -79,9 +79,13 @@ jobs:
               column.append(yaml_data['info']['impact'])
               column.append(yaml_data['info']['category']['displayName'])
               column.append(yaml_data['info']['severity'])
-
+  
+              references = []
+  
               if 'references' in yaml_data['info']:
                   column.append(yaml_data['info']['references'])
+                  references = yaml_data['info']['references']
+                  
               else:
                   column.append("")
 
@@ -89,7 +93,16 @@ jobs:
 
               url_path = ''
               column.append(url_path)
-
+              column.append(yaml_data['id'])
+              
+              rlink1 = "" if len(references) <= 0 else references[0]
+              rlink2 = "" if len(references) <= 1 else references[1]
+              rlink3 = "" if len(references) <= 2 else references[2]
+              
+              column.append(rlink1)
+              column.append(rlink2)
+              column.append(rlink3)
+              
               csv_writer.writerow(column)
 
 
@@ -112,7 +125,7 @@ jobs:
               if yaml_files:
                   with open(csv_file_path, 'w', newline='') as csv_file:
                       writer = csv.writer(csv_file)
-                      writer.writerow(['Name', 'Slug', 'Description', 'Details', 'Impact', 'OWASP Category', 'Severity', 'References', 'Content', 'URL Path'])
+                      writer.writerow(['Name', 'Slug', 'Description', 'Details', 'Impact', 'OWASP Category', 'Severity', 'References', 'Content', 'URL Path', 'Test_ID', 'RLink1', 'RLink2', 'RLink3'])
 
                       for yaml_file in yaml_files:
                           yaml_url = yaml_file['html_url']
