@@ -17,8 +17,6 @@ const Users = () => {
 
     useEffect(() => {
         const getTeamData = async () => {
-            await new Promise(r => setTimeout(r, 10000));
-
             const usersResponse = await settingRequests.getTeamData()
             setUsers(usersResponse.users)
             setLoading(false)
