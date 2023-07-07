@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
+import Store from "../../store"
 
 const Settings = () => {
     const navigate = useNavigate();
