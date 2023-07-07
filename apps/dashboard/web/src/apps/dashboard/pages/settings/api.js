@@ -33,6 +33,7 @@ const settingRequests = {
         
         return res
     },
+    
     fetchApiTokens: async function() {
         const resp = await request({
             url: '/api/fetchApiTokens',
@@ -46,8 +47,6 @@ const settingRequests = {
             url: '/api/addApiToken',
             method: 'post',
             data: {tokenUtility}
-        }).then((resp) => {
-            return resp
         })
     },
     deleteApiToken(apiTokenId) {
@@ -55,8 +54,6 @@ const settingRequests = {
             url: '/api/deleteApiToken',
             method: 'post',
             data: {apiTokenId}
-        }).then((resp) => {
-            return resp
         })
     },
 
@@ -65,8 +62,6 @@ const settingRequests = {
             url: '/api/fetchPostmanWorkspaces',
             method: 'post',
             data: {api_key}
-        }).then((resp) => {
-            return resp
         })
     },
     addOrUpdatePostmanCred(api_key, workspace_id) {
@@ -74,8 +69,6 @@ const settingRequests = {
             url: '/api/addOrUpdatePostmanCred',
             method: 'post',
             data: {api_key,workspace_id}
-        }).then((resp) => {
-            return resp
         })
     },
     getPostmanCredentials() {
@@ -83,8 +76,25 @@ const settingRequests = {
             url: '/api/getPostmanCredential',
             method: 'post',
             data: {}
-        }).then((resp) => {
-            return resp
+        })
+    },
+
+    fetchAktoGptConfig(){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {
+                "apiCollectionId": -1
+            }
+        })
+    },
+    saveAktoGptConfig(aktoConfigList){
+        return request({
+            url: '/api/saveAktoGptConfig',
+            method: 'post',
+            data: {
+                "currentState": aktoConfigList
+            }
         })
     },
 }
