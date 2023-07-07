@@ -15,16 +15,21 @@ const Users = () => {
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
 
-    useEffect(() => {
-        const getTeamData = async () => {
-            const usersResponse = await settingRequests.getTeamData()
-            setUsers(usersResponse.users)
-            setLoading(false)
-        };
+    const getTeamData = async () => {
+        const usersResponse = await settingRequests.getTeamData()
+        setUsers(usersResponse.users)
+    };
 
+    useEffect(() => {
         setLoading(true);
         getTeamData();
+        setLoading(false)
     }, [])
+
+    setInviteUser({
+        ...inviteUser,
+        state: "success"
+    })
 
     const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
 

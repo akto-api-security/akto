@@ -2,6 +2,7 @@ import { Modal, Text, TextField } from "@shopify/polaris"
 import { useState } from "react"
 import func from "../../../../../util/func"
 import Store from "../../../store"
+import settingRequests from "../api"
 
 const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) => {
     const setToastConfig = Store(state => state.setToastConfig)
