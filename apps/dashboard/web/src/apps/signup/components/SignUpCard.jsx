@@ -10,12 +10,14 @@ import GoogleIcon from "../images/google.png"
 import Store from "../../dashboard/store"
 
 const SignUpCard = () => {
-  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
   const toastConfig = Store(state => state.toastConfig)
   const setToastConfig = Store(state => state.setToastConfig)
+  const storeUsername = Store(state => state.storeUsername)
+
+  const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
 
   const setLoginErrorToast = () => {
       setToastConfig({
@@ -46,8 +48,8 @@ const SignUpCard = () => {
   }
 
   const handleContinueWithEmail = async () => {
-
     api.login(email, password).then((resp)=>{
+      storeUsername(email)
       console.log(resp);
     }).catch((err) => {
       console.log(err);
@@ -67,8 +69,6 @@ const SignUpCard = () => {
               <Text variant="headingXl">Getting started</Text>
               <Text variant="bodyLg">Start free, no credit card required</Text>
             </div>
-
-            <Button size="large" fullWidth="true" icon={GoogleIcon}>Continue with Google</Button>
 
             <Divider />
             <Text variant="bodySm" alignment="center">or</Text>
