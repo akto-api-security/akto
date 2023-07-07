@@ -58,10 +58,4 @@ validate:
   response_code:
     eq: 200
   response_payload:
-    regex: ^(?=.*^\\s*\"?on\"?:)(?=.*^\\s*\"?jobs\"?:)(?=.*^\\s*\"?steps\"?:)(?=.*^\\s*- \"?uses\"?:)
-
-
-    # - regex: "(?m)^\\s*\"?on\"?:"
-    # - regex: "(?m)^\\s*\"?jobs\"?:"
-    # - regex: "(?m)^\\s*\"?steps\"?:"
-    # - regex: "(?m)^\\s*- \"?uses\"?:"
+    regex: (?m)^\s*"?on"?:|^\s*"?jobs"?:|^\s*"?steps"?:|^\s*- "?uses"?:
