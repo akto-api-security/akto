@@ -1,13 +1,26 @@
-import { Button, Card, Frame, HorizontalStack, Icon, Modal, Navigation, Scrollable, Text, TextContainer } from "@shopify/polaris"
-import { HomeMinor, OrdersMinor, ProductsMinor, CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
+import { Card, Frame, Icon, Text } from "@shopify/polaris"
+import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { tokens } from "@shopify/polaris-tokens"
-import { useCallback, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
+import homeFunctions from "../home/module";
+import Store from "../../store";
+import { useEffect } from "react";
 
 const Settings = () => {
     const navigate = useNavigate();
+    const setAllCollections = Store(state => state.setAllCollections)
+
+    const fetchAllCollections = async()=>{
+        let apiCollections = await homeFunctions.getAllCollections()
+        setAllCollections(apiCollections)
+    }
+
+    useEffect(() => {
+        fetchAllCollections()
+    }, [])
+
     return (
         <Frame>
             <Card>
