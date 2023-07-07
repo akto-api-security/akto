@@ -1,4 +1,4 @@
-import { Button, Card, Frame, HorizontalStack, Icon, Modal, Navigation, Scrollable, Text, TextContainer } from "@shopify/polaris"
+import { Button, Card, Frame, HorizontalStack, Icon, Modal, Navigation, Scrollable, Text, Toast } from "@shopify/polaris"
 import { HomeMinor, OrdersMinor, ProductsMinor, CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { tokens } from "@shopify/polaris-tokens"
 import { useCallback, useState } from "react";

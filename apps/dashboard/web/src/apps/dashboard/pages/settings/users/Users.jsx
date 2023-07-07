@@ -3,8 +3,11 @@ import { useCallback, useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "../../../../../util/func";
 import InviteUserModal from "./InviteUserModal";
+import Store from "../../../store";
 
 const Users = () => {
+    const username = Store(state => state.username)
+
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
         state: "initial", // initial, loading, success
@@ -27,6 +30,12 @@ const Users = () => {
     }, [])
 
     const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
+    const currentUser = users.find(user => user.login === username)
+
+    let isAdmin = false
+    if (currentUser) {
+        isAdmin = currentUser.role === "ADMIN"
+    } 
 
     const toggleInviteUserModal = () => {
         setInviteUser({
@@ -77,13 +86,13 @@ const Users = () => {
 
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />;
-                            const shortcutActions =
+                            const shortcutActions = username !== login && isAdmin  ? 
                                 [
                                     {
                                         content: 'Remove User',
-                                        onAction: () => {handleRemoveUser(login)}
+                                        onAction: () => {handleRemoveUser(login)},
                                     }
-                                ]
+                                ] : []
 
                             return (
                                 <ResourceItem

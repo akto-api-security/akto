@@ -102,18 +102,14 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
             >
 
                 <Modal.Section>
-                    <Text variant="bodyMd">
-                        Your invitation email has been successfully sent.
-                    </Text>
-                    <br />
-                    <Text variant="bodyMd" color="subdued">
-                        Alternatively, you can copy the invite link and share it with your invitee directly.
-                    </Text>
                     <TextField
                         label="Invite link"
                         disabled={true}
                         value={inviteUser.inviteLink}
                     />
+                     <Text variant="bodyMd" color="subdued">
+                        Alternatively, you can copy the invite link and share it with your invitee directly.
+                    </Text>
                 </Modal.Section>
             </Modal>
         )
