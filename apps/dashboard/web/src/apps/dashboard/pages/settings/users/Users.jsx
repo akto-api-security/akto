@@ -26,11 +26,6 @@ const Users = () => {
         setLoading(false)
     }, [])
 
-    setInviteUser({
-        ...inviteUser,
-        state: "success"
-    })
-
     const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
 
     const toggleInviteUserModal = () => {
