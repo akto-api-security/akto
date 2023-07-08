@@ -15,6 +15,7 @@ import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
+import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 
 const router = createBrowserRouter([
   {
@@ -66,6 +67,10 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/settings/integrations/akto_gpt",
         element: <AktoGPT />,
+      },
+      {
+        path: "/dashboard/settings/health_logs",
+        element: <HealthLogs />,
       }
   ]
   },

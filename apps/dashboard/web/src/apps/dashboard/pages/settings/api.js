@@ -97,6 +97,17 @@ const settingRequests = {
             }
         })
     },
+    fetchLogsFromDb(startTime, endTime, logDb) {
+        return request({
+            url: '/api/fetchLogsFromDb',
+            method: 'post',
+            data: {
+                startTime,
+                endTime,
+                logDb
+            }
+        })
+    },
 }
 
 export default settingRequests
