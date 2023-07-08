@@ -162,7 +162,12 @@ const func = {
       .catch((err) => {
         console.error('Failed to copy text to clipboard:', err);
       });
-  }
+  },
+  epochToDateTime (timestamp) {
+    var date = new Date(timestamp * 1000);
+    return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+
+},
 
 }
 

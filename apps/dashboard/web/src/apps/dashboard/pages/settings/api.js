@@ -33,6 +33,7 @@ const settingRequests = {
         
         return res
     },
+
     
     fetchApiTokens: async function() {
         const resp = await request({
@@ -57,6 +58,7 @@ const settingRequests = {
         })
     },
 
+
     fetchPostmanWorkspaces(api_key) {
         return request({
             url: '/api/fetchPostmanWorkspaces',
@@ -78,6 +80,7 @@ const settingRequests = {
             data: {}
         })
     },
+    
 
     fetchAktoGptConfig(){
         return request({
@@ -95,6 +98,22 @@ const settingRequests = {
             data: {
                 "currentState": aktoConfigList
             }
+        })
+    },
+
+
+    fetchAdminSettings() {
+        return request({
+            url: '/api/fetchAdminSettings',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchUserLastLoginTs() {
+        return request({
+            url: '/api/fetchUserLastLoginTs',
+            method: 'post',
+            data: {}
         })
     },
 }
