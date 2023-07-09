@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="" :tabs='["Settings", "Access"]'>
+    <layout-with-tabs title="" :tabs='["Settings", "Access", "Analyze"]'>
         <template slot="Settings">
             <div style="height: 100%" v-if="(!isSelectedRoleEmpty || createNew)">
                 <v-container style="padding: 12px 12px 12px 0px">
@@ -82,7 +82,6 @@
                 </v-container>
             </div>
         </template>
-
         <template slot="Access">
             <div v-if="!isSelectedRoleEmpty && !createNew">
                 <simple-table 
@@ -100,6 +99,26 @@
                 </simple-table>
             </div>
         </template>
+        <template slot="Analyze">
+          <div class="pa-4">
+            <div class="grey-text pb-2">
+              Analyze header values from sample data
+            </div>
+            <div style="width: 500px">
+              <simple-text-field
+                  :readOutsideClick="true"
+                  placeholder="Enter comma-separated header names and press enter"
+                  @changed="analyzeApiSamples"
+              />
+            </div>
+            <div v-for="(sampleValues, headerName, index) in resultApiSamples" :key="'hh_'+index">
+              <div class="fw-500 pt-2">{{headerName}}:</div>
+              <div v-for="(vv, ii) in sampleValues" :key="'vv_'+ii">
+                <div class="pl-4 fs-12">{{vv}}</div>
+              </div>
+            </div>
+          </div>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -114,12 +133,14 @@ import LayoutWithTabs from "@/apps/dashboard/layouts/LayoutWithTabs"
 import { mapState } from "vuex";
 import func from "@/util/func";
 import api from "../api"
+import SimpleTextField from "@/apps/dashboard/shared/components/SimpleTextField.vue";
 
 export default {
     name: "TestRolesConfigDetails",
     props: {
     },
     components: {
+      SimpleTextField,
         ReviewTable,
         SimpleTable,
         TestRoleConditionsTable,
@@ -175,7 +196,8 @@ export default {
                     text: 'url',
                     value: 'url'
                 }],
-            conditionCollections: []
+            conditionCollections: [],
+            resultApiSamples: {}
         }
     },
     methods: {
@@ -287,6 +309,11 @@ export default {
         async createAccessMatrix(){
             let apiCollectionIds = this.conditionCollections.map((collectionId) => parseInt(collectionId));
             await api.createMultipleAccessMatrixTasks(apiCollectionIds)
+        },
+        async analyzeApiSamples(headerNames) {
+          let apiCollectionIds = this.conditionCollections.map((collectionId) => parseInt(collectionId));
+          let resultApiSamplesResp = await api.analyzeApiSamples(apiCollectionIds, headerNames.split(",").map(x => x.trim().toLowerCase()))
+          this.resultApiSamples = resultApiSamplesResp.headerValues
         }
     },
     mounted() {

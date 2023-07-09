@@ -46,6 +46,15 @@ export default {
             return resp
         })
     },
+    analyzeApiSamples(apiCollectionIds, headerNames){
+        return request({
+            url: '/api/analyzeApiSamples',
+            method: 'post',
+            data: {apiCollectionIds, headerNames}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchCollectionWiseApiEndpoints (apiCollectionId) {
         return request({
             url: '/api/fetchCollectionWiseApiEndpoints',
