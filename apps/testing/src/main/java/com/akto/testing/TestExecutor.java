@@ -100,8 +100,6 @@ public class TestExecutor {
 
         List<AuthParam> authParams = authMechanism.getAuthParams();
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
-
         authMechanism.setAuthParams(authParams);
         return authMechanism;
     }
@@ -120,6 +118,7 @@ public class TestExecutor {
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
         AuthMechanism authMechanism = createAuthMechanism();
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         TestingUtil testingUtil = createTestingUtil(testingEndpoints, authMechanism);
@@ -141,9 +140,9 @@ public class TestExecutor {
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
-        for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
+        for (ApiInfo.ApiInfoKey apiInfoKey: testingUtil.getSampleMessages().keySet()) {
             if (apiInfoKeySet.contains(apiInfoKey)) {
-                sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, sampleMessages.get(apiInfoKey));
+                sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, testingUtil.getSampleMessages().get(apiInfoKey));
             }
         }
 
