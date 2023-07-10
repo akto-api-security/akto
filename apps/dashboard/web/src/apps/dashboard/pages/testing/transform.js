@@ -107,22 +107,29 @@ const transform = {
     })
     return testRuns;
     },
+    prepareTestRunResult : (data, subCategoryMap, subCategoryFromSourceConfigMap) => {
+      let obj = {};
+      obj['hexId'] = data.hexId;
+      obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
+      obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
+      obj["endTimestamp"] = data.endTimestamp
+      obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
+      obj['url'] = "Detected in " + (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
+      obj['severity'] = data.vulnerable ? [{confidence : func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))}] : []
+      obj['total_severity'] = getTotalSeverityTestRunResult(obj['severity'])
+      obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
+      obj['apiFilter'] = [(data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url]
+      obj['categoryFilter'] = [obj['testCategory']]
+      obj['testFilter'] = [obj['name']]
+      obj['testResults'] = data['testResults'] || []
+      obj['singleTypeInfos'] = data['singleTypeInfos'] || []
+      obj['vulnerable'] = data['vulnerable'] || false
+      return obj;
+    },
     prepareTestRunResults : (testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
       let testRunResults = []
       testingRunResults.forEach((data) => {
-        let obj = {};
-        obj['hexId'] = data.hexId;
-        obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
-        obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
-        obj["endTimestamp"] = data.endTimestamp
-        obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
-        obj['url'] = "Detected in " + data.apiInfoKey.method + " " + data.apiInfoKey.url 
-        obj['severity'] = data.vulnerable ? [{confidence : func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))}] : []
-        obj['total_severity'] = getTotalSeverityTestRunResult(obj['severity'])
-        obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
-        obj['apiFilter'] = [data.apiInfoKey.method + " " + data.apiInfoKey.url]
-        obj['categoryFilter'] = [obj['testCategory']]
-        obj['testFilter'] = [obj['name']]
+        let obj = transform.prepareTestRunResult(data, subCategoryMap, subCategoryFromSourceConfigMap);
         if(obj['name'] && obj['testCategory']){
           testRunResults.push(obj);
         }
@@ -150,7 +157,37 @@ const transform = {
           localFilters[index].choices = choiceList
         })
         return localFilters
-    }
+    },
+    issueSummaryTable(issuesDetails, subCategoryMap) {
+      if (issuesDetails) {
+          return [
+              {
+                  title: 'Issue category',
+                  description: subCategoryMap[issuesDetails.id.testSubCategory].superCategory.displayName
+              },
+              {
+                  title: 'Test run',
+                  description: subCategoryMap[issuesDetails.id.testSubCategory].testName
+              },
+              {
+                  title: 'Severity',
+                  description: subCategoryMap[issuesDetails.id.testSubCategory].superCategory.severity._name
+              },
+              {
+                  title: 'Endpoint',
+                  description: {
+                      method: issuesDetails.id.apiInfoKey.method,
+                      url: issuesDetails.id.apiInfoKey.url
+                  }
+              },
+              // {
+              //     title: 'Collection',
+              //     description: this.mapCollectionIdToName[issuesDetails.id.apiInfoKey.apiCollectionId]
+              // }
+          ]
+      }
+      return []
+  },
 }
 
 export default transform

@@ -220,6 +220,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     selectable = {true}
     promotedBulkActions = {promotedBulkActions}
     loading={loading}
+    page={2}
   />
   </VerticalStack>
   );

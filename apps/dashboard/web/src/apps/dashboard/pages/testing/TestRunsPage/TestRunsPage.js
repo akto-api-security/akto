@@ -224,9 +224,8 @@ useEffect(()=>{
         headers={headers}
         getActions = {getActions}
         hasRowActions={true}
-        nextPage={"singleTestRunPage"}
         loading={loading}
-        // func={pull_data}
+        page={1}
       />
     </VerticalStack>
   );

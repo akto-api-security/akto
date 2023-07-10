@@ -148,7 +148,7 @@ function GithubTable(props) {
         selectedResources={selectedResources}
         headers={props.headers}
         hasRowActions={props.hasRowActions || false}
-        nextPage={props.nextPage || ""}
+        page={props.page || 0}
         />
     ),
   );
@@ -164,7 +164,8 @@ function GithubTable(props) {
   return (
     <div>
       <LegacyCard>
-        <IndexFilters
+        <LegacyCard.Section flush>
+          <IndexFilters
           sortOptions={props.sortOptions}
           sortSelected={sortSelected}
           queryValue={queryValue}
@@ -210,24 +211,25 @@ function GithubTable(props) {
 
         >
           {rowMarkup}
-        </IndexTable>
-        <Card>
+          </IndexTable>
+        </LegacyCard.Section>
+        <LegacyCard.Section>
           <HorizontalStack
             align="center">
             <Pagination
               label={
-                data.length==0 ? 'No test runs found' :
-                `Showing ${page*pageLimit+Math.min(1,data.length)}-${Math.min((page+1)*pageLimit, data.length)} of ${data.length}`
+                data.length == 0 ? 'No test runs found' :
+                  `Showing ${page * pageLimit + Math.min(1, data.length)}-${Math.min((page + 1) * pageLimit, data.length)} of ${data.length}`
               }
-              hasPrevious = {page > 0}
+              hasPrevious={page > 0}
               previousKeys={[Key.LeftArrow]}
               onPrevious={onPagePrevious}
-              hasNext = {data.length > (page+1) * pageLimit}
+              hasNext={data.length > (page + 1) * pageLimit}
               nextKeys={[Key.RightArrow]}
               onNext={onPageNext}
             />
           </HorizontalStack>
-        </Card>
+        </LegacyCard.Section>
       </LegacyCard>
     </div>
   );
