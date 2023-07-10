@@ -65,7 +65,8 @@ const settingFunctions = {
 			}));
 
       await settingRequests.saveAktoGptConfig(arr)
-    }
+    },
+    
 }
 
 export default settingFunctions

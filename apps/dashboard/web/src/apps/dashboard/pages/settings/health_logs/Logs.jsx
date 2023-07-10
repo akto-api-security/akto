@@ -1,43 +1,84 @@
-import { LegacyCard, Select, Text } from "@shopify/polaris"
+import { Button, ButtonGroup, HorizontalGrid, HorizontalStack, LegacyCard, Page, Scrollable, Select, Text } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
+import func from "../../../../../util/func";
+import LogsContainer from "./LogsContainer";
+import Dropdown from "../../../components/layouts/leftnav/Dropdown";
 
 const Logs = () => {
+    const fiveMins = 1000 * 60 * 5
 
-    const [logGroup, setLogGroup] = useState('')
+    const [ logs, setLogs ] = useState({
+        startTime: null,
+        endTime: null,
+        logGroup: '',
+        logData: []
+    })
 
-    const handleSelectLogGroup = (logGroup) => setLogGroup(logGroup) 
+    const logGroupSelected = logs.logGroup !== ''
 
     const logGroupOptions = [
         { label: "Testing", value: "TESTING" },
         { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
     ];
-
-    const fetchLogsFromDb = async () => {
-        let fiveMins = 1000 * 60 * 5
-        let startTime = Date.now() - fiveMins
-        let endTime = Date.now()
-
-        if (logGroup !== '')
-        {
-            const logsResponse = await settingRequests.fetchLogsFromDb(startTime, endTime, logGroup)
-            console.log(logsResponse)
+    const handleSelectLogGroup = (logGroup) => {
+        setLogs(previousState => ({ ...previousState, logGroup: logGroup }))
+    }
+    
+    const fetchLogsFromDb = async (startTime, endTime, refresh = false) => {
+        if (logs.logGroup !== '') {
+            const logsResponse = await settingRequests.fetchLogsFromDb(
+                Math.floor(startTime / 1000), 
+                Math.floor(endTime  / 1000),
+                log.logGroup
+            )
+            setLogs(previousState => (
+                {
+                    ...logs,
+                    startTime: startTime,
+                    endTime: endTime,
+                    logData: refresh ? [...logsResponse.logs] : [...logsResponse.logs, ...previousState.logData]
+                }))
         }
     }
 
     useEffect(() => {
-        fetchLogsFromDb()
-    }, [logGroup])
+        const startTime = Date.now() - fiveMins
+        const endTime = Date.now() 
+        fetchLogsFromDb(startTime, endTime)
+    }, [logs.logGroup])
 
-    fetchLogsFromDb()
+   const exportLogsCsv = () => {
+        let headers = ['timestamp', 'log'];
+        let csv = headers.join(",")+"\r\n"
+        logs.logData.forEach(log => {
+            csv += func.epochToDateTime(log.timestamp) +","+ log.log + "\r\n"
+        })
+        let blob = new Blob([csv], {
+            type: "application/csvcharset=UTF-8"
+        });
+        saveAs(blob, "log.csv");
+   } 
+
+    const handleRefresh = () => {
+        const startTime = Date.now() - fiveMins;
+        const endTime = Date.now();
+        fetchLogsFromDb(startTime, endTime, true)
+    }
+
+    const handlePreviousFiveMinutesLogs = () => {
+        const startTime = logs.startTime - fiveMins;
+        const endTime = logs.startTime;
+        fetchLogsFromDb(startTime, endTime)
+    }
 
     return (
         <LegacyCard
             sectioned
             title="Logs"
             actions={[
-                { content: 'Export' },
+                { content: 'Export', onAction: exportLogsCsv },
                 { content: 'Configure log level' }
             ]}
         >
@@ -45,13 +86,34 @@ const Logs = () => {
                 API logs capture detailed records of API requests and responses, including metadata such as timestamps, request headers, payload data, and authentication details.
             </Text>
             <br />
-            <Select
-                labelHidden
-                placeholder="Select log group level"
-                options={logGroupOptions}
-                onChange={handleSelectLogGroup}
-                value={logGroup}
-            />
+
+            <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
+                {/* <Select
+                    labelHidden
+                    placeholder="Select log group level"
+                    options={logGroupOptions}
+                    onChange={handleSelectLogGroup}
+                    value={logs.logGroup}
+                /> */}
+                <Dropdown
+                    menuItems={logGroupOptions}
+                    initial="Dashboard"
+                    selected={(selectedVal) => setLogs(previousState => ({...previousState, logGroup: selectedVal}))}
+                    />
+                <ButtonGroup segmented>
+                    <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
+                    <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
+                </ButtonGroup>
+            </div>
+          
+            <br />
+
+            {
+                logGroupSelected ? <LogsContainer logs={logs}/> : <Text variant="bodyMd">Select log group to fetch logs</Text>
+            }
+
+           
+
         </LegacyCard>
     )
 }
