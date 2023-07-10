@@ -87,8 +87,8 @@
             </div>
             <div v-for="(sampleValues, headerName, index) in resultApiSamples" :key="'hh_'+index">
               <div class="fw-500 pt-2">{{headerName}}:</div>
-              <div v-for="(vv, ii) in sampleValues" :key="'vv_'+ii">
-                <div class="pl-4 fs-12">{{vv}}</div>
+              <div v-for="(counter, vv, ii) in sampleValues" :key="'vv_'+ii">
+                <div class="pl-4 fs-12">{{vv}}: {{counter}}</div>
               </div>
             </div>
           </div>

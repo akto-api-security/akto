@@ -88,7 +88,7 @@ public class AccessMatrixTaskAction extends UserAction{
 
     private List<String> headerNames;
 
-    private Map<String, Set<String>> headerValues;
+    private Map<String, Map<String, Integer>> headerValues;
     public String analyzeApiSamples(){
         if(apiCollectionIds==null || apiCollectionIds.isEmpty()){
             addActionError("No endpoints found to analyze API samples");
@@ -120,13 +120,16 @@ public class AccessMatrixTaskAction extends UserAction{
                                 if (headerValue == null) {
                                     continue;
                                 }
-                                Set<String> recordedValues = headerValues.get(headerName);
+                                Map<String, Integer> recordedValues = headerValues.get(headerName);
                                 if (recordedValues == null) {
-                                    recordedValues = new HashSet<>();
+                                    recordedValues = new HashMap<>();
                                     headerValues.put(headerName, recordedValues);
                                 }
 
-                                recordedValues.addAll(headerValue);
+                                for(String headerValueFound: headerValue) {
+                                    int currCounter = recordedValues.getOrDefault(headerValueFound, 0);
+                                    recordedValues.put(headerValueFound, currCounter+1);
+                                }
                             }
                         } catch (Exception e) {
                             System.out.println(e.getMessage());
@@ -247,7 +250,7 @@ public class AccessMatrixTaskAction extends UserAction{
         this.headerNames = headerNames;
     }
 
-    public Map<String, Set<String>> getHeaderValues() {
+    public Map<String, Map<String, Integer>> getHeaderValues() {
         return headerValues;
     }
 }
