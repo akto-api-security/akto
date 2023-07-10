@@ -16,6 +16,8 @@ import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
+import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
+import About from "../dashboard/pages/settings/about/About";
 
 const router = createBrowserRouter([
   {
@@ -55,12 +57,8 @@ const router = createBrowserRouter([
         element: <Integrations />,
       },
       {
-        path: "/dashboard/settings/integrations/burp",
-        element: <BurpSuite />,
-      },
-      {
-        path: "/dashboard/settings/integrations",
-        element: <Integrations />,
+        path: "/dashboard/settings/about",
+        element: <About />,
       },
       {
         path: "/dashboard/settings/integrations/burp",
@@ -73,6 +71,10 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/settings/integrations/akto_apis",
         element: <ApiTokens />,
+      },
+      {
+        path: "/dashboard/settings/integrations/akto_gpt",
+        element: <AktoGPT />,
       }
   ]
   },

@@ -1,4 +1,5 @@
 import settingRequests from './api';
+import func from '@/util/func';
 
 const settingFunctions = {
     getTokenList: async function (type){
@@ -44,6 +45,63 @@ const settingFunctions = {
     },
     addOrUpdatePostmanCred: async function(postman_id,workspace_id){
       await settingRequests.addOrUpdatePostmanCred(postman_id,workspace_id)
+    },
+
+    fetchGptCollections: async function(){
+      let arr = []
+      await settingRequests.fetchAktoGptConfig().then((resp)=>{
+        resp.currentState.forEach((collection) =>{
+          if(collection.state === 'ENABLED'){
+            arr.push(collection.id)
+          }
+        })
+      })
+      return arr
+    },
+    updateGptCollections: async function(selectedList,allCollections){
+      let selectedSet = new Set(selectedList)
+      const arr = allCollections.map(item => ({
+				id: item.id,
+				state: selectedSet.has(item.id) ? 'ENABLED' : 'DISABLED'
+			}));
+
+      await settingRequests.saveAktoGptConfig(arr)
+    },
+
+    fetchLoginInfo: async function(){
+      let lastLogin = ''
+      await settingRequests.fetchUserLastLoginTs().then((resp)=>{
+        lastLogin = func.epochToDateTime (resp.lastLoginTs);
+      })
+      return lastLogin
+    },
+    fetchAdminInfo: async function(){
+      const loginInfo = await this.fetchLoginInfo()
+      let arr = []
+      await settingRequests.fetchAdminSettings().then((response)=>{
+        let resp = response.accountSettings
+        arr = [
+          {
+            title: 'Organisation',
+            text: 'Akto'
+          },
+          {
+            title: 'Organisation ID',
+            text: resp.id,
+          },{
+            title: 'Dashboard Version',
+            text: resp.dashboardVersion,
+          },{
+            title: 'Runtime Version',
+            text: resp.apiRuntimeVersion
+          },
+          {
+            title: 'Last Login',
+            text: loginInfo,
+          },
+        ]
+      })
+      return arr
     }
 }
 

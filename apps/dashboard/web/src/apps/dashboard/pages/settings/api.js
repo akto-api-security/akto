@@ -22,17 +22,19 @@ const settingRequests = {
         })
         return res
     },
-    removeUser: (email) => {
-        return request({
+    removeUser: async (email) => {
+        const res = await request({
             url: '/api/removeUser',
             method: 'post',
             data: {
                 email: email
             }
-        }).then((resp) => {
-            return resp
         })
+        
+        return res
     },
+
+    
     fetchApiTokens: async function() {
         const resp = await request({
             url: '/api/fetchApiTokens',
@@ -46,8 +48,6 @@ const settingRequests = {
             url: '/api/addApiToken',
             method: 'post',
             data: {tokenUtility}
-        }).then((resp) => {
-            return resp
         })
     },
     deleteApiToken(apiTokenId) {
@@ -55,18 +55,15 @@ const settingRequests = {
             url: '/api/deleteApiToken',
             method: 'post',
             data: {apiTokenId}
-        }).then((resp) => {
-            return resp
         })
     },
+
 
     fetchPostmanWorkspaces(api_key) {
         return request({
             url: '/api/fetchPostmanWorkspaces',
             method: 'post',
             data: {api_key}
-        }).then((resp) => {
-            return resp
         })
     },
     addOrUpdatePostmanCred(api_key, workspace_id) {
@@ -74,8 +71,6 @@ const settingRequests = {
             url: '/api/addOrUpdatePostmanCred',
             method: 'post',
             data: {api_key,workspace_id}
-        }).then((resp) => {
-            return resp
         })
     },
     getPostmanCredentials() {
@@ -83,8 +78,42 @@ const settingRequests = {
             url: '/api/getPostmanCredential',
             method: 'post',
             data: {}
-        }).then((resp) => {
-            return resp
+        })
+    },
+    
+
+    fetchAktoGptConfig(){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {
+                "apiCollectionId": -1
+            }
+        })
+    },
+    saveAktoGptConfig(aktoConfigList){
+        return request({
+            url: '/api/saveAktoGptConfig',
+            method: 'post',
+            data: {
+                "currentState": aktoConfigList
+            }
+        })
+    },
+
+
+    fetchAdminSettings() {
+        return request({
+            url: '/api/fetchAdminSettings',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchUserLastLoginTs() {
+        return request({
+            url: '/api/fetchUserLastLoginTs',
+            method: 'post',
+            data: {}
         })
     },
 }

@@ -8,6 +8,8 @@ let store = (set)=>({
     },
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
+    username: null,
+    storeUsername: (username) => set({ username: username}),
     toastConfig: {
         isActive: false,
         isError: false,
@@ -21,6 +23,10 @@ let store = (set)=>({
                 message: updateToastConfig.message
             }
         })
+    },
+    allCollections: [],
+    setAllCollections:(allCollections)=>{
+        set({allCollections: allCollections})
     }
 })
 
