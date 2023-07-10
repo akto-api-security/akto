@@ -22,7 +22,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class BFLATest extends AuthRequiredRunAllTestPlugin {
+import static com.akto.rules.TestPlugin.isStatusGood;
+import static com.akto.rules.TestPlugin.loggerMaker;
+
+public class BFLATest {
 
     public List<String> updateAllowedRoles(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         List<String> ret = new ArrayList<>();
@@ -69,7 +72,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
 
             RawApi rawApiDuplicate = rawApi.copy();
             try {
-                ApiExecutionDetails apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
+                TestPlugin.ApiExecutionDetails apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
                 if(isStatusGood(apiExecutionDetails.statusCode)) {
                     ret.add(testRoles.getName());
                 }
@@ -86,58 +89,4 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
 
         return ret;        
     }
-
-    public List<ExecutorResult> execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-
-        updateAllowedRoles(rawApi, apiInfoKey, testingUtil);
-
-        TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-
-        TestRoles normalUserTestRole = new TestRoles();
-        normalUserTestRole.getAuthWithCondList().get(0).setAuthMechanism(testingUtil.getAuthMechanism());
-        testRoleMatcher.enemies.add(normalUserTestRole);
-
-        List<ExecutorResult> executorResults = new ArrayList<>();
-
-        for (TestRoles testRoles: testRoleMatcher.enemies) {
-            OriginalHttpRequest testRequest = rawApi.getRequest().copy();
-
-            testRoles.getAuthWithCondList().get(0).getAuthMechanism().addAuthToRequest(testRequest);
-            BFLATestInfo bflaTestInfo = new BFLATestInfo(
-                    "NORMAL", testingUtil.getTestRoles().get(0).getName()
-            );
-
-            ApiExecutionDetails apiExecutionDetails;
-            RawApi rawApiDuplicate = rawApi.copy();
-            try {
-                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e,LogDb.TESTING);
-                return Collections.singletonList(new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
-                        TestResult.TestError.API_REQUEST_FAILED, testRequest, null, bflaTestInfo));
-            }
-
-            boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode);
-            TestResult.Confidence confidence = vulnerable ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
-
-            ExecutorResult executorResult = new ExecutorResult(vulnerable,confidence, null, apiExecutionDetails.percentageMatch,
-            rawApiDuplicate, null, testRequest, apiExecutionDetails.testResponse, bflaTestInfo);
-
-            executorResults.add(executorResult);
-        }
-
-        return executorResults;
-
-    }
-
-    @Override
-    public String superTestName() {
-        return "BFLA";
-    }
-
-    @Override
-    public String subTestName() {
-        return "BFLA";
-    }
-
 }
