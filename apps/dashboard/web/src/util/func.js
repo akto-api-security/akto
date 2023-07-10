@@ -163,19 +163,10 @@ const func = {
         console.error('Failed to copy text to clipboard:', err);
       });
   },
-  epochToDateTime: (timestamp) => {
+  epochToDateTime (timestamp) {
     var date = new Date(timestamp * 1000);
-
-    var year = date.getFullYear();
-    var month = date.getMonth() + 1;
-    var day = date.getDate();
-    var hours = date.getHours();
-    var minutes = date.getMinutes();
-    var seconds = date.getSeconds();
-
-    return year + "-" + month + "-" + day + " " + hours + ":" + minutes + ":" + seconds
+    return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
 },
-
 }
 
 export default func

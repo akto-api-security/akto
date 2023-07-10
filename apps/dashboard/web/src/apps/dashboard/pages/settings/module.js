@@ -1,4 +1,5 @@
 import settingRequests from './api';
+import func from '@/util/func';
 
 const settingFunctions = {
     getTokenList: async function (type){
@@ -66,7 +67,41 @@ const settingFunctions = {
 
       await settingRequests.saveAktoGptConfig(arr)
     },
-    
+    fetchLoginInfo: async function(){
+      let lastLogin = ''
+      await settingRequests.fetchUserLastLoginTs().then((resp)=>{
+        lastLogin = func.epochToDateTime (resp.lastLoginTs);
+      })
+      return lastLogin
+    },
+    fetchAdminInfo: async function(){
+      const loginInfo = await this.fetchLoginInfo()
+      let arr = []
+      await settingRequests.fetchAdminSettings().then((response)=>{
+        let resp = response.accountSettings
+        arr = [
+          {
+            title: 'Organisation',
+            text: 'Akto'
+          },
+          {
+            title: 'Organisation ID',
+            text: resp.id,
+          },{
+            title: 'Dashboard Version',
+            text: resp.dashboardVersion,
+          },{
+            title: 'Runtime Version',
+            text: resp.apiRuntimeVersion
+          },
+          {
+            title: 'Last Login',
+            text: loginInfo,
+          },
+        ]
+      })
+      return arr
+    }
 }
 
 export default settingFunctions
