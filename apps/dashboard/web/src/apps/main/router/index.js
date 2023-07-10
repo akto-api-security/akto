@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import func from "@/util/func";
 const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
@@ -23,6 +24,7 @@ const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes"
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
+const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
 
 Vue.use(Router)
 
@@ -90,7 +92,7 @@ const router =  new Router({
                             name: 'testResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: true
+                                type: func.testingType().active
                             })
                         },
                         {
@@ -98,7 +100,7 @@ const router =  new Router({
                             name: 'testResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: false
+                                type: func.testingType().inactive
                             })
                         },
                         {
@@ -106,7 +108,15 @@ const router =  new Router({
                             name: 'inactiveTestResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: false
+                                type: func.testingType().inactive
+                            })
+                        },
+                        {
+                            path: 'cicd',
+                            name: 'cicdTestResults',
+                            component: TestingRunsTable,
+                            props: route => ({
+                                type: func.testingType().cicd
                             })
                         },
                         {
@@ -227,6 +237,18 @@ const router =  new Router({
                             })
                         }
                     ]                    
+                },
+                {
+                    path: 'test-editor',
+                    redirect: '/dashboard/test-editor/REMOVE_TOKENS'
+                },
+                {
+                    path: 'test-editor/:testId',
+                    name: 'test-editor-id',
+                    component: TextEditor,
+                    props: route => ({
+                        defaultTestId: decodeURIComponent(route.params.testId)
+                    })    
                 }
             ]
         },

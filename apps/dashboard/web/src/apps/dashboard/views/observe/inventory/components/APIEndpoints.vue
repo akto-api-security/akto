@@ -1,20 +1,6 @@
 <template>
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
-        <v-dialog
-            v-model="showGptDialog"
-            width="fit-content" 
-            content-class="dialog-no-shadow"
-            overlay-opacity="0.7"
-        >
-            <div class="gpt-dialog-container ma-0">
-                <chat-gpt-input
-                    v-if="showGptDialog"
-                    :items="chatGptPrompts"
-                />
-            </div>
-
-        </v-dialog>
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
@@ -181,13 +167,6 @@
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
-
-        <div class="fix-at-top">
-            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
-                Ask AktoGPT 
-                <v-icon size="16">$chatGPT</v-icon>
-            </v-btn>
-        </div>
     </div>
 </template>
 
@@ -210,7 +189,6 @@ import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
-import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput'
 
 export default {
     name: "ApiEndpoints",
@@ -227,7 +205,6 @@ export default {
         WorkflowTestBuilder,
         TestsSelector,
         SecondaryButton,
-        ChatGptInput
     },
     props: {
         apiCollectionId: obj.numR
@@ -238,32 +215,6 @@ export default {
     data() {
         return {
             filteredItems: [],
-            chatGptPrompts: [
-                {
-                    icon: "$fas_magic",
-                    label: "Create API groups",
-                    prepareQuery: () => { return {
-                        type: "group_apis_by_functionality",
-                        meta: {
-                            "urls": this.filteredItems.map(x => x.endpoint)
-                        }                        
-                    }},
-                    callback: (data) => console.log("callback create api groups", data)
-                },
-                {
-                    icon: "$fas_layer-group",
-                    label: "Tell me APIs related to ${input}",
-                    prepareQuery: (filterApi) => { return {
-                        type: "list_apis_by_type",
-                        meta: {
-                            "urls": this.filteredItems.map(x => x.endpoint),
-                            "type_of_apis": filterApi
-                        }                        
-                    }},
-                    callback: (data) => console.log("callback Tell me all the apis", data)
-                }
-            ],
-            showGptDialog: false,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
@@ -400,12 +351,10 @@ export default {
     methods: {
         filterApplied(data) {
             this.filteredItems = data
+            this.$store.commit('inventory/FILTERED_ITEMS', data)
         },
-        showGPTScreen(){
-            this.showGptDialog = true
-        },
-        rowClicked(row) {
-            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
+        rowClicked(row,$event) {
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2},$event)
         },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
@@ -435,6 +384,14 @@ export default {
                 // of the file in the v-model prop
                 
                 let isHar = file.name.endsWith(".har")
+                if(isHar && file.size >= 52428800){
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: "Please limit the file size to less than 50 MB",
+                        color: 'red'
+                    })
+                    return
+                }
                 let isJson = file.name.endsWith(".json")
                 let isPcap = file.name.endsWith(".pcap")
                 if (isHar || isJson) {
@@ -445,7 +402,46 @@ export default {
                 reader.onload = async () => {
                     let skipKafka = false;//window.location.href.indexOf("http://localhost") != -1
                     if (isHar) {
-                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                        var formData = new FormData();
+                        formData.append("harString", reader.result)
+                        formData.append("hsFile", reader.result)
+                        formData.append("skipKafka", skipKafka)
+                        window._AKTO.$emit('SHOW_SNACKBAR', {
+                            show: true,
+                            text: "We are uploading your har file, please dont refresh the page!",
+                            color: 'green'
+                        })
+                        this.$store.dispatch('inventory/uploadHarFile', { formData }).then(resp => {
+                            if(file.size > 2097152){
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "We have successfully read your file, please refresh the page in a few mins to check your APIs",
+                                    color: 'green'
+                                })
+                            }
+                            else {
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "Your Har file has been successfully processed, please refresh the page to see your APIs",
+                                    color: 'green'
+                                })
+                            }
+                        }).catch(err => {
+                            if(err.message.includes(404)){
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "Please limit the file size to less than 50 MB",
+                                    color: 'red'
+                                })
+                            } else {
+                                window._AKTO.$emit('SHOW_SNACKBAR', {
+                                    show: true,
+                                    text: "Something went wrong while processing the file",
+                                    color: 'red'
+                                })
+                            }
+                        })
+
                     } else if (isPcap) {
                         var arrayBuffer = reader.result
                         var bytes = new Uint8Array(arrayBuffer);
@@ -534,16 +530,16 @@ export default {
                 }
             })
         },
-        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests}) {
+        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
             if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
+                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl})
             } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
+                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source: "TESTING_UI"})
             }
             
             this.showTestSelectorDialog = false            
@@ -594,19 +590,15 @@ export default {
             } catch (e) {
             }
             return ret
-        }
+        },
     },
-    async mounted() {}
+    async mounted() {
+        
+    }
 }
 </script>
 
 <style lang="sass" scoped>  
-.fix-at-top
-    position: absolute
-    right: 260px
-    top: 18px
-.gpt-dialog-container
-    background-color: var(--gptBackground)
 .api-endpoints
     & .table-column
         &:nth-child(1)    

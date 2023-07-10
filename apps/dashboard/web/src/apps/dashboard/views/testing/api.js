@@ -1,22 +1,12 @@
 import request from '@/util/request'
 
 export default {
-    fetchActiveTestingDetails() {
-        return request({
-            url: '/api/retrieveAllCollectionTests',
-            method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    fetchPastTestingDetails({startTimestamp, endTimestamp}) {
+    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd}) {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, 
-                endTimestamp
+                startTimestamp, endTimestamp, fetchCicd
             }
         }).then((resp) => {
             return resp
@@ -54,21 +44,21 @@ export default {
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests}
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}
         }).then((resp) => {
             return resp
         })        
@@ -83,7 +73,24 @@ export default {
             return resp
         })        
     },
-
+    addTestTemplate(content,originalTestId) {
+        return request({
+            url: '/api/saveTestEditorFile',
+            method: 'post',
+            data:{content, originalTestId}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    runTestForTemplate(content, apiInfoKey) {
+        return request({
+            url: '/api/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
@@ -116,12 +123,32 @@ export default {
         })
     },
 
+    fetchTestingRunResultFromTestingRun(testingRunHexId) {
+        return request({
+            url: '/api/fetchTestingRunResultFromTestingRun',
+            method: 'post',
+            data: {
+                testingRunHexId
+            }
+        })
+    },
+
     fetchIssueFromTestRunResultDetails(testingRunResultHexId) {
         return request({
             url: '/api/fetchIssueFromTestRunResultDetails',
             method: 'post',
             data: {
                 testingRunResultHexId
+            }
+        })
+    },
+
+    fetchIssueFromTestRunResultDetailsForTestEditor(testingRunResultHexId, isTestRunByTestEditor) {
+        return request({
+            url: '/api/fetchIssueFromTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId, isTestRunByTestEditor
             }
         })
     },

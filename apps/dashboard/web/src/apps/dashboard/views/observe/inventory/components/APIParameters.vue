@@ -3,28 +3,6 @@
         <spinner/>
     </div>
     <div v-else>
-        <div class="fix-at-top" v-if="allSamples && allSamples.length > 0">
-            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
-                Ask AktoGPT 
-                <v-icon size="16">$chatGPT</v-icon>
-            </v-btn>
-        </div>
-
-        <v-dialog
-            v-model="showGptDialog"
-            width="fit-content" 
-            content-class="dialog-no-shadow"
-            overlay-opacity="0.7"
-        >
-            <div class="gpt-dialog-container ma-0">
-                <chat-gpt-input
-                    v-if="showGptDialog"
-                    :items="chatGptPrompts"
-                />
-            </div>
-
-        </v-dialog>
-
         <v-row>
             <v-col md="6">
                 <sensitive-params-card title="Sensitive parameters" :sensitiveParams="sensitiveParamsForChart"/>
@@ -97,7 +75,6 @@ import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitivePar
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
-import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput.vue'
 
 import api from '../api'
 import SampleDataList from '@/apps/dashboard/shared/components/SampleDataList'
@@ -113,8 +90,7 @@ export default {
     LineChart,
     Spinner,
     SampleData,
-    SampleDataList,
-    ChatGptInput
+    SampleDataList
 },
     props: {
         urlAndMethod: obj.strR,
@@ -122,20 +98,6 @@ export default {
     },
     data () {
         return {
-            showGptDialog:false,
-            chatGptPrompts: [
-                {
-                    icon: "$fas_user-lock",
-                    label: "Fetch Sensitive Params",
-                    prepareQuery: () => { return {
-                        type: "list_sensitive_params",
-                        meta: {
-                            "sampleData": this.parseMsg(this.allSamples[0].message)
-                        }                        
-                    }},
-                    callback: (data) => console.log("callback create api groups", data)
-                }
-            ],
             headers: [
                 {
                     text: '',
@@ -179,22 +141,10 @@ export default {
             loadingTrafficData: false,
             trafficInfo: {},
             sampleData: null,
-            sensitiveSampleData: null
+            sensitiveSampleData: null,
         }  
     },
     methods: {
-        parseMsg(jsonStr) {
-            let json = JSON.parse(jsonStr)
-            return {
-                request: JSON.parse(json.requestPayload),
-                response: JSON.parse(json.responsePayload)
-            }
-        },
-        showGPTScreen(){
-            this.showGptDialog=true
-            console.log(this.sampleData)
-            console.log(this.sensitiveSampleData)
-        },
         prettifyDate(ts) {
             if (ts) {
                 return func.prettifyEpoch(ts)
@@ -241,13 +191,14 @@ export default {
             obj.savedAsSensitive = false
             obj.sensitive = false
             return !func.isSubTypeSensitive(obj)
-        }
+        },
+        allSamples(){
+            let arr =  [...(this.sampleData || []), ...(this.sensitiveSampleData || [])]
+            this.$store.commit('inventory/ALL_SAMPLED_DATA',arr)
+        },
     },
     computed: {
         ...mapState('inventory', ['parameters', 'parametersLoading']),
-        allSamples(){
-            return  [...(this.sampleData || []), ...(this.sensitiveSampleData || [])]
-        },
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
@@ -305,9 +256,10 @@ export default {
         },
         responseItems() {
             return this.parameters.filter(x => x.responseCode > -1).map(this.prepareItem)
-        }
+        },
     },
     async mounted() {
+        let _this = this;
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
         if (
             this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
@@ -353,18 +305,12 @@ export default {
 
             this.sensitiveSampleData.push({"message": c, "highlightPaths": highlightPaths})
         }
+        this.allSamples()
     }
 }
 </script>
 
 <style lang="sass" scoped>
-.fix-at-top
-    position: absolute
-    right: 260px
-    top: 18px
-.gpt-dialog-container
-    min-height: 300px
-    background-color: var(--gptBackground)
 .table-title
     font-size: 16px    
     color: var(--themeColorDark)

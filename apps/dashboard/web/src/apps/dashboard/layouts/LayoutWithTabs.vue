@@ -13,7 +13,7 @@
                 <slot name="title"/>
             </div>
             <div class="d-flex justify-space-between">
-                <div class="pt-4 d-flex jc-sb" style="width: 100%">
+                <div class="control-padding d-flex jc-sb" style="width: 100%">
                     <div class="tabs-container">
                         <v-tabs
                             active-class="active-tab"
@@ -58,7 +58,8 @@
             description: obj.strN,
             defaultTabName: obj.strN,
             tabsContent: obj.objN,
-            tab: obj.strN
+            tab: obj.strN,
+            disableHash: obj.boolN
         },
         data () {
             return {
@@ -70,12 +71,22 @@
                 this.tabName = 0
             },
             setTabWithName(tabName) {
-                this.tabName = this.tabs.indexOf(tabName)
+                let tabRealName = tabName.replace("-"," ")
+                this.tabName = this.tabs.indexOf(tabRealName)
             }
         },
         watch: {
             defaultTabName: function (newVal) {
                 this.tabName = this.tabs.indexOf(newVal)
+            },
+            tabName: function (newVal) {
+                let tabName = this.tabs[newVal]
+                if(tabName){
+                    tabName = this.tabs[newVal].replace(" ", "-")
+                }
+                if (this.disableHash !== true) {
+                    window.location.hash = "#" + tabName
+                }
             }
         },
         mounted() {
@@ -85,6 +96,8 @@
                 if(tab){
                     this.setTabWithName(tab)
                 }
+            } else {
+                this.setTabWithName(window.location.hash.substring(1))
             }
         },
     }
@@ -120,4 +133,6 @@
 
 .tabs-container
     padding-left: 0px
+.control-padding
+    padding-top: 16px
 </style>

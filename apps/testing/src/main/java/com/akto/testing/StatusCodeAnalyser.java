@@ -6,8 +6,11 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -19,6 +22,7 @@ import com.mongodb.ConnectionString;
 import java.util.*;
 
 import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
+import static com.akto.testing.TestExecutor.findHost;
 
 public class StatusCodeAnalyser {
 
@@ -26,6 +30,7 @@ public class StatusCodeAnalyser {
     static JsonFactory factory = mapper.getFactory();
 
     static List<StatusCodeIdentifier> result = new ArrayList<>();
+    static Map<Integer, Integer> defaultPayloadsMap = new HashMap<>();
 
     public static class StatusCodeIdentifier {
         public Set<String> keySet;
@@ -42,11 +47,73 @@ public class StatusCodeAnalyser {
         }
     }
 
+    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
+        defaultPayloadsMap = new HashMap<>();
+        result = new ArrayList<>();
+
+        loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
+
+        calculateDefaultPayloads(sampleDataMap, testingRunConfig);
+
+        loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
+        fillResult(sampleDataMap, testingRunConfig);
+    }
+
+    public static void calculateDefaultPayloads(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
+        Set<String> hosts = new HashSet<>();
+        for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
+            String host;
+            try {
+                 host = findHost(apiInfoKey, sampleDataMap);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
+                continue;
+            }
+
+            hosts.add(host);
+        }
+
+        for (String host: hosts) {
+            loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
+            for (int idx=0; idx<11;idx++) {
+                try {
+                    String url = host;
+                    if (!url.endsWith("/")) url += "/";
+                    if (idx > 0) url += "akto-"+idx; // we want to hit host url once too
+
+                    OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
+                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig);
+                    boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
+                    if (!isStatusGood) continue;
+
+                    String body = response.getBody();
+                    fillDefaultPayloadsMap(body);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("", LogDb.TESTING);
+                }
+            }
+        }
+
+    }
+
+    public static void fillDefaultPayloadsMap(String body) {
+        int hash = body.hashCode();
+        Integer count = defaultPayloadsMap.getOrDefault(hash, 0);
+        defaultPayloadsMap.put(hash, count+1);
+    }
+
+    public static boolean isDefaultPayload(String payload) {
+        if (payload == null) return true;
+        int hash = payload.hashCode();
+        int occurrence = defaultPayloadsMap.getOrDefault(hash, 0);
+
+        return occurrence >= 5;
+    }
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
-    public static void run() {
+    public static void fillResult(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
         loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.fetchSampleMessages();
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null) {
@@ -76,7 +143,7 @@ public class StatusCodeAnalyser {
                 List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
                 boolean success;
                 try {
-                    success = fillFrequencyMap(messages, authMechanism, frequencyMap);
+                    success = fillFrequencyMap(messages, authMechanism, frequencyMap, testingRunConfig);
                 } catch (Exception e) {
                     inc += 1;
                     continue;
@@ -108,7 +175,8 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) throws Exception {
+    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism,
+                                           Map<Set<String>, Map<String,Integer>> frequencyMap, TestingRunConfig testingRunConfig) throws Exception {
 
         // fetch sample message
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
@@ -130,10 +198,12 @@ public class StatusCodeAnalyser {
         if (!result) return false;
 
         // execute API
-        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true);
+        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true, testingRunConfig);
 
         // if non 2xx then skip this api
         if (finalResponse.getStatusCode() < 200 || finalResponse.getStatusCode() >= 300) return false;
+
+        fillDefaultPayloadsMap(finalResponse.getBody());
 
         // store response keys and values in map
         String payload = finalResponse.getBody();

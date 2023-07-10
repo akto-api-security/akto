@@ -1,7 +1,10 @@
 package com.akto.rules;
 
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
@@ -10,9 +13,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
-import com.akto.testing.ApiExecutor;
+import com.akto.test_editor.filter.Filter;
 import com.akto.testing.StatusCodeAnalyser;
-import com.akto.testing.TestExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -22,8 +24,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
-import org.json.JSONObject;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,12 +40,12 @@ import static com.akto.runtime.APICatalogSync.trimAndSplit;
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    final LoggerMaker loggerMaker = new LoggerMaker(this.getClass());
+    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
 
-    public abstract Result  start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil);
+    public abstract Result  start(ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig);
 
     public abstract String superTestName();
     public abstract String subTestName();
@@ -141,7 +144,7 @@ public abstract class TestPlugin {
 
     public Result addWithoutRequestError(String originalMessage, TestResult.TestError testError) {
         List<TestResult> testResults = new ArrayList<>();
-        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, null));
+        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
         return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
@@ -153,7 +156,7 @@ public abstract class TestPlugin {
             loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e, LogDb.TESTING);
         }
 
-        return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);
+        return new TestResult(message, originalMessage, Collections.singletonList(testError.getMessage()), 0, false, TestResult.Confidence.HIGH, testInfo);
     }
 
     public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request, TestInfo testInfo) {
@@ -166,14 +169,14 @@ public abstract class TestPlugin {
     public TestResult buildTestResult(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage,
                                       double percentageMatch, boolean isVulnerable, TestInfo testInfo) {
 
-        List<TestResult.TestError> errors = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             logger.error("Error while converting OriginalHttpRequest to string", e);
             message = RedactSampleData.convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
-            errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING);
+            errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
         }
 
         return new TestResult(message, originalMessage, errors, percentageMatch, isVulnerable, TestResult.Confidence.HIGH, testInfo);
@@ -216,12 +219,16 @@ public abstract class TestPlugin {
                                          ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode,
                                          Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
-        String key = SingleTypeInfo.composeKey(
-                apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader,
-                param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
+        Bson filter = Filters.and(
+            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.eq("url", apiInfoKey.url),
+            Filters.eq("method", apiInfoKey.method.name()),
+            Filters.eq("responseCode", responseCode),
+            Filters.eq("isHeader", isHeader),
+            Filters.eq("param", param),
+            Filters.eq("isUrlParam", isUrlParam)
         );
-
-        SingleTypeInfo singleTypeInfo = singleTypeInfoMap.get(key);
+        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
 
         if (singleTypeInfo == null) return null;
 
@@ -329,58 +336,6 @@ public abstract class TestPlugin {
         return undocumentedMethods;
     }
 
-    public ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, RawApi rawApi) throws Exception {
-        OriginalHttpResponse testResponse = ApiExecutor.sendRequest(testRequest, followRedirects);;
-
-        OriginalHttpRequest originalHttpRequest = rawApi.getRequest().copy();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
-
-        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        PercentageMatchRequest percentMatchReq = getPercentageMatchRequest(originalHttpRequest, 2, followRedirects, originalHttpResponse);
-        double percentageMatch = compareWithOriginalResponse(percentMatchReq.getResponse().getBody(), testResponse.getBody(), percentMatchReq.getExcludedKeys());
-
-        String originalMessage = rawApi.getOriginalMessage();
-
-        Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
-        if (percentMatchReq.getResponse() != null) {
-            json.put("responsePayload", percentMatchReq.getResponse().getBody());
-            try {
-                JSONObject headers = new JSONObject();
-                for (String headerName: percentMatchReq.getResponse().getHeaders().keySet()) {
-                    List<String> headerValues = percentMatchReq.getResponse().getHeaders().get(headerName);
-                    String val =  String.join(";", headerValues);
-                    headers.put(headerName, val);
-                }
-                String responseHeaders = headers.toString();
-                json.put("responseHeaders", responseHeaders);
-            } catch (Exception e) {
-                logger.error("response exracting response header from percent match req");
-            }
-            originalMessage = gson.toJson(json);
-            rawApi.setOriginalMessage(originalMessage);
-        }
-
-        return new ApiExecutionDetails(statusCode, percentageMatch, testResponse, percentMatchReq.getResponse(), originalMessage);
-    }
-
-    private PercentageMatchRequest getPercentageMatchRequest(OriginalHttpRequest request, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
-
-        Map<String, Boolean> comparisonExcludedKeys = new HashMap<>();
-        PercentageMatchRequest percentMatchReq = new PercentageMatchRequest(originalHttpResponse, comparisonExcludedKeys);        
-        
-        SampleRequestReplayResponse sampleReplayResp = replaySampleReq(request, replayCount, followRedirects, originalHttpResponse);
-        ArrayList<OriginalHttpResponse> replayedResponses = sampleReplayResp.getReplayedResponses();
-        if (replayedResponses.size() < 2) {
-            return percentMatchReq;
-        }
-
-        comparisonExcludedKeys = getComparisonExcludedKeys(sampleReplayResp, sampleReplayResp.getReplayedResponseMap());
-        percentMatchReq.setExcludedKeys(comparisonExcludedKeys);
-        percentMatchReq.setResponse(replayedResponses.get(replayedResponses.size() - 1));
-
-        return percentMatchReq; 
-     }
-
     public static Map<String, Boolean> getComparisonExcludedKeys(SampleRequestReplayResponse sampleReplayResp, ArrayList<Map<String, Set<String>>> replayedResponseMap) {
 
         Map<String, Boolean> comparisonExcludedKeys = new HashMap<>();
@@ -405,39 +360,30 @@ public abstract class TestPlugin {
 
         return comparisonExcludedKeys;
     }
-    
-    private SampleRequestReplayResponse replaySampleReq(OriginalHttpRequest testRequest, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
-        
-        OriginalHttpResponse replayedResponse;
-        ArrayList<OriginalHttpResponse> replayedResponses = new ArrayList<>();
-        ArrayList<Map<String, Set<String>>> replayedResponseMap = new ArrayList<>();
-        
-        SampleRequestReplayResponse sampleReplayResp = new SampleRequestReplayResponse();
-        
-        for (int i = 0; i < replayCount; i++) {
-            try {
-                replayedResponse = ApiExecutor.sendRequest(testRequest, followRedirects);
-            } catch (Exception e) {
-                logger.error("request replay failed with error " + e.getMessage());
-                continue;
-            }
-            int replayedStatusCode = StatusCodeAnalyser.getStatusCode(replayedResponse.getBody(), replayedResponse.getStatusCode());
-            int originalStatusCode = StatusCodeAnalyser.getStatusCode(originalHttpResponse.getBody(), originalHttpResponse.getStatusCode());
-            if (replayedStatusCode == originalStatusCode) {
-                try {
-                    Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
-                    extractAllValuesFromPayload(replayedResponse.getBody(), originalResponseParamMap);
-                    replayedResponseMap.add(originalResponseParamMap);
-                    replayedResponses.add(replayedResponse);
-                } catch (Exception e) {
-                    continue;
-                }
-            }
-        }
 
-        sampleReplayResp.setReplayedResponseMap(replayedResponseMap);
-        sampleReplayResp.setReplayedResponses(replayedResponses);
-        return sampleReplayResp;
+    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (filterNode == null) return true;
+        if (rawApi == null) return false;
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
+    }
+
+    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (validatorNode == null) return true;
+        if (testRawApi == null) return false;
+
+        OriginalHttpResponse response = testRawApi.getResponse();
+        String body = response == null ? null : response.getBody();
+        boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
+        boolean validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
+
+        // loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
+        return !isDefaultPayload && validateResult;
+    }
+
+    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
+        Filter filter = new Filter();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId);
+        return dataOperandsFilterResponse.getResult();
     }
 
     public static class ApiExecutionDetails {
@@ -496,36 +442,6 @@ public abstract class TestPlugin {
             this.confidencePercentage = confidencePercentage;
         }
     }
-
-
-
-    public Result convertExecutorResultsToResult(List<BOLATest.ExecutorResult> results) {
-
-        if (results.isEmpty()) return null;
-
-        boolean vulnerable = false;
-
-        List<TestResult> testResults = new ArrayList<>();
-        for (BOLATest.ExecutorResult result: results) {
-            vulnerable = vulnerable || result.vulnerable;
-            TestResult testResult;
-            if (result.testError == null) {
-                testResult = buildTestResult(
-                        result.testRequest, result.testResponse, result.rawApi.getOriginalMessage(),
-                        result.percentageMatch, result.vulnerable, result.testInfo
-                );
-            } else {
-                testResult = buildFailedTestResultWithOriginalMessage(result.rawApi.getOriginalMessage(), result.testError, result.testRequest, result.testInfo);
-            }
-            testResults.add(testResult);
-        }
-
-
-        return addTestSuccessResult(
-                vulnerable, testResults, results.get(0).singleTypeInfos, TestResult.Confidence.HIGH
-        );
-    }
-
 
     public static class TestRoleMatcher {
         List<TestRoles> friends;

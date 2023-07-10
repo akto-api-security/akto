@@ -2,11 +2,9 @@ package com.akto.action;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import com.akto.utils.Utils;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
@@ -26,8 +24,8 @@ public class TestWebhookAction extends MongoBasedTest{
     @Test
     public void testFetchCustomWebhooks(){
         CustomWebhooksDao.instance.getMCollection().drop();
-        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
-        CustomWebhook customWebhook2 = new CustomWebhook(2,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
+        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, null, null, null);
+        CustomWebhook customWebhook2 = new CustomWebhook(2,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, null, null, null);
         CustomWebhooksDao.instance.insertOne(customWebhook);
         CustomWebhooksDao.instance.insertOne(customWebhook2);
 
@@ -71,7 +69,7 @@ public class TestWebhookAction extends MongoBasedTest{
     @Test
     public void testAddCustomWebhook(){
         CustomWebhooksDao.instance.getMCollection().drop();
-        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
+        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, Collections.singletonList(CustomWebhook.WebhookOptions.NEW_ENDPOINT), null, null);
         CustomWebhooksDao.instance.insertOne(customWebhook);
         
         WebhookAction webhookAction = new WebhookAction();
@@ -83,6 +81,7 @@ public class TestWebhookAction extends MongoBasedTest{
         webhookAction.setMethod(Method.POST);
         webhookAction.setFrequencyInSeconds(10);
         webhookAction.setActiveStatus(ActiveStatus.ACTIVE);
+        webhookAction.setSelectedWebhookOptions(Collections.singletonList(CustomWebhook.WebhookOptions.NEW_ENDPOINT));
 
         Map<String,Object> session = new HashMap<>();
         User user = new User();
@@ -98,7 +97,7 @@ public class TestWebhookAction extends MongoBasedTest{
     @Test
     public void testUpdateCustomWebhook(){
         CustomWebhooksDao.instance.getMCollection().drop();
-        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
+        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, Collections.singletonList(CustomWebhook.WebhookOptions.NEW_ENDPOINT), null, null);
         CustomWebhooksDao.instance.insertOne(customWebhook);
 
         WebhookAction webhookAction = new WebhookAction();
@@ -111,6 +110,7 @@ public class TestWebhookAction extends MongoBasedTest{
         webhookAction.setMethod(Method.POST);
         webhookAction.setFrequencyInSeconds(20);
         webhookAction.setActiveStatus(ActiveStatus.ACTIVE);
+        webhookAction.setSelectedWebhookOptions(Collections.singletonList(CustomWebhook.WebhookOptions.NEW_ENDPOINT));
 
         Map<String,Object> session = new HashMap<>();
         User user = new User();
@@ -126,7 +126,7 @@ public class TestWebhookAction extends MongoBasedTest{
     @Test
     public void testChangeStatus(){
         CustomWebhooksDao.instance.getMCollection().drop();
-        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
+        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, null, null, null);
         CustomWebhooksDao.instance.insertOne(customWebhook);
 
         WebhookAction webhookAction = new WebhookAction();
@@ -146,8 +146,8 @@ public class TestWebhookAction extends MongoBasedTest{
     @Test
     public void testDeleteCustomWebhook(){
         CustomWebhooksDao.instance.getMCollection().drop();
-        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
-        CustomWebhook customWebhook2 = new CustomWebhook(2,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE);
+        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, null, null, null);
+        CustomWebhook customWebhook2 = new CustomWebhook(2,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, null, null, null);
         CustomWebhooksDao.instance.insertOne(customWebhook);
         CustomWebhooksDao.instance.insertOne(customWebhook2);
 
@@ -162,6 +162,11 @@ public class TestWebhookAction extends MongoBasedTest{
         assertEquals("SUCCESS",result);
         List<CustomWebhook> customWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
         assertEquals(1,customWebhooks.size());
+    }
+
+    @Test
+    public void testValidURL() {
+        System.out.println(Utils.isValidURL("asdad"));
     }
 
 }

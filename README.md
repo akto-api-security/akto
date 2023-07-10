@@ -25,6 +25,12 @@
 
 # Akto.io API Security
 
+## Contributors
+<a href="https://github.com/akto-api-security/akto/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
+</a>
+
+
 # What is Akto?
 
 [How it works](https://docs.akto.io/#how-it-works) • [Getting-Started](https://docs.akto.io/#how-to-get-started) • [API Inventory](https://docs.akto.io/api-inventory/api-collections) • [API testing](https://docs.akto.io/testing/run-test) • [Add Test](https://docs.akto.io/testing/test-library) • [Join Discord community](https://discord.com/invite/Wpc6xVME4s) •
@@ -79,11 +85,6 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 
 </details>  
   
-## Contributors
-<a href="https://github.com/akto-api-security/akto/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
-</a>
-
 
 
 # Develop and contribute
@@ -163,8 +164,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 2. `cd ~/akto_code/akto`
 3. `cd apps/testing`
 4. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
-5. [OPTIONAL] To setup nuclei testing: Compile the nuclei executable from https://github.com/akto-api-security/nuclei-wrapper. Once executable is built add the path of executable to env variable "NUCLEI_EXECUTABLE_PATH".
-6. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
+5. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
 
   </details>  
   
@@ -188,6 +188,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
   d. A list of running Java processes with show up. Select the web server process to attach the debugger
 
 </details>  
+<a href="https://hits.sh/github.com/akto-api-security/hits.svg?label=Hits%20since%2020%2F5&color=FFFFFF&labelColor=FFFFFF"><img alt="Hits" src="https://hits.sh/github.com/akto-api-security/hits.svg?label=Hits%20since%2020%2F5&color=FFFFFF&labelColor=FFFFFF"/></a> 
   
 ## Contributing
 

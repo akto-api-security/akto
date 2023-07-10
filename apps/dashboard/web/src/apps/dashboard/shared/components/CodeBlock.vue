@@ -1,5 +1,5 @@
 <template>
-    <div class="master_div mt-2 mb-2">
+    <div class="master_div mb-2">
         <v-icon class="copy_btn mt-1 mr-1" v-on:click="copyContent">$fas_copy</v-icon>
         <div class="codeblock">
             <div class="mt-2  pt-1"></div>

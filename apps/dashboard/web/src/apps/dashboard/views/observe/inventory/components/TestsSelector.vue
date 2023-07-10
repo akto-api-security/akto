@@ -9,6 +9,11 @@
             <div class="d-flex" >
                 <div class="name-div">Name: </div>
                 <name-input :defaultName="collectionName" :defaultSuffixes="nameSuffixes" @changed="setTestName" />
+                <v-btn plain :ripple="false" class="pa-0" @click="deselectAll">
+                    <v-chip small color="var(--lighten2)" text-color="var(--themeColorDark)" class="tag-chip clickable">
+                        Remove all <v-icon  color="var(--themeColorDark)" style="max-width: 12px;" class="pl-1" size="12">$fas_times</v-icon>
+                    </v-chip>
+                </v-btn>
             </div>
             <div class="d-flex brda">
                 <div class="category-list-container">
@@ -111,7 +116,7 @@ export default {
         marketplaceApi.fetchAllMarketplaceSubcategories().then(resp => {
             _this.testSourceConfigs = resp.testSourceConfigs
             issuesApi.fetchAllSubCategories().then(resp => {
-                resp.subCategories.splice(resp.subCategories.findIndex(x => x.name === "CUSTOM_IAM"), 1)
+                //resp.subCategories.splice(resp.subCategories.findIndex(x => x.name === "CUSTOM_IAM"), 1)
                 _this.businessLogicSubcategories = resp.subCategories
                 _this.categories = resp.categories
                 _this.loading = false
@@ -127,6 +132,10 @@ export default {
         
     },
     methods: {
+        deselectAll() {
+            this.globalCheckbox = false
+            Object.keys(this.mapCategoryToSubcategory).map(kk => this.mapCategoryToSubcategory[kk].selected=[])
+        },
         getCategoryName(category) {
             return this.categories.find(x => x.name === category).displayName
         },
@@ -138,7 +147,7 @@ export default {
             let currObj = this.mapCategoryToSubcategory[this.selectedCategory]
             currObj.selected = this.globalCheckbox ? [...currObj.all] : []
         },
-        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests}) {
+        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}) {
             if (!this.testName) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -156,7 +165,8 @@ export default {
                 selectedTests, 
                 testRunTime,
                 maxConcurrentRequests,
-                testName: this.testName
+                testName: this.testName,
+                overriddenTestAppUrl
             }
             return this.$emit('testsSelected', ret)
         },
@@ -226,14 +236,16 @@ export default {
 
 .category-list-container
     width: 40%
+    min-width: 40%
+    max-width: 40%
     flex-grow: 0
 
 .test-list
-    height: 400px
+    height: 350px
     overflow: scroll
 
 .category-list
-    height: 400px
+    height: 350px
     overflow: scroll
 
 .column-title
@@ -266,4 +278,9 @@ export default {
 .disable-div
     pointer-events: none
     opacity: 0.4
+
+.tag-chip
+    font-weight: 400
+    font-size: 12px
+
 </style>

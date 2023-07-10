@@ -1,24 +1,29 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
+import com.akto.dao.demo.VulnerableRequestForTemplateDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.demo.VulnerableRequestForTemplate;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.enums.GlobalEnums.*;
@@ -36,7 +41,7 @@ public class IssuesAction extends UserAction {
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
-    private List<TestSubCategory> filterSubCategory;
+    private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private int startEpoch;
     private Bson createFilters () {
@@ -59,26 +64,17 @@ public class IssuesAction extends UserAction {
         if (startEpoch != 0) {
             filters = Filters.and(filters, Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch));
         }
-        return filters;
+
+        Bson combinedFilters = Filters.and(filters, Filters.ne("_id.testErrorSource", "TEST_EDITOR"));
+        
+        return combinedFilters;
     }
 
     public String fetchAffectedEndpoints() {
         Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
-        TestSubCategory subCategory = issueId.getTestSubCategory();
-        TestCategory superCategory;
-        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
-            superCategory = TestSourceConfigsDao.instance.getTestSourceConfig(issueId.getTestCategoryFromSourceConfig()).getCategory();
-        } else {
-            superCategory = issueId.getTestSubCategory().getSuperCategory();
-        }
-
-        List<TestSubCategory> subCategoryList = new ArrayList<>();
-        for (TestSubCategory sctg : TestSubCategory.getValuesArray()) {
-            if (sctg.getSuperCategory() == superCategory) {
-                subCategoryList.add(sctg);
-            }
-        }
+        
+        String subCategory = issueId.getTestSubCategory();
         List<TestSourceConfig> sourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         List<String> sourceConfigIds = new ArrayList<>();
         for (TestSourceConfig sourceConfig : sourceConfigs) {
@@ -86,7 +82,7 @@ public class IssuesAction extends UserAction {
         }
         Bson filters = Filters.and(
                 Filters.or(
-                        Filters.in(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategoryList),
+                        Filters.eq(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategory),
                         Filters.in(ID + "." + TestingIssuesId.TEST_CATEGORY_FROM_SOURCE_CONFIG, sourceConfigIds)
                 ), Filters.ne(ID, issueId));
         similarlyAffectedIssues = TestingRunIssuesDao.instance.findAll(filters, 0,3, sort);
@@ -101,7 +97,8 @@ public class IssuesAction extends UserAction {
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
 
         for (TestingRunIssues runIssue : issues) {
-            if (runIssue.getId().getTestSubCategory().equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//TestSourceConfig case
+            // string comparison (nuclei test)
+            if (runIssue.getId().getTestSubCategory().startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
             }
@@ -114,11 +111,13 @@ public class IssuesAction extends UserAction {
         }
         TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
         String testSubType = null;
-        TestSubCategory subCategory = issue.getId().getTestSubCategory();
-        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
+        // ?? enum stored in db
+        String subCategory = issue.getId().getTestSubCategory();
+        // string comparison (nuclei test)
+        if (subCategory.startsWith("http")) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
-            testSubType = issue.getId().getTestSubCategory().getName();
+            testSubType = issue.getId().getTestSubCategory();
         }
         Bson filterForRunResult = Filters.and(
                 Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, issue.getLatestTestingRunSummaryId()),
@@ -129,13 +128,48 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private TestSubCategory[] subCategories;
+    private ArrayList<BasicDBObject> subCategories;
+    private List<VulnerableRequestForTemplate> vulnerableRequests;
     private TestCategory[] categories;
     private List<TestSourceConfig> testSourceConfigs;
     public String fetchAllSubCategories() {
-        this.subCategories = GlobalEnums.TestSubCategory.getValuesArray();
+
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true);
+        subCategories = new ArrayList<>();
+        for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
+            Info info = entry.getValue().getInfo();
+            if (info.getName().equals("FUZZING")) {
+                continue;
+            }
+            BasicDBObject infoObj = new BasicDBObject();
+            BasicDBObject superCategory = new BasicDBObject();
+            BasicDBObject severity = new BasicDBObject();
+            infoObj.put("issueDescription", info.getDescription());
+            infoObj.put("issueDetails", info.getDetails());
+            infoObj.put("issueImpact", info.getImpact());
+            infoObj.put("issueTags", info.getTags());
+            infoObj.put("testName", info.getName());
+            infoObj.put("references", info.getReferences());
+            infoObj.put("name", entry.getValue().getId());
+            infoObj.put("_name", entry.getValue().getId());
+            infoObj.put("content", entry.getValue().getContent());
+            infoObj.put("templateSource", entry.getValue().getTemplateSource());
+            infoObj.put("updatedTs", entry.getValue().getUpdateTs());
+            
+            superCategory.put("displayName", info.getCategory().getDisplayName());
+            superCategory.put("name", info.getCategory().getName());
+            superCategory.put("shortName", info.getCategory().getShortName());
+
+            severity.put("_name",info.getSeverity());
+            superCategory.put("severity", severity);
+            infoObj.put("superCategory", superCategory);
+            
+            subCategories.add(infoObj);
+        }
+
         this.categories = GlobalEnums.TestCategory.values();
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+        this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -254,11 +288,11 @@ public class IssuesAction extends UserAction {
         this.filterSeverity = filterSeverity;
     }
 
-    public List<TestSubCategory> getFilterSubCategory() {
+    public List<String> getFilterSubCategory() {
         return filterSubCategory;
     }
 
-    public void setFilterSubCategory(List<TestSubCategory> filterSubCategory) {
+    public void setFilterSubCategory(List<String> filterSubCategory) {
         this.filterSubCategory = filterSubCategory;
     }
 
@@ -286,7 +320,7 @@ public class IssuesAction extends UserAction {
         this.testingRunResult = testingRunResult;
     }
 
-    public TestSubCategory[] getSubCategories() {
+    public ArrayList<BasicDBObject> getSubCategories() {
         return this.subCategories;
     }
 
@@ -312,5 +346,13 @@ public class IssuesAction extends UserAction {
 
     public void setTestSourceConfigs(List<TestSourceConfig> testSourceConfigs) {
         this.testSourceConfigs = testSourceConfigs;
+    }
+
+    public List<VulnerableRequestForTemplate> getVulnerableRequests() {
+        return vulnerableRequests;
+    }
+
+    public void setVulnerableRequests(List<VulnerableRequestForTemplate> vulnerableRequests) {
+        this.vulnerableRequests = vulnerableRequests;
     }
 }

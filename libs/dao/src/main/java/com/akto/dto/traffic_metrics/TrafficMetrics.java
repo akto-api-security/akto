@@ -17,8 +17,27 @@ public class TrafficMetrics {
     }
 
     public enum Name {
-        OUTGOING_PACKETS_MIRRORING, OUTGOING_REQUESTS_MIRRORING, INCOMING_PACKETS_MIRRORING, TOTAL_REQUESTS_RUNTIME,
-        FILTERED_REQUESTS_RUNTIME
+        OUTGOING_PACKETS_MIRRORING("Bytes processed for HTTP data", "Bytes of data processed by traffic mirroring module"),
+        OUTGOING_REQUESTS_MIRRORING("API calls extracted", "Count of API req-resp processed by traffic mirroring module"),
+        INCOMING_PACKETS_MIRRORING("Bytes received", "Bytes of data received from traffic mirroring"),
+        TOTAL_REQUESTS_RUNTIME("API calls received", "Count of API req-resp recevied by runtime module"),
+        FILTERED_REQUESTS_RUNTIME("API calls processed", "Count of API req-resp processed successfully by runtime module");
+
+        private final String description;
+        private final String descriptionName;
+
+        Name(String descriptionName, String description){
+            this.descriptionName = descriptionName;
+            this.description = description;
+        }
+
+        public String getDescription(){
+            return this.description;
+        }
+
+        public String getDescriptionName(){
+            return this.descriptionName;
+        }
     }
 
     public static class Key {

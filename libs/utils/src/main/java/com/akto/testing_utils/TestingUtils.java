@@ -28,20 +28,30 @@ public class TestingUtils {
     }
 
     public static Map<TestingIssuesId, TestingRunResult> listOfIssuesIdsFromTestingRunResults(List<TestingRunResult> testingRunResults,
-                                                                                              boolean isAutomatedTesting) {
+                                                                                              boolean isAutomatedTesting, boolean triggeredByTestEditor) {
 
         HashMap<TestingIssuesId, TestingRunResult> mapOfIssueIdsvsTestingRunResult = new HashMap<>();
         List<TestingIssuesId> idList = new ArrayList<>();
         testingRunResults.forEach(runResult -> {
             String subType = runResult.getTestSubType();
             TestSourceConfig config = null;
-            GlobalEnums.TestSubCategory subCategory = GlobalEnums.TestSubCategory.getTestCategory(subType);
-            if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//Issue came from custom template
+            // name = subtype
+            String subCategory = subType;
+            // string comparison (nuclei test)
+            if (subCategory.startsWith("http")) {//Issue came from custom template
                 config = TestSourceConfigsDao.instance.getTestSourceConfig(subType);
             }
-            TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(),
-                    isAutomatedTesting ?
-                            GlobalEnums.TestErrorSource.AUTOMATED_TESTING : GlobalEnums.TestErrorSource.RUNTIME,
+
+            GlobalEnums.TestErrorSource testErrorSource;
+
+            if (triggeredByTestEditor) {
+                testErrorSource = GlobalEnums.TestErrorSource.TEST_EDITOR;
+            } else {
+                testErrorSource = isAutomatedTesting ?
+                GlobalEnums.TestErrorSource.AUTOMATED_TESTING : GlobalEnums.TestErrorSource.RUNTIME;
+            }
+
+            TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(), testErrorSource,
                     subCategory, config != null ?config.getId() : null);
             if (!doesExists(idList, issueId)) {
                 idList.add(issueId);

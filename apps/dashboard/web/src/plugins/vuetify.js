@@ -18,10 +18,14 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import NGINX from "../apps/dashboard/shared/icons/NGINX"
 import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
+import CICDIcon from "../apps/dashboard/shared/icons/CICDIcon"
 import ChatGPT from "../apps/dashboard/shared/icons/ChatGPT"
+import SaveIcon from "../apps/dashboard/shared/icons/SaveIcon"
+import TestEditorIcon from "../apps/dashboard/shared/icons/TestEditorIcon"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -119,6 +123,7 @@ import {
   faLayerGroup,
   faPaperPlane,
   faUserGraduate,
+  faArrowUp,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -154,7 +159,7 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,faEllipsisH,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,faUserGraduate,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,faUserGraduate,faArrowUp,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle, faBook, farCircle, farDotCircle, farPaperPlane,
@@ -262,8 +267,25 @@ faIconsOpts.trashDoubleTick = {
   component: TrashDoubleTick
 }
 
+faIconsOpts.cicdicon = {
+  component: CICDIcon
+
+}
+
+faIconsOpts.nginx = {
+  component: NGINX
+}
+
 faIconsOpts.chatGPT = {
   component: ChatGPT
+}
+
+faIconsOpts.saveIcon = {
+  component: SaveIcon
+}
+
+faIconsOpts.testEditorIcon = {
+  component: TestEditorIcon
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {

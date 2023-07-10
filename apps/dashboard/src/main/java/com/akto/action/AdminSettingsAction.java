@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class AdminSettingsAction extends UserAction {
 
     AccountSettings accountSettings;
+    private int globalRateLimit = 0;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     @Override
@@ -32,6 +33,14 @@ public class AdminSettingsAction extends UserAction {
                 new UpdateOptions().upsert(true)
         );
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateGlobalRateLimit() {
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.GLOBAL_RATE_LIMIT, globalRateLimit));
         return SUCCESS.toUpperCase();
     }
 
@@ -125,4 +134,11 @@ public class AdminSettingsAction extends UserAction {
         this.newMergingEnabled = newMergingEnabled;
     }
 
+    public int getGlobalRateLimit() {
+        return globalRateLimit;
+    }
+
+    public void setGlobalRateLimit(int globalRateLimit) {
+        this.globalRateLimit = globalRateLimit;
+    }
 }

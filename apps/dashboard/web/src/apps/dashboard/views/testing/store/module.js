@@ -9,6 +9,7 @@ const state = {
     loading: false,
     testingRuns: [],
     pastTestingRuns: [],
+    cicdTestingRuns: [],
     authMechanism: null,
     testingRunResults: []
 }
@@ -23,10 +24,14 @@ const testing = {
             state.authMechanism = null
             state.testingRunResults = []
             state.pastTestingRuns = []
+            state.cicdTestingRuns = []
         },
         SAVE_DETAILS (state, {authMechanism, testingRuns}) {
             state.authMechanism = authMechanism
             state.testingRuns = testingRuns
+        },        
+        SAVE_CICD_DETAILS (state, {testingRuns}) {
+            state.cicdTestingRuns = testingRuns
         },
         SAVE_PAST_DETAILS (state, {testingRuns}) {
             state.pastTestingRuns = testingRuns
@@ -45,30 +50,33 @@ const testing = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
+        async loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
             commit('EMPTY_STATE')
             state.loading = true
-            return api.fetchActiveTestingDetails().then((resp) => {
+            await api.fetchTestingDetails({startTimeStamp:0, endTimeStamp:0, fetchCicd:false}).then((resp) => {
                 commit('SAVE_DETAILS', resp)
-
-                api.fetchPastTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
-                    commit('SAVE_PAST_DETAILS', resp2)
-                }).catch(() => {
-
-                })
-
-                state.loading = false
             }).catch(() => {
                 state.loading = false
             })
+            await api.fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd:false}).then(resp2 => {
+                commit('SAVE_PAST_DETAILS', resp2)
+            }).catch(() => {
+                state.loading = false
+            })
+            await api.fetchTestingDetails({startTimeStamp:0, endTimeStamp:0, fetchCicd:true}).then(resp3 => {
+                commit('SAVE_CICD_DETAILS',resp3)
+            }).catch(() => {
+                state.loading = false
+            })
+            state.loading = false
         },
         startTestForCollection({commit}, {apiCollectionId, testName}) {
             return api.startTestForCollection(apiCollectionId, testName).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName,testRunTime, maxConcurrentRequests} ) {
-            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests).then((resp) => {
+        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName,testRunTime, maxConcurrentRequests, overriddenTestAppUrl} ) {
+            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
@@ -77,14 +85,19 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests} ) {
-            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests).then((resp) => {
+        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source} ) {
+            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
         addAuthMechanism({commit}, {type, requestData, authParamData}) {
             return api.addAuthMechanism(type, requestData, authParamData).then(resp => {
-                commit('SAVE_AUTH_MECHANISM', resp)
+
+            })
+        },
+        addTestTemplate({commit},{content, originalTestId}) {
+            return api.addTestTemplate(content, originalTestId).then(resp => {
+                return resp
             })
         },
         loadTestingRunResults({commit}) {

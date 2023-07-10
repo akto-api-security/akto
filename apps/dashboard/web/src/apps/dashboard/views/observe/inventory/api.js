@@ -28,13 +28,11 @@ export default {
             }
         })
     },
-    uploadHarFile(content, apiCollectionId, skipKafka) {
+    uploadHarFile(formData) {
         return request({
             url: '/api/uploadHar',
             method: 'post',
-            data: {
-                content, apiCollectionId, skipKafka
-            }
+            data: formData,
         })
     },
     uploadTcpFile(content, apiCollectionId, skipKafka) {
@@ -365,6 +363,15 @@ export default {
             url: '/api/setFalsePositives',
             method: 'post',
             data: {falsePositives:falsePositives}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchAktoGptConfig(apiCollectionId){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {apiCollectionId}
         }).then((resp) => {
             return resp
         })
