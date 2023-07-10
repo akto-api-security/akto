@@ -98,6 +98,21 @@ const test_roles = {
                     this.loading = false
                 })
                 }
+        },
+        async addAuthToRole({commit}, {roleName, apiCond, authParamData}) {
+            state.loading = true
+            let resp = await api.addAuthToRole(roleName, apiCond, authParamData)
+            commit('SAVE_SELECTED_ROLE', resp);
+            commit('UPDATE_TESTROLES', resp);
+
+            state.loading = false
+        },
+        async deleteAuthFromRole({commit}, {roleName, index}) {
+            state.loading = true
+            let resp = await api.deleteAuthFromRole(roleName, index)
+            commit('SAVE_SELECTED_ROLE', resp);
+            commit('UPDATE_TESTROLES', resp);
+            state.loading = false
         }
     },
     getters: {

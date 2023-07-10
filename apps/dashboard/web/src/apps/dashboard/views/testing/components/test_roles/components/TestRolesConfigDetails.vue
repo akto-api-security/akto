@@ -42,33 +42,7 @@
                         </v-row>
                     </div>
 
-                    <div class="d-flex pt-4">
-                        <div class="form-text">
-                            Auth token
-                        </div>
-
-                        <div class="input-value">
-                            <v-text-field v-model="newKey" style="width: 200px">
-                                <template slot="label">
-                                    <div class="d-flex">
-                                        Auth header key
-                                    </div>
-                                </template>
-                            </v-text-field>
-
-                        </div>
-                        <div class="input-value">
-                            <v-text-field v-model="newVal" style="width: 500px">
-                                <template slot="label">
-                                    <div class="d-flex">
-                                        Auth header value
-                                    </div>
-                                </template>
-
-                            </v-text-field>
-                        </div>
-                    </div>
-
+                    <role-auth-mechanism/>
 
                     <v-row style="padding-top: 30px">
                         <div style="padding: 12px">
@@ -134,12 +108,14 @@ import { mapState } from "vuex";
 import func from "@/util/func";
 import api from "../api"
 import SimpleTextField from "@/apps/dashboard/shared/components/SimpleTextField.vue";
+import RoleAuthMechanism from "@/apps/dashboard/views/testing/components/test_roles/components/RoleAuthMechanism.vue";
 
 export default {
     name: "TestRolesConfigDetails",
     props: {
     },
     components: {
+      RoleAuthMechanism,
       SimpleTextField,
         ReviewTable,
         SimpleTable,

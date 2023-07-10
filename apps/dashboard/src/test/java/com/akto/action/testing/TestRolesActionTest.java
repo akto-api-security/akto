@@ -57,7 +57,6 @@ public class TestRolesActionTest extends MongoBasedTest {
 
         if (TestRolesAction.SUCCESS.toUpperCase().equals(action.createTestRole())) {
             assertEquals("admin", action.getSelectedRole().getName());
-            assertEquals(1, action.getSelectedRole().getAuthMechanism().getAuthParams().size());
         } else {
             fail();
         }
@@ -75,7 +74,6 @@ public class TestRolesActionTest extends MongoBasedTest {
         andConditionUtils.setPredicates(list);
 
         assertEquals(TestRolesAction.SUCCESS.toUpperCase(), action.updateTestRoles());
-        assertEquals(1, action.getSelectedRole().getAuthMechanism().getAuthParams().size());
 
 
     }

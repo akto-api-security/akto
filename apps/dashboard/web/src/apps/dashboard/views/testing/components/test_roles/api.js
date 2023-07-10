@@ -55,6 +55,20 @@ export default {
             return resp
         })
     },
+    addAuthToRole(roleName, apiCond, authParamData) {
+        return request({
+            url: '/api/addAuthToRole',
+            method: 'post',
+            data: {roleName, apiCond, authParamData}
+        })
+    },
+    deleteAuthFromRole(roleName, index) {
+        return request({
+            url: '/api/deleteAuthFromRole',
+            method: 'post',
+            data: {roleName, index}
+        })
+    },
     fetchCollectionWiseApiEndpoints (apiCollectionId) {
         return request({
             url: '/api/fetchCollectionWiseApiEndpoints',

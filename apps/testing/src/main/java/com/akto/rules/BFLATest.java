@@ -8,6 +8,7 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.info.BFLATestInfo;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
 import com.akto.util.Constants;
@@ -19,12 +20,15 @@ import org.bson.conversions.Bson;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class BFLATest extends AuthRequiredRunAllTestPlugin {
 
     public List<String> updateAllowedRoles(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         List<String> ret = new ArrayList<>();
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
+
+        /*
         testingUtil.getAuthMechanism().addAuthToRequest(testRequest);
         ApiExecutionDetails apiExecutionDetails;
         RawApi rawApiDuplicate = rawApi.copy();
@@ -37,19 +41,42 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
         } catch (Exception e) {
             return ret;
         }
+        */
 
         for (TestRoles testRoles: testingUtil.getTestRoles()) {
-            testRoles.getAuthMechanism().addAuthToRequest(testRequest);
-            rawApiDuplicate = rawApi.copy();
+            Map<String, List<String>> reqHeaders = testRequest.getHeaders();
+
+            for(AuthWithCond authWithCond: testRoles.getAuthWithCondList()) {
+                boolean allHeadersMatched = true;
+                if (authWithCond != null && authWithCond.getHeaderKVPairs() != null) {
+                    for(String hKey: authWithCond.getHeaderKVPairs().keySet()) {
+                        String hVal = authWithCond.getHeaderKVPairs().get(hKey);
+                        if (reqHeaders.containsKey(hKey.toLowerCase())) {
+                            if (reqHeaders.get(hKey.toLowerCase()).indexOf(hVal) == -1) {
+                                allHeadersMatched = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (allHeadersMatched) {
+                    authWithCond.getAuthMechanism().addAuthToRequest(testRequest);
+                    break;
+                }
+            }
+
+
+            RawApi rawApiDuplicate = rawApi.copy();
             try {
-                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
+                ApiExecutionDetails apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
+                if(isStatusGood(apiExecutionDetails.statusCode)) {
+                    ret.add(testRoles.getName());
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("BFLA Matrix update error" + e.toString(), LogDb.TESTING);
             }
 
-            if(isStatusGood(apiExecutionDetails.statusCode)) {
-                ret.add(testRoles.getName());
-            }
         }
 
         Bson q = Filters.eq(Constants.ID, apiInfoKey);
@@ -67,7 +94,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
         TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
 
         TestRoles normalUserTestRole = new TestRoles();
-        normalUserTestRole.setAuthMechanism(testingUtil.getAuthMechanism());
+        normalUserTestRole.getAuthWithCondList().get(0).setAuthMechanism(testingUtil.getAuthMechanism());
         testRoleMatcher.enemies.add(normalUserTestRole);
 
         List<ExecutorResult> executorResults = new ArrayList<>();
@@ -75,7 +102,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
         for (TestRoles testRoles: testRoleMatcher.enemies) {
             OriginalHttpRequest testRequest = rawApi.getRequest().copy();
 
-            testRoles.getAuthMechanism().addAuthToRequest(testRequest);
+            testRoles.getAuthWithCondList().get(0).getAuthMechanism().addAuthToRequest(testRequest);
             BFLATestInfo bflaTestInfo = new BFLATestInfo(
                     "NORMAL", testingUtil.getTestRoles().get(0).getName()
             );

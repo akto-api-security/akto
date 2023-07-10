@@ -14,14 +14,15 @@ import com.akto.dto.testing.AuthParamData;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class TestRolesAction extends UserAction {
     private List<TestRoles> testRoles;
@@ -30,6 +31,7 @@ public class TestRolesAction extends UserAction {
     private RolesConditionUtils orConditions;
     private String roleName;
     private List<AuthParamData> authParamData;
+    private Map<String, String> apiCond;
 
     public static class RolesConditionUtils {
         private Operator operator;
@@ -76,20 +78,28 @@ public class TestRolesAction extends UserAction {
             List<AuthParam> authParams = new ArrayList<>();
             authParams.add(param);
             AuthMechanism authM = new AuthMechanism(authParams, null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString());
-            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.AUTH_MECHANISM, authM));
-            role.setAuthMechanism(authM);
+            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond);
+            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
         }
     }
 
-    public String updateTestRoles() {
+    private TestRoles getRole() {
         if (roleName == null) {
             addActionError("Test role id is empty");
-            return ERROR.toUpperCase();
+            return null;
         }
 
         TestRoles role = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, roleName));
         if (role == null) {//Role doesn't exists
             addActionError("Role doesn't exists");
+            return null;
+        }
+
+        return role;
+    }
+    public String updateTestRoles() {
+        TestRoles role = getRole();
+        if (role == null) {
             return ERROR.toUpperCase();
         }
 
@@ -112,7 +122,6 @@ public class TestRolesAction extends UserAction {
             EndpointLogicalGroupDao.instance.updateLogicalGroup(logicalGroup, andConditions, orConditions);
         }
         role.setLastUpdatedTs(Context.now());
-        addAuthMechanism(role);
         this.selectedRole = role;
         this.selectedRole.setEndpointLogicalGroup(logicalGroup);
         TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()));
@@ -148,7 +157,6 @@ public class TestRolesAction extends UserAction {
                 createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
-        addAuthMechanism(selectedRole);
         return SUCCESS.toUpperCase();
     }
 
@@ -160,6 +168,33 @@ public class TestRolesAction extends UserAction {
             arrayList.add(predicate);
         }
         return arrayList;
+    }
+
+    private int index;
+    public String deleteAuthFromRole() {
+        TestRoles role = getRole();
+        if (role == null) {
+            return ERROR.toUpperCase();
+        }
+
+        Bson roleFilter = Filters.eq(TestRoles.NAME, roleName);
+        Bson removeFromArr = Updates.unset(TestRoles.AUTH_WITH_COND_LIST+"."+index);
+        Bson removeNull = Updates.pull(TestRoles.AUTH_WITH_COND_LIST, null);
+        TestRolesDao.instance.updateOne(roleFilter, removeFromArr);
+        TestRolesDao.instance.updateOne(roleFilter, removeNull);
+        this.selectedRole = getRole();
+        return SUCCESS.toUpperCase();
+    }
+
+    public String addAuthToRole() {
+        TestRoles role = getRole();
+        if (role == null) {
+            return ERROR.toUpperCase();
+        }
+
+        addAuthMechanism(role);
+        this.selectedRole = getRole();
+        return SUCCESS.toUpperCase();
     }
 
     public List<TestRoles> getTestRoles() {
@@ -206,6 +241,13 @@ public class TestRolesAction extends UserAction {
 
     public void setAuthParamData(List<AuthParamData> authParamData) {
         this.authParamData = authParamData;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
+    }
+    public void setApiCond(Map<String, String> apiCond) {
+        this.apiCond = apiCond;
     }
 
 }
