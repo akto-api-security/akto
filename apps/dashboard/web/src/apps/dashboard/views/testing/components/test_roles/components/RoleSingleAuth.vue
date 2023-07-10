@@ -24,8 +24,8 @@
 
       <div v-for="(headerV, headerK, index) in headerKVPairs" :key="'header_'+index">
         <v-row>
-          <v-col md="2" class="fw-500">{{headerK}}</v-col>
-          <v-col md="3" class="fw-500">{{headerV}}</v-col>
+          <v-col md="2" class="clipped-text fw-500">{{headerK}}</v-col>
+          <v-col md="3" class="clipped-text">{{headerV}}</v-col>
         </v-row>
       </div>
       <div v-if="Object.keys(headerKVPairs).length == 0">
