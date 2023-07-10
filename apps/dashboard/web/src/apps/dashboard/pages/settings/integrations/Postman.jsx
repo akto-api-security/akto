@@ -3,6 +3,7 @@ import {LegacyCard, Select} from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
+import Dropdown from '../../../components/layouts/Dropdown';
 
 function Postman() {
     
@@ -10,10 +11,9 @@ function Postman() {
     const [workspaces, setWorkspaces] = useState([]);
     const [selected, setSelected] = useState('');
 
-    const handleSelectChange = useCallback(
-        value=> setSelected(value),
-        [],
-    );
+    const handleSelectChange = (id) =>{
+      setSelected(id)
+    }
     
     async function fetchPostmanCred() {
       let postmanData = await settingFunctions.getPostmanCredentials();
@@ -64,11 +64,7 @@ function Postman() {
             />
           </LegacyCard.Section>    
           <LegacyCard.Section title="Select Postman workspace">
-            <Select options={workspaces} 
-                    helpText="Select the Postman workspace you wish to import."
-                    onChange={handleSelectChange}
-                    value={selected} 
-            /> 
+            <Dropdown helpText="Select the Postman workspace you wish to import." menuItems={workspaces} selected={handleSelectChange} initial={selected}/>
           </LegacyCard.Section> 
         </LegacyCard>
     )
