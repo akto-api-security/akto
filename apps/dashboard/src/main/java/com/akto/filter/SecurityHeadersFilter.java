@@ -1,12 +1,10 @@
 package com.akto.filter;
 
+import com.akto.utils.HttpUtils;
+
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import com.akto.dao.context.Context;
-import com.akto.utils.HttpUtils;
-
 import java.io.IOException;
 
 
