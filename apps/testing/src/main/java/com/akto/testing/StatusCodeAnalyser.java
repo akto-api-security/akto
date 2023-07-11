@@ -10,6 +10,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.AuthMechanismStore;
 import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -47,24 +48,27 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
+    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig) {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
-
+        if (sampleDataMap == null) {
+            loggerMaker.errorAndAddToDb("No sample data", LogDb.TESTING);
+            return;
+        }
         loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
 
-        calculateDefaultPayloads(sampleDataMap, testingRunConfig);
+        calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig);
 
         loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
-        fillResult(sampleDataMap, testingRunConfig);
+        fillResult(sampleMessageStore, sampleDataMap, authMechanismStore, testingRunConfig);
     }
 
-    public static void calculateDefaultPayloads(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
+    public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
         Set<String> hosts = new HashSet<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             String host;
             try {
-                 host = findHost(apiInfoKey, sampleDataMap);
+                 host = findHost(apiInfoKey, sampleDataMap, sampleMessageStore);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
                 continue;
@@ -112,10 +116,10 @@ public class StatusCodeAnalyser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
-    public static void fillResult(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
+    public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig) {
         loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
 
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
             loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
             return;
@@ -140,7 +144,7 @@ public class StatusCodeAnalyser {
 
             if (count > MAX_COUNT) break;
             try {
-                List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
+                List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
                 boolean success;
                 try {
                     success = fillFrequencyMap(messages, authMechanism, frequencyMap, testingRunConfig);

@@ -11,6 +11,11 @@ public class UserAccountEntry {
         this.accountId = accountId;
     }
 
+    public UserAccountEntry(int accountId, String name) {
+        this.accountId = accountId;
+        this.name = name;
+    }
+
     public int getAccountId() {
         return accountId;
     }

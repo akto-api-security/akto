@@ -197,7 +197,7 @@ public class TestTestPlugin extends MongoBasedTest {
     }
 
     private void insertIntoStiMap(ApiInfo.ApiInfoKey apiInfoKey, String param, SingleTypeInfo.SubType subType,
-                                  boolean isUrlParam, boolean isPrivate, Map<String, SingleTypeInfo> singleTypeInfoMap)  {
+                                  boolean isUrlParam, boolean isPrivate, SampleMessageStore sampleMessageStore)  {
         int apiCollectionId = apiInfoKey.getApiCollectionId();
         String url = apiInfoKey.getUrl();
         String method = apiInfoKey.getMethod().name();
@@ -217,7 +217,7 @@ public class TestTestPlugin extends MongoBasedTest {
             singleTypeInfo.setUniqueCount(10);
         }
 
-        singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
+        sampleMessageStore.getSingleTypeInfos().put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
     }
 
     @Test

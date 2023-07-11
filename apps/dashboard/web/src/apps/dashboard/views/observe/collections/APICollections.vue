@@ -2,6 +2,9 @@
     <div>   
         <spinner v-if="loading" />      
         <div v-else class="pt-8">
+            <div v-if="showTrafficHelper" style="padding-left: 28px">
+                <add-traffic-prompt/>
+            </div>
             <simple-table
                 :headers="headers" 
                 :items="apiCollectionsForTable"  
@@ -74,6 +77,7 @@ import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import BatchOperation from '../changes/components/BatchOperation'
 import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import AddTrafficPrompt from '../../../shared/components/AddTrafficPrompt.vue'
 
 export default {
     name: "ApiCollections",
@@ -83,7 +87,8 @@ export default {
         SimpleTextField,
         BatchOperation,
         ScheduleBox,
-        SecondaryButton
+        SecondaryButton,
+        AddTrafficPrompt
     },
     
     data() {
@@ -248,6 +253,13 @@ export default {
                     detected: func.prettifyEpoch(c.startTs)
                 }
             })
+        },
+        showTrafficHelper() {
+            let flag = true;
+            this.apiCollections.forEach((c) => {
+                if ((c.urlsCount) > 0) flag = false
+            })
+            return flag
         }
     },
     async mounted () {

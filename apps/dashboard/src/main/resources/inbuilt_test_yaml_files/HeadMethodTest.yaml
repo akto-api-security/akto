@@ -18,7 +18,7 @@ info:
           money transactions and sending personal messages."
   category:
     name: UHM
-    shortName: UHM
+    shortName: Unnecessary HTTP Methods
     displayName: Unnecessary HTTP Methods (UHM)
   subCategory: HEAD_METHOD_TEST
   severity: LOW

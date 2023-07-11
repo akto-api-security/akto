@@ -217,9 +217,10 @@ public class QuickStartAction extends UserAction {
     }
 
     private void invokeLambdaIfNecessary(StackState stackState){
+        int accountId = Context.accountId.get();
         Runnable runnable = () -> {
             if(Stack.StackStatus.CREATE_COMPLETE.toString().equals(this.stackState.getStatus())){
-                Context.accountId.set(1_000_000);
+                Context.accountId.set(accountId);
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if(!backwardCompatibility.isMirroringLambdaTriggered()){
                     try{
