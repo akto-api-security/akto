@@ -111,7 +111,8 @@ const Logs = () => {
 
             {
                 logGroupSelected ? 
-                    loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
+                    // loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
+                    <LogsContainer logs={logs} />  
                     : <Text variant="bodyMd">Select log group to fetch logs</Text>
             }
 
