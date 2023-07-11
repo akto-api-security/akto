@@ -6,7 +6,6 @@ import {
   HorizontalStack} from '@shopify/polaris';
 import {
   CircleCancelMinor,
-  CircleTickMinor,
   CalendarMinor,
   ReplayMinor,
   FraudProtectMinor,
@@ -14,10 +13,10 @@ import {
   ClockMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import func from '@/util/func';
 import Store from "../../../store";
-
-import { useState, useCallback, useEffect } from 'react';
+import TestingStore from "../testingStore";
+import { useEffect, useState } from 'react';
+import transform from "../transform";
 
 let headers = [
   {
@@ -70,69 +69,11 @@ let headers = [
   }
 ]
 
-const MAX_SEVERITY_THRESHOLD = 100000;
-
-function getOrderPriority(state){
-    switch(state._name){
-        case "RUNNING": return 1;
-        case "SCHEDULED": return 2;
-        case "STOPPED": return 4;
-        default: return 3;
-    }
-}
-
-function getTestingRunType(testingRun, testingRunResultSummary){
-    if(testingRunResultSummary.metadata!=null){
-        return 'CI/CD';
-    }
-    if(testingRun.periodInSeconds==0){
-        return 'One-time'
-    }
-    return 'Recurring';
-}
-
-function getTotalSeverity(countIssues){
-    let ts = 0;
-    if(countIssues==null){
-        return 0;
-    }
-    ts = MAX_SEVERITY_THRESHOLD*(countIssues['High']*MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
-    return ts;
-}
-
-function getRuntime(scheduleTimestamp ,endTimestamp, state){
-    if(state._name=='RUNNING'){
-        return "Currently running";
-    }
-    const currTime = Date.now();
-    if(endTimestamp == -1){
-      if(currTime > scheduleTimestamp){
-        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
-    } else {
-        return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
-    }
-}
-return 'Last run ' + func.prettifyEpoch(endTimestamp);
-}
-
-function getAlternateTestsInfo(state){
-    switch(state._name){
-        case "RUNNING": return "Tests are still running";
-        case "SCHEDULED": return "Tests have been scheduled";
-        case "STOPPED": return "Tests have been stopper";
-        default: return "Information unavailable";
-    }
-}
-
-function getTestsInfo(testResultsCount, state){
-    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
-}
-
 const sortOptions = [
-  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
-  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity' },
   { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp' },
   { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp' },
+  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
+  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity' },
 ];
 
 const resourceName = {
@@ -169,8 +110,6 @@ function disambiguateLabel(key, value) {
 }
 
 function TestRunsPage() {
-
-  const [testRuns, setTestRuns] = useState([])
 
   const setToastConfig = Store(state => state.setToastConfig)
   const setToast = (isActive, isError, message) => {
@@ -252,57 +191,20 @@ function getActions(item){
   return arr
 }
 
+const storeSetTestRuns = TestingStore(state => state.setTestRuns);
+const testRuns = TestingStore(state => state.testRuns);
+const [loading, setLoading] = useState(true);
+
 useEffect(()=>{
-  api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
-    // console.log(testingRuns, latestTestingRunResultSummaries)
-    let testRuns = []
-    testingRuns.forEach((data)=>{
-      let obj={};
-      let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']];
-      if(testingRunResultSummary==null){
-          testingRunResultSummary = {};
-      }
-      if(testingRunResultSummary.countIssues!=null){
-          testingRunResultSummary.countIssues['High'] = testingRunResultSummary.countIssues['HIGH']
-          testingRunResultSummary.countIssues['Medium'] = testingRunResultSummary.countIssues['MEDIUM']
-          testingRunResultSummary.countIssues['Low'] = testingRunResultSummary.countIssues['LOW']
-          delete testingRunResultSummary.countIssues['HIGH']
-          delete testingRunResultSummary.countIssues['MEDIUM']
-          delete testingRunResultSummary.countIssues['LOW']
-      }
-      obj['hexId'] = data.hexId;
-      obj['orderPriority'] = getOrderPriority(data.state)
-      obj['icon'] = func.getTestingRunIcon(data.state);
-      obj['name'] = data.name || "Test"
-      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
-      obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
-      obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
-      obj['scheduleTimestamp'] = data.scheduleTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
-      obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
-      obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
-      obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
-      obj['runTypeStatus'] = [obj['run_type']]
-      filters.forEach((filter, index) => {
-      let key = filter["key"]
-        switch(key){
-          case 'severityStatus' : obj["severityStatus"].map((item) => filter.availableChoices.add(item)); break;
-          case 'runTypeStatus' : obj["runTypeStatus"].map((item) => filter.availableChoices.add(item)); 
-        }
-        filters[index] = filter
-      })
-      testRuns.push(obj);
-  })
-  setTestRuns(testRuns);
-  filters.forEach((filter, index) => {
-      let choiceList = []
-      filter.availableChoices.forEach((choice) => {
-        choiceList.push({label:choice, value:choice})
-      })
-      filters[index].choices = choiceList
-    })  
-  })
-  
+  async function fetchData () {
+    await api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
+      let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
+      filters = transform.prepareFilters(testRuns,filters);
+      storeSetTestRuns(testRuns);
+      setLoading(false);
+    })
+  }
+  fetchData();
 }, [])
 
   return (
@@ -322,8 +224,8 @@ useEffect(()=>{
         headers={headers}
         getActions = {getActions}
         hasRowActions={true}
-        nextPage={"singleTestRunPage"}
-        // func={pull_data}
+        loading={loading}
+        page={1}
       />
     </VerticalStack>
   );

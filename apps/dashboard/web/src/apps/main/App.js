@@ -1,6 +1,8 @@
 import HomePage from "../dashboard/pages/home/HomePage"
 import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
+import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
+import PageTesting from "../dashboard/pages/testing/PageTesting";
 import { AppProvider } from "@shopify/polaris"
 import SignUp from "../signup/pages/SignUp"
 import {
@@ -25,12 +27,22 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/dashboard/testing",
-        element: <TestRunsPage />
-      },
-      {
-        path: "/dashboard/testing/:hexId",
-        element: <SingleTestRunPage />
-      },
+        element: <PageTesting />,
+        children:[
+          {
+            path: "/dashboard/testing",
+            element: <TestRunsPage />
+          },
+          {
+            path: "/dashboard/testing/:hexId",
+            element: <SingleTestRunPage />
+          },
+          {
+            path: "/dashboard/testing/:hexId/result/:hexId2",
+            element: <TestRunResultPage />
+          }
+        ]
+      }
     ]
   },
   {

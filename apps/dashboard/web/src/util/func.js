@@ -3,20 +3,20 @@ import {
   CalendarMinor,
   ClockMinor
 } from '@shopify/polaris-icons';
+import { saveAs } from 'file-saver'
 
 const func = {
-  toDateStr(date, needYear) {
-    var strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var d = date.getDate();
-    var m = strArray[date.getMonth()];
-    var y = date.getFullYear();
-    return m + ' ' + d + (needYear ? ' ' + y : '');
-  },
-  prettifyEpoch(epoch) {
-    var diffSeconds = (+Date.now()) / 1000 - epoch
-
-    var sign = 1
-    if (diffSeconds < 0) { sign = -1 }
+    toDateStr (date, needYear) {
+        let strArray=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        let d = date.getDate();
+        let m = strArray[date.getMonth()];
+        let y = date.getFullYear();
+        return m + ' ' + d + (needYear ? ' ' + y: '' );
+    },
+    prettifyEpoch(epoch) {
+        let diffSeconds = (+Date.now())/1000 - epoch
+        let sign = 1
+        if(diffSeconds < 0){sign = -1}
 
     if (diffSeconds < 120) {
       return '1 minute ago'
@@ -28,14 +28,11 @@ const func = {
       return Math.round(diffSeconds / 3600) + ' hours ago'
     }
 
-    var diffDays = diffSeconds / 86400
-
-    var diffWeeks = diffDays / 7
-
-    var diffMonths = diffDays / 30
-
-    var count = Math.round(diffDays)
-    var unit = 'day'
+        let diffDays = diffSeconds/86400
+        let diffWeeks = diffDays/7
+        let diffMonths = diffDays/30
+        let count = Math.round(diffDays)
+        let unit = 'day'
 
     if (diffMonths > 2) {
       return this.toDateStr(new Date(epoch * 1000), true)
@@ -51,7 +48,7 @@ const func = {
       return 'today'
     }
 
-    var plural = count <= 1 ? '' : 's'
+        let plural = count <= 1 ? '' : 's'
 
     return count + ' ' + unit + plural + ' ago'
   },
@@ -60,7 +57,6 @@ const func = {
     if (str == null) return ""
     return str[0].toUpperCase() + (str.length > 1 ? str.substring(1).toLowerCase() : "");
   },
-
   testingResultType() {
     return {
       BURP: "BURP",
@@ -76,6 +72,48 @@ const func = {
     } else {
       return ret
     }
+  },
+  valToString(val) {
+    if (val instanceof Set) {
+        return [...val].join(" & ")
+    } else {
+        return val || "-"
+    }
+  },
+  downloadAsCSV(data, selectedTestRun) {
+    // use correct function, this does not expand objects.
+    let headerTextToValueMap = Object.keys(data[0])
+  
+    let csv = headerTextToValueMap.join(",")+"\r\n"
+    data.forEach(i => {
+        csv += Object.values(headerTextToValueMap).map(h => this.valToString(i[h])).join(",") + "\r\n"
+    })
+    let blob = new Blob([csv], {
+        type: "application/csvcharset=UTF-8"
+    });
+    saveAs(blob, (selectedTestRun.name || "file") + ".csv");
+  },
+  flattenObject (obj, prefix = '') {
+    return Object.keys(obj).reduce((acc, k) => {
+      const pre = prefix.length ? `${prefix}.` : '';
+      if (
+        typeof obj[k] === 'object' &&
+        obj[k] !== null &&
+        Object.keys(obj[k]).length > 0
+      )
+        Object.assign(acc, this.flattenObject(obj[k], pre + k));
+      else acc[pre + k] = obj[k];
+      return acc;
+    }, {}) 
+  },
+  findInObjectValue (obj, query, keysToIgnore=[]){
+    let flattenedObject = this.flattenObject(obj);
+    let ret = false;
+    Object.keys(flattenedObject).forEach((key) => {
+      ret |= !keysToIgnore.some(ignore => key.toLowerCase().includes(ignore.toLowerCase())) && 
+      flattenedObject[key].toString().toLowerCase().includes(query);
+    })
+    return ret;
   },
   getSeverityStatus(countIssues) {
     return Object.keys(countIssues).filter((key) => {

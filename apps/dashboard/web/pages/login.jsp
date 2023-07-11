@@ -92,6 +92,27 @@
                 </script>
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
                 <div id="root"></div>
+                <script>
+                    // putting the generated json.worker.js file in root solves the error.
+                    self.MonacoEnvironment = {
+                    getWorkerUrl: function (moduleId, label) {
+                        if (label === 'json') {
+                            return '/dist/json.worker.js';
+                        }
+                        // if (label === 'css' || label === 'scss' || label === 'less') {
+                        // 	return './css.worker.bundle.js';
+                        // }
+                        // if (label === 'html' || label === 'handlebars' || label === 'razor') {
+                        // 	return './html.worker.bundle.js';
+                        // }
+                        // if (label === 'typescript' || label === 'javascript') {
+                        // 	return './ts.worker.bundle.js';
+                        // }
+                        return '/dist/editor.worker.js';
+                    }
+                    };
+
+                </script>
                 <script src="/dist/main.js"></script>
             </body>
 
