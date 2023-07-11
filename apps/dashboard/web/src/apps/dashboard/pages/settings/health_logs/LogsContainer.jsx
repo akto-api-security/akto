@@ -1,14 +1,15 @@
-import { Scrollable, Text } from "@shopify/polaris";
+import { Scrollable, Spinner } from "@shopify/polaris";
 import func from "../../../../../util/func";
 import { tokens } from "@shopify/polaris-tokens"
 
 const LogsContainer = ({ logs }) => {
 
+    console.log(logs)
+
     const logsFetchBetween = () => {
         let d1 = func.epochToDateTime(Math.floor(logs.startTime / 1000))
         let d2 = func.epochToDateTime(Math.floor(logs.endTime / 1000))
 
-        //return "Fetched logs from " + d1 + " to " + d2;
         return (
             <span>
                 <span>Fetched logs from </span>

@@ -1,9 +1,10 @@
-import { Button, ButtonGroup, HorizontalGrid, HorizontalStack, LegacyCard, Page, Scrollable, Select, Text } from "@shopify/polaris"
+import { Button, ButtonGroup, HorizontalGrid, HorizontalStack, LegacyCard, Page, Scrollable, Select, Spinner, Text } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "../../../../../util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -14,6 +15,7 @@ const Logs = () => {
         logGroup: '',
         logData: []
     })
+    const [ loading, setLoading ] = useState(false)
 
     const logGroupSelected = logs.logGroup !== ''
 
@@ -22,20 +24,21 @@ const Logs = () => {
         { label: "Dashboard", value: "DASHBOARD" },
         { label: "Testing", value: "TESTING" },
     ];
-    // const handleSelectLogGroup = (logGroup) => {
-    //     setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
-    // }
+  
     const handleSelectLogGroup = (logGroup) => {
        setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
     }
     
     const fetchLogsFromDb = async (startTime, endTime, refresh = false) => {
         if (logs.logGroup !== '') {
+            setLoading(true)
+
             const logsResponse = await settingRequests.fetchLogsFromDb(
                 Math.floor(startTime / 1000), 
                 Math.floor(endTime  / 1000),
                 logs.logGroup
             )
+            
             setLogs(previousState => (
                 {
                     ...logs,
@@ -43,6 +46,8 @@ const Logs = () => {
                     endTime: endTime,
                     logData: refresh ? [...logsResponse.logs] : [...logsResponse.logs, ...previousState.logData]
                 }))
+
+            setLoading(false)
         }
     }
 
@@ -91,13 +96,6 @@ const Logs = () => {
             <br />
 
             <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
-                {/* <Select
-                    labelHidden
-                    placeholder="Select log group level"
-                    options={logGroupOptions}
-                    onChange={handleSelectLogGroup}
-                    value={logs.logGroup}
-                /> */}
                 <Dropdown
                     menuItems={logGroupOptions}
                     initial="Select log group"
@@ -112,10 +110,10 @@ const Logs = () => {
             <br />
 
             {
-                logGroupSelected ? <LogsContainer logs={logs}/> : <Text variant="bodyMd">Select log group to fetch logs</Text>
+                logGroupSelected ? 
+                    loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
+                    : <Text variant="bodyMd">Select log group to fetch logs</Text>
             }
-
-           
 
         </LegacyCard>
     )
