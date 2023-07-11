@@ -21,7 +21,7 @@ import { useParams } from 'react-router';
 import { useState, useEffect } from 'react';
 import TestingStore from "../testingStore";
 import transform from "../transform";
-import PageWithMultipleCards from "../PageWithMultipleCards";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 
 let headers = [
   {

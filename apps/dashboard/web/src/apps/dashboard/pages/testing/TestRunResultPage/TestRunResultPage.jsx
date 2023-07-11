@@ -40,8 +40,7 @@ import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighligh
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
 import { useNavigate } from "react-router-dom";
-import PageWithMultipleCards from '../PageWithMultipleCards';
-
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 let headers = [
   {
     name: {

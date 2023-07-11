@@ -17,7 +17,7 @@ import Store from "../../../store";
 import TestingStore from "../testingStore";
 import { useEffect, useState } from 'react';
 import transform from "../transform";
-import PageWithMultipleCards from "../PageWithMultipleCards";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 
 let headers = [
   {
