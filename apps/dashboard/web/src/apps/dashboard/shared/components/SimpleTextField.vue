@@ -9,6 +9,7 @@
         required autofocus dense flat
         @keydown.enter="onSubmit"
         @keydown.esc="onEscape"
+        @keyup="onKeystroke"
     />
 </template>
 
@@ -33,6 +34,10 @@
                 this.newName = ''
                 e.stopPropagation()
                 this.$emit('changed', finalName)
+            },
+            onKeystroke(e) {
+                e.stopPropagation()
+                this.$emit('onKeystroke', this.newName)
             },
             onEscape() {
                 this.newName = ''

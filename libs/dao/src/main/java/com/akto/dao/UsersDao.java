@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.bson.conversions.Bson;
+
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Projections.include;
@@ -26,7 +28,7 @@ public class UsersDao extends CommonContextDao<User> {
 
     public static User addUser(String login, String name, String password, boolean emailValidated) {
         // Checking if the user with same login exists or not
-        if (UsersDao.instance.getMCollection().find(eq("login",login)).first() != null) {
+        if (UsersDao.instance.getMCollection().find(eq(User.LOGIN,login)).first() != null) {
             return null;
         }
         String salt = "39yu";
@@ -34,14 +36,14 @@ public class UsersDao extends CommonContextDao<User> {
         return null;
     }
 
-    public static void addAccount(String login, int accountId) {
-        BasicDBObject setQ = new BasicDBObject("accounts", new BasicDBObject(""+accountId, new UserAccountEntry(accountId)));
-        UsersDao.instance.getMCollection().updateOne(eq("login", login), new BasicDBObject("$set", setQ));
+    public static void addAccount(String login, int accountId, String name) {
+        BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + accountId,new UserAccountEntry(accountId, name));
+        UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ));
     }
 
     public User insertSignUp(String email, String name, SignupInfo info, int accountId) {
-        User user = findOne("login", email);
-        User ret = null;
+        User user = findOne(User.LOGIN, email);
+        User ret;
         UserAccountEntry userAccountEntry = new UserAccountEntry();
         userAccountEntry.setAccountId(accountId);
         userAccountEntry.setDefault(true);
@@ -85,8 +87,9 @@ public class UsersDao extends CommonContextDao<User> {
 
     final public static UsersDao instance = new UsersDao();
 
-    public User getFirstUser() {
-        MongoCursor<User> cursor = instance.getMCollection().find().sort(Sorts.ascending("_id")).limit(1).cursor();
+    public User getFirstUser(int accountId) {
+        Bson findQ = Filters.exists("accounts."+accountId);
+        MongoCursor<User> cursor = instance.getMCollection().find(findQ).sort(Sorts.ascending("_id")).limit(1).cursor();
         if (cursor.hasNext()) {
             return cursor.next();
         }

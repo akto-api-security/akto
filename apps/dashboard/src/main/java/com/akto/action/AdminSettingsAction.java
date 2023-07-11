@@ -6,6 +6,7 @@ import com.akto.dto.*;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.checkerframework.checker.units.qual.C;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -71,7 +72,7 @@ public class AdminSettingsAction extends UserAction {
     public String toggleRedactFeature() {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
-        boolean isAdmin = RBACDao.instance.isAdmin(user.getId());
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
         if (!isAdmin) return ERROR.toUpperCase();
 
         AccountSettingsDao.instance.getMCollection().updateOne(

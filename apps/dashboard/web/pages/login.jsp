@@ -47,14 +47,21 @@
                     window.SIGNUP_INFO = JSON.parse('${requestScope.signupInfo}' || '{}');
                     window.AVATAR = '${requestScope.avatar}';
                     window.USER_NAME = '${requestScope.username}';
-                    window.USERS = JSON.parse('${requestScope.users}' || '{}');
+                    window.USERS = '{}';
                     window.DASHBOARDS = JSON.parse(atob('${requestScope.dashboards}') || '[]');
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
+                    window.IS_SAAS = '${requestScope.isSaas}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
+
+                    if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
+                        window.DASHBOARD_MODE='LOCAL_DEPLOY'
+                        window.IS_SAAS='true'
+                    }
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 

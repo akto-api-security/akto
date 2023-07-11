@@ -132,39 +132,46 @@ public class IssuesAction extends UserAction {
     private List<VulnerableRequestForTemplate> vulnerableRequests;
     private TestCategory[] categories;
     private List<TestSourceConfig> testSourceConfigs;
+
+    public static BasicDBObject createSubcategoriesInfoObj(TestConfig testConfig) {
+        Info info = testConfig.getInfo();
+        if (info.getName().equals("FUZZING")) {
+            return null;
+        }
+        BasicDBObject infoObj = new BasicDBObject();
+        BasicDBObject superCategory = new BasicDBObject();
+        BasicDBObject severity = new BasicDBObject();
+        infoObj.put("issueDescription", info.getDescription());
+        infoObj.put("issueDetails", info.getDetails());
+        infoObj.put("issueImpact", info.getImpact());
+        infoObj.put("issueTags", info.getTags());
+        infoObj.put("testName", info.getName());
+        infoObj.put("references", info.getReferences());
+        infoObj.put("name", testConfig.getId());
+        infoObj.put("_name", testConfig.getId());
+        infoObj.put("content", testConfig.getContent());
+        infoObj.put("templateSource", testConfig.getTemplateSource());
+        infoObj.put("updatedTs", testConfig.getUpdateTs());
+
+        superCategory.put("displayName", info.getCategory().getDisplayName());
+        superCategory.put("name", info.getCategory().getName());
+        superCategory.put("shortName", info.getCategory().getShortName());
+
+        severity.put("_name",info.getSeverity());
+        superCategory.put("severity", severity);
+        infoObj.put("superCategory", superCategory);
+        return infoObj;
+    }
+
     public String fetchAllSubCategories() {
 
         Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
-            Info info = entry.getValue().getInfo();
-            if (info.getName().equals("FUZZING")) {
-                continue;
+            BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
+            if (infoObj != null) {
+                subCategories.add(infoObj);
             }
-            BasicDBObject infoObj = new BasicDBObject();
-            BasicDBObject superCategory = new BasicDBObject();
-            BasicDBObject severity = new BasicDBObject();
-            infoObj.put("issueDescription", info.getDescription());
-            infoObj.put("issueDetails", info.getDetails());
-            infoObj.put("issueImpact", info.getImpact());
-            infoObj.put("issueTags", info.getTags());
-            infoObj.put("testName", info.getName());
-            infoObj.put("references", info.getReferences());
-            infoObj.put("name", entry.getValue().getId());
-            infoObj.put("_name", entry.getValue().getId());
-            infoObj.put("content", entry.getValue().getContent());
-            infoObj.put("templateSource", entry.getValue().getTemplateSource());
-            infoObj.put("updatedTs", entry.getValue().getUpdateTs());
-            
-            superCategory.put("displayName", info.getCategory().getDisplayName());
-            superCategory.put("name", info.getCategory().getName());
-            superCategory.put("shortName", info.getCategory().getShortName());
-
-            severity.put("_name",info.getSeverity());
-            superCategory.put("severity", severity);
-            infoObj.put("superCategory", superCategory);
-            
-            subCategories.add(infoObj);
         }
 
         this.categories = GlobalEnums.TestCategory.values();

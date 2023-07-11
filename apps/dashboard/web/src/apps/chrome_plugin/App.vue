@@ -1,212 +1,233 @@
 <template>
-    <div class="pa-2">
-        <inventory/>
+    <div class="main-app-container" data-app>
+        <v-app-bar
+            color="#6200EA"
+            dense
+            dark
+            flat
+        >
+            <v-icon size="20">$akto</v-icon>
+
+            <v-toolbar-title class="akto-title">akto</v-toolbar-title>
+
+            <v-spacer></v-spacer>
+
+            <v-tooltip 
+                v-for="(btn, index) in btnActions"
+                :key="index"
+                bottom
+            >
+                <template v-slot:activator="{ on: tooltip, attrs }">
+                    <v-btn 
+                        @click="btn.action"
+                        v-bind="attrs"
+                        v-on="tooltip"
+                        icon 
+                        primary 
+                        plain 
+                        :ripple="false" 
+                        width="20" 
+                        :class="['settings-btn', btn.showIf ? 'show-btn': 'hide-btn']">
+                        <v-icon size="16">{{btn.icon}}</v-icon>
+                    </v-btn>
+                </template>
+                <span>{{btn.label}}</span>
+            </v-tooltip>
+        </v-app-bar>
+        <div
+            v-if="showDeleteDialogBox"
+            class="dialog-box"
+        >
+            <div>
+                <div class="question"> 
+                    Delete data from 
+                    <span class="question-website">{{storedWebsiteHostName}} </span> 
+                    and start recording for 
+                    <span class="question-website">{{tempWebsiteHostName}}</span> 
+                    ? 
+                </div>
+            <div class="ma-2">
+                <v-btn primary dark color="#6200EA" @click="emptyData(true)"  :ripple="false" class="ml-2">
+                    Yes
+                </v-btn>
+                <v-btn primary @click="closePopup()"  :ripple="false"  class="ml-2">
+                    No
+                </v-btn> 
+            </div>
+            </div>           
+        </div>
+        <div v-if="!showDeleteDialogBox">
+            <div class="ma-2" v-if="!userSignedIn">
+                <v-icon size="12" color="#6200EA">$fas_info-circle</v-icon>
+                You are not signed in. Click 
+                <span class="clickable underline" @click=openDashboardInNewTab>here</span> 
+                to sign in.
+            </div>
+        </div>
+        <router-view v-if="!showDeleteDialogBox"/>
     </div>
 </template>
 
 <script>
 
-    import catalog from '@/apps/chrome_plugin/util/catalog'
-    import Inventory from '@/apps/dashboard/views/observe/inventory/Inventory'
+import {mapState} from 'vuex'
 
-    export default {
-        name: 'App',
-        components: {
-            Inventory
-        },
-        data () {
-            return {
-                endpoints: {}
-            }
-        },
-        methods : {
-            getOrCreatePath (dict, keys) {
-                let curr = dict
-                keys.forEach(k => {
-                    if (k.indexOf(".") === 0) {
-                        k = k.substr(1)
-                    }
-                    let v = curr[k]
-                    if (!v) {
-                        v = {}
-                        curr[k] = v
-                    }
-
-                    curr = v
-                })
-
-                return curr
-            },
-
-            addInfoForSingleObject(obj, reqOrResp, headerOrPayload, url, method) {
-                let _getOrCreatePath = this.getOrCreatePath
-                let _endpoints = this.endpoints
-                Object.entries(obj).forEach(x => {
-                    Object.entries(x[1]).forEach(y => {
-                        let v = _getOrCreatePath(_endpoints, [url, method, reqOrResp, headerOrPayload, x[0], y[0]])
-
-                        if (!v.values) {
-                            v.values = new Set()
-                        }
-
-                        y[1].values.forEach(z => v.values.add(z))
-                    })
-                })
-            },
-
-            aggregateInfo(method, url, reqHeaders, reqBody, respHeaders, respBody) {
-                this.addInfoForSingleObject(reqHeaders, "Request", "Headers", url, method)
-                this.addInfoForSingleObject(reqBody, "Request", "Payload", url, method)
-                this.addInfoForSingleObject(respHeaders, "Response", "Headers", url, method)
-                this.addInfoForSingleObject(respBody, "Response", "Payload", url, method)
-            },
-
-            createParamsList() {
-                let params =  []
-                let now = parseInt(+(new Date())/1000)
-                Object.entries(this.endpoints).map(urlAndMethods => 
-                    Object.entries(urlAndMethods[1]).map(methodAndReqResp => 
-                        Object.entries(methodAndReqResp[1]).map(reqRespAndHeaderPayload => 
-                            Object.entries(reqRespAndHeaderPayload[1]).map(headerPayloadAndParamNames => 
-                                Object.entries(headerPayloadAndParamNames[1]).map(paramNamesAndType => 
-                                    Object.entries(paramNamesAndType[1]).map(typeAndValues => 
-                                        params.push({
-                                            examples: typeAndValues[1],
-                                            isHeader: headerPayloadAndParamNames[0] === "Headers",
-                                            method: methodAndReqResp[0],
-                                            param: paramNamesAndType[0],
-                                            responseCode: reqRespAndHeaderPayload[0] === "Response" ? 200 : -1,
-                                            subType: headerPayloadAndParamNames[0] === "Headers" ? catalog.toSuperType(typeAndValues[0]) : typeAndValues[0],
-                                            timestamp: now,
-                                            url: urlAndMethods[0],
-                                            userIds: []
-                                        })
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )                
-                
-                let ret = {
-                    name: "API calls",
-                    endpoints: params
-                }
-                return ret
-                
-            }
-        },
-        created () {
-            let _aggregateInfo = this.aggregateInfo
-            let _endpoints = this.endpoints
-            let _store = this.$store
-            let _createParamsList = this.createParamsList
-            // When a network request has finished this function will be called.
-            chrome.devtools.network.onRequestFinished.addListener(request => {
-                const response = request.response;
-                // Find the Content-Type header.
-
-                if (response && response.content.size > 0) {
-
-                    request.getContent((body) => {
-                        if (request.request && request.request.url) {
-                            try { 
-                                let reqHeaders = Object.fromEntries(request.request.headers.map(x => [x.name, x.value]))
-                                let reqBody = {}
-
-                                if (request.request.postData) {
-                                    if (request.request.postData.mimeType.indexOf("application/json") === 0) {
-                                        reqBody = JSON.parse(request.request.postData.text)
-                                    } else if (request.request.postData.mimeType.indexOf("application/x-www-form-urlencoded") === 0) {
-                                        reqBody = Object.fromEntries(request.request.postData.params.map(x => [x.name, x.value]))
-                                    } else {
-                                        return 
-                                    }
-                                }
-                                
-
-                                if (request.request.queryString && request.request.queryString.length > 0) {
-                                    reqBody = {...reqBody, ...Object.fromEntries(request.request.queryString.map(x => [x.name, x.value]))}
-                                }  
-
-
-                                let respHeaders = Object.fromEntries(response.headers.map(x => [x.name, x.value]))
-
-                                let url = request.request.url
-
-                                if (url.indexOf("?") > -1) {
-                                    url = url.substr(0, url.indexOf("?"))
-                                }
-
-                                let respBody = JSON.parse(body)
-
-                                let currCount = Object.entries(_endpoints).length
-
-                                _aggregateInfo(
-                                    request.request.method, 
-                                    url, 
-                                    catalog.tryParamsOrJson(reqHeaders), 
-                                    catalog.tryParamsOrJson(reqBody), 
-                                    catalog.tryParamsOrJson(respHeaders), 
-                                    catalog.tryParamsOrJson(respBody)
-                                )
-
-                                if (Object.entries(_endpoints).length> currCount) {
-                                    _store.commit('inventory/SAVE_API_COLLECTION', {data: _createParamsList(), apiCollectionId: 0})
-                                }
-                            } catch(e) {
-
-                            }
-                        }
-                    });
-                }
-
-            });
+export default {
+    name: "App",
+    data() {
+        return {
+            tabId: 0,
+            port: null,
+            showDeleteDialogBox: false,
+            storedWebsiteHostName: '',
+            tempWebsiteHostName: '',
+            userSignedIn: false
         }
+    },
+    methods: {        
+        emptyData(startListeningToNew) {
+            let currWebsite = this.websiteHostName
+            this.$store.commit('endpoints/EMPTY_STATE')  
+            this.port.postMessage({"emptyState": currWebsite || true, startListeningToNew})
+            this.showDeleteDialogBox = false
+            if (startListeningToNew) {
+                chrome.tabs.query({ active: true }, function (tabs) {
+                    let tab = tabs[0];
+                    chrome.tabs.sendMessage(
+                        tab.id,
+                        {"new_message_akto": true}
+                    )
+                });
+            }
+        },
+        closePopup() {
+            window.close()
+        },
+        login() {
+            chrome.runtime.sendMessage({ action: 'login' }, function (params) {
+                console.log('login', params)
+            })
+        },
+        logout() {
+            chrome.runtime.sendMessage({ action: 'logout' }, function (params) {
+                console.log('logout', params)
+            })
+        },
+        openDashboardInNewTab() {
+            chrome.tabs.create({url: "https://app.akto.io/dashboard/observe/inventory"});
+        }        
+    },
+    created () {
+        let _this = this
+        setInterval(() => {
+            chrome.runtime.sendMessage({ action: 'user_signed_in' }, function (params) {
+                _this.userSignedIn = params.user_signed_in
+            })            
+        }, 1000);
+
+        chrome.tabs.query({ currentWindow: true, active: true }, function (tabs) {
+            _this.tabId = tabs[0].id
+        });
+
+        this.port = chrome.extension.connect({
+            name: "Akto Communication"
+        });
+
+        let _store = this.$store
+        let _port = this.port
+        _port.onMessage.addListener(function(msg) {
+            if (msg.storedWebsiteHostNames && msg.storedWebsiteHostNames.length == 1) {
+                _this.storedWebsiteHostName = msg.storedWebsiteHostNames[0]
+                _this.tempWebsiteHostName = msg.currHostname
+                _this.showDeleteDialogBox = true
+            } else {
+                _store.commit('endpoints/SAVE_ENDPOINTS', {endpoints: msg.endpoints, websiteHostName: msg.origin})
+            }
+
+            _port.postMessage({"received_msg": msg})
+        });
+    },
+    computed: {
+        ...mapState('endpoints', ['websiteHostName']),
+        btnActions() {
+            
+            let ret = [
+                {
+                    icon: "$fas_redo",
+                    label: "Clear data",
+                    action: () => this.emptyData(false),
+                    showIf: true
+                },
+                {
+                    icon: "$fas_external-link-alt",
+                    label: "Open dashboard",
+                    action: () => {
+                        chrome.tabs.create({url: "https://app.akto.io/dashboard/observe/inventory"});
+                    },
+                    showIf: this.userSignedIn
+                }
+            ]
+
+            return ret
+        }
+
     }
+}
 </script>
 
-<style>
-    @import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600&display=swap');
-    .v-application {
-        font-family: Poppins, sans-serif !important;
-        color: var(--base);
-        letter-spacing: unset !important;
-    }
+<style lang="sass" scoped>
 
-    .clickable {
-        cursor: pointer;
-    }
+.show-btn
+    display: block !important
 
+.hide-btn
+    display: none
+
+.main-app-container
+    width: 449px
+    min-height: 200px
+    color: #47466A
+
+.akto-title
+  font-weight: 600
+  font-size: 20px
+  margin-left: 8px !important
+
+.question
+  font-size: 16px
+
+.question-website
+  font-weight: 600    
+
+.settings-btn
+    margin-right: 8px
+
+.dialog-box
+    padding: 30px 
 </style>
+.brdb
+  border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
 
 <style lang="sass">
-.v-application a
-    color: unset !important
-    text-decoration: auto
+.d-flex
+    display: flex
 
-.active-tab
-    color: var(--base)
-    font-weight: 500
+.ml-2
+    margin-left: 8px
 
-.tabs-container
-    padding-left: 16px
+.ma-2
+    margin: 8px
 
-.right-pane-tab
-    text-transform: unset
-    letter-spacing: normal
-    padding: 0
+.grey-text
+    color: #47466A99
 
-.brdb
-  border-bottom: 1px solid var(--themeColorDark13) !important
-
-.highcharts-credits
-  display: none
+.underline
+  text-decoration: underline
 
 .v-tooltip__content
   font-size: 10px !important
   opacity: 1 !important
-  background-color: var(--lightGrey)
+  background-color: #7e7e97
   border-radius: 2px
   transition: all 0s !important
 
@@ -217,7 +238,7 @@
 .v-tooltip__content:after
   border-left: solid transparent 4px
   border-right: solid transparent 4px
-  border-bottom: solid var(--lightGrey) 4px
+  border-bottom: solid #7e7e97 4px
   top: -4px
   content: " "
   height: 0
@@ -231,11 +252,14 @@
   text-transform: unset !important
   letter-spacing: normal
 
+.highcharts-credits
+  display: none
+  
 .coming-soon
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: var(--themeColorDark12)
+    color: #47466A3D
     font-size: 13px
 
 
