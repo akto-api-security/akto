@@ -2,6 +2,8 @@ import HomePage from "../dashboard/pages/home/HomePage"
 import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
 import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
+import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
+import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
 import { AppProvider } from "@shopify/polaris"
 import SignUp from "../signup/pages/SignUp"
@@ -39,6 +41,16 @@ const router = createBrowserRouter([
           {
             path: "/dashboard/testing/:hexId/result/:hexId2",
             element: <TestRunResultPage />
+          }
+        ]
+      },
+      {
+        path: "/dashboard/observe",
+        element: <PageObserve/>,
+        children: [
+          {
+            path: "/dashboard/observe/sensitive",
+            element: <SensitiveDataExposure/>
           }
         ]
       }

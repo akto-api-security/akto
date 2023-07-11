@@ -145,9 +145,8 @@ useEffect(()=>{
           })
       } else if(Object.keys(subCategoryMap)!=0 && Object.keys(subCategoryFromSourceConfigMap)!=0){
         await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-          let testRunResults = transform.prepareTestRunResults(testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+          let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
           setTestRunResults(testRunResults)
-          filters = transform.prepareFilters(testRunResults, filters);
           setLoading(false);
         })
       }
@@ -208,6 +207,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     primaryAction={<Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button>}
     components = {[
       <GithubTable 
+      key="table"
       data={testRunResults} 
       sortOptions={sortOptions} 
       resourceName={resourceName} 
@@ -218,7 +218,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
       selectable = {true}
       promotedBulkActions = {promotedBulkActions}
       loading={loading}
-      page={2}
     />
     ]}
     />

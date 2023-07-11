@@ -200,7 +200,6 @@ useEffect(()=>{
   async function fetchData () {
     await api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
       let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
-      filters = transform.prepareFilters(testRuns,filters);
       storeSetTestRuns(testRuns);
       setLoading(false);
     })
@@ -218,6 +217,7 @@ useEffect(()=>{
     primaryAction={<Button primary>New test run</Button>}
     components={[
       <GithubTable 
+        key="table"
         data={testRuns} 
         sortOptions={sortOptions} 
         resourceName={resourceName} 
@@ -227,7 +227,6 @@ useEffect(()=>{
         getActions = {getActions}
         hasRowActions={true}
         loading={loading}
-        page={1}
       />
     ]}
     />

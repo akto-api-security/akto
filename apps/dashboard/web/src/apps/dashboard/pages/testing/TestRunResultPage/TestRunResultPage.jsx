@@ -142,7 +142,7 @@ function MoreInformationComponent(props) {
 
 function formatJSON(val = {}) {
   try {
-    const res = JSON.parse(val);
+    const res = typeof val == 'object' ? val : JSON.parse(val);
     Object.keys(res).forEach((key) => {
       res[key] = formatJSON(res[key])
     })
@@ -179,8 +179,8 @@ function AttemptComponent(props) {
         })
       })
     }
-    if (props.results?.[page]?.originalMessage && refText.length==2) {
-      let message = formatJSON(props.results?.[page]?.originalMessage);
+    if (props.results?.[page]?.message && refText.length==2) {
+      let message = formatJSON(props.results?.[page]?.message);
       let res = {}, req = {}
       Object.keys(message).forEach((key) => {
         if (key.startsWith("req") || key.startsWith("query")) {
@@ -205,7 +205,7 @@ function AttemptComponent(props) {
                 props.results?.length==0 ? 'No test runs found' :
                 `${page+1} of ${props.results?.length}`
               }
-              hasPrevious = {page < 0}
+              hasPrevious = {page > 0}
               previousKeys={[Key.LeftArrow]}
               onPrevious={() => {setPage((old) => (old-1))}}
               hasNext = {props.results?.length > (page+1)}
@@ -245,8 +245,6 @@ function AttemptComponent(props) {
 
 function TestRunResultPage(props) {
 
-  const selectedTestRun = TestingStore(state => state.selectedTestRun);
-  const setSelectedTestRun = TestingStore(state => state.setSelectedTestRun);
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
   const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
@@ -261,7 +259,7 @@ function TestRunResultPage(props) {
     async function fetchData() {
       if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0 ) {
       await api.fetchTestRunResultDetails(hexId2).then(({ testingRunResult }) => {
-        testRunResult = transform.prepareTestRunResult(testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
+        testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
         setSelectedTestRunResult(testRunResult)
       })
       
@@ -382,17 +380,19 @@ function TestRunResultPage(props) {
     secondaryActions = {<Button disclosure>Dismiss alert</Button>}
     components = {[
       issueDetails.id &&
-      <LegacyCard title="Description" sectioned>
+      <LegacyCard title="Description" sectioned key="description">
         {parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "")}
       </LegacyCard>
     ,
     selectedTestRunResult.testResults &&
     <AttemptComponent
+      key="attempt"
       results={selectedTestRunResult?.testResults}
       vulnerable={selectedTestRunResult?.vulnerable}
     />,
       issueDetails.id &&
       <MoreInformationComponent
+        key="info"
         sections={infoState}
       />
     ]}

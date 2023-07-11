@@ -16,7 +16,6 @@ import {
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from 'react';
-import TestingStore from '../../../pages/testing/testingStore';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 
@@ -28,22 +27,8 @@ function GithubRow(props) {
         [],
     );
     
-    const selectedTestRun = TestingStore(state => state.selectedTestRun)
-    const setSelectedTestRun = TestingStore(state => state.setSelectedTestRun)
-    const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult)
-    function nextPage(data, page){
-        switch(page){
-            case 1: 
-                setSelectedTestRun(data)
-                navigate("/dashboard/testing/"+data.hexId)
-                break;
-            case 2:
-                setSelectedTestRunResult(data)
-                navigate("/dashboard/testing/"+selectedTestRun.hexId +"/result/" + data.hexId)
-                break;
-            default:
-                break;            
-        }
+    function nextPage(data){
+        navigate(data?.nextUrl)
     }
 
     const [rowClickable, setRowClickable] = useState(props.page==2)
@@ -64,7 +49,7 @@ function GithubRow(props) {
                     {...(rowClickable ? {dataPrimaryLink: rowClickable} : {})}
                     monochrome
                     removeUnderline
-                    onClick={() => (nextPage(props.data, props.page))}
+                    onClick={() => (nextPage(props.data))}
                     // onClick={() => console.log("something")}
                 >
                     <GithubCell

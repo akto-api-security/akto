@@ -206,6 +206,28 @@ const func = {
     return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
 
 },
+prepareFilters: (data, filters) => {
+  let localFilters = filters;
+  localFilters.forEach((filter, index) => {
+    localFilters[index].availableChoices = new Set()
+    localFilters[index].choices = []
+  })
+  data.forEach((obj) => {
+  localFilters.forEach((filter, index) => {
+    let key = filter["key"]
+    obj[key].map((item) => filter.availableChoices.add(item));
+    localFilters[index] = filter
+    })
+  })
+  localFilters.forEach((filter, index) => {
+    let choiceList = []
+    filter.availableChoices.forEach((choice) => {
+      choiceList.push({label:choice, value:choice})
+    })
+    localFilters[index].choices = choiceList
+  })
+  return localFilters
+},
 
 }
 

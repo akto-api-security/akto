@@ -6,7 +6,6 @@ import {
   IndexFiltersMode,
   useIndexResourceState,
   Pagination,  
-  Card, 
   HorizontalStack, 
   Key, 
   ChoiceList} from '@shopify/polaris';
@@ -88,7 +87,7 @@ function GithubTable(props) {
     changeAppliedFilters(key, value);
   }
 
-  let filters = formatFilters(props.filters)
+  let filters = formatFilters(func.prepareFilters(props.data,props.filters))
   function formatFilters(filters) {
     return filters
       .filter((filter) => {

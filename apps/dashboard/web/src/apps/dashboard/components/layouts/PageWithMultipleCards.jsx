@@ -5,14 +5,14 @@ const PageWithMultipleCards = (props) => {
 
     return (
         <Page fullWidth
-            title={props.title}
-            backAction={props.backAction}
-            primaryAction={props.primaryAction}
-            secondaryActions={props.secondaryActions}
+            title={props?.title}
+            backAction={props?.backAction}
+            primaryAction={props?.primaryAction}
+            secondaryActions={props?.secondaryActions}
         >
         <VerticalStack gap="4">
-        {props.components.filter((component, index) => {
-            return <div key={index}>{component}</div>
+        {props?.components?.filter((component) => {
+            return component
         })}
         </VerticalStack>
         </Page>
