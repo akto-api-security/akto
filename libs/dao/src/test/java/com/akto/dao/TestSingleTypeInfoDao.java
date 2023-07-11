@@ -72,9 +72,9 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         );
 
         CustomDataTypeDao.instance.insertOne(customDataType);
-        SingleTypeInfo.fetchCustomDataTypes();
+        SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
-        assertEquals(SingleTypeInfo.customDataTypeMap.keySet().size(), 1);
+        assertEquals(SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).keySet().size(), 1);
 
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", customDataType.toSubType(), 0, false
@@ -126,7 +126,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         bulkWrites.add(createSingleTypeInfoUpdate("G", "GET", SingleTypeInfo.EMAIL, 0,-1));
         bulkWrites.add(createSingleTypeInfoUpdate("H", "GET", SingleTypeInfo.EMAIL, 1,-1));
 
-        SingleTypeInfo.fetchCustomDataTypes();;
+        SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());;
 
         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
 

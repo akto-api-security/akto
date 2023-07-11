@@ -1,6 +1,6 @@
 id: MUST_CONTAIN_RESPONSE_HEADERS
 info:
-  name: Must contain response headers
+  name: Missing HTTP Response Headers
   description: "The response does not contain some HTTP security headers."
   details: >
             "The endpoint seems to be missing some HTTP security headers which provide yet another layer of 
@@ -13,7 +13,7 @@ info:
   impact: "This information can be used to facilitate more sophisticated attacks on your application."
   category:
     name: MHH
-    shortName: MHH
+    shortName: Misconfigured HTTP Headers
     displayName: Misconfigured HTTP Headers (MHH)
   subCategory: MUST_CONTAIN_RESPONSE_HEADERS
   severity: LOW

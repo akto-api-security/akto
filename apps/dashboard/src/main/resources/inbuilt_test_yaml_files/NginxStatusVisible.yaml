@@ -1,0 +1,50 @@
+id: NGINX_STATUS_VISIBLE
+info:
+  name: "NGINX Status Disclosure"
+  description: "Appending 'nginx-status' to the URL, this test checks if the NGINX status module is accessible, potentially revealing sensitive server information."
+  details: >
+            "By appending "nginx-status" to the URL, this test determines if the NGINX status module is accessible.
+            A successful access exposes sensitive server information, such as performance metrics, configurations, and potentially aiding attackers in identifying vulnerabilities for further exploitation."
+  impact: "The NGINX status disclosure vulnerability allows unauthorized access to server information, aiding attackers in profiling the system and potentially identifying weaknesses for targeted exploitation or unauthorized modifications."
+  category:
+    name: SM
+    shortName: Security Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: NGINX_STATUS_VISIBLE
+  severity: LOW
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.jotform.com/answers/3159752-vulnerability-disclosure"
+    - "https://www.acunetix.com/vulnerabilities/web/unrestricted-access-to-nginx-status-module/"
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+
+  method:
+    contains_either:
+      - "GET"
+
+  response_payload:
+    contains_either:
+      - <!doctype html>
+
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/
+      - modify_url:
+          regex_replace:
+            regex: \/+$
+            replace_with: '/nginx_status'
+
+validate:
+  response_payload:
+    contains_either: "Active connections:"

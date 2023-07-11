@@ -13,7 +13,7 @@ info:
             They can also exploit this vulnerability by supplying an arbitrary claim in the JWT payload to escalate their privileges or impersonate other users. For example, if the token contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
   category:
     name: NO_AUTH
-    shortName: Broken Authentication
+    shortName: Broken User Authentication
     displayName: Broken User Authentication (BUA)
   subCategory: JWT_NONE_ALGO
   severity: HIGH
