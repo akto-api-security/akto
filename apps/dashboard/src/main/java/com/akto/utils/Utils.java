@@ -14,25 +14,20 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.TestExecutor;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
 
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.sql.Timestamp;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.mongodb.client.model.Filters;
 
 import static com.akto.utils.RedactSampleData.convertHeaders;
 
@@ -312,9 +307,26 @@ public class Utils {
         }
 
         if(skipKafka) {
-            SingleTypeInfo.fetchCustomDataTypes(); //todo:
-            APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
+            String accountIdStr = responses.get(0).accountId;
+            if (!StringUtils.isNumeric(accountIdStr)) {
+                return;
+            }
+
+            int accountId = Integer.parseInt(accountIdStr);
+            Context.accountId.set(accountId);
+
+            SingleTypeInfo.fetchCustomDataTypes(accountId);
+            AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+            if (info == null) { // account created after docker run
+                info = new AccountHTTPCallParserAktoPolicyInfo();
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                info.setHttpCallParser(callParser);
+                info.setPolicy(new AktoPolicyNew(false));
+                RuntimeListener.accountHTTPParserMap.put(accountId, info);
+            }
+
+            info.getHttpCallParser().syncFunction(responses, true, false);
+            info.getPolicy().main(responses, true, false);
         }
     }
 

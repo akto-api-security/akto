@@ -6,20 +6,10 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.APICatalogSync;
 
 public class AktoPolicies {
-    private AktoPolicy aktoPolicy;
-    private AktoPolicyNew aktoPolicyNew;
+    private final AktoPolicyNew aktoPolicyNew;
 
-    public AktoPolicies(APICatalogSync apiCatalogSync, boolean fetchAllSTI) {
-        if (APICatalogSync.mergeAsyncOutside) {
-            this.aktoPolicyNew = new AktoPolicyNew(fetchAllSTI);;
-        } else {
-            this.aktoPolicy = new AktoPolicy(apiCatalogSync, fetchAllSTI);
-        }
-    }    
-    
-
-    public AktoPolicy getAktoPolicy() {
-        return this.aktoPolicy;
+    public AktoPolicies(boolean fetchAllSTI) {
+        this.aktoPolicyNew = new AktoPolicyNew(fetchAllSTI);;
     }
 
     public AktoPolicyNew getAktoPolicyNew() {
@@ -27,12 +17,6 @@ public class AktoPolicies {
     }
 
     public void main(List<HttpResponseParams> httpResponseParamsList, APICatalogSync apiCatalogSync, boolean fetchAllSTI) throws Exception {
-        if (this.aktoPolicy != null) {
-            this.aktoPolicy.main(httpResponseParamsList, apiCatalogSync, fetchAllSTI);
-        } 
-
-        if (this.aktoPolicyNew != null) {
-            this.aktoPolicyNew.main(httpResponseParamsList, apiCatalogSync != null, fetchAllSTI);
-        }
+        this.aktoPolicyNew.main(httpResponseParamsList, apiCatalogSync != null, fetchAllSTI);
     }
 }
