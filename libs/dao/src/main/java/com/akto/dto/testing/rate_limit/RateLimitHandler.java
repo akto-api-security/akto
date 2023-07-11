@@ -2,15 +2,27 @@ package com.akto.dto.testing.rate_limit;
 
 import okhttp3.Request;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RateLimitHandler {
     Map<ApiRateLimit, Integer> rateLimits = new ConcurrentHashMap<>();
-    private static final RateLimitHandler instance = new RateLimitHandler();
-    public static RateLimitHandler getInstance() {
-        return instance;
+    private static final Map<Integer, RateLimitHandler> handlerMap = new HashMap<>();
+
+    public static RateLimitHandler getInstance(int accountId) {
+        RateLimitHandler handler = handlerMap.get(accountId);
+        if (handler == null) {
+            synchronized (handlerMap) {
+                handler = handlerMap.get(accountId);
+                if (handler == null) {
+                    handler = new RateLimitHandler();
+                    handlerMap.put(accountId, handler);
+                }
+            }
+        }
+        return handler;
     }
 
     public Map<ApiRateLimit, Integer> getRateLimitsMap() {

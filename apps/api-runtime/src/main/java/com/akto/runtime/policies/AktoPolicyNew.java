@@ -88,7 +88,7 @@ public class AktoPolicyNew {
     public void syncWithDb(boolean initialising, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
         if (!initialising) {
-            AktoPolicy.UpdateReturn updateReturn = AktoPolicy.getUpdates(apiInfoCatalogMap);
+            UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap);
             List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
             List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
             loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
@@ -142,7 +142,7 @@ public class AktoPolicyNew {
     }
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
-        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes;
+        List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
@@ -164,13 +164,19 @@ public class AktoPolicyNew {
             boolean saveSample = false;
             switch (useCase) {
                 case AUTH_TYPE:
-                    saveSample = AuthPolicy.findAuthType(httpResponseParams, apiInfo, filter, customAuthTypes);
+                    try {
+                        saveSample = AuthPolicy.findAuthType(httpResponseParams, apiInfo, filter, customAuthTypes);
+                    } catch (Exception ignored) {}
                     break;
                 case SET_CUSTOM_FIELD:
-                    saveSample = SetFieldPolicy.setField(httpResponseParams, apiInfo, filter);
+                    try {
+                        saveSample = SetFieldPolicy.setField(httpResponseParams, apiInfo, filter);
+                    } catch (Exception ignored) {}
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
-                    saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                    try {
+                        saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                    } catch (Exception ignored) {}
                     break;
                 default:
                     throw new Exception("Function for use case not defined");
@@ -235,7 +241,7 @@ public class AktoPolicyNew {
         return newPolicyCatalog;
     }
 
-    public static AktoPolicy.UpdateReturn getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {
+    public static UpdateReturn getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {
         List<ApiInfo> apiInfoList = new ArrayList<>();
         List<FilterSampleData> filterSampleDataList = new ArrayList<>();
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
@@ -262,7 +268,7 @@ public class AktoPolicyNew {
         List<WriteModel<ApiInfo>> updatesForApiInfo = getUpdatesForApiInfo(apiInfoList);
         List<WriteModel<FilterSampleData>> updatesForSampleData = getUpdatesForSampleData(filterSampleDataList);
 
-        return new AktoPolicy.UpdateReturn(updatesForApiInfo, updatesForSampleData);
+        return new UpdateReturn(updatesForApiInfo, updatesForSampleData);
     }
 
     public static class UpdateReturn {

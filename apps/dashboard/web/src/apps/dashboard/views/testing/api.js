@@ -82,11 +82,29 @@ export default {
             return resp
         })
     },
-    runTestForTemplate(content, apiInfoKey) {
+    runTestForTemplate(content, apiInfoKey, sampleDataList) {
         return request({
             url: '/api/runTestForGivenTemplate',
             method: 'post',
-            data:{content, apiInfoKey}
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    runTestForTemplateAnonymous(content, apiInfoKey, sampleDataList) {
+        return request({
+            url: '/tools/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    setCustomSampleApi(sampleRequestString, sampleResponseString) {
+        return request({
+            url: '/tools/createSampleDataJson',
+            method: 'post',
+            data:{sampleRequestString, sampleResponseString}
         }).then((resp) => {
             return resp
         })

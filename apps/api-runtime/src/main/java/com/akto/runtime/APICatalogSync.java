@@ -63,9 +63,9 @@ public class APICatalogSync {
                 mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
             }
         } catch (Exception e) {
-            
+
         }
-        
+
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
@@ -1023,7 +1023,7 @@ public class APICatalogSync {
             update = Updates.inc("count", inc);
 
             if (oldTs == 0) {
-                update = Updates.combine(update, Updates.set("timestamp", now));
+                update = Updates.combine(update, Updates.setOnInsert("timestamp", now));
             }
 
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));

@@ -1,0 +1,49 @@
+id: GRAPHQL_INTROSPECTION_MODE_ENABLED
+info:
+  name: "Graphql Introspection Mode Enabled"
+  description: "GraphQL introspection mode vulnerability allows unauthorized access to schema details, potentially exposing sensitive data and increasing attack surface."
+  details: > 
+            "GraphQL introspection mode enabled vulnerability refers to a security weakness in GraphQL implementations that arises when the introspection functionality is improperly configured. Introspection is a feature in GraphQL that allows clients to query the server for information about its schema, including available types, fields, and their respective arguments. While introspection is useful for documentation and client development, leaving it enabled in production environments can pose serious risks."
+            "When the introspection mode is enabled without proper access control measures, it becomes a potential entry point for attackers. By sending a specially crafted introspection query, an unauthorized user can obtain detailed information about the GraphQL schema and the underlying data model. This exposes sensitive details, such as the names of database tables, fields, and their types, which can aid attackers in planning more targeted and effective attacks.""
+            "The consequences of this vulnerability can be severe. Attackers can leverage the exposed schema information to identify potential injection points, understand data relationships, and craft malicious queries to extract sensitive data or perform unauthorized operations. Additionally, the increased attack surface can lead to other vulnerabilities, including data leakage, unauthorized data modification, denial of service, or remote code execution.""
+            "To mitigate this vulnerability, it is crucial to properly configure access controls and restrict introspection to authorized clients or development environments. Disabling introspection in production is generally recommended, as it minimizes the exposure of sensitive information to potential attackers. Regular security audits and penetration testing can help identify misconfigurations or vulnerabilities related to GraphQL introspection, ensuring the protection of sensitive data and maintaining a secure GraphQL implementation."
+  impact: "Sensitive data exposure, unauthorized access, and increased attack surface due to GraphQL introspection mode vulnerability."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GRAPHQL_INTROSPECTION_MODE_ENABLED
+  severity: HIGH
+  tags:
+    - GraphQL
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://nostarch.com/black-hat-graphql Chapter 6 - Information Disclosure"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
+    - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
+    - "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
+
+api_selection_filters:
+  url:
+    regex: graphql
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+          regex_replace:
+            regex: graphql.*
+            replace_with: graphql
+      - replace_body: '{ "query": "query IntrospectionQuery { __schema { queryType { name } mutationType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }" }'
+
+validate:
+  response_payload:
+    contains_all: 
+      - "data"
+      - "__schema"
+
+strategy:
+  run_once: /
