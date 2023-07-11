@@ -1,13 +1,12 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.calendar.DateUtils;
 import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
@@ -24,17 +23,15 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.*;
-import com.akto.rules.SSRFOnAwsMetadataEndpoint;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
-import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
@@ -53,30 +50,17 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     public static long acceptableSizeInBytes = 5_000_000;
-    
-    public void init(TestingRun testingRun, ObjectId summaryId) {
+    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
+    public static final String REQUEST_HOUR = "requestHour";
+    public static final String COUNT = "count";
+    public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+
+    public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId);
+            apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
         } else {
             workflowInit(testingRun, summaryId);
         }
-    }
-
-    public static void main(String[] args) {
-        
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        TestExecutor testExecutor = new TestExecutor();
-        TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
-        if (testingRun.getTestIdConfig() > 1) {
-            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            if (testingRunConfig != null) {
-                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
-                testingRun.setTestingRunConfig(testingRunConfig);
-            }
-        }
-        testExecutor.init(testingRun, new ObjectId());
     }
 
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
@@ -120,16 +104,15 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
-        List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         List<AuthParam> authParams = authMechanism.getAuthParams();
 
@@ -137,7 +120,7 @@ public class TestExecutor {
 
         authMechanism.setAuthParams(authParams);
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail());
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
@@ -156,6 +139,7 @@ public class TestExecutor {
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
             if (apiInfoKeySet.contains(apiInfoKey)) {
                 sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, sampleMessages.get(apiInfoKey));
@@ -163,7 +147,7 @@ public class TestExecutor {
         }
 
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser);
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -182,7 +166,7 @@ public class TestExecutor {
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                String host = findHost(apiInfoKey, testingUtil.getSampleMessages());
+                String host = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
                 if (host != null && hostsToApiCollectionMap.get(host) == null) {
                     hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
                 }
@@ -280,11 +264,11 @@ public class TestExecutor {
         return severity;
     }
 
-    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap) throws URISyntaxException {
+    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore) throws URISyntaxException {
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessagesMap);
+        List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
         OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
@@ -327,7 +311,7 @@ public class TestExecutor {
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
 
                         FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
-                        TestingRunResult fuzzResult = runTestNuclei(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
+                        TestingRunResult fuzzResult = runTestNuclei(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId, testingRun.getTestingRunConfig());
                         if (fuzzResult != null) {
                             trim(fuzzResult);
                             TestingRunResultDao.instance.insertOne(fuzzResult);
@@ -581,7 +565,7 @@ public class TestExecutor {
             if (testConfig == null) continue;
             TestingRunResult testingRunResult = null;
             try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig);
+                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
                 e.printStackTrace();
@@ -592,7 +576,7 @@ public class TestExecutor {
         return testingRunResults;
     }
 
-    public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil, ObjectId testRunResultSummaryId, TestConfig testConfig) {
+    public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil, ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.size() == 0) return null;
@@ -623,7 +607,7 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
-        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId);
+        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig);
         List<TestResult> testResults = yamlTestTemplate.run();
         if (testResults == null || testResults.size() == 0) {
             return null;
@@ -652,172 +636,32 @@ public class TestExecutor {
         );
     }
 
-    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
-                                        TestingRunConfig testingRunConfig, TestingUtil testingUtil, ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap) {
-
-        if (testIdConfig == 1) {
-            loggerMaker.errorAndAddToDb("Test id config is 1", LogDb.TESTING);
-            return new ArrayList<>();
-        }
-
-        List<String> testSubCategories = testingRunConfig == null ? null : testingRunConfig.getTestSubCategoryList();
-
-        BOLATest bolaTest = new BOLATest();//REPLACE_AUTH_TOKEN
-//        NoAuthTest noAuthTest = new NoAuthTest();//REMOVE_TOKENS
-        ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();//CHANGE_METHOD
-        AddMethodInParameterTest addMethodInParameterTest = new AddMethodInParameterTest();//ADD_METHOD_IN_PARAMETER
-        AddMethodOverrideHeadersTest addMethodOverrideHeadersTest = new AddMethodOverrideHeadersTest();//ADD_METHOD_OVERRIDE_HEADERS
-        AddUserIdTest addUserIdTest = new AddUserIdTest();//ADD_USER_ID
-        ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();//PARAMETER_POLLUTION
-        OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();//REPLACE_AUTH_TOKEN_OLD_VERSION
-        JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();//JWT_NONE_ALGO
-        JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();//JWT_INVALID_SIGNATURE
-        AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();//ADD_JKU_TO_JWT
-        BFLATest bflaTest = new BFLATest();//BFLA
-        // PageSizeDosTest pageSizeDosTest = new PageSizeDosTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());//PAGE_SIZE_DOS
-        // OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        // SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        // CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        // PortScanningViaSSRF portScanningViaSSRF = new PortScanningViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        // FetchSensitiveFilesViaSSRF fetchSensitiveFilesViaSSRF = new FetchSensitiveFilesViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        //if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-        //if (filteredMessages.isEmpty()) return null;
-
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
-        RawApi message = messages.size() == 0? null: messages.get(0);
-        RawApi authenticatedMessage = filteredMessages.size() == 0? null: filteredMessages.get(0);
-
-        TestConfig testConfig = testConfigMap.get("REMOVE_TOKENS");
-        ConfigParserResult apiSelectionFilters = testConfig.getApiSelectionFilters();
-        FilterNode filterNode = null;
-        if (apiSelectionFilters != null) {
-            filterNode = apiSelectionFilters.getNode();
-        }
-//        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, filterNode, authenticatedMessage);
-//        if (noAuthTestResult != null) {
-//            testingRunResults.add(noAuthTestResult);
-//        } else {
-//            loggerMaker.infoAndAddToDb("No auth result is null for " + apiInfoKey, LogDb.TESTING);
-//        }
-        boolean shouldRunAuthTests = true;
-
-        TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-        
-        for (String subCategory: testSubCategories) {
-            if (!testConfigMap.containsKey(subCategory)) {
-                loggerMaker.infoAndAddToDb("invalid test subcateogry specified " + subCategory, LogDb.TESTING);
-                continue;
-            }
-            testConfig = testConfigMap.get(subCategory);
-            TestPlugin test = null;
-            RawApi rawApi = null;
-            filterNode = null;
-            apiSelectionFilters = testConfig.getApiSelectionFilters();
-            if (apiSelectionFilters != null) {
-                filterNode = apiSelectionFilters.getNode();
-            }
-
-            if (testConfig.getInfo().getSubCategory().equals("BFLA") && shouldRunAuthTests && testRoleMatcher.shouldDoBFLA()) {
-                test = bflaTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("REPLACE_AUTH_TOKEN") && shouldRunAuthTests) {
-                test = bolaTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("ADD_USER_ID") && shouldRunAuthTests) {
-                test = addUserIdTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("PARAMETER_POLLUTION") && shouldRunAuthTests) {
-                test = parameterPollutionTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("REPLACE_AUTH_TOKEN_OLD_VERSION") && shouldRunAuthTests) {
-                test = oldApiVersionTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("JWT_NONE_ALGO") && shouldRunAuthTests) {
-                test = jwtNoneAlgoTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("JWT_INVALID_SIGNATURE") && shouldRunAuthTests) {
-                test = jwtInvalidSignatureTest;
-                rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getSubCategory().equals("ADD_JKU_TO_JWT") && shouldRunAuthTests) {
-                test = addJkuToJwtTest;
-                rawApi = authenticatedMessage;
-//            } else if (testConfig.getInfo().getSubCategory().equals("PAGINATION_MISCONFIGURATION")) {
-//                test = pageSizeDosTest;
-//                rawApi = message;
-            } else if (testConfig.getInfo().getSubCategory().equals("ADD_METHOD_IN_PARAMETER")) {
-                test = addMethodInParameterTest;
-                rawApi = message;
-            } else if (testConfig.getInfo().getSubCategory().equals("ADD_METHOD_OVERRIDE_HEADERS")) {
-                test = addMethodOverrideHeadersTest;
-                rawApi = message;
-            } else if (testConfig.getInfo().getSubCategory().equals("CHANGE_METHOD")) {
-                test = changeHttpMethodTest;
-                rawApi = message;
-//            } else if (testConfig.getInfo().getSubCategory().equals( "OPEN_REDIRECT")) {
-//                test = openRedirectTest;
-//                rawApi = message;
-//            } else if (testConfig.getInfo().getSubCategory().equals( "SSRF_AWS_METADATA_EXPOSED")) {
-//                test = ssrfOnAwsMetadataEndpoint;
-//                rawApi = message;
-//            } else if (testConfig.getInfo().getSubCategory().equals("MASS_ASSIGNMENT_CREATE_ADMIN_ROLE")) {
-//                test = createAdminUserViaMassAssignment;
-//                rawApi = message;
-            }
-
-            TestingRunResult result = runTest(test, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, filterNode, rawApi);
-            if (result != null) {
-                testingRunResults.add(result);
-            }
-
-        }
-
-        // if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PORT_SCANNING.name())) {
-        //     TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        //     if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
-        // }
-
-        // if(testSubCategories == null || testSubCategories.contains(TestSubCategory.FETCH_SENSITIVE_FILES.name())) {
-        //     TestingRunResult fetchSensitiveFilesViaSSRFResult = runTest(fetchSensitiveFilesViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        //     if (fetchSensitiveFilesViaSSRFResult != null) testingRunResults.add(fetchSensitiveFilesViaSSRFResult);
-        // }
-
-        return testingRunResults;
-    }
-
-    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId, FilterNode filterNode, RawApi rawApi) {
+    public TestingRunResult runTestNuclei(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil,
+                                          ObjectId testRunId, ObjectId testRunResultSummaryId, TestingRunConfig testingRunConfig) {
 
         int startTime = Context.now();
-        if (testPlugin == null) {
-            return null;
+        Map<String, Integer> requestCount = requestRestrictionMap.get(testingUtil.getUserEmail());
+        if (requestCount == null) {//First time case
+            requestCount = new ConcurrentHashMap<>();
+            requestCount.put(REQUEST_HOUR,Context.currentHour());
+            requestCount.put(COUNT, 1);
+            requestRestrictionMap.put(testingUtil.getUserEmail(), requestCount);
+        } else {
+            int currentHour = Context.currentHour();
+            int requestHour = requestCount.get(REQUEST_HOUR);
+            int count = requestCount.get(COUNT);
+            if (currentHour == requestHour) {//hour hasn't changed, will increment the count
+                if (count >= ALLOWED_REQUEST_PER_HOUR) {
+                    return null;
+                }
+                count++;
+                requestCount.put(COUNT, count);
+            } else {//Hour changed, start count again
+                requestCount.put(REQUEST_HOUR, currentHour);
+                requestCount.put(COUNT, 1);
+            }
         }
-        String logId = UUID.randomUUID().toString();
-        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>(), logId)) {
-            return null;
-        }
-        TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
-        if (result == null) return null;
-        int endTime = Context.now();
-
-        String subTestName = testPlugin.subTestName();
-
-        if (testPlugin instanceof FuzzingTest) {
-            FuzzingTest test = (FuzzingTest) testPlugin;
-            subTestName = test.getTestSourceConfigCategory();
-        }
-
-        return new TestingRunResult(
-                testRunId, apiInfoKey, testPlugin.superTestName(), subTestName, result.testResults,
-                result.isVulnerable,result.singleTypeInfos, result.confidencePercentage,
-                startTime, endTime, testRunResultSummaryId
-        );
-    }
-
-    public TestingRunResult runTestNuclei(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId) {
-
-        int startTime = Context.now();
-        TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
+        TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil, testingRunConfig);
         if (result == null) return null;
         int endTime = Context.now();
 

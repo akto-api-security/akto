@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.*;
 
+import com.akto.utils.Utils;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
@@ -161,6 +162,11 @@ public class TestWebhookAction extends MongoBasedTest{
         assertEquals("SUCCESS",result);
         List<CustomWebhook> customWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
         assertEquals(1,customWebhooks.size());
+    }
+
+    @Test
+    public void testValidURL() {
+        System.out.println(Utils.isValidURL("asdad"));
     }
 
 }

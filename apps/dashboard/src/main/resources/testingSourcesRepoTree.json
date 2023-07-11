@@ -1,0 +1,1134 @@
+{
+  "sha": "f1792cce5b7cea364278dc97bf4a4640a337900a",
+  "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/f1792cce5b7cea364278dc97bf4a4640a337900a",
+  "tree": [
+    {
+      "path": "BOLA",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "93e4775ccbeac28e07290773c02da154e48c6fe5",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/93e4775ccbeac28e07290773c02da154e48c6fe5"
+    },
+    {
+      "path": "BOLA/business-logic",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a8f290eab4eb94500323495d1d6cd31b0783622f",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/a8f290eab4eb94500323495d1d6cd31b0783622f"
+    },
+    {
+      "path": "BOLA/business-logic/AddUserIdTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "99acbc8f4ee591d3a00d925c2db38b7f490c4874",
+      "size": 3137,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/99acbc8f4ee591d3a00d925c2db38b7f490c4874"
+    },
+    {
+      "path": "BOLA/business-logic/BOLATest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e84accf7a33acca9d6824806352fc0caf357c231",
+      "size": 4277,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e84accf7a33acca9d6824806352fc0caf357c231"
+    },
+    {
+      "path": "BOLA/business-logic/OldApiVersionTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "09cec53e67fc5d788076ae5924f240f10e31c8e0",
+      "size": 2805,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/09cec53e67fc5d788076ae5924f240f10e31c8e0"
+    },
+    {
+      "path": "BOLA/business-logic/ParameterPollutionTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "04c15a702a8c7b9bb307cb91040b120fe7dd3149",
+      "size": 3158,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/04c15a702a8c7b9bb307cb91040b120fe7dd3149"
+    },
+    {
+      "path": "BOLA/path_traversal",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3449ac49616ea37e624df3db01e39f6bf0a80879",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/3449ac49616ea37e624df3db01e39f6bf0a80879"
+    },
+    {
+      "path": "BOLA/path_traversal/path_traversal_PayloadsAllTheThings.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "691583343d014a2da0315a7a831b98c4ba754c35",
+      "size": 872,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/691583343d014a2da0315a7a831b98c4ba754c35"
+    },
+    {
+      "path": "BOLA/path_traversal/path_traversal_Pentestlab.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5df55923928f47af7afad41087ff5e3221c3d31",
+      "size": 677,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d5df55923928f47af7afad41087ff5e3221c3d31"
+    },
+    {
+      "path": "BOLA/path_traversal/path_traversal_common.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d12dfb828eaedbb9d8b1f1255c70c7cfbd22d4d",
+      "size": 809,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/3d12dfb828eaedbb9d8b1f1255c70c7cfbd22d4d"
+    },
+    {
+      "path": "BOLA/path_traversal/path_traversal_full.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c275bae269a848701aaf012d0b8751e9f8c052ed",
+      "size": 844,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c275bae269a848701aaf012d0b8751e9f8c052ed"
+    },
+    {
+      "path": "BOLA/path_traversal/wordlists",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "622242e506a88d430975029fe8b08dcd39f3024b",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/622242e506a88d430975029fe8b08dcd39f3024b"
+    },
+    {
+      "path": "BOLA/path_traversal/wordlists/directory_traversal_pentestlab.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "30922d46facbdc7f3e2108f6490c1e3b88d2bf9f",
+      "size": 5477,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/30922d46facbdc7f3e2108f6490c1e3b88d2bf9f"
+    },
+    {
+      "path": "Broken Authentication",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "80fcdfbaf562424e8157144e667ca2257e986157",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/80fcdfbaf562424e8157144e667ca2257e986157"
+    },
+    {
+      "path": "Broken Authentication/business-logic",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b9a2a6601efd7c5db216844b4054a721ac32c8a5",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/b9a2a6601efd7c5db216844b4054a721ac32c8a5"
+    },
+    {
+      "path": "Broken Authentication/business-logic/AddJkuToJwtTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b92e7b10d47ffb159da756eba3ba65362b087631",
+      "size": 578,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/b92e7b10d47ffb159da756eba3ba65362b087631"
+    },
+    {
+      "path": "Broken Authentication/business-logic/JWTInvalidSignatureTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c45f5b13832d297c25f107306c354a565c67604c",
+      "size": 601,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c45f5b13832d297c25f107306c354a565c67604c"
+    },
+    {
+      "path": "Broken Authentication/business-logic/JWTNoneAlgoTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "78176a6ccf673cf6e4aa8df8ff156afe8110b5f2",
+      "size": 968,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/78176a6ccf673cf6e4aa8df8ff156afe8110b5f2"
+    },
+    {
+      "path": "Broken Authentication/business-logic/NoAuthTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8055afa13998919c36004254e5d429dce11bc611",
+      "size": 1642,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/8055afa13998919c36004254e5d429dce11bc611"
+    },
+    {
+      "path": "Broken Function Level Authorization",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "79b2218a3a21286b47f4d3eabecc69fb16755136",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/79b2218a3a21286b47f4d3eabecc69fb16755136"
+    },
+    {
+      "path": "Broken Function Level Authorization/business-logic",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3c8624a8fdde1cb636ade2fe13144de988f5d891",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/3c8624a8fdde1cb636ade2fe13144de988f5d891"
+    },
+    {
+      "path": "Broken Function Level Authorization/business-logic/AddMethodInParameterTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ef9db7d48735d63fdb816163d4d811d0dfe5c837",
+      "size": 889,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ef9db7d48735d63fdb816163d4d811d0dfe5c837"
+    },
+    {
+      "path": "Broken Function Level Authorization/business-logic/AddMethodOverrideHeadersTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8111b7b957761fa3ea34ce3856b95f9154ecd4d0",
+      "size": 915,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/8111b7b957761fa3ea34ce3856b95f9154ecd4d0"
+    },
+    {
+      "path": "Broken Function Level Authorization/business-logic/BFLATest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f503c11b4563218c57dba1a8ad09577ca34e487",
+      "size": 2516,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/1f503c11b4563218c57dba1a8ad09577ca34e487"
+    },
+    {
+      "path": "Broken Function Level Authorization/business-logic/ChangeHttpMethodTest.java",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f8ffdc0ba6b20162dd984166f66a4e076f98de1b",
+      "size": 571,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/f8ffdc0ba6b20162dd984166f66a4e076f98de1b"
+    },
+    {
+      "path": "Injection",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d307714a532236f7b8f8254942df9604fec07486",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/d307714a532236f7b8f8254942df9604fec07486"
+    },
+    {
+      "path": "Injection/host-injection",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "858cc3d7dd18b0ec1a9b645b70dd2ef9913cccf5",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/858cc3d7dd18b0ec1a9b645b70dd2ef9913cccf5"
+    },
+    {
+      "path": "Injection/host-injection/host-header-injection.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9166fdec4d8b96edccec482db61934563a995747",
+      "size": 869,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/9166fdec4d8b96edccec482db61934563a995747"
+    },
+    {
+      "path": "Injection/lfi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "efb4f9a4744b231d540071a71d4b852701acd4ad",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/efb4f9a4744b231d540071a71d4b852701acd4ad"
+    },
+    {
+      "path": "Injection/lfi/generic-j2ee-lfi.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "831d809765ecaf01e6e1dabe6f4fa20c6211c76e",
+      "size": 1387,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/831d809765ecaf01e6e1dabe6f4fa20c6211c76e"
+    },
+    {
+      "path": "Injection/lfi/generic-linux-lfi.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e028f11a9e090cbf9e6de0d3f9a8841c60ada4b5",
+      "size": 2852,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e028f11a9e090cbf9e6de0d3f9a8841c60ada4b5"
+    },
+    {
+      "path": "Injection/lfi/generic-windows-lfi.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e5ad66a3680c3f73cc27241f4c0783dff61ce86",
+      "size": 2485,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/9e5ad66a3680c3f73cc27241f4c0783dff61ce86"
+    },
+    {
+      "path": "Injection/lfi/linux-lfi-fuzzing.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9441661aa17c2f25f9210f005bfd096e55437f5e",
+      "size": 8229,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/9441661aa17c2f25f9210f005bfd096e55437f5e"
+    },
+    {
+      "path": "Injection/method-injection",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3069b5317de04b19e432cdaf50f65ae0a39a9b56",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/3069b5317de04b19e432cdaf50f65ae0a39a9b56"
+    },
+    {
+      "path": "Injection/method-injection/put-method-enabled.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba7178411821211ca1e7e160d5863f406ab73a5f",
+      "size": 1053,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ba7178411821211ca1e7e160d5863f406ab73a5f"
+    },
+    {
+      "path": "Injection/rce",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "43eef6466b3332fe5c3aa21da05114acb7105f23",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/43eef6466b3332fe5c3aa21da05114acb7105f23"
+    },
+    {
+      "path": "Injection/rce/header-command-injection.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b520226f35715655bdd8f3706c4392de19eafd45",
+      "size": 912,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/b520226f35715655bdd8f3706c4392de19eafd45"
+    },
+    {
+      "path": "Injection/sqli",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "7cd9898ad6900b8349fd8abd0a6b824b676cb8b3",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/7cd9898ad6900b8349fd8abd0a6b824b676cb8b3"
+    },
+    {
+      "path": "Injection/sqli/error-based-sql-injection.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d41cf435800464c11ce345c4c50e1626318481f6",
+      "size": 15717,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d41cf435800464c11ce345c4c50e1626318481f6"
+    },
+    {
+      "path": "Injection/sqli/mdb-database-file.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dbb0337b2f32426f6f192c40f0152975d311b44d",
+      "size": 946,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/dbb0337b2f32426f6f192c40f0152975d311b44d"
+    },
+    {
+      "path": "Injection/xss",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ae9bcc46e89eea48ac84d687fd69cdef85cd4e14",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/ae9bcc46e89eea48ac84d687fd69cdef85cd4e14"
+    },
+    {
+      "path": "Injection/xss/basic-xss-prober.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fa6b23c2a1ad222f2d59efe388c197f61763e6fd",
+      "size": 739,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/fa6b23c2a1ad222f2d59efe388c197f61763e6fd"
+    },
+    {
+      "path": "Injection/xss/crlf-injection.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf604d0ccf839a34d8bbb6672d678db5d0c42b96",
+      "size": 4444,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/bf604d0ccf839a34d8bbb6672d678db5d0c42b96"
+    },
+    {
+      "path": "Injection/xss/top-xss-params.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ddd98ddac848e3655e05c7d6271a5efa43ef8271",
+      "size": 5426,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ddd98ddac848e3655e05c7d6271a5efa43ef8271"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7dfc7b974f10946d8cef2cd1a28596841378377",
+      "size": 1061,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d7dfc7b974f10946d8cef2cd1a28596841378377"
+    },
+    {
+      "path": "Misconfiguration",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "21f77e9bf712c3d991e4b504d643bf0278de089f",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/21f77e9bf712c3d991e4b504d643bf0278de089f"
+    },
+    {
+      "path": "Misconfiguration/backups",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e65babc4a444140eeaa38614aa121efe73b9ed02",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/e65babc4a444140eeaa38614aa121efe73b9ed02"
+    },
+    {
+      "path": "Misconfiguration/backups/php-backup-files.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "50a0289cb98fb8654391d702b9be48e3fd9d84b9",
+      "size": 1175,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/50a0289cb98fb8654391d702b9be48e3fd9d84b9"
+    },
+    {
+      "path": "Misconfiguration/backups/settings-php-files.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "19e5e358cf3a0ecf9317b54ce8318e51e15106f7",
+      "size": 606,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/19e5e358cf3a0ecf9317b54ce8318e51e15106f7"
+    },
+    {
+      "path": "Misconfiguration/backups/sql-dump.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba77e6ba0920525090d081d010892e124d738193",
+      "size": 1442,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ba77e6ba0920525090d081d010892e124d738193"
+    },
+    {
+      "path": "Misconfiguration/backups/zip-backup-files.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5e647afda0d4caa3da5dafbb3177862ddaceedf",
+      "size": 1667,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d5e647afda0d4caa3da5dafbb3177862ddaceedf"
+    },
+    {
+      "path": "Misconfiguration/cache",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "641f950d841750bc6b0328c6c8a6873f20b8d8fb",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/641f950d841750bc6b0328c6c8a6873f20b8d8fb"
+    },
+    {
+      "path": "Misconfiguration/cache/cache-poisoning-fuzz.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dd3e14d2a3984ff0317ccc2d0b55af229c9a6eff",
+      "size": 667,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/dd3e14d2a3984ff0317ccc2d0b55af229c9a6eff"
+    },
+    {
+      "path": "Misconfiguration/cache/cache-poisoning.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "88f4e1af9fb885f899305c1e3804dfef62b74f92",
+      "size": 795,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/88f4e1af9fb885f899305c1e3804dfef62b74f92"
+    },
+    {
+      "path": "Misconfiguration/configs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "7739087634adcc919b35265bc37b79772dd7a5e1",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/7739087634adcc919b35265bc37b79772dd7a5e1"
+    },
+    {
+      "path": "Misconfiguration/configs/airflow-configuration-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "594945b2d062bf583cd7cd0cdaf128140934ee16",
+      "size": 346,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/594945b2d062bf583cd7cd0cdaf128140934ee16"
+    },
+    {
+      "path": "Misconfiguration/configs/amazon-docker-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4eaa175dfc18ba39482456e874087b7dd49e930a",
+      "size": 368,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/4eaa175dfc18ba39482456e874087b7dd49e930a"
+    },
+    {
+      "path": "Misconfiguration/configs/apache-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3c677acf69bb43fb0af1f3cc39c4bf103e6e8607",
+      "size": 474,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/3c677acf69bb43fb0af1f3cc39c4bf103e6e8607"
+    },
+    {
+      "path": "Misconfiguration/configs/appspec-yml-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "910e8875b7a4344faa65e5f6b81e740d10ad797d",
+      "size": 593,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/910e8875b7a4344faa65e5f6b81e740d10ad797d"
+    },
+    {
+      "path": "Misconfiguration/configs/cgi-printenv.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aa82b6b7e9734e5da31f141a51cb037f355ef008",
+      "size": 801,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/aa82b6b7e9734e5da31f141a51cb037f355ef008"
+    },
+    {
+      "path": "Misconfiguration/configs/circleci-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d05c07274761e8eedf844e82d8e601ea7d6f41b",
+      "size": 516,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/3d05c07274761e8eedf844e82d8e601ea7d6f41b"
+    },
+    {
+      "path": "Misconfiguration/configs/config-json.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2449d452ef7c72a719dfbce76cb3b9dd768ffe0",
+      "size": 643,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/a2449d452ef7c72a719dfbce76cb3b9dd768ffe0"
+    },
+    {
+      "path": "Misconfiguration/configs/config-rb.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "13374d3a0666bdfce2535fd1d6dd2040aea2a9af",
+      "size": 578,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/13374d3a0666bdfce2535fd1d6dd2040aea2a9af"
+    },
+    {
+      "path": "Misconfiguration/configs/configuration-listing.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0041a4c241658bfc305f3c8271b9a0cd1d92b2a9",
+      "size": 534,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/0041a4c241658bfc305f3c8271b9a0cd1d92b2a9"
+    },
+    {
+      "path": "Misconfiguration/configs/debug-vars.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "21d4c0fae60d20cb2a8afaae8ecbcafc8f18b6e1",
+      "size": 401,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/21d4c0fae60d20cb2a8afaae8ecbcafc8f18b6e1"
+    },
+    {
+      "path": "Misconfiguration/configs/docker-compose-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8628109ab8512d13f1d855cf9831c0a0a406d15d",
+      "size": 797,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/8628109ab8512d13f1d855cf9831c0a0a406d15d"
+    },
+    {
+      "path": "Misconfiguration/configs/dockerfile-hidden-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "79367f969bdc2e17d451465a6904871426697dcc",
+      "size": 703,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/79367f969bdc2e17d451465a6904871426697dcc"
+    },
+    {
+      "path": "Misconfiguration/configs/esmtprc-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e85220d004839bf5c16167770a0354d3d4f9cd89",
+      "size": 644,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e85220d004839bf5c16167770a0354d3d4f9cd89"
+    },
+    {
+      "path": "Misconfiguration/configs/firebase-config-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "abf104cc6a3883f981b1c654e6ddd640fe59818c",
+      "size": 628,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/abf104cc6a3883f981b1c654e6ddd640fe59818c"
+    },
+    {
+      "path": "Misconfiguration/configs/ftp-credentials-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6cf2071ea52e12d1acdedab12aeb9c4a96673e2e",
+      "size": 482,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/6cf2071ea52e12d1acdedab12aeb9c4a96673e2e"
+    },
+    {
+      "path": "Misconfiguration/configs/git-config-nginxoffbyslash.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "314985a7fbe40862a1eec9394d28b7ab2bd2e3df",
+      "size": 1187,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/314985a7fbe40862a1eec9394d28b7ab2bd2e3df"
+    },
+    {
+      "path": "Misconfiguration/configs/git-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "919106075f3beec6f3793dd2945c5435613ab2a7",
+      "size": 590,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/919106075f3beec6f3793dd2945c5435613ab2a7"
+    },
+    {
+      "path": "Misconfiguration/configs/git-credentials-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e2bbadd051c1011568a62e875a897ae09e4b4812",
+      "size": 648,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e2bbadd051c1011568a62e875a897ae09e4b4812"
+    },
+    {
+      "path": "Misconfiguration/configs/github-workflows-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ffb92e85bbfd5e1ebbf512be11c73774f21b5c4",
+      "size": 2003,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/4ffb92e85bbfd5e1ebbf512be11c73774f21b5c4"
+    },
+    {
+      "path": "Misconfiguration/configs/kubernetes-kustomization-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8724cb78ea884963b03a75ad1059a385968ea2ab",
+      "size": 781,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/8724cb78ea884963b03a75ad1059a385968ea2ab"
+    },
+    {
+      "path": "Misconfiguration/configs/laravel-env.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5ea0b169e973e774b2dfa84d2ebb2419ec2938a6",
+      "size": 1742,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/5ea0b169e973e774b2dfa84d2ebb2419ec2938a6"
+    },
+    {
+      "path": "Misconfiguration/configs/misconfigured-docker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "79d1061031d34751d1ae5ccfc05baa8bc9976a8c",
+      "size": 1061,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/79d1061031d34751d1ae5ccfc05baa8bc9976a8c"
+    },
+    {
+      "path": "Misconfiguration/configs/msmtp-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c418d119a8602c5c81f2ee06e66aaac13229ab2a",
+      "size": 743,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c418d119a8602c5c81f2ee06e66aaac13229ab2a"
+    },
+    {
+      "path": "Misconfiguration/configs/nginx-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9975df445404b838dafa7358ca35fde8fcad0488",
+      "size": 508,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/9975df445404b838dafa7358ca35fde8fcad0488"
+    },
+    {
+      "path": "Misconfiguration/configs/oracle-ebs-credentials.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5d0282a21253216cc2433cd12a3b1d2a87ab6c94",
+      "size": 818,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/5d0282a21253216cc2433cd12a3b1d2a87ab6c94"
+    },
+    {
+      "path": "Misconfiguration/configs/parameters-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e31a1a2423acb824d7202244d2e6e473b535b4ad",
+      "size": 824,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e31a1a2423acb824d7202244d2e6e473b535b4ad"
+    },
+    {
+      "path": "Misconfiguration/configs/prometheus-metrics.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b98c6d64edd25ba2440859f080b27621970d8126",
+      "size": 649,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/b98c6d64edd25ba2440859f080b27621970d8126"
+    },
+    {
+      "path": "Misconfiguration/configs/redis-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "63a8801564e6a44fb0c839376d23b2eab9360dd7",
+      "size": 656,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/63a8801564e6a44fb0c839376d23b2eab9360dd7"
+    },
+    {
+      "path": "Misconfiguration/configs/robomongo-credential.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ecf6a4cbc50ff2b0b2db064dd679cd069586a910",
+      "size": 664,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ecf6a4cbc50ff2b0b2db064dd679cd069586a910"
+    },
+    {
+      "path": "Misconfiguration/configs/server-private-keys.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0cc6c96dbc05cca3998d2102b41d50bd3663ea5f",
+      "size": 1390,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/0cc6c96dbc05cca3998d2102b41d50bd3663ea5f"
+    },
+    {
+      "path": "Misconfiguration/configs/sftp-config-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d3e3c5db0e69825caff482af85fcf746db04aff",
+      "size": 785,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/6d3e3c5db0e69825caff482af85fcf746db04aff"
+    },
+    {
+      "path": "Misconfiguration/configs/sonarqube-public-projects.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c4ae4e82866e424ab077cbf92b799a38bfcf6bca",
+      "size": 590,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c4ae4e82866e424ab077cbf92b799a38bfcf6bca"
+    },
+    {
+      "path": "Misconfiguration/configs/ssh-authorized-keys.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c1a902cc3fb8967b4920bb3991ad2f34598b384",
+      "size": 569,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/5c1a902cc3fb8967b4920bb3991ad2f34598b384"
+    },
+    {
+      "path": "Misconfiguration/configs/ssh-known-hosts.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "021c21570201cfffee870895de27bdd767f730c7",
+      "size": 548,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/021c21570201cfffee870895de27bdd767f730c7"
+    },
+    {
+      "path": "Misconfiguration/configs/unauthenticated-mongo-express.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "845139288395e61132a42b04bd26b2caaec6f7b6",
+      "size": 747,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/845139288395e61132a42b04bd26b2caaec6f7b6"
+    },
+    {
+      "path": "Misconfiguration/configs/wgetrc-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "038b767fcbb9383d7a67ec2b047f15a52f566e8d",
+      "size": 599,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/038b767fcbb9383d7a67ec2b047f15a52f566e8d"
+    },
+    {
+      "path": "Misconfiguration/configs/wpconfig-aws-keys.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b640cdf3b4e6eedaec5c2bf6ebda9e9bcd74330",
+      "size": 429,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/7b640cdf3b4e6eedaec5c2bf6ebda9e9bcd74330"
+    },
+    {
+      "path": "Misconfiguration/redirect",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0afdc3d1d5d8638c352ddf32ea5ce689d9193cf2",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/0afdc3d1d5d8638c352ddf32ea5ce689d9193cf2"
+    },
+    {
+      "path": "Misconfiguration/redirect/open-redirect.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "db9a91aafa03a20c88b4e49df2a8d426074b7a65",
+      "size": 3792,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/db9a91aafa03a20c88b4e49df2a8d426074b7a65"
+    },
+    {
+      "path": "Misconfiguration/smuggling",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c89ddbd5341de129fac96cc64b22d0239c8ac15d",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/c89ddbd5341de129fac96cc64b22d0239c8ac15d"
+    },
+    {
+      "path": "Misconfiguration/smuggling/cl-te-http-request-smuggling.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4adc17f10c1a0c524b43f5efe7428dabfa8d1b3d",
+      "size": 833,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/4adc17f10c1a0c524b43f5efe7428dabfa8d1b3d"
+    },
+    {
+      "path": "Misconfiguration/smuggling/te-cl-http-smuggling.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0eba5fd3d07135910964f7773ab58039742560da",
+      "size": 1013,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/0eba5fd3d07135910964f7773ab58039742560da"
+    },
+    {
+      "path": "Misconfiguration/swagger-detection",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5a8fb3b998171b648f15f442bce51b1b405a4c13",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/5a8fb3b998171b648f15f442bce51b1b405a4c13"
+    },
+    {
+      "path": "Misconfiguration/swagger-detection/swagger_file_basic.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4cd05ee35cf2aa4d8f08916f9534d1f95da51571",
+      "size": 691,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/4cd05ee35cf2aa4d8f08916f9534d1f95da51571"
+    },
+    {
+      "path": "Misconfiguration/swagger-detection/swagger_file_detection_SecLists.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b649c481505902769e59d705691ccc8d2acbe54d",
+      "size": 647,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/b649c481505902769e59d705691ccc8d2acbe54d"
+    },
+    {
+      "path": "Misconfiguration/swagger-detection/wordlists",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0cdbd3dd0379e3656e97654fff1b4bd790a87a67",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/0cdbd3dd0379e3656e97654fff1b4bd790a87a67"
+    },
+    {
+      "path": "Misconfiguration/swagger-detection/wordlists/swagger_pathlist.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c4d13771274895f052016bf6c0f2ddd33a685898",
+      "size": 86,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c4d13771274895f052016bf6c0f2ddd33a685898"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2d27dea59d19fac6777d969848dd19d5a003606b",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/2d27dea59d19fac6777d969848dd19d5a003606b"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/apache-licenserc.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e4a3244678b454af11992fe17ea6faa120b31f73",
+      "size": 478,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e4a3244678b454af11992fe17ea6faa120b31f73"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/appsettings-file-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f6d0a727377c9082f1d724dba6d5dcec9deccd3c",
+      "size": 803,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/f6d0a727377c9082f1d724dba6d5dcec9deccd3c"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/cloud-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8ee6c0e8926ab05452e9610289bd382e32cf1e48",
+      "size": 679,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/8ee6c0e8926ab05452e9610289bd382e32cf1e48"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/composer-auth-json.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0b29672e527876b23db2a465a922471f32570278",
+      "size": 663,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/0b29672e527876b23db2a465a922471f32570278"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/credentials-json.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b823f441f31f0ff4a13c12e8b52f4f6e4fccecf4",
+      "size": 594,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/b823f441f31f0ff4a13c12e8b52f4f6e4fccecf4"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/database-credentials.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "edf5ec191598eea533c75c42830d9f92735d00ae",
+      "size": 636,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/edf5ec191598eea533c75c42830d9f92735d00ae"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/db-xml-file.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c0728ced523832c49085c33a401273d98b122c59",
+      "size": 511,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c0728ced523832c49085c33a401273d98b122c59"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/django-secret-key.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "17625cd7ca810feae555d90e6558be9d092efff8",
+      "size": 986,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/17625cd7ca810feae555d90e6558be9d092efff8"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/docker-cloud.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "957f54befa035df704a4b859e359d55aea007f41",
+      "size": 733,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/957f54befa035df704a4b859e359d55aea007f41"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/environment-rb.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a74a4d9737d758dcb25c66ef0e6b389e319b0e33",
+      "size": 603,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/a74a4d9737d758dcb25c66ef0e6b389e319b0e33"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/exposed-alps-spring.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bdc10a99af05ba296a5ec465acf97301b0df0e9d",
+      "size": 767,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/bdc10a99af05ba296a5ec465acf97301b0df0e9d"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/gcloud-access-token.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc1f47169eeda36d78bd6c750465d79993cf4f8f",
+      "size": 679,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/cc1f47169eeda36d78bd6c750465d79993cf4f8f"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/gcloud-credentials.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dcf183f6f3a4107a87a3e80f819b2a949ae2cf3e",
+      "size": 668,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/dcf183f6f3a4107a87a3e80f819b2a949ae2cf3e"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/git-mailmap.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e5be88d7b03819ee48e22b55f03a7ab58bed931f",
+      "size": 1170,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/e5be88d7b03819ee48e22b55f03a7ab58bed931f"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/github-gemfile-files.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bef044f4f626930fde4e49eaa990ee2d33d29122",
+      "size": 759,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/bef044f4f626930fde4e49eaa990ee2d33d29122"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/go-mod-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec349a3846a747ae199295b5128591828d04e083",
+      "size": 464,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ec349a3846a747ae199295b5128591828d04e083"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/gogs-install-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7ec1e55e51854165ca4f857b41da5202afc5da9",
+      "size": 452,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d7ec1e55e51854165ca4f857b41da5202afc5da9"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/google-api-private-key.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b1e7d9ee6ee140fdc474d615c71429616a202699",
+      "size": 769,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/b1e7d9ee6ee140fdc474d615c71429616a202699"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/google-services-json.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "16e6ee78e584c8be670cf78d86174ddbab7bb96f",
+      "size": 697,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/16e6ee78e584c8be670cf78d86174ddbab7bb96f"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/kubernetes-etcd-keys.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "10ffe53158fae3ef1ae5dd44b0af330156f1f985",
+      "size": 647,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/10ffe53158fae3ef1ae5dd44b0af330156f1f985"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/oauth-credentials-json.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c5ebf6df90fbfae7c96b76ea0aac904703cdf05",
+      "size": 519,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/1c5ebf6df90fbfae7c96b76ea0aac904703cdf05"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/openstack-user-secrets.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "edba628d4aa58865d6e4c0baae14809ec3b81f8e",
+      "size": 713,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/edba628d4aa58865d6e4c0baae14809ec3b81f8e"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/php-user-ini-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ca2d24605dc3f3b97a60448a50f69cded3f452e2",
+      "size": 661,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ca2d24605dc3f3b97a60448a50f69cded3f452e2"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/phpunit-result-cache-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "de713bb2df169b0a23cd83348c2fb24c4a40c68e",
+      "size": 468,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/de713bb2df169b0a23cd83348c2fb24c4a40c68e"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/putty-private-key-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5226890a135d71b05482908ece6ae87778e10ae0",
+      "size": 948,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/5226890a135d71b05482908ece6ae87778e10ae0"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/rails-secret-token-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3208da5e3441c20bbbc9c9b45dcdaf8d275160e5",
+      "size": 642,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/3208da5e3441c20bbbc9c9b45dcdaf8d275160e5"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/random-files.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4fd74ffb92affd70a275a8299bcb89d45f92bb5",
+      "size": 600,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d4fd74ffb92affd70a275a8299bcb89d45f92bb5"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/ruby-rail-storage.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35f027542450059dd1f9ac1eac2936dad7254cd2",
+      "size": 825,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/35f027542450059dd1f9ac1eac2936dad7254cd2"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/secret-token-rb.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a9f26f72543d4085d2f8701c6d0140d09d46b610",
+      "size": 642,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/a9f26f72543d4085d2f8701c6d0140d09d46b610"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/secrets-file.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cb7173938ad1a2d47d97907a00efc5f132c38789",
+      "size": 985,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/cb7173938ad1a2d47d97907a00efc5f132c38789"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/sendgrid-env.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c1cd58ef0ce5bbeda4c8ebbd16697770fd574501",
+      "size": 407,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c1cd58ef0ce5bbeda4c8ebbd16697770fd574501"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/sensitive-storage-exposure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d09ef5ede814f0950e22acf06ff82bd1446e3c27",
+      "size": 839,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/d09ef5ede814f0950e22acf06ff82bd1446e3c27"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/service-account-credentials.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "976df04256a7cc6c5983f9c28a28ca421acb51be",
+      "size": 675,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/976df04256a7cc6c5983f9c28a28ca421acb51be"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/service-pwd.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f9c0ef5da358188d55c145c1fbd854a88be748f",
+      "size": 592,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/1f9c0ef5da358188d55c145c1fbd854a88be748f"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/token-json.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06925e5731df01fe8faf92843ddbddceb463a91c",
+      "size": 571,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/06925e5731df01fe8faf92843ddbddceb463a91c"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/travis-ci-disclosure.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64eb6c02e55041dedf406ee767b41745ac57031a",
+      "size": 1559,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/64eb6c02e55041dedf406ee767b41745ac57031a"
+    },
+    {
+      "path": "Misconfiguration/unprotected-files/vscode-sftp.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee326cae39d87ab0014056b4f1f7a57e938dd1c1",
+      "size": 841,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/ee326cae39d87ab0014056b4f1f7a57e938dd1c1"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8868100a4ae979b75f30a5803d800e8a6a518f86",
+      "size": 2503,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/8868100a4ae979b75f30a5803d800e8a6a518f86"
+    },
+    {
+      "path": "resources",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "43bd72b7e0b318e980a8bee8544dae10b6ca6321",
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/trees/43bd72b7e0b318e980a8bee8544dae10b6ca6321"
+    },
+    {
+      "path": "resources/juiceshop.har",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f02b62cd263f592047ab2e6bf818dc4d5907baba",
+      "size": 399786,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/f02b62cd263f592047ab2e6bf818dc4d5907baba"
+    },
+    {
+      "path": "resources/juiceshop_tokens.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c810457e82957649565be137b9a663735b7a9235",
+      "size": 1623,
+      "url": "https://api.github.com/repos/akto-api-security/tests-library/git/blobs/c810457e82957649565be137b9a663735b7a9235"
+    }
+  ],
+  "truncated": false
+}

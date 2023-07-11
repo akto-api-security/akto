@@ -62,7 +62,7 @@
                                         v-html="subCatogoryMap[issuesDetails.id.testSubCategory].issueImpact"></span>
                                 </div>
                             </div>
-                            <div v-if="similarlyAffectedIssues || similarlyAffectedIssues.length === 0" class="mt-4">
+                            <div v-if="similarlyAffectedIssues && similarlyAffectedIssues.length > 0" class="mt-4">
                                 <span class="description-title">Api endpoints affected</span>
                                 <table class="mt-3 mb-3">
                                     <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
