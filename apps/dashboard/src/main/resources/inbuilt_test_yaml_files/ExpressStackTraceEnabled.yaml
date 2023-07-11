@@ -1,0 +1,43 @@
+id: EXPRESS_STACK_TRACE_ENABLED
+info:
+  name: Express Stack Trace Enabled 
+  description:  Express Stack Trace Enabled Misconfiguration exposes sensitive error details, potentially aiding attackers in identifying vulnerabilities and exploiting the application.
+  details: >
+          The Express Stack Trace Enabled misconfiguration occurs when detailed error stack traces are returned in response 
+          payloads. These stack traces contain sensitive information about the application's code, such as file paths and 
+          function names. If an attacker gains access to these stack traces, it can significantly aid them in identifying 
+          potential vulnerabilities and crafting targeted attacks. It is crucial to disable stack trace information in 
+          production environments to prevent the exposure of sensitive details and enhance security posture.
+  impact:  Enabling stack traces in Express responses exposes sensitive code information, assisting attackers in pinpointing vulnerabilities and launching targeted attacks.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - ExpressJS
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/cy8Ku20LH6V6Yc0q0pJX
+
+validate:
+  response_payload:
+    contains_all:
+      - "NotFoundError: Not Found"
+      - "at Function.handle"

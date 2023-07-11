@@ -31,18 +31,12 @@ api_selection_filters:
     gte: 200
     lt: 300
 
-wordLists:
-  invalid_cors_origin: 
-    - evil.com
-    - "`evil.com"
-    - "1221"
-
 execute:
   type: single
   requests:
     - req:
       - add_header:
-          origin:  ${invalid_cors_origin}
+          origin:  "`evil.com"
 
 validate:
   response_code:
@@ -54,7 +48,7 @@ validate:
           key:
             contains_either: access-control-allow-origin
           value:
-            contains_either: ${invalid_cors_origin}
+            contains_either: "`evil.com"
       - for_one:
           key:
             contains_either: access-control-allow-credentials

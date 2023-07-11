@@ -1,0 +1,42 @@
+id: FIREBASE_UNAUTHENTICATED
+info:
+  name: "Firebase Collection Exposed Data"
+  description: "Assessing security vulnerability by appending .json to API path, accessing complete Firebase collection data without authentication."
+  details: >
+            "Conducting a critical security test to evaluate the potential risk of appending '.json' to the API path, allowing unauthorized access to retrieve and view the entire data of a Firebase collection. 
+             This vulnerability poses a serious threat as it exposes sensitive information, potentially leading to unauthorized data exposure and privacy breaches."
+  impact: "Unrestricted access to Firebase collection data by simply adding '.json' to the API path, causing alarming data exposure and privacy nightmares."
+  category:
+    name: SM
+    shortName: Security Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: FIREBASE_UNAUTHENTICATED
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "http://ghostlulz.com/google-exposed-firebase-database/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    regex: .*
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_url: ${urlVar}.json
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    length:
+      gt: 100
