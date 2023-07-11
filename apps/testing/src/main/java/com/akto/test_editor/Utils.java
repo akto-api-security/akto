@@ -165,4 +165,16 @@ public class Utils {
         return result;
     }
 
+    public static BasicDBObject fetchJsonObjForString(Object val) {
+        if (!(val instanceof String)) {
+            return null;
+        }
+        try {
+            BasicDBObject obj = BasicDBObject.parse(val.toString());
+            return obj;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 }
