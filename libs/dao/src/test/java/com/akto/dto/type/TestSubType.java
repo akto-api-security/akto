@@ -4,19 +4,29 @@ import static org.junit.Assert.*;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
+import com.akto.dao.context.Context;
 import org.junit.Test;
 
 import com.akto.dto.AktoDataType;
 import com.akto.dto.IgnoreData;
 public class TestSubType {
 
+    private final int ACCOUNT_ID = 1_000_000;
     public void testInitializer(){
-        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
-        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        Context.accountId.set(ACCOUNT_ID);
+        Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
+        if (info == null) {
+            info = new AccountDataTypesInfo();
+        }
+        info.setAktoDataTypeMap(aktoDataTypeMap);
+        SingleTypeInfo.getAccountToDataTypesInfo().put(ACCOUNT_ID, info);
     }
 
     @Test

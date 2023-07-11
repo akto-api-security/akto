@@ -24,23 +24,29 @@ import java.util.*;
 import static org.junit.Assert.assertEquals;
 
 public class TestApiCatalogSync extends MongoBasedTest {
-    public void testInitializer(){
-        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
-        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+    public void testInitializer() {
+        Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
+        if (info == null) {
+            info = new AccountDataTypesInfo();
         }
-        
+        info.setAktoDataTypeMap(aktoDataTypeMap);
+        SingleTypeInfo.getAccountToDataTypesInfo().put(ACCOUNT_ID, info);
+    }
+
     @Test
     public void testFillUrlParams() {
         testInitializer();
         RequestTemplate requestTemplate1 = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder());
         validateSubTypeAndMinMax(requestTemplate1, "/api/books/378282246310005", "/api/books/STRING",
-                SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE, 1,1);
+                SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE, 1, 1);
         validateSubTypeAndMinMax(requestTemplate1, "api/books/378282246310005", "/api/books/STRING",
                 SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE, 2, 1);
         validateSubTypeAndMinMax(requestTemplate1, "api/books/4111111111111111/", "/api/books/STRING",
@@ -50,7 +56,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
         validateSubTypeAndMinMax(requestTemplate2, "/api/books/234", "/api/books/INTEGER",
                 SingleTypeInfo.INTEGER_32, 234, 234, 1, 1);
         validateSubTypeAndMinMax(requestTemplate2, "api/books/999", "/api/books/INTEGER",
-                SingleTypeInfo.INTEGER_32, 234,999, 2, 2);
+                SingleTypeInfo.INTEGER_32, 234, 999, 2, 2);
     }
 
     private void validateSubTypeAndMinMax(RequestTemplate requestTemplate, String url, String templateUrl,
@@ -64,7 +70,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
 
         assertEquals(1, requestTemplate.getUrlParams().size());
         KeyTypes keyTypes = requestTemplate.getUrlParams().get(2);
-        SingleTypeInfo singleTypeInfo= keyTypes.getOccurrences().get(subType);
+        SingleTypeInfo singleTypeInfo = keyTypes.getOccurrences().get(subType);
         assertEquals(subType, singleTypeInfo.getSubType());
         assertEquals(maxValue, singleTypeInfo.getMaxValue());
         assertEquals(minValue, singleTypeInfo.getMinValue());
@@ -89,14 +95,14 @@ public class TestApiCatalogSync extends MongoBasedTest {
         toMergeUrls.add("/api/books/3");
         String mergedUrl = "/api/books/INTEGER";
 
-        for (Object m: toMergeUrls.toArray()) {
+        for (Object m : toMergeUrls.toArray()) {
             buildAndInsert((String) m);
         }
 
         MergeSimilarUrls.mergeAndUpdateDb(mergedUrl, toMergeUrls, 100, URLMethods.Method.GET);
 
         List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
-        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+        for (SingleTypeInfo singleTypeInfo : singleTypeInfos) {
             assertEquals(mergedUrl, singleTypeInfo.getUrl());
         }
         assertEquals(12, singleTypeInfos.size());
@@ -113,19 +119,19 @@ public class TestApiCatalogSync extends MongoBasedTest {
         assertEquals(0, trafficInfoCount);
 
         List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(new BasicDBObject());
-        for (SensitiveSampleData sensitiveSampleData: sensitiveSampleDataList) {
+        for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
             assertEquals(mergedUrl, sensitiveSampleData.getId().getUrl());
         }
         assertEquals(12, sensitiveSampleDataList.size());
 
         List<SensitiveParamInfo> sensitiveParamInfoList = SensitiveParamInfoDao.instance.findAll(new BasicDBObject());
-        for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfoList) {
+        for (SensitiveParamInfo sensitiveParamInfo : sensitiveParamInfoList) {
             assertEquals(mergedUrl, sensitiveParamInfo.getUrl());
         }
         assertEquals(12, sensitiveParamInfoList.size());
 
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        for (FilterSampleData filterSampleData: filterSampleDataList) {
+        for (FilterSampleData filterSampleData : filterSampleDataList) {
             assertEquals(mergedUrl, filterSampleData.getId().getApiInfoKey().getUrl());
         }
         assertEquals(3, filterSampleDataList.size());
@@ -133,15 +139,15 @@ public class TestApiCatalogSync extends MongoBasedTest {
 
     public void buildAndInsert(String url) {
         List<String> params = new ArrayList<>();
-        for (int i = 0; i<4; i++) {
-            params.add("param_" + url + "_"+i);
+        for (int i = 0; i < 4; i++) {
+            params.add("param_" + url + "_" + i);
         }
         int apiCollectionId = 100;
         URLMethods.Method method = URLMethods.Method.GET;
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
-        for (String param: params) {
+        for (String param : params) {
             SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, method.name(), 200, false, param, SingleTypeInfo.GENERIC, apiCollectionId, false);
-            SingleTypeInfo sti = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+            SingleTypeInfo sti = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, 0, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
             singleTypeInfos.add(sti);
         }
         SingleTypeInfoDao.instance.insertMany(singleTypeInfos);
@@ -151,14 +157,14 @@ public class TestApiCatalogSync extends MongoBasedTest {
 
         SampleDataDao.instance.insertOne(
                 new SampleData(
-                        new Key(apiCollectionId, url, method, -1, 0,0),
+                        new Key(apiCollectionId, url, method, -1, 0, 0),
                         Collections.singletonList("")
                 )
         );
 
         List<TrafficInfo> trafficInfoList = new ArrayList<>();
-        for (int i =0; i<10; i++) {
-            Key key = new Key(apiCollectionId, url, method, -1, i*10,i*10+10);
+        for (int i = 0; i < 10; i++) {
+            Key key = new Key(apiCollectionId, url, method, -1, i * 10, i * 10 + 10);
             TrafficInfo trafficInfo = new TrafficInfo(key, new HashMap<>());
             trafficInfoList.add(trafficInfo);
         }
@@ -167,7 +173,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
 
 
         List<SensitiveSampleData> sensitiveSampleDataList = new ArrayList<>();
-        for (String param: params) {
+        for (String param : params) {
             SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, method.name(), 200, false, param, SingleTypeInfo.GENERIC, apiCollectionId, false);
             SensitiveSampleData sensitiveSampleData = new SensitiveSampleData(
                     paramId, Collections.singletonList("1")
@@ -178,7 +184,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
 
 
         List<SensitiveParamInfo> sensitiveParamInfos = new ArrayList<>();
-        for (String param: params) {
+        for (String param : params) {
             SensitiveParamInfo sensitiveParamInfo = new SensitiveParamInfo(
                     url, method.name(), 200, false, param, apiCollectionId, true
             );
@@ -188,7 +194,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
         SensitiveParamInfoDao.instance.insertMany(sensitiveParamInfos);
 
         List<FilterSampleData> filterSampleDataList = new ArrayList<>();
-        for (int i =0;i<3; i++) {
+        for (int i = 0; i < 3; i++) {
             FilterSampleData filterSampleData = new FilterSampleData(apiInfo.getId(), i);
             filterSampleDataList.add(filterSampleData);
         }

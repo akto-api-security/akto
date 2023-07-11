@@ -1,0 +1,48 @@
+id: GRAPHQL_TYPE_INTROSPECTION_ALLOWED
+info:
+  name: "Graphql Type Introspection Allowed"
+  description: "GraphQL type introspection vulnerability enables unauthorized access to type details, potentially leading to data exposure and security breaches."
+  details: > 
+            "GraphQL type introspection mode enabled vulnerability refers to a security flaw where the type introspection feature in GraphQL is improperly configured, allowing unauthorized access to type information. Type introspection allows clients to query the server for details about available types, their fields, and their relationships." 
+            "When this mode is enabled without proper access controls, it exposes sensitive information about the GraphQL schema, potentially leading to data exposure and security breaches. Attackers can leverage this vulnerability to gain insights into the data model, identify valuable fields, and craft targeted queries to extract sensitive data or perform unauthorized operations." 
+            "Mitigation involves disabling or securing type introspection to prevent unauthorized access to schema details."
+  impact: "Data exposure and security risks from GraphQL type introspection vulnerability."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GRAPHQL_TYPE_INTROSPECTION_ALLOWED
+  severity: HIGH
+  tags:
+    - GraphQL
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://nostarch.com/black-hat-graphql Chapter 6 - Information Disclosure"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
+    - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
+    - "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
+
+api_selection_filters:
+  url:
+    regex: graphql
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+          regex_replace:
+            regex: graphql.*
+            replace_with: graphql
+      - replace_body: '{ "query": "query { __type(name:\"Query\") { name } }" }'
+
+validate:
+  response_payload:
+    contains_all: 
+      - "data"
+      - "__type"
+
+strategy:
+  run_once: /

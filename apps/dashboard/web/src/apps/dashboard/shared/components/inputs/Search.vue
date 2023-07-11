@@ -9,6 +9,7 @@
                 :readOutsideClick="true"
                 :placeholder=placeholder
                 @changed="changed"
+                @onKeystroke="onKeystroke"
                 :key="finalName"
             />
         </div>
@@ -39,6 +40,10 @@ export default {
         changed(newName) {
             this.$emit('changed', newName)
             this.finalName = newName
+        },
+        onKeystroke(value) {
+            this.$emit('onKeystroke', value)
+            this.finalName = value
         }
     }
 }
