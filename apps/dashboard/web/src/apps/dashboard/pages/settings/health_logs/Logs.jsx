@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "../../../../../util/func";
 import LogsContainer from "./LogsContainer";
-import Dropdown from "../../../components/layouts/leftnav/Dropdown";
+import Dropdown from "../../../components/layouts/Dropdown"
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -21,7 +21,6 @@ const Logs = () => {
         { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
         { label: "Testing", value: "TESTING" },
-        { label: "Select log group", value: "" },
     ];
     // const handleSelectLogGroup = (logGroup) => {
     //     setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))

@@ -7,7 +7,16 @@ const LogsContainer = ({ logs }) => {
     const logsFetchBetween = () => {
         let d1 = func.epochToDateTime(Math.floor(logs.startTime / 1000))
         let d2 = func.epochToDateTime(Math.floor(logs.endTime / 1000))
-        return "Fetched logs from " + d1 + " to " + d2;
+
+        //return "Fetched logs from " + d1 + " to " + d2;
+        return (
+            <span>
+                <span>Fetched logs from </span>
+                <span style={{color: tokens.color["color-bg-success-strong"]}}>{d1}</span>
+                <span > to </span>
+                <span style={{color: tokens.color["color-bg-success-strong"]}}>{d2}</span>
+            </span>
+        )
     }
 
     const logContent = []
@@ -27,9 +36,9 @@ const LogsContainer = ({ logs }) => {
             <Scrollable style={{height: '60vh'}}>
                {logContent.map((logText, idx) => (
                 <div key={idx}>
-                    <Text style={{ fontFamily: tokens.font["font-family-mono"] }}>
+                    <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"], lineHeight: "16px", letterSpacing: "0px", textAlign: "left"}}>
                         {logText}
-                    </Text>
+                    </div>
                     <br />
                 </div>
                ))}
