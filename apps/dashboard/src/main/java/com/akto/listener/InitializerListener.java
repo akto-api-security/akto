@@ -133,13 +133,15 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void setUpPiiCleanerScheduler(){
+        Set<Integer> whiteListCollectionSet = new HashSet<>();
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         try {
-                            executePiiCleaner(true);
+                            executePiiCleaner(whiteListCollectionSet);
                         } catch (Exception e) {
                         }
 
@@ -321,7 +323,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    static void executePiiCleaner(boolean isDryRun) {
+    static void executePiiCleaner(Set<Integer> whiteListCollectionSet) {
         final int BATCH_SIZE = 100;
         int currMarker = 0;
         Bson filterSsdQ =
@@ -360,18 +362,21 @@ public class InitializerListener implements ServletContextListener {
                 dataPoints++;
             }
 
-            bulkSensitiveInvalidate(idsToDelete, isDryRun);
-            bulkSingleTypeInfoDelete(idsToDelete, isDryRun);
+            bulkSensitiveInvalidate(idsToDelete, whiteListCollectionSet);
+            bulkSingleTypeInfoDelete(idsToDelete, whiteListCollectionSet);
 
         } while (dataPoints == BATCH_SIZE);
     }
 
-    private static void bulkSensitiveInvalidate(List<SingleTypeInfo.ParamId> idsToDelete, boolean isDryRun) {
+    private static void bulkSensitiveInvalidate(List<SingleTypeInfo.ParamId> idsToDelete, Set<Integer> whiteListCollectionSet) {
         ArrayList<WriteModel<SensitiveSampleData>> bulkSensitiveInvalidateUpdates = new ArrayList<>();
         for(SingleTypeInfo.ParamId paramId: idsToDelete) {
             String paramStr = "PII cleaner - invalidating: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
             String url = "dashboard/observe/inventory/"+paramId.getApiCollectionId()+"/"+Base64.getEncoder().encodeToString((paramId.getUrl() + " " + paramId.getMethod()).getBytes());
             loggerMaker.infoAndAddToDb(paramStr + url, LogDb.DASHBOARD);
+
+            if (!whiteListCollectionSet.contains(paramId.getApiCollectionId())) continue;
+
             List<Bson> filters = new ArrayList<>();
             filters.add(Filters.eq("url", paramId.getUrl()));
             filters.add(Filters.eq("method", paramId.getMethod()));
@@ -384,21 +389,22 @@ public class InitializerListener implements ServletContextListener {
         }
 
         if (!bulkSensitiveInvalidateUpdates.isEmpty()) {
-            if (!isDryRun) {
-                BulkWriteResult bwr =
-                        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkSensitiveInvalidateUpdates, new BulkWriteOptions().ordered(false));
+            BulkWriteResult bwr =
+                    SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkSensitiveInvalidateUpdates, new BulkWriteOptions().ordered(false));
 
-                loggerMaker.infoAndAddToDb("PII cleaner - modified " + bwr.getModifiedCount() + " from STI", LogDb.DASHBOARD);
-            }
+            loggerMaker.infoAndAddToDb("PII cleaner - modified " + bwr.getModifiedCount() + " from STI", LogDb.DASHBOARD);
         }
 
     }
 
-    private static void bulkSingleTypeInfoDelete(List<SingleTypeInfo.ParamId> idsToDelete, boolean isDryRun) {
+    private static void bulkSingleTypeInfoDelete(List<SingleTypeInfo.ParamId> idsToDelete, Set<Integer> whiteListCollectionSet) {
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
         for(SingleTypeInfo.ParamId paramId: idsToDelete) {
             String paramStr = "PII cleaner - deleting: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
             loggerMaker.infoAndAddToDb(paramStr, LogDb.DASHBOARD);
+
+            if (!whiteListCollectionSet.contains(paramId.getApiCollectionId())) continue;
+
             List<Bson> filters = new ArrayList<>();
             filters.add(Filters.eq("url", paramId.getUrl()));
             filters.add(Filters.eq("method", paramId.getMethod()));
@@ -411,12 +417,10 @@ public class InitializerListener implements ServletContextListener {
         }
 
         if (!bulkUpdatesForSingleTypeInfo.isEmpty()) {
-            if (!isDryRun) {
-                BulkWriteResult bwr =
-                        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo, new BulkWriteOptions().ordered(false));
+            BulkWriteResult bwr =
+                    SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo, new BulkWriteOptions().ordered(false));
 
-                loggerMaker.infoAndAddToDb("PII cleaner - deleted " + bwr.getDeletedCount() + " from STI", LogDb.DASHBOARD);
-            }
+            loggerMaker.infoAndAddToDb("PII cleaner - deleted " + bwr.getDeletedCount() + " from STI", LogDb.DASHBOARD);
         }
 
     }
