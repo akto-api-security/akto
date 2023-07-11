@@ -22,6 +22,11 @@ public class HttpMethodFilter implements Filter {
             return ;
         }
 
+        if (method.equalsIgnoreCase("OPTIONS")) {
+            httpServletResponse.sendError(204);
+            return;
+        }
+
         if (!method.equalsIgnoreCase("POST") && !method.equalsIgnoreCase("GET")) {
             httpServletResponse.sendError(404);
             return ;

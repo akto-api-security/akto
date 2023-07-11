@@ -38,7 +38,10 @@ public class GlobalEnums {
         MHH("MHH", Severity.LOW, "Misconfigured HTTP Headers (MHH)", "Misconfigured HTTP Headers"),
         SVD("SVD", Severity.LOW, "Server Version Disclosure (SVD)", "Server Version Disclosure"),
         CORS("CORS", Severity.HIGH, "Cross-Origin Resource Sharing (CORS)", "CORS Misconfiguration"),
-        CRLF("CRLF", Severity.MEDIUM, "CRLF Injection", "CRLF Injection");
+        CRLF("CRLF", Severity.MEDIUM, "CRLF Injection", "CRLF Injection"),
+        SSTI("SSTI", Severity.HIGH, "Server Side Template Injection (SSTI)", "Server Side Template Injection"),
+        LFI("LFI", Severity.HIGH, "Local File Inclusion (LFI)", "Local File Inclusion"),
+        XSS("XSS", Severity.HIGH, "Cross-site scripting (XSS)", "Cross-site scripting");
 
         private final String name;
         private final Severity severity;

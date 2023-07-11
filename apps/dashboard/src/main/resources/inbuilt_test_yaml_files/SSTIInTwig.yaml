@@ -1,0 +1,46 @@
+id: SSTI_IN_TWIG
+info:
+  name: "SSTI in Twig"
+  description: "Fuzzing vulnerable payloads in request body and query params to assess Server-Side Template Injection vulnerability."
+  details: >
+    "By fuzzing vulnerable payloads in request bodies and query parameters, it aims to identify and exploit Server-Side Template Injection vulnerabilities specific to Twig templates.
+    This test assesses the risk of arbitrary code execution, data exposure, and server compromise within the Twig templating engine, ensuring comprehensive security assessment."
+  impact: "Successful exploitation might compromise sensitive AWS information which attacker can use to get unauthorized access to AWS."
+  category:
+    name: SSTI
+    shortName: Server Side Template Injection
+    displayName: Server Side Template Injection (SSTI)
+  subCategory: SSTI_IN_TWIG
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.cobalt.io/blog/a-pentesters-guide-to-server-side-template-injection-ssti"
+
+api_selection_filters:
+  or:
+    - request_payload:
+        for_one:
+          key:
+            regex: .*
+            extract: payloadKey
+    - query_param:
+        for_one:
+          key:
+            regex: .*
+            extract: queryKey
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_query_param:
+            queryKey: '%7B%7B89%20*%2091%7D%7D'
+        - modify_body_param:
+            payloadKey: '{{89 * 91}}'
+
+validate:
+  response_payload:
+    contains_either: '8099'

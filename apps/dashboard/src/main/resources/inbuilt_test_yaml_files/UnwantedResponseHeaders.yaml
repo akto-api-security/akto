@@ -10,7 +10,7 @@ info:
   impact: "This information can be used to facilitate more sophisticated attacks on your application."
   category:
     name: MHH
-    shortName: MHH
+    shortName: Misconfigured HTTP Headers
     displayName: Misconfigured HTTP Headers (MHH)
   subCategory: UNWANTED_RESPONSE_HEADERS
   severity: LOW
