@@ -127,6 +127,11 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
+    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key, Object value) {
+        rawApi.getRequest().setBody(key.toString());
+        return new ExecutorSingleOperationResp(true, "");
+    }
+
     public static ExecutorSingleOperationResp modifyUrl(RawApi rawApi, String value) {
         rawApi.modifyUrl(value);
         return new ExecutorSingleOperationResp(true, "");

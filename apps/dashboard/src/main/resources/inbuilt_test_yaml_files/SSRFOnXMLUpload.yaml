@@ -1,6 +1,6 @@
 id: SSRF_ON_XML_UPLOAD
 info:
-  name: "Sensitive AWS details exposed via replacing XML param"
+  name: "Sensitive AWS details exposed via replacing XML param due to SSRF"
   description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing XML upload parameter with url that redirects to AWS IMDS endpoint. The application responded with 2XX success code and also gave out sensitive AWS information in response."
   details: >
     "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing XML upload parameter with url that redirects to AWS IMDS endpoint. The application responded with 2XX success code and also gave out sensitive AWS information in response. Server-Side Request Forgery (SSRF) flaws occur whenever an API is fetching a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or a VPN.\n
@@ -34,23 +34,23 @@ api_selection_filters:
             contains_either:
                 - .xml
           key:
-            extract: csv_key
+            extract: xml_key
     - query_param:
         for_one:
           value:
             contains_either:
                 - .xml
           key:
-            extract: csv_key
+            extract: xml_key
 
 execute:
   type: single
   requests:
     - req:
         - modify_query_param:
-            csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
+            xml_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
         - modify_body_param:
-            csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
+            xml_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
 
 validate:
   response_code:
