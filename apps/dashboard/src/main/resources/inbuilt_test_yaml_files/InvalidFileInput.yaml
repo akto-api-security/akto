@@ -1,6 +1,6 @@
 id: INVALID_FILE_INPUT
 info:
-  name: Invalid File Input
+  name: Invalid File Input Leaking Sensitive Details Via Verbose Error Message
   description: "The error response contains information which may help in more sophisticated attacks"
   details: >
           "The error response contains information about the database or an inconsistent error message.<br>"
@@ -13,7 +13,7 @@ info:
   impact: "This information can be used to facilitate more sophisticated attacks on your application"
   category:
     name: VEM
-    shortName: VEM
+    shortName: Verbose Error Messages
     displayName: Verbose Error Messages (VEM)
   subCategory: INVALID_FILE_INPUT
   severity: LOW

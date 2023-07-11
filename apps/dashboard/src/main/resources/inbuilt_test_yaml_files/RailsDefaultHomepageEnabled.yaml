@@ -1,0 +1,45 @@
+id: RAILS_DEFAULT_HOMEPAGE_ENABLED
+info:
+  name: Rails Default Homepage Enabled 
+  description: Rails Default Homepage Enabled Misconfiguration.
+  details: >
+       The Rails Default Homepage Enabled misconfiguration occurs when the default homepage of a Rails 
+       application is accessible in a production environment. This misconfiguration reveals sensitive 
+       information such as the Rails version and can potentially provide attackers with valuable 
+       insights into the application's technology stack. It is recommended to customize the default
+        homepage or restrict its access to prevent information leakage and mitigate the risk of 
+        targeted attacks. This misconfiguration has a low severity level and falls under the Security 
+        Misconfiguration category.
+  impact: Allowing access to the default Rails homepage exposes sensitive information about the application, aiding potential attackers in understanding its technology stack and vulnerabilities.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Rails
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_payload:
+    contains_all:
+      - "<title>Ruby on Rails</title>"
+        

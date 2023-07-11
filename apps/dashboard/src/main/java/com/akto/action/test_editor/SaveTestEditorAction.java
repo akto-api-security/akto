@@ -19,6 +19,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
@@ -210,7 +211,8 @@ public class SaveTestEditorAction extends UserAction {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleDataMap, null, null);
+        SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null);
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
