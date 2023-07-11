@@ -61,8 +61,14 @@
                     if (window.USER_NAME.length > 0) {
                         // Initialize mixpanel
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
-                        mixpanel.identify(window.USER_NAME);
-                        mixpanel.people.set({ "$email": window.USER_NAME });
+                        
+                        let user_id = window.USER_NAME + '_' + window.DASHBOARD_MODE
+                        mixpanel.identify(user_id)
+
+                        let domain_name = window.USER_NAME.split("@")[1];
+                        let account_name = domain_name.split('.')[0];
+                        mixpanel.people.set({ "$email": window.USER_NAME, "$account Name": account_name });
+
                         mixpanel.register({
                             'email': window.USER_NAME,
                             'dashboard_mode': 'ON_PREM'
