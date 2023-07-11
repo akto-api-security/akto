@@ -1,0 +1,50 @@
+id: LARAVEL_TELESCOPE_ENABLED
+info:
+  name: Laravel Telescope Enabled 
+  description: Laravel Telescope Enabled Misconfiguration.
+  details: >
+        Laravel Telescope makes a wonderful companion to your local Laravel development environment. Telescope provides 
+        insight into the requests coming into your application, exceptions, log entries, database queries, queued jobs, mail, 
+        notifications, cache operations, scheduled tasks, variable dumps, and more. The Laravel Telescope Enabled 
+        misconfiguration occurs when the Laravel Telescope debugging tool is accessible in a production environment. Telescope
+        provides extensive insights into the application's requests, commands, and schedule,  which can be useful during 
+        development but pose a security risk when exposed in a live environment. This misconfiguration reveals sensitive 
+        information about the application's internal workings and can aid potential attackers in understanding its structure 
+        and vulnerabilities. It is recommended to disable or restrict access to Laravel Telescope in production to mitigate the risk of information leakage.
+  impact: Allowing access to Laravel Telescope exposes sensitive internal information about the application, aiding potential attackers in understanding its structure and vulnerabilities.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Laravel
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://laravel.com/docs/10.x/telescope"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}telescope/requests
+
+validate:
+  response_payload:
+    contains_all: 
+      - "<title>Telescope - Laravel</title>"
+      - "Requests"
+      - "Commands"
+      - "Schedule"
+    
