@@ -1,0 +1,43 @@
+id: DESCRIPTIVE_ERROR_MESSAGE_INVALID_PAYLOAD
+info:
+  name: Descriptive Error Message Using invalid payloads
+  description: "Verifies error messages for sensitive information leakage, specifically preventing the exposure of stack traces, enhancing application security."
+  details: >
+          "The DESCRIPTIVE_ERROR_MESSAGE test ensures that error messages do not leak sensitive information, specifically avoiding the exposure of stack traces. 
+          It verifies that error messages provide useful and informative feedback without disclosing implementation details, reducing the risk of exposing vulnerabilities and aiding in maintaining the security and integrity of the application."
+  impact: "This information can be used to facilitate more sophisticated attacks on your application"
+  category:
+    name: VEM
+    shortName: VEM
+    displayName: Verbose Error Messages (VEM)
+  subCategory: DESCRIPTIVE_ERROR_MESSAGE_INVALID_PAYLOAD
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-community/Improper_Error_Handling"
+
+api_selection_filters:
+  method:
+    contains_either:
+      - "PUT"
+      - "POST"
+      - "PATCH"
+
+execute:
+  type: single
+  requests:
+    - req:
+      - replace_body: "random payload containing 5s3c1@al characters and emojis😊"
+validate:
+  response_payload:
+    - contains_either:
+      - column
+      - row
+      - line
+      - function
+      - class
+      - stack
+      - trace
