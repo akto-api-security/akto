@@ -268,13 +268,13 @@ function TestRunResultPage(props) {
           setIssueDetails(...[resp.runIssues]);
           moreInfoSections[0].content = (
             <Text color='subdued'>
-              {subCategoryMap[resp.runIssues.id?.testSubCategory].issueImpact}
+              {subCategoryMap[resp.runIssues.id?.testSubCategory]?.issueImpact || "No impact found"}
             </Text>
           )
           moreInfoSections[1].content = (
             <HorizontalStack gap="2">
               {
-                subCategoryMap[resp.runIssues.id.testSubCategory].issueTags.map((tag, index) => {
+                subCategoryMap[resp.runIssues.id.testSubCategory]?.issueTags.map((tag, index) => {
                   return (
                     <Badge progress="complete" key={index}>{tag}</Badge>
                   )
@@ -285,7 +285,7 @@ function TestRunResultPage(props) {
           moreInfoSections[3].content = (
             <List type='bullet' spacing="extraTight">
               {
-                subCategoryMap[resp.runIssues.id?.testSubCategory].references.map((reference) => {
+                subCategoryMap[resp.runIssues.id?.testSubCategory]?.references.map((reference) => {
                   return (
                     <List.Item key={reference}>
                       <Link key={reference} url={reference} monochrome removeUnderline>
@@ -381,7 +381,7 @@ function TestRunResultPage(props) {
     components = {[
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
-        {parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "")}
+        {parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found")}
       </LegacyCard>
     ,
     selectedTestRunResult.testResults &&
