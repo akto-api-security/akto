@@ -91,6 +91,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
+        //For the case when no account exists, the user will get access to 1_000_000 account
         String accountIdStr = user.getAccounts().keySet().isEmpty() ? "1000000" : user.getAccounts().keySet().iterator().next();
         int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
         decideFirstPage(loginResult, accountId);
