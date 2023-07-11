@@ -23,13 +23,13 @@ import com.akto.types.CappedSet;
 public class CustomAuthUtilTest extends MongoBasedTest{
 
     public static SingleTypeInfo generateSingleTypeInfo(String param, Boolean isHeader) {
-        SingleTypeInfo.ParamId p = new SingleTypeInfo.ParamId("/api","POST",200,isHeader,param,SingleTypeInfo.GENERIC,ACCOUNT_ID, false);
+        SingleTypeInfo.ParamId p = new SingleTypeInfo.ParamId("/api","POST",-1,isHeader,param,SingleTypeInfo.GENERIC,ACCOUNT_ID, false);
         return new SingleTypeInfo(p,new HashSet<>(),new HashSet<>(),0,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
     }
 
     @Test
     public void test1(){
-        ApiInfo apiInfo = new ApiInfo(ACCOUNT_ID, "/api", Method.POST);
+        ApiInfo apiInfo =  new ApiInfo(ACCOUNT_ID, "/api", Method.POST);
         Set<Set<ApiInfo.AuthType>> authTypes = new HashSet<>();
         Set<ApiInfo.AuthType> types = new HashSet<>();
         types.add(ApiInfo.AuthType.UNAUTHENTICATED);

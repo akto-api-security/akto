@@ -2,18 +2,13 @@ package com.akto.store;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.rules.BOLATest;
-import com.mongodb.client.model.Filters;
-import org.bson.types.ObjectId;
 import org.junit.Test;
-import org.springframework.security.core.parameters.P;
 
 import java.util.*;
 
@@ -30,7 +25,7 @@ public class TestSampleMessageStore extends MongoBasedTest {
         SampleData sampleData3 = new SampleData(new Key(0, "url3", URLMethods.Method.GET,0,0,0), Collections.emptyList());
         SampleDataDao.instance.insertMany(Arrays.asList(sampleData1, sampleData2, sampleData3));
 
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap =  SampleMessageStore.fetchSampleMessages();
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap =  SampleMessageStore.create().getSampleDataMap();
 
         assertEquals(sampleDataMap.size(), 2);
         List<String> messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET));
@@ -40,7 +35,7 @@ public class TestSampleMessageStore extends MongoBasedTest {
         sampleData2 = new SampleData(new Key(0, "url2", URLMethods.Method.GET,0,0,0), Arrays.asList("m1", "m2", "m3"));
         SampleDataDao.instance.insertMany(Arrays.asList(sampleData1, sampleData2));
 
-        sampleDataMap =  SampleMessageStore.fetchSampleMessages();
+        sampleDataMap =  SampleMessageStore.create().getSampleDataMap();
         assertEquals(sampleDataMap.size(), 1);
         messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET));
         assertEquals(messages.size(), 3);

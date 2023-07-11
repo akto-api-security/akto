@@ -1,10 +1,12 @@
 package com.akto.rules;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
@@ -26,6 +28,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,8 +42,9 @@ public class FuzzingTest extends TestPlugin {
     private final String subcategory;
     private String testSourceConfigCategory;
     private final Map<String, Object> valuesMap;
-
+    private static final int ONE_DAY = 24*60*60;
     public static final int payloadLineLimit = 100;
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
 
     public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory,
                        String testSourceConfigCategory, Map<String, Object> valuesMap) {
@@ -63,9 +67,21 @@ public class FuzzingTest extends TestPlugin {
         }
     }
 
+    private static boolean downloadFileCheck(String filePath){
+        try {
+            FileTime fileTime = java.nio.file.Files.getLastModifiedTime(new File(filePath).toPath());
+            if(fileTime.toMillis()/1000l >= (Context.now()-ONE_DAY)){
+                return false;
+            }
+        } catch (Exception e){
+            return true;
+        }
+        return true;
+    }
+
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig) {
+        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         RawApi rawApi;
         if (messages.isEmpty()) {
             OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(
@@ -74,7 +90,7 @@ public class FuzzingTest extends TestPlugin {
 
             OriginalHttpResponse originalHttpResponse = null;
             try {
-                originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true);
+                originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true, testingRunConfig);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e, LogDb.TESTING);
                 return null;
@@ -85,10 +101,10 @@ public class FuzzingTest extends TestPlugin {
             rawApi = messages.get(0);
         }
 
-        return runNucleiTest(rawApi);
+        return runNucleiTest(rawApi, testingRunConfig);
     }
 
-    public Result runNucleiTest(RawApi rawApi) {
+    public Result runNucleiTest(RawApi rawApi, TestingRunConfig testingRunConfig) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
         String originalMessage = rawApi.getOriginalMessage();
@@ -109,7 +125,9 @@ public class FuzzingTest extends TestPlugin {
         NucleiTestInfo nucleiTestInfo = new NucleiTestInfo(this.subcategory, this.origTemplatePath);
 
         try {
-            FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
+            if(downloadFileCheck(this.tempTemplatePath)){
+            FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+            }
         } catch (IOException e1) {
             e1.printStackTrace();
             return addWithRequestError( originalMessage, TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);
@@ -125,6 +143,10 @@ public class FuzzingTest extends TestPlugin {
         String fullUrlWithHost;
         try {
             fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
+
+            fullUrlWithHost = ApiExecutor.replaceHostFromConfig(fullUrlWithHost, testingRunConfig);
+
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LogDb.TESTING);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
@@ -242,6 +264,7 @@ public class FuzzingTest extends TestPlugin {
 
         File file = new File(templatePath);
         FileUtils.writeStringToFile(file, finalTemplateString, Charsets.UTF_8);
+        inputStream.close();
     }
 
     public static void downloadLinks(String templatePath, String outputDir) throws IOException {
@@ -282,6 +305,7 @@ public class FuzzingTest extends TestPlugin {
 
             FileUtils.writeLines(new File(outputDir + "/" + fileNameList[fileNameList.length-1]), StandardCharsets.UTF_8.name(), lines);
         }
+        inputStream.close();
     }
 
     public String getSubcategory() {

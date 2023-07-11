@@ -99,10 +99,10 @@ export default {
         saveInfo(urlDetails){
             this.newCollection.url = urlDetails.item.value
         },
-        showApiEndpoints(collectionDetails){
+        async showApiEndpoints(collectionDetails){
             this.newCollection.name = collectionDetails.title
             this.newCollection.id = collectionDetails.value
-            testApi.fetchCollectionWiseApiEndpoints(this.newCollection.id).then((resp)=>{
+            await testApi.fetchCollectionWiseApiEndpoints(this.newCollection.id).then((resp)=>{
                 this.field2.items=this.getApiEndpoints(resp.listOfEndpointsInCollection)
             })
         },

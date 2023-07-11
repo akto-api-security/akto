@@ -28,13 +28,11 @@ export default {
             }
         })
     },
-    uploadHarFile(content, apiCollectionId, skipKafka) {
+    uploadHarFile(formData) {
         return request({
             url: '/api/uploadHar',
             method: 'post',
-            data: {
-                content, apiCollectionId, skipKafka
-            }
+            data: formData,
         })
     },
     uploadTcpFile(content, apiCollectionId, skipKafka) {

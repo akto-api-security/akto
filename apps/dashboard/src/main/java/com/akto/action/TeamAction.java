@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -26,7 +27,7 @@ public class TeamAction extends UserAction {
     BasicDBList users;
 
     public String fetchTeamData() {
-        List<RBAC> allRoles = RBACDao.instance.findAll(new BasicDBObject());
+        List<RBAC> allRoles = RBACDao.instance.findAll(RBAC.ACCOUNT_ID, Context.accountId.get());
 
         Map<Integer, RBAC> userToRBAC = new HashMap<>();
         for(RBAC rbac: allRoles) {
@@ -41,7 +42,7 @@ public class TeamAction extends UserAction {
             userObj.append("role", status);
         }
 
-        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(new BasicDBObject());
+        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(RBAC.ACCOUNT_ID, Context.accountId.get());
 
         for(PendingInviteCode pendingInviteCode: pendingInviteCodes) {
             users.add(
@@ -59,14 +60,19 @@ public class TeamAction extends UserAction {
     public String removeUser() {
         int currUserId = getSUser().getId();
         RBAC record = RBACDao.instance.findOne("userId", currUserId, "role", Role.ADMIN);
-        if (record == null || getSUser().getLogin().equals(email) || email == null) {
+        boolean isAdmin = RBACDao.instance.isAdmin(currUserId, Context.accountId.get());
+        if (!isAdmin) {
             return Action.ERROR.toUpperCase();
         } else {
             int accId = Context.accountId.get();
 
-            Bson findQ = Filters.eq("login", email);
-            boolean userExists = UsersDao.instance.findOne(findQ) != null;
-            
+            Bson findQ = Filters.eq(User.LOGIN, email);
+            User userDetails = UsersDao.instance.findOne(findQ);
+            boolean userExists =  userDetails != null;
+            if (userExists && userDetails.getId() == currUserId) {
+                return Action.ERROR.toUpperCase();
+            }
+
             if (userExists) {
                 UsersDao.instance.updateOne(findQ, Updates.unset("accounts."+accId));
                 return Action.SUCCESS.toUpperCase();
