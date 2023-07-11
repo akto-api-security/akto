@@ -1,12 +1,14 @@
 package com.akto.test_editor.execution;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -14,20 +16,24 @@ import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.testing.ApiExecutor;
+import com.akto.utils.RedactSampleData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 
 public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
-    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
-
-        List<ExecutionResult> result = new ArrayList<>();
+    public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
+        AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig) {
+        List<TestResult> result = new ArrayList<>();
         
         if (node.getChildNodes().size() < 2) {
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
@@ -52,19 +58,51 @@ public class Executor {
             if (testRawApis == null) {
                 continue;
             }
+            boolean vulnerable = false;
             for (RawApi testReq: testRawApis) {
+                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+                    break;
+                }
                 try {
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
-                    result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse));
+                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                    TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    if (res != null) {
+                        result.add(res);
+                    }
+                    vulnerable = res.getVulnerable();
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
-                    result.add(new ExecutionResult(false, singleReq.getErrMsg(), testReq.getRequest(), null));
                 }
             }
         }
 
         return result;
+    }
+
+    public TestResult validate(ExecutionResult attempt, RawApi rawApi, Map<String, Object> varMap, String logId, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {
+        if (attempt == null || attempt.getResponse() == null) {
+            return null;
+        }
+
+        String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
+        RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
+        boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
+        if (vulnerable) {
+            loggerMaker.infoAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+        }
+        double percentageMatch = 0;
+        if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
+            percentageMatch = TestPlugin.compareWithOriginalResponse(
+                rawApi.getResponse().getBody(), testRawApi.getResponse().getBody(), new HashMap<>()
+            );
+        }
+        TestResult testResult = new TestResult(
+                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable, TestResult.Confidence.HIGH, null
+        );
+
+        return testResult;
     }
 
     public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism) {
@@ -241,7 +279,7 @@ public class Executor {
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":
-                return Operations.replaceBody(rawApi, key, value);
+                return Operations.replaceBody(rawApi, key);
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":

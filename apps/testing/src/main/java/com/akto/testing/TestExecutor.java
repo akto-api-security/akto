@@ -9,6 +9,7 @@ import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorNode;
@@ -170,11 +171,33 @@ public class TestExecutor {
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
 
+        ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
+        Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
+        String hostName;
+        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+            TestConfig testConfig = testConfigMap.get(testSubCategory);
+            if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
+                continue;
+            }
+            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+                try {
+                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages());
+                    if (hostName == null) {
+                        continue;
+                    }
+                    apiInfoKeyToHostMap.put(apiInfoKey, hostName);
+                    subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
+                } catch (URISyntaxException e) {
+                    loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+                }
+            }
+        }
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                String host = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                if (host != null && hostsToApiCollectionMap.get(host) == null) {
-                    hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
+                String hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
+                if (hostName != null && hostsToApiCollectionMap.get(hostName) == null) {
+                    hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
                 }
             } catch (URISyntaxException e) {
                 loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
@@ -184,7 +207,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun));
+                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -491,7 +514,8 @@ public class TestExecutor {
     public List<TestingRunResult> startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
-            int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun) {
+            int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
 
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
 
@@ -502,7 +526,7 @@ public class TestExecutor {
             try {
                 // todo: commented out older one
 //                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                testingRunResults = startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
+                testingRunResults = startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap);
                 String size = testingRunResults.size()+"";
                 loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
                 if (!testingRunResults.isEmpty()) {
@@ -561,7 +585,8 @@ public class TestExecutor {
 
     public List<TestingRunResult> startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
-                                               ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap) {
+                                               ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
+                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
@@ -570,6 +595,9 @@ public class TestExecutor {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null) continue;
             TestingRunResult testingRunResult = null;
+            if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+                continue;
+            }
             try {
                 testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
             } catch (Exception e) {
@@ -580,6 +608,21 @@ public class TestExecutor {
         }
 
         return testingRunResults;
+    }
+
+    public boolean applyRunOnceCheck(ApiInfoKey apiInfoKey, TestConfig testConfig, ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, String testSubCategory) {
+
+        if (testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
+            return true;
+        }
+
+        String host;
+        host = apiInfoKeyToHostMap.get(apiInfoKey);
+        if (host != null) {
+            String val = subCategoryEndpointMap.remove(apiInfoKey.getApiCollectionId() + "_" + testSubCategory);
+            return val != null;
+        }
+        return true;
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil, ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
