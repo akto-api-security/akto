@@ -21,7 +21,7 @@ const Logs = () => {
         { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
         { label: "Testing", value: "TESTING" },
-        { label: "Select log group", value: "SELECT" },
+        { label: "Select log group", value: "" },
     ];
     // const handleSelectLogGroup = (logGroup) => {
     //     setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
