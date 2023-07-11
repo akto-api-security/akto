@@ -5,7 +5,9 @@ public class Account {
     private String name;
     private boolean isDefault = false;
     private String timezone = "US/Pacific";
-
+    public static final String INACTIVE_STR = "inactive";
+    private boolean inactive = false;
+    private int statusChangeTimestamp = 0;
     public Account() {}
 
     public Account(int id, String name) {
@@ -43,5 +45,21 @@ public class Account {
 
     public void setTimezone(String timezone) {
         this.timezone = timezone;
+    }
+
+    public boolean isInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
+    }
+
+    public int getStatusChangeTimestamp() {
+        return statusChangeTimestamp;
+    }
+
+    public void setStatusChangeTimestamp(int statusChangeTimestamp) {
+        this.statusChangeTimestamp = statusChangeTimestamp;
     }
 }

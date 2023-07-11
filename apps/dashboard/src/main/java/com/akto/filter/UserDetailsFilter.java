@@ -57,7 +57,10 @@ public class UserDetailsFilter implements Filter {
         }
 
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
-            httpServletResponse.sendRedirect(LOGIN_URI+"?redirect_uri="+httpServletRequest.getRequestURI());
+
+            boolean isSetupLink = "/dashboard/setup".equalsIgnoreCase(httpServletRequest.getRequestURI());
+            String redirectParam = isSetupLink ? "" : ("?redirect_uri="+httpServletRequest.getRequestURI());
+            httpServletResponse.sendRedirect(LOGIN_URI+redirectParam);
             return;
         }
         filterChain.doFilter(httpServletRequest, httpServletResponse);
@@ -79,7 +82,13 @@ public class UserDetailsFilter implements Filter {
         // else find access token from request header
         boolean apiKeyFlag = apiKey != null;
         Utility utility = null;
+
+        HttpSession session = httpServletRequest.getSession(false);
         if (apiKeyFlag) {
+            // For apiKey sessions we want to start fresh. Hence, delete any existing session and create new one
+            if (session != null) session.invalidate();
+            session = httpServletRequest.getSession(true);
+
             if (endPointBlockedForApiToken(requestURI)) {
                 httpServletResponse.sendError(403);
                 return;
@@ -149,7 +158,6 @@ public class UserDetailsFilter implements Filter {
             return ;
         }
 
-        HttpSession session = httpServletRequest.getSession(apiKeyFlag);
         // session will be non-null for external API Key requests and when session data has not been deleted
         if (session == null ) {
             Token tempToken = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
@@ -196,31 +204,82 @@ public class UserDetailsFilter implements Filter {
         User user = (User) session.getAttribute("user");
         boolean isSignedUp = "true".equalsIgnoreCase(signedUp);
 
-        if ((httpServletRequest.getRequestURI().startsWith("/dashboard") || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
+        boolean setupPathCondition = requestURI.startsWith("/dashboard/setup");
+        boolean dashboardWithoutSetupCondition = requestURI.startsWith("/dashboard") && !setupPathCondition;
+
+        if (setupPathCondition && !isSignedUp) {
+            SignupUserInfo signupUserInfo = SignupDao.instance.findOne("user.login", username);
+            if (signupUserInfo == null) {
+                redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                return ;
+            }
+            user = signupUserInfo.getUser();
+            session.setAttribute("user", user);
+
+            int step = 1;
+            if (StringUtils.isEmpty(signupUserInfo.getCompanyName())) {
+                step = 1;
+            } else if (StringUtils.isEmpty(signupUserInfo.getTeamName())) {
+                step = 2;
+            } else if (signupUserInfo.getEmailInvitations() == null) {
+                step = 3;
+            }
+            User signupUserInfoUser = signupUserInfo.getUser();
+            BasicDBObject infoObj =
+                    new BasicDBObject("username", signupUserInfoUser.getName())
+                            .append("email", signupUserInfoUser.getLogin())
+                            .append("companyName", signupUserInfo.getCompanyName())
+                            .append("teamName", signupUserInfo.getTeamName())
+                            .append("formVersion", 1)
+                            .append("step", step);
+
+            servletRequest.setAttribute("signupInfo", infoObj);
+        } else if ((dashboardWithoutSetupCondition || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
 
             // if no user details in the session, ask from DB
+            // TODO: if session info is too old, then also fetch from DB
             if (user == null || !username.equals(user.getLogin())) {
                 user = UsersDao.instance.findOne("login", username);
+                if (user == null) {
+                    redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                    return ;
+                }
                 session.setAttribute("user", user);
+                session.setAttribute("username", user.getLogin());
+                String accountId = Context.accountId.get() == null ? user.findAnyAccountId() : (""+Context.accountId.get());
+                if (accountId == null) {
+                    redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                    return ;
+                }
+                session.setAttribute("accountId", accountId);
             }
-
             Object accountIdObj = session.getAttribute("accountId");
             String accountIdStr = accountIdObj == null ? null : accountIdObj+"";
 
             if (StringUtils.isEmpty(accountIdStr)) {
                 accountIdStr = httpServletRequest.getHeader("account");
             }
-
             if (StringUtils.isNotEmpty(accountIdStr)) {
                 int accountId = Integer.parseInt(accountIdStr);
                 if (accountId > 0) {
                     if(user.getAccounts().containsKey(accountIdStr)) {
                         Context.accountId.set(accountId);
                     } else {
+
+                        accountIdStr = user.findAnyAccountId();
+                        if (accountIdStr == null) {
+                            redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                            return ;
+                        }
+
+                        accountId = Integer.parseInt(accountIdStr);
+
+                        Context.accountId.set(accountId);
+                        session.setAttribute("accountId", accountId);
+
                     }
                 }
             }
-
             if (accessTokenFromRequest == null) {
                 ProfileAction.executeMeta1(user, httpServletRequest, httpServletResponse);
             }
