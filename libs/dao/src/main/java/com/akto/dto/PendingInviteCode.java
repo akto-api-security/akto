@@ -10,15 +10,17 @@ public class PendingInviteCode {
     private int issuer;
     private String inviteeEmailId;
     private long expiry;
+    private int accountId;
 
     public PendingInviteCode() {
     }
 
-    public PendingInviteCode(String inviteCode, int issuer, String inviteeEmailId, long expiry) {
+    public PendingInviteCode(String inviteCode, int issuer, String inviteeEmailId, long expiry, int accountId) {
         this.inviteCode = inviteCode;
         this.issuer = issuer;
         this.inviteeEmailId = inviteeEmailId;
         this.expiry = expiry;
+        this.accountId = accountId;
     }
 
     public ObjectId getId() {
@@ -59,5 +61,13 @@ public class PendingInviteCode {
 
     public void setExpiry(long expiry) {
         this.expiry = expiry;
+    }
+
+    public int getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
     }
 }

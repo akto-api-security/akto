@@ -17,6 +17,35 @@
     </error-page>
 
     <filter>
+        <filter-name>cross-origin</filter-name>
+        <filter-class>org.eclipse.jetty.servlets.CrossOriginFilter</filter-class>
+        <init-param>
+            <param-name>allowedOrigins</param-name>
+            <param-value>*</param-value>
+        </init-param>
+        <init-param>
+            <param-name>allowedMethods</param-name>
+            <param-value>GET,POST,DELETE,PUT,HEAD,OPTIONS</param-value>
+        </init-param>
+        <init-param>
+            <param-name>allowedHeaders</param-name>
+            <param-value>*</param-value>
+        </init-param>
+        <init-param>
+            <param-name>supportsCredentials</param-name>
+            <param-value>true</param-value>
+        </init-param>
+        <init-param>
+            <param-name>chainPreflight</param-name>
+            <param-value>false</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>cross-origin</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>GzipFilter</filter-name>
         <filter-class>org.eclipse.jetty.servlets.GzipFilter</filter-class>
         <init-param>
@@ -64,8 +93,17 @@
         <filter-name>RateLimitFilter</filter-name>
         <url-pattern>/auth/login</url-pattern>
         <url-pattern>/api/inviteUsers</url-pattern>
+        <url-pattern>/tools/*</url-pattern>
     </filter-mapping>
 
+    <filter>
+        <filter-name>GrowthToolsFilter</filter-name>
+        <filter-class>com.akto.filter.GrowthToolsFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>GrowthToolsFilter</filter-name>
+        <url-pattern>/tools/*</url-pattern>
+    </filter-mapping>
 
     <filter>
         <filter-name>UserDetailsFilter</filter-name>
@@ -96,6 +134,16 @@
     <filter-mapping>
         <filter-name>InfraMetricsFilter</filter-name>
         <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>LoggingFilter</filter-name>
+        <filter-class>com.akto.filter.LoggingFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>LoggingFilter</filter-name>
+        <url-pattern>*</url-pattern>
     </filter-mapping>
 
     <filter>

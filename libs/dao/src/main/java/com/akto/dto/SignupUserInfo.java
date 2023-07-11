@@ -11,13 +11,15 @@ public class SignupUserInfo {
     String companyName, teamName;
     boolean completedSignup = false;
     int formVersion = 1;
+    private int invitationToAccount;
 
-    public SignupUserInfo(User user, String companyName, String teamName, List<String> metrics, List<String> emailInvitations) {
+    public SignupUserInfo(User user, String companyName, String teamName, List<String> metrics, List<String> emailInvitations, int invitationToAccount) {
         this.user = user;
         this.companyName = companyName;
         this.teamName = teamName;
         this.metrics = metrics;
         this.emailInvitations = emailInvitations;
+        this.invitationToAccount = invitationToAccount;
     }
 
     List<String> metrics;
@@ -65,4 +67,11 @@ public class SignupUserInfo {
 
     List<String> emailInvitations;
 
+    public int getInvitationToAccount() {
+        return invitationToAccount;
+    }
+
+    public void setInvitationToAccount(int invitationToAccount) {
+        this.invitationToAccount = invitationToAccount;
+    }
 }
