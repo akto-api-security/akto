@@ -107,8 +107,8 @@ const issues = {
                 state.loading = false
             })
         },
-        fetchAllSubCategories() {
-            return api.fetchAllSubCategories().then((resp) => {
+        async fetchAllSubCategories() {
+            return await api.fetchAllSubCategories().then((resp) => {
                 state.subCatogoryMap = {}
                 resp.subCategories.forEach((x) => {
                     state.subCatogoryMap[x.name] = x

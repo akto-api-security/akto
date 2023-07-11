@@ -12,8 +12,8 @@
           <span style="vertical-align: text-bottom; color: var(--themeColor)"> akto </span>
         </div>
         
-
-        <!-- <google-auth @signInCallback="signInCallback" scope="" purpose="signup">
+        <div v-if="(isLocalDeploy && isSaas)">
+         <google-auth @signInCallback="signInCallback" scope="" purpose="signup">
           <v-btn class="sign-up-third-party" plain width="100%">
             <div>
               <img src="@/assets/logo_google.svg" alt="Google" class="logo"/>
@@ -21,8 +21,9 @@
             </div>
           </v-btn>
         </google-auth>
+      </div>
 
-        <slack-auth @signInCallback="signInCallback" :login-only="true">
+        <!--<slack-auth @signInCallback="signInCallback" :login-only="true">
           <v-btn class="sign-up-third-party" plain width="100%">
             <div>
               <img src='@/assets/logo_slack.svg' alt="Slack" class="logo"/>
@@ -39,10 +40,12 @@
 <!--        </v-btn>-->
         <!-- <div class="or">or</div> -->
 
-        <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true" class="mt-4"/>
-        <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  var(--themeColor) !important; color: var(--white) !important">
-          Sign up
-        </v-btn>
+        <div v-if="username || (!isSaas)">
+          <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true" class="mt-4"/>
+          <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  var(--themeColor) !important; color: var(--white) !important">
+            Sign up
+          </v-btn>
+        </div>
         <div class="legal-docs">
           By clicking on "Sign Up" you are agreeing to Akto's <a class="clickable-docs" href="https://www.akto.io/terms-of-service" target="_blank" >Terms of Service</a>, <a class="clickable-docs" href="https://www.akto.io/privacy" target="_blank">Privacy Policy</a> and <a class="clickable-docs" href="https://www.akto.io/cookie" target="_blank">Cookie Policy</a>.
         </div>
@@ -78,7 +81,9 @@ export default {
             return ret
           }
       ],
-      username: null,
+      username: window.SIGNUP_EMAIL_ID || null,
+      isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
       fullName: null,
       companyName: null,
       role: null,
@@ -122,7 +127,7 @@ export default {
             color: 'red'
           })
         } else {
-          window.location.href = '/dashboard/quick-start'
+          window.location.href = '/dashboard/onboarding'
         }
       })
     }
