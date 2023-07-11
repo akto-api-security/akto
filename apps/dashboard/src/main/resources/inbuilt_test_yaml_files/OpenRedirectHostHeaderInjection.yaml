@@ -1,0 +1,55 @@
+id: OPEN_REDIRECT_HOST_HEADER_INJECTION
+info:
+  name: "Open redirect using host header injection"
+  description: "Tests for open redirect vulnerability by injecting evil.com into host headers, ensuring secure redirection and protection against malicious redirects."
+  details: > 
+            "Executing a comprehensive vulnerability assessment by injecting 'evil.com' into the host header, aiming to detect and mitigate open redirect vulnerabilities.
+            Open redirects can enable attackers to trick users into visiting malicious websites, leading to various risks such as phishing, malware distribution, and unauthorized access.
+            Ensuring robust protection against this vulnerability is crucial for preserving user trust, data integrity, and overall system security.
+  impact: "This behavior can be leveraged to facilitate phishing attacks against users of the application."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: OPEN_REDIRECT_HOST_HEADER_INJECTION
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
+    - "https://hackerone.com/reports/1444675"
+api_selection_filters:
+  response_code:
+    eq: 302
+
+execute:
+  type: single
+  requests:
+    - req:
+      - add_header:
+          X-Forwarded-Host: evil.com
+      - add_header:
+          X-Real-Host: evil.com
+      - add_header:
+          X-Origin-Host: evil.com
+      - add_header:
+          X-Host-Override: evil.com
+      - add_header:
+          X-Forwarded-Server: evil.com
+      - add_header:
+          X-Proxy-Host: evil.com
+      - follow_redirect: false
+
+
+validate:
+  response_code:
+    eq: 302
+  response_headers:
+    for_one:
+      key:
+        eq: location
+      value:
+        contains_either:
+          - evil.com
