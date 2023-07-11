@@ -100,8 +100,17 @@ const settingRequests = {
             }
         })
     },
-
-
+    fetchLogsFromDb(startTime, endTime, logDb) {
+        return request({
+            url: '/api/fetchLogsFromDb',
+            method: 'post',
+            data: {
+                startTime,
+                endTime,
+                logDb
+            }
+        })
+    },
     fetchAdminSettings() {
         return request({
             url: '/api/fetchAdminSettings',

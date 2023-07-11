@@ -204,9 +204,7 @@ const func = {
   epochToDateTime (timestamp) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-
 },
-
 }
 
 export default func

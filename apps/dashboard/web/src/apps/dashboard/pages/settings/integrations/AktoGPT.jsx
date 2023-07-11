@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
-import { Button, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
-import {SortMinor} from "@shopify/polaris-icons"
+import { Box, Button, Icon, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
+import {SortMinor, SearchMinor} from "@shopify/polaris-icons"
 import Store from "../../../store"
 import "../settings.css"
 import settingFunctions from '../module'
-import SearchWithList from '../../../components/layouts/SearchWithList'
 
 function AktoGPT() {
 
     const apiCollections = Store(state => state.allCollections)
     const [selectedItems, setSelectedItems] = useState([]);
     const [clonedItems, setClonedItems] = useState([]);
-    const [searchItems, setSearchItems] = useState([])
+    const [searchValue, setSearchValue] = useState("")
     const [displayItems , setDisplayItems] = useState(apiCollections)
     const [sortOrder, setSortOrder] = useState(true)
 
@@ -22,19 +21,8 @@ function AktoGPT() {
         setClonedItems(arr)
     }
 
-    const transformApiCollections = () =>{
-        const arr = apiCollections.map((item) => {
-            return {
-                value: item.id,
-                label: item.name
-            }
-        })
-        setSearchItems(arr)
-    }
-
     useEffect(()=>{
         fetchSelectedCollections()
-        transformApiCollections()
     },[])
 
     function renderItem(item) {
@@ -85,12 +73,33 @@ function AktoGPT() {
     )
 
     const searchResult = (item) =>{
-        const updatedArray = selectedItems.includes(item) ? selectedItems.filter((el) => el !== item) : [...selectedItems, item]; 
-        setSelectedItems(updatedArray)
+        setSearchValue(item)
+        let localVar = selectedItems;
+        setSelectedItems([])
+        const filterRegex = new RegExp(item, 'i');
+        const resultOptions = apiCollections.filter((option) =>
+            option.displayName.match(filterRegex)
+        );
+        setDisplayItems(resultOptions)
+        setTimeout(() => {
+            setSelectedItems(localVar);
+        }, 0)
     }
 
+    const SearchIcon =  (
+        <Box>
+            <Icon source={SearchMinor} />   
+        </Box>
+    )
+
     const headerComponent = (
-        <SearchWithList searchItems = {searchItems} connectedRight = {sortFunc} getSelected={searchResult}/>
+        <TextField 
+            connectedRight={sortFunc} 
+            prefix={SearchIcon} 
+            onChange={searchResult} 
+            value={searchValue}
+            placeholder={`Search within ${apiCollections.length} available`}
+        />
     )
 
     const component = (

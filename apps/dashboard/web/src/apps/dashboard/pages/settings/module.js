@@ -67,7 +67,6 @@ const settingFunctions = {
 
       await settingRequests.saveAktoGptConfig(arr)
     },
-
     fetchLoginInfo: async function(){
       let lastLogin = ''
       await settingRequests.fetchUserLastLoginTs().then((resp)=>{
