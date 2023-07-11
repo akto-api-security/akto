@@ -1,5 +1,6 @@
 import { Scrollable, Text } from "@shopify/polaris";
 import func from "../../../../../util/func";
+import { tokens } from "@shopify/polaris-tokens"
 
 const LogsContainer = ({ logs }) => {
 
@@ -26,7 +27,7 @@ const LogsContainer = ({ logs }) => {
             <Scrollable style={{height: '60vh'}}>
                {logContent.map((logText, idx) => (
                 <div key={idx}>
-                    <Text variant="bodyMd-mono">
+                    <Text style={{ fontFamily: tokens.font["font-family-mono"] }}>
                         {logText}
                     </Text>
                     <br />

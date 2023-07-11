@@ -18,12 +18,16 @@ const Logs = () => {
     const logGroupSelected = logs.logGroup !== ''
 
     const logGroupOptions = [
-        { label: "Testing", value: "TESTING" },
         { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
+        { label: "Testing", value: "TESTING" },
+        { label: "Select log group", value: "SELECT" },
     ];
+    // const handleSelectLogGroup = (logGroup) => {
+    //     setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
+    // }
     const handleSelectLogGroup = (logGroup) => {
-        setLogs(previousState => ({ ...previousState, logGroup: logGroup }))
+       setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
     }
     
     const fetchLogsFromDb = async (startTime, endTime, refresh = false) => {
@@ -31,7 +35,7 @@ const Logs = () => {
             const logsResponse = await settingRequests.fetchLogsFromDb(
                 Math.floor(startTime / 1000), 
                 Math.floor(endTime  / 1000),
-                log.logGroup
+                logs.logGroup
             )
             setLogs(previousState => (
                 {
@@ -97,8 +101,8 @@ const Logs = () => {
                 /> */}
                 <Dropdown
                     menuItems={logGroupOptions}
-                    initial="Dashboard"
-                    selected={(selectedVal) => setLogs(previousState => ({...previousState, logGroup: selectedVal}))}
+                    initial="Select log group"
+                    selected={handleSelectLogGroup}
                     />
                 <ButtonGroup segmented>
                     <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
