@@ -1,5 +1,7 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
+import com.akto.calendar.DateUtils;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -20,6 +22,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.*;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
@@ -45,10 +48,14 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     public static long acceptableSizeInBytes = 5_000_000;
-    
-    public void init(TestingRun testingRun, ObjectId summaryId) {
+    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
+    public static final String REQUEST_HOUR = "requestHour";
+    public static final String COUNT = "count";
+    public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+
+    public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId);
+            apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
         } else {
             workflowInit(testingRun, summaryId);
         }
@@ -109,17 +116,17 @@ public class TestExecutor {
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-
         return new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
     }
-
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+      
+    public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+
         AuthMechanism authMechanism = createAuthMechanism();
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
-        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         TestingUtil testingUtil = createTestingUtil(testingEndpoints, authMechanism);
 
@@ -140,14 +147,15 @@ public class TestExecutor {
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
-        for (ApiInfo.ApiInfoKey apiInfoKey: testingUtil.getSampleMessages().keySet()) {
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
+        for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
             if (apiInfoKeySet.contains(apiInfoKey)) {
                 sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, testingUtil.getSampleMessages().get(apiInfoKey));
             }
         }
 
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, testingRun.getTestingRunConfig());
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -166,7 +174,7 @@ public class TestExecutor {
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                String host = findHost(apiInfoKey, testingUtil.getSampleMessages());
+                String host = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
                 if (host != null && hostsToApiCollectionMap.get(host) == null) {
                     hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
                 }
@@ -253,11 +261,11 @@ public class TestExecutor {
 
     }
 
-    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap) throws URISyntaxException {
+    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore) throws URISyntaxException {
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessagesMap);
+        List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
         OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
@@ -623,6 +631,27 @@ public class TestExecutor {
                                           ObjectId testRunId, ObjectId testRunResultSummaryId, TestingRunConfig testingRunConfig) {
 
         int startTime = Context.now();
+        Map<String, Integer> requestCount = requestRestrictionMap.get(testingUtil.getUserEmail());
+        if (requestCount == null) {//First time case
+            requestCount = new ConcurrentHashMap<>();
+            requestCount.put(REQUEST_HOUR,Context.currentHour());
+            requestCount.put(COUNT, 1);
+            requestRestrictionMap.put(testingUtil.getUserEmail(), requestCount);
+        } else {
+            int currentHour = Context.currentHour();
+            int requestHour = requestCount.get(REQUEST_HOUR);
+            int count = requestCount.get(COUNT);
+            if (currentHour == requestHour) {//hour hasn't changed, will increment the count
+                if (count >= ALLOWED_REQUEST_PER_HOUR) {
+                    return null;
+                }
+                count++;
+                requestCount.put(COUNT, count);
+            } else {//Hour changed, start count again
+                requestCount.put(REQUEST_HOUR, currentHour);
+                requestCount.put(COUNT, 1);
+            }
+        }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil, testingRunConfig);
         if (result == null) return null;
         int endTime = Context.now();

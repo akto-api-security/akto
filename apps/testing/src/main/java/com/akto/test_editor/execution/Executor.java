@@ -75,11 +75,16 @@ public class Executor {
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutorSingleRequest(true, "", null, false);
+            return new ExecutorSingleRequest(true, "", null, true);
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
-            return new ExecutorSingleRequest(true, "", null, true);
+            boolean redirect = true;
+            try {
+                redirect = Boolean.valueOf(node.getValues().toString());
+            } catch (Exception e) {
+            }
+            return new ExecutorSingleRequest(true, "", rawApis, redirect);
         }
         Boolean followRedirect = true;
         List<RawApi> newRawApis = new ArrayList<>();
@@ -173,7 +178,7 @@ public class Executor {
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
-            followRedirect = followRedirect || executionResult.getFollowRedirect();
+            followRedirect = followRedirect && executionResult.getFollowRedirect();
         }
 
         if (newRawApis.size() > 0) {
@@ -235,6 +240,8 @@ public class Executor {
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
+            case "replace_body":
+                return Operations.replaceBody(rawApi, key, value);
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":

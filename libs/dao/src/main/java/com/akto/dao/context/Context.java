@@ -12,6 +12,8 @@ public class Context {
     public static int getId() {
         return (int) (System.currentTimeMillis()/1000l);
     }
+    private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMddHH");
+
 
     public static void dummy() {
         
@@ -19,6 +21,11 @@ public class Context {
 
     public static int today() {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
+        LocalDateTime now = LocalDateTime.now();
+        return Integer.parseInt(dtf.format(now));
+    }
+
+    public static int currentHour() {
         LocalDateTime now = LocalDateTime.now();
         return Integer.parseInt(dtf.format(now));
     }

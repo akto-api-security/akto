@@ -2,11 +2,13 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -16,6 +18,9 @@ import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.AuthMechanismStore;
+import com.akto.store.SampleMessageStore;
+import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -28,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 import java.util.concurrent.TimeUnit;
 
 public class Main {
@@ -60,17 +66,21 @@ public class Main {
 
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
             public void run() {
-                Context.accountId.set(1_000_000);
-                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                if (settings == null) {
-                    return;
-                }
-                int globalRateLimit = settings.getGlobalRateLimit();
-                Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance().getRateLimitsMap();
-                rateLimitMap.clear();
-                rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        if (settings == null) {
+                            return;
+                        }
+                        int globalRateLimit = settings.getGlobalRateLimit();
+                        int accountId = t.getId();
+                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
+                        rateLimitMap.clear();
+                        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+                    }
+                }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
     }
@@ -78,12 +88,11 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
-        Context.accountId.set(1_000_000);
 
         boolean connectedToMongo = false;
         do {
             try {
-                AccountSettingsDao.instance.getStats();
+                AccountsDao.instance.getStats();
                 connectedToMongo = true;
             } catch (Exception ignored) {
             } finally {
@@ -95,14 +104,9 @@ public class Main {
             }
         } while (!connectedToMongo);
 
-        int delta = Context.now() - 20*60;
         setupRateLimitWatcher();
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
-
-        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -117,76 +121,85 @@ public class Main {
         TestExecutor testExecutor = new TestExecutor();
 
         while (true) {
-            int start = Context.now();
+            AccountTask.instance.executeTask(account -> {
+                int delta = Context.now() - 20*60;
 
-            Bson filter1 = Filters.and(
-                    Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-            );
-            Bson filter2 = Filters.and(
-                    Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
-            );
+                Bson filter1 = Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED);
+                Bson filter2 = Filters.and(
+                        Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
+                );
 
-            Bson update = Updates.combine(
-                    Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-            );
+                Bson update = Updates.combine(
+                        Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+                );
 
-            TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.or(filter1,filter2), update);
+                int start = Context.now();
 
+                TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                        Filters.or(filter1,filter2), update);
 
-            if (testingRun == null) {
+                if (testingRun == null) {
+                    return;
+                }
+
+                loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString(), LogDb.TESTING);
+
                 try {
-                    Thread.sleep(10 * 1000L);
-                    continue;
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
+                    boolean runStatusCodeAnalyser = accountSettings == null ||
+                            accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
 
-            long timestamp = testingRun.getId().getTimestamp();
-            long seconds = Context.now() - timestamp;
-            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
-            if (testingRun.getTestIdConfig() > 1) {
-                TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-                if (testingRunConfig != null) {
-                    loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
-                    testingRun.setTestingRunConfig(testingRunConfig);
-                } else {
-                    loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
-                }
-            }
+                    SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+                    AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+
+
+                    TestExecutor testExecutor = new TestExecutor();
+                    long timestamp = testingRun.getId().getTimestamp();
+                    long seconds = Context.now() - timestamp;
+                    loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
+                    if (testingRun.getTestIdConfig() > 1) {
+                        TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                        if (testingRunConfig != null) {
+                            loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
+                            testingRun.setTestingRunConfig(testingRunConfig);
+                        }else {
+                            loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
+                        }
+                    }
+                    if (runStatusCodeAnalyser) {
+                        StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore, testingRun.getTestingRunConfig());
+                    }
 
             ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
             loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
 
-            try {
-                testExecutor.init(testingRun, summaryId);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
-            }
+                    testExecutor.init(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                Bson completedUpdate = Updates.combine(
+                        Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
+                        Updates.set(TestingRun.END_TIMESTAMP, Context.now())
+                );
 
-            Bson completedUpdate = Updates.combine(
-                    Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                    Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-            );
+                if (testingRun.getPeriodInSeconds() > 0 ) {
+                    completedUpdate = Updates.combine(
+                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
+                    );
+                }
 
-            if (testingRun.getPeriodInSeconds() > 0 ) {
-                completedUpdate = Updates.combine(
-                    Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                    Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                );                
-            }
-
-            TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.eq("_id", testingRun.getId()),  completedUpdate
-            );
+                TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                        Filters.eq("_id", testingRun.getId()),  completedUpdate
+                );
 
 
-            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+            }, "testing");
+            Thread.sleep(1000);
         }
     }
 }
