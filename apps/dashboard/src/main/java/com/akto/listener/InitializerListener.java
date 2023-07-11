@@ -43,6 +43,8 @@ import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.JSONUtils;
+import com.akto.testing.HostDNSLookup;
+import com.akto.util.AccountTask;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -62,11 +64,13 @@ import com.slack.api.webhook.WebhookResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.checkerframework.checker.units.qual.C;
 import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +89,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import static com.mongodb.client.model.Filters.eq;
@@ -93,11 +98,15 @@ public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
+    private static final int THREE_HOURS = 3*60*60;
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
+    public static String subdomain = "https://app.akto.io";
 
     public static String getDomain() {
         if (domain == null) {
@@ -111,19 +120,37 @@ public class InitializerListener implements ServletContextListener {
         return domain;
     }
 
+    private static boolean downloadFileCheck(String filePath){
+        try {
+            FileTime fileTime = Files.getLastModifiedTime(new File(filePath).toPath());
+            if(fileTime.toMillis()/1000l >= (Context.now()-THREE_HOURS)){
+                return false;
+            }
+        } catch (Exception e){
+            return true;
+        }
+        return true;
+    }
+
     public void setUpPiiCleanerScheduler(){
         Set<Integer> whiteListCollectionSet = new HashSet<>();
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
-                Context.accountId.set(1_000_000);
-                try {
-                    executePiiCleaner(whiteListCollectionSet);
-                } catch (Exception e) {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            executePiiCleaner(whiteListCollectionSet);
+                        } catch (Exception e) {
+                        }
 
-                }
+                        try {
+                            executePIISourceFetch();
+                        } catch (Exception e) {
+                        }
+                    }
+                }, "pii-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
@@ -132,34 +159,37 @@ public class InitializerListener implements ServletContextListener {
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
-                Context.accountId.set(1_000_000);
-                try {
-                    executeTestSourcesFetch();
-                    editTestSourceConfig();
-                } catch (Exception e) {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            executeTestSourcesFetch();
+                            editTestSourceConfig();
+                        } catch (Exception e) {
+                        }
 
-                }
-
-                try {
-                    executePIISourceFetch();
-                } catch (Exception e) {
-
-                }
+                        try {
+                            executePIISourceFetch();
+                        } catch (Exception e) {
+                        }
+                    }
+                }, "pii-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
-    static void editTestSourceConfig() throws IOException{
+
+    public static void editTestSourceConfig() throws IOException{
         List<TestSourceConfig> detailsTest = TestSourceConfigsDao.instance.findAll(new BasicDBObject()) ;
         for(TestSourceConfig tsc : detailsTest){
             String filePath = tsc.getId() ;
             filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
-            try {
-                FileUtils.copyURLToFile(new URL(filePath), new File(filePath));
-            } catch (IOException e1) {
-                e1.printStackTrace();
-                continue;
+            if(downloadFileCheck(filePath)){
+                try {
+                    FileUtils.copyURLToFile(new URL(filePath), new File(filePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                    continue;
+                }
             }
 
             Yaml yaml = new Yaml();
@@ -184,7 +214,7 @@ public class InitializerListener implements ServletContextListener {
                         castedSeverity = Severity.valueOf(severity.toUpperCase()) ;
                         tsc.setSeverity(castedSeverity);
                     }
-                    
+
                     String stringTags = (String) currObj.get("tags") ;
                     List<String> tags = new ArrayList<>();
                     if(stringTags != null){
@@ -199,7 +229,11 @@ public class InitializerListener implements ServletContextListener {
             } catch (Exception e) {
                 // TODO: handle exception
             }
-            
+            finally{
+                if(inputStream!=null){
+                    inputStream.close();
+                }
+            }
         }
     }
 
@@ -213,7 +247,7 @@ public class InitializerListener implements ServletContextListener {
         return parentPath.substring(parentPath.lastIndexOf("/") + 1);
     }
 
-    static void executeTestSourcesFetch() {
+    public static void executeTestSourcesFetch() {
         try {
             TestCategory[] testCategories = TestCategory.values();
             Map<String, TestCategory> shortNameToTestCategory = new HashMap<>();
@@ -225,8 +259,22 @@ public class InitializerListener implements ServletContextListener {
 
             String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/tests-library/git/trees/master?recursive=1";
             String tempFilename = "temp_testingSourcesRepoTree.json";
-            FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
-            String fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            String fileContent = "";
+            if(downloadFileCheck(tempFilename)) {
+                try {
+                    FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                } catch (Exception e) {
+                    logger.error("api github error " + tempFilename, e);
+                }
+            }
+
+            try {
+                fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                logger.error("temp file does not exist, using local file " + tempFilename, e);
+                fileContent = convertStreamToString(InitializerListener.class.getResourceAsStream("/testingSourcesRepoTree.json"));
+            }
+
             BasicDBObject fileList = BasicDBObject.parse(fileContent);
             BasicDBList files = (BasicDBList) (fileList.get("tree"));
 
@@ -268,7 +316,8 @@ public class InitializerListener implements ServletContextListener {
             }
 
 
-        } catch (IOException e1) {
+        } catch (Exception e1) {
+            logger.error("executeTestSourcesFetch error " , e1);
         }
 
 
@@ -416,7 +465,7 @@ public class InitializerListener implements ServletContextListener {
         return false;
     }
 
-    static void executePIISourceFetch() {
+    public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
         for (PIISource piiSource : piiSources) {
             String fileUrl = piiSource.getFileUrl();
@@ -429,7 +478,9 @@ public class InitializerListener implements ServletContextListener {
             try {
                 if (fileUrl.startsWith("http")) {
                     String tempFileUrl = "temp_" + id;
-                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl));
+                    if(downloadFileCheck(tempFileUrl)){
+                        FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                    }
                     fileUrl = tempFileUrl;
                 }
                 String fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
@@ -477,10 +528,8 @@ public class InitializerListener implements ServletContextListener {
 
             } catch (IOException e) {
                 loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
-                continue;
             }
         }
-        SingleTypeInfo.fetchCustomDataTypes();
     }
 
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
@@ -509,61 +558,71 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
-                    Context.accountId.set(1_000_000);
-                    List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-                    if (listWebhooks == null || listWebhooks.isEmpty()) {
-                        return;
-                    }
+                    AccountTask.instance.executeTask(new Consumer<Account>() {
+                        @Override
+                        public void accept(Account t) {
+                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                                return;
+                            }
 
-                    Slack slack = Slack.getInstance();
-        
-                    for(SlackWebhook slackWebhook: listWebhooks) {
-                        int now =Context.now();
+                            Slack slack = Slack.getInstance();
 
-                        if (slackWebhook.getFrequencyInSeconds() == 0) {
-                            slackWebhook.setFrequencyInSeconds(24 * 60 * 60);
-                        }
+                            for(SlackWebhook slackWebhook: listWebhooks) {
+                                int now =Context.now();
 
-                        boolean shouldSend = (slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds()) <= now;
+                                if(slackWebhook.getFrequencyInSeconds()==0) {
+                                    slackWebhook.setFrequencyInSeconds(24*60*60);
+                                }
 
-                        if (!shouldSend) {
-                            continue;
-                        }
+                                boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
 
-                        loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
+                                if(!shouldSend){
+                                    continue;
+                                }
 
-                        ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp(), null, null, false);
-                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
-                            return;
-                        }
+                                loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
 
-                        DailyUpdate dailyUpdate = new DailyUpdate(
+                                ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp(), null, null, false);
+                                if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
+                                    return;
+                                }
+
+                                DailyUpdate dailyUpdate = new DailyUpdate(
                                 0, 0,
                                 ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
                                 ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
                                 slackWebhook.getLastSentTimestamp(), now,
                                 ci.newSensitiveParams, slackWebhook.getDashboardUrl());
 
-                        slackWebhook.setLastSentTimestamp(now);
-                        SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
+                                slackWebhook.setLastSentTimestamp(now);
+                                SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
-                        loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
-                        String webhookUrl = slackWebhook.getWebhook();
-                        String payload = dailyUpdate.toJSON();
-                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
-                        WebhookResponse response = slack.send(webhookUrl, payload);
-                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
+                                loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
+                                String webhookUrl = slackWebhook.getWebhook();
+                                String payload = dailyUpdate.toJSON();
+                                loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
+                                try {
+                                    if (!HostDNSLookup.isRequestValid(webhookUrl)) {
+                                        throw new IllegalArgumentException("SSRF attack attempt");
+                                    }
+                                    WebhookResponse response = slack.send(webhookUrl, payload);
+                                    loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
-                        // slack testing notification
-                        loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
-                        TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
-                        payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
-                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
-                        response = slack.send(webhookUrl, payload);
-                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
+                                    // slack testing notification
+                                    loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
+                                    TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(Context.accountId.get());
+                                    payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
+                                    loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
+                                    response = slack.send(webhookUrl, payload);
+                                    loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
-                    }
-
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                    }, "setUpDailyScheduler");
                 } catch (Exception ex) {
                 }
             }
@@ -670,11 +729,12 @@ public class InitializerListener implements ServletContextListener {
     public void setUpWebhookScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
-                Context.accountId.set(1_000_000);
-
-                webhookSender();
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        webhookSender();
+                    }
+                }, "webhook-sener");
             }
         }, 0, 15, TimeUnit.MINUTES);
     }
@@ -861,7 +921,7 @@ public class InitializerListener implements ServletContextListener {
         return null;
     }
 
-    public void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
+    public static void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropFilterSampleData() == 0) {
             FilterSampleDataDao.instance.getMCollection().drop();
         }
@@ -871,7 +931,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
+    public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
         }
@@ -881,7 +941,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
+    public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
             WorkflowTestResultsDao.instance.getMCollection().drop();
         }
@@ -891,7 +951,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void resetSingleTypeInfoCount(BackwardCompatibility backwardCompatibility) {
+    public static void resetSingleTypeInfoCount(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getResetSingleTypeInfoCount() == 0) {
             SingleTypeInfoDao.instance.resetCount();
         }
@@ -902,7 +962,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
+    public static void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
         if (accountSettings == null) return;
         if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
             AdminSettingsAction.dropCollections(Context.accountId.get());
@@ -910,7 +970,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
+    public static void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDeleteAccessListFromApiToken() == 0) {
             ApiTokensDao.instance.updateMany(new BasicDBObject(), Updates.unset("accessList"));
         }
@@ -921,7 +981,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
+    public static void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
             TestingRunIssuesDao.instance.deleteAll(
                     Filters.or(
@@ -938,7 +998,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void enableNewMerging(BackwardCompatibility backwardCompatibility) {
+    public static void enableNewMerging(BackwardCompatibility backwardCompatibility) {
         if (!DashboardMode.isLocalDeployment()) {
             return;
         }
@@ -955,7 +1015,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
+    public static void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
             TestingRunResultDao.instance.getMCollection().drop();
@@ -969,7 +1029,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
+    public static void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getAddAktoDataTypes() == 0) {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
@@ -992,8 +1052,23 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void checkMongoConnection() throws Exception {
+        AccountsDao.instance.getStats();
+        connectedToMongo = true;
+    }
+
+    public static void setSubdomain(){
+        if (System.getenv("AKTO_SUBDOMAIN") != null) {
+            subdomain = System.getenv("AKTO_SUBDOMAIN");
+        }
+
+        subdomain += "/signup-google";
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        setSubdomain();
+
         sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
 
         logger.info("context initialized");
@@ -1008,14 +1083,22 @@ public class InitializerListener implements ServletContextListener {
                 boolean calledOnce = false;
                 do {
                     try {
+
                         if (!calledOnce) {
                             DaoInit.init(new ConnectionString(mongoURI));
-                            Context.accountId.set(1_000_000);
                             calledOnce = true;
                         }
-                        AccountSettingsDao.instance.getStats();
-                        connectedToMongo = true;
-                        runInitializerFunctions();
+                        checkMongoConnection();
+                        AccountTask.instance.executeTask(new Consumer<Account>() {
+                            @Override
+                            public void accept(Account account) {
+                                AccountSettingsDao.instance.getStats();
+                                runInitializerFunctions();
+                            }
+                        }, "context-initializer");
+                        setUpDailyScheduler();
+                        setUpWebhookScheduler();
+                        setUpPiiAndTestSourcesScheduler();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1029,6 +1112,43 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, TimeUnit.SECONDS);
 
+    }
+
+    public static void insertPiiSources(){
+        if (PIISourceDao.instance.findOne("_id", "A") == null) {
+            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
+            PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+            piiSource.setId("A");
+
+            PIISourceDao.instance.insertOne(piiSource);
+        }
+
+        if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
+            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
+            PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+            piiSource.setId("Fin");
+            PIISourceDao.instance.insertOne(piiSource);
+        }
+
+        if (PIISourceDao.instance.findOne("_id", "File") == null) {
+            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
+            PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+            piiSource.setId("File");
+            PIISourceDao.instance.insertOne(piiSource);
+        }
+    }
+
+    public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        dropFilterSampleDataCollection(backwardCompatibility);
+        resetSingleTypeInfoCount(backwardCompatibility);
+        dropWorkflowTestResultCollection(backwardCompatibility);
+        readyForNewTestingFramework(backwardCompatibility);
+        addAktoDataTypes(backwardCompatibility);
+        updateDeploymentStatus(backwardCompatibility);
+        dropAuthMechanismData(backwardCompatibility);
+        deleteAccessListFromApiToken(backwardCompatibility);
+        deleteNullSubCategoryIssues(backwardCompatibility);
+        enableNewMerging(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
@@ -1051,42 +1171,11 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         try {
-            dropFilterSampleDataCollection(backwardCompatibility);
-            resetSingleTypeInfoCount(backwardCompatibility);
-            dropWorkflowTestResultCollection(backwardCompatibility);
-            readyForNewTestingFramework(backwardCompatibility);
-            addAktoDataTypes(backwardCompatibility);
-            updateDeploymentStatus(backwardCompatibility);
-            dropAuthMechanismData(backwardCompatibility);
-            deleteAccessListFromApiToken(backwardCompatibility);
-            deleteNullSubCategoryIssues(backwardCompatibility);
-            enableNewMerging(backwardCompatibility);
+            setBackwardCompatibilities(backwardCompatibility);
 
             SingleTypeInfo.init();
 
-            Context.accountId.set(1000000);
-
-            if (PIISourceDao.instance.findOne("_id", "A") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
-                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
-                piiSource.setId("A");
-
-                PIISourceDao.instance.insertOne(piiSource);
-            }
-
-            if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
-                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
-                piiSource.setId("Fin");
-                PIISourceDao.instance.insertOne(piiSource);
-            }
-
-            if (PIISourceDao.instance.findOne("_id", "File") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
-                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
-                piiSource.setId("File");
-                PIISourceDao.instance.insertOne(piiSource);
-            }
+            insertPiiSources();
 
             setUpPiiCleanerScheduler();
             setUpDailyScheduler();
@@ -1136,7 +1225,10 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
+    public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
+        if(DashboardMode.isLocalDeployment()){
+            return;
+        }
         String ownerEmail = System.getenv("OWNER_EMAIL");
         if (ownerEmail == null) {
             logger.info("Owner email missing, might be an existing customer, skipping sending an slack and mixpanel alert");
@@ -1162,7 +1254,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    private String getUpdateDeploymentStatusUrl() {
+    private static String getUpdateDeploymentStatusUrl() {
         String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
@@ -1222,6 +1314,7 @@ public class InitializerListener implements ServletContextListener {
             files.add(line);
         }
         in.close();
+        reader.close();
         return files;
     }
 
@@ -1234,6 +1327,7 @@ public class InitializerListener implements ServletContextListener {
             stringbuilder.append(line + "\n");
         }
         in.close();
+        reader.close();
         return stringbuilder.toString();
     }
 }

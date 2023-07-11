@@ -1,0 +1,47 @@
+id: STRUTS_DEBUG_MODE_ENABLED
+info:
+  name: Struts Debug Mode Enabled 
+  description: "Struts debug mode enabled misconfiguration can expose sensitive information, potentially leading to security vulnerabilities."
+  details: >
+          The Struts Debug Mode Enabled misconfiguration occurs when the Apache Struts framework is 
+          configured to run in debug mode, allowing detailed debugging information to be displayed in
+          error responses. This can expose sensitive information, such as stack traces, internal 
+          paths, and configuration details, to potential attackers. By analyzing the debug output, 
+          attackers can gain insights into the application's structure and potentially exploit 
+          vulnerabilities. This misconfiguration falls under the Security Misconfiguration category 
+          and has a low severity level. Properly disabling debug mode is crucial to prevent 
+           information disclosure and enhance the overall security of the application.
+  impact: "Exposing Struts debug mode can disclose sensitive information, increasing the risk of security vulnerabilities and potential attacks."
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://struts.apache.org/core-developers/development-mode"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}?debug=xml
+
+validate:
+  response_payload:
+      contains_either: 
+        - "<debug>"
+        - "<struts.actionMapping>"
+        - "Stacktraces"
