@@ -1,6 +1,6 @@
 <template>
   <div @click="loginViaGoogle">
-    <slot/>
+    <slot />
   </div>
 </template>
 
@@ -25,36 +25,16 @@ export default {
   },
   methods: {
     async loginViaGoogle() {
-      let result = await request({
-        url: 'api/googleConfig',
-        method: 'post',
-        data: {}
-      })
-      if (this.purpose === 'addfile') {
-        var objThis = this
-        gapi.load('auth2', function() {
-          objThis.auth2 = gapi.auth2.init({
-            client_id: result.client_id,
-            scope: objThis.scope
-          });
-          objThis.auth2.grantOfflineAccess().then((x) => {
-            objThis.$emit('signInCallback', x)
-          }).catch(() => {});
-        })
-      } else {
-        window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' +
-            'access_type=offline&' +
-            'scope=https%3A//www.googleapis.com/auth/userinfo.email%20https%3A//www.googleapis.com/auth/userinfo.profile&' +
-            'response_type=code&' +
-            'state=' + this.purpose + '&' +
-            'redirect_uri=https%3A//staging.akto.io%3A8443/signup-google&' +
-            'client_id=' + result.client_id
-      }
+      window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' +
+        'access_type=offline&' +
+        'scope=https%3A//www.googleapis.com/auth/userinfo.email%20https%3A//www.googleapis.com/auth/userinfo.profile&' +
+        'response_type=code&' +
+        'state=' + this.purpose + '&' +
+        'redirect_uri=https%3A//' + window.location.host + '/signup-google&' +
+        'client_id=779574722609-j4scecjhuiiu8u8g9hegjs27ihhpa3c2.apps.googleusercontent.com'
     }
-  },
+  }
 }
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>
