@@ -17,6 +17,7 @@ import Store from "../../../store";
 import TestingStore from "../testingStore";
 import { useEffect, useState } from 'react';
 import transform from "../transform";
+import PageWithMultipleCards from "../PageWithMultipleCards";
 
 let headers = [
   {
@@ -208,13 +209,14 @@ useEffect(()=>{
 }, [])
 
   return (
-    <VerticalStack gap="4">
-      <HorizontalStack align="space-between" blockAlign="center">
-        <Text as="div" variant="headingLg">
-          Test results
-        </Text>
-        <Button primary>New test run</Button>
-      </HorizontalStack>
+    <PageWithMultipleCards
+    title={
+      <Text as="div" variant="headingLg">
+           Test results
+         </Text>
+    }
+    primaryAction={<Button primary>New test run</Button>}
+    components={[
       <GithubTable 
         data={testRuns} 
         sortOptions={sortOptions} 
@@ -227,7 +229,8 @@ useEffect(()=>{
         loading={loading}
         page={1}
       />
-    </VerticalStack>
+    ]}
+    />
   );
 }
 

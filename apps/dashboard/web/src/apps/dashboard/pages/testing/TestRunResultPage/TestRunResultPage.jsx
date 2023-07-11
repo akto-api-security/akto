@@ -40,7 +40,7 @@ import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighligh
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
 import { useNavigate } from "react-router-dom";
-
+import PageWithMultipleCards from '../PageWithMultipleCards';
 
 let headers = [
   {
@@ -167,19 +167,6 @@ function AttemptComponent(props) {
     setRefText((old) => [...old, text]);
   }
   useEffect(()=>{
-    if (props.results?.[page]?.originalMessage) {
-      let message = formatJSON(props.results?.[page]?.originalMessage);
-      let res = {}, req = {}
-      Object.keys(message).forEach((key) => {
-        if (key.startsWith("req") || key.startsWith("query")) {
-          req[key] = message[key]
-        } else if (key.startsWith("res")) {
-          res[key] = message[key]
-        }
-      })
-      refText[0].setValue(JSON.stringify(req, null, 2))
-      refText[1].setValue(JSON.stringify(res, null, 2))
-    }
     if(refText.length==0){
       [requestRef, responseRef].map((ref) => {
         createEditor(ref.current, {
@@ -193,7 +180,20 @@ function AttemptComponent(props) {
         })
       })
     }
-  }, [props.results, page])
+    if (props.results?.[page]?.originalMessage && refText.length==2) {
+      let message = formatJSON(props.results?.[page]?.originalMessage);
+      let res = {}, req = {}
+      Object.keys(message).forEach((key) => {
+        if (key.startsWith("req") || key.startsWith("query")) {
+          req[key] = message[key]
+        } else if (key.startsWith("res")) {
+          res[key] = message[key]
+        }
+      })
+        refText[0].setValue(JSON.stringify(req, null, 2))
+        refText[1].setValue(JSON.stringify(res, null, 2))
+    }
+  }, [props.results, page, refText])
 
   return (
     <VerticalStack gap="4">
@@ -335,13 +335,9 @@ function TestRunResultPage(props) {
   }
 
   return (
-    <VerticalStack gap="10">
-      <HorizontalStack align="space-between"  >
-        <HorizontalStack gap={"2"}>
-          <div style={{ marginBottom: "auto" }}>
-            <Button icon={MobileBackArrowMajor} onClick={navigateBack} textAlign="start" />
-          </div>
-          <VerticalStack gap="3">
+    <PageWithMultipleCards
+    title = {
+        <VerticalStack gap="3">
           <HorizontalStack gap="2" align="start" blockAlign='start'>
             {selectedTestRunResult?.icon &&
               <Box> {<Icon color="primary" source={selectedTestRunResult.icon}></Icon>}
@@ -356,8 +352,10 @@ function TestRunResultPage(props) {
               selectedTestRunResult?.severity &&
               selectedTestRunResult.severity
                 .map((item) =>
-                  <Badge key={item.confidence} status={func.getStatus(item)}><Text variant='bodySm'>
-                    {item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}</Text></Badge>
+                  <Badge key={item.confidence} status={func.getStatus(item)}>
+                    <Text fontWeight="regular">
+                    {item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}
+                    </Text></Badge>
                 )
             }
           </HorizontalStack>
@@ -379,31 +377,27 @@ function TestRunResultPage(props) {
             }
           </HorizontalStack>
         </VerticalStack>
-        </HorizontalStack>
-        <HorizontalStack>
-          <ButtonGroup>
-            <Button disclosure>Dismiss alert</Button>
-            <Button primary>Create issue</Button>
-          </ButtonGroup>
-        </HorizontalStack>
-      </HorizontalStack>
-      {
-        issueDetails.id && 
-              <LegacyCard title="Description" sectioned>
-              {parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "")}
-            </LegacyCard>
-      }
-      <AttemptComponent
-        results ={selectedTestRunResult?.testResults}
-        vulnerable={selectedTestRunResult?.vulnerable}
-      />
-      {
-        issueDetails.id && 
-        <MoreInformationComponent
+    }
+    backAction = {{onAction:navigateBack}}
+    primaryAction = {<Button primary>Create issue</Button>}
+    secondaryActions = {<Button disclosure>Dismiss alert</Button>}
+    components = {[
+      issueDetails.id &&
+      <LegacyCard title="Description" sectioned>
+        {parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "")}
+      </LegacyCard>
+    ,
+    selectedTestRunResult.testResults &&
+    <AttemptComponent
+      results={selectedTestRunResult?.testResults}
+      vulnerable={selectedTestRunResult?.vulnerable}
+    />,
+      issueDetails.id &&
+      <MoreInformationComponent
         sections={infoState}
-        />
-      }
-    </VerticalStack>
+      />
+    ]}
+    />
   )
 }
 

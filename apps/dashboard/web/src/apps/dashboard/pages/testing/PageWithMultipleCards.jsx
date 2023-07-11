@@ -1,13 +1,20 @@
 import { Outlet } from "react-router-dom";
-import { Page } from "@shopify/polaris";
+import { Page, VerticalStack } from "@shopify/polaris";
 
 const PageWithMultipleCards = (props) => {
 
     return (
         <Page fullWidth
-            title={props.title || "blank"}
+            title={props.title}
+            backAction={props.backAction}
+            primaryAction={props.primaryAction}
+            secondaryActions={props.secondaryActions}
         >
-            <Outlet />
+        <VerticalStack gap="4">
+        {props.components.filter((component, index) => {
+            return <div key={index}>{component}</div>
+        })}
+        </VerticalStack>
         </Page>
     )
 }
