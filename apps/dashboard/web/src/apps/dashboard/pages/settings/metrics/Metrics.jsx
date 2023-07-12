@@ -31,16 +31,13 @@ function Metrics() {
         let arr = await settingFunctions.fetchMetricData()
         setMetricList(arr)
     }
-    const names = metricsList.map((element) =>{
-        return(
-            element._name
-        )
-    })
+    const names = ['INCOMING_PACKETS_MIRRORING','OUTGOING_PACKETS_MIRRORING','OUTGOING_REQUESTS_MIRRORING','TOTAL_REQUESTS_RUNTIME','FILTERED_REQUESTS_RUNTIME']
 
     const nameMap = new Map(metricsList.map(obj => [obj._name, { description: obj.description, descriptionName: obj.descriptionName }]));
         
 
     const getGraphData = async(startTime,endTime) =>{
+        console.log(names,metricsList)
         let host = null
         const metricData = await settingFunctions.fetchGraphData(groupBy,startTime,endTime,names,host)
         let result = {}
@@ -49,40 +46,24 @@ function Metrics() {
             result[key] =val
         }
         setOrderedResult([])
-        let arr = [
-            {
-                key: 'INCOMING_PACKETS_MIRRORING' , 
-                value: result['INCOMING_PACKETS_MIRRORING']
-            },
-            {   key: 'OUTGOING_PACKETS_MIRRORING' ,
-                value: result['OUTGOING_PACKETS_MIRRORING']
-            },
-            {
-                key: 'OUTGOING_REQUESTS_MIRRORING' ,
-                value: result['OUTGOING_REQUESTS_MIRRORING'],
-            },
-            {
-                key: 'TOTAL_REQUESTS_RUNTIME' , 
-                value: result['TOTAL_REQUESTS_RUNTIME'],
-            },
-            { 
-                key: 'FILTERED_REQUESTS_RUNTIME' , 
-                value: result['FILTERED_REQUESTS_RUNTIME']
-            }           
-        ]
+        const arr = names.map((name)=>{
+            return{
+                key: name,
+                value: result[name]
+            }
+        })
         setTimeout(() => {
             setOrderedResult(arr)
         }, 0);
     }
-
-    useEffect(()=>{
-        getGraphData(startTime,endTime)
-    },[startTime,endTime,groupBy])
-
     useEffect(()=>{
         getMetricsList()
         setHosts(func.getListOfHosts(apiCollections))
     },[])
+
+    useEffect(()=>{
+        getGraphData(startTime,endTime)
+    },[startTime,endTime,groupBy])
 
     const handleDate = (dateRange) =>{
         setStartTime(Math.floor(Date.parse(dateRange.since) / 1000))
