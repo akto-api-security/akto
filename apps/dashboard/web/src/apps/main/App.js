@@ -1,6 +1,8 @@
 import HomePage from "../dashboard/pages/home/HomePage"
 import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
+import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
+import PageTesting from "../dashboard/pages/testing/PageTesting";
 import { AppProvider } from "@shopify/polaris"
 import SignUp from "../signup/pages/SignUp"
 import {
@@ -15,6 +17,7 @@ import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
+import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 
@@ -25,12 +28,22 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/dashboard/testing",
-        element: <TestRunsPage />
-      },
-      {
-        path: "/dashboard/testing/:hexId",
-        element: <SingleTestRunPage />
-      },
+        element: <PageTesting />,
+        children:[
+          {
+            path: "/dashboard/testing",
+            element: <TestRunsPage />
+          },
+          {
+            path: "/dashboard/testing/:hexId",
+            element: <SingleTestRunPage />
+          },
+          {
+            path: "/dashboard/testing/:hexId/result/:hexId2",
+            element: <TestRunResultPage />
+          }
+        ]
+      }
     ]
   },
   {
@@ -68,6 +81,10 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/settings/integrations/akto_gpt",
         element: <AktoGPT />,
+      },
+      {
+        path: "/dashboard/settings/health_logs",
+        element: <HealthLogs />,
       }
   ]
   },

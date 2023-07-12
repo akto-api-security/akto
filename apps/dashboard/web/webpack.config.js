@@ -3,6 +3,7 @@ var webpack = require('webpack')
 require("babel-polyfill")
 const TerserPlugin = require("terser-webpack-plugin");
 const { GenerateSW } = require("workbox-webpack-plugin");
+const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 
 function resolve (dir) {
       return path.join(__dirname, '..', dir)
@@ -15,7 +16,13 @@ function hashGenerator() {
 process.env.HASH = hashGenerator()
 
 module.exports = {
-  entry: {"babel-polyfill": "babel-polyfill", main: './web/src/apps/main/index.js'},
+  entry: {"babel-polyfill": "babel-polyfill", main: './web/src/apps/main/index.js',
+  'editor.worker': 'monaco-editor/esm/vs/editor/editor.worker.js',
+  'json.worker': 'monaco-editor/esm/vs/language/json/json.worker',
+  // 'css.worker': 'monaco-editor/esm/vs/language/css/css.worker',
+  // 'html.worker': 'monaco-editor/esm/vs/language/html/html.worker',
+  // 'ts.worker': 'monaco-editor/esm/vs/language/typescript/ts.worker'
+},
   output: {
     path: path.resolve(__dirname, './dist'),
     publicPath: '/dist/',
@@ -99,9 +106,9 @@ if (process.env.NODE_ENV === 'production') {
   module.exports.devtool = 'source-map'
   // http://vue-loader.vuejs.org/en/workflow/production.html
   module.exports.plugins = (module.exports.plugins || []).concat([
-    new GenerateSW({
-       exclude: [/\.map$/, /asset-manifest\.json$/],
-     }),
+    // new GenerateSW({
+    //    exclude: [/\.map$/, /asset-manifest\.json$/],
+    //  }),
     // new SWPrecacheWebpackPlugin({
     //   cacheId: 'akto-app',
     //   filename: 'sw.js',
@@ -126,6 +133,10 @@ if (process.env.NODE_ENV === 'production') {
     }),
     new webpack.LoaderOptionsPlugin({
       minimize: true
-    })
+    }),
+    // new MonacoWebpackPlugin({
+    //   languages:["json"],
+    //   publicPath:"/"
+    // })
   ])
 }

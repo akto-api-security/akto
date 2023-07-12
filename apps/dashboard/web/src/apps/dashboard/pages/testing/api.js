@@ -53,4 +53,29 @@ export default {
         })
         return resp        
     },
+    fetchAffectedEndpoints (issueId) {
+        return request({
+            url: 'api/fetchAffectedEndpoints',
+            method: 'post',
+            data: {issueId}
+        })
+    },
+    fetchTestRunResultDetails(testingRunResultHexId) {
+        return request({
+            url: '/api/fetchTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId
+            }
+        })
+    },
+    fetchIssueFromTestRunResultDetails(testingRunResultHexId) {
+        return request({
+            url: '/api/fetchIssueFromTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId
+            }
+        })
+    },
 }
