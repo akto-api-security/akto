@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import {LegacyCard, Select} from '@shopify/polaris';
+import React, { useEffect, useState } from 'react'
+import {LegacyCard} from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
