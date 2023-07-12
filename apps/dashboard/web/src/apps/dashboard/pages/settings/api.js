@@ -116,6 +116,22 @@ const settingRequests = {
             data: {}
         })
     },
+
+
+    fetchTrafficMetricsDesciptions() {
+        return request({
+            url: '/api/fetchTrafficMetricsDesciptions',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
+        return request({
+            url: '/api/fetchTrafficMetrics',
+            method: 'post',
+            data: {groupBy, startTimestamp, endTimestamp, names, host}
+        })
+    },
 }
 
 export default settingRequests

@@ -102,6 +102,22 @@ const settingFunctions = {
         ]
       })
       return arr
+    },
+
+
+    fetchMetricData: async function(){
+      let arr = []
+      await settingRequests.fetchTrafficMetricsDesciptions().then((resp)=>{
+        arr = resp.names
+      })
+      return arr
+    },
+    fetchGraphData: async function(groupBy, startTimestamp, endTimestamp, names, host){
+      let trafficData = {}
+      await settingRequests.fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host).then((resp)=>{
+        trafficData = resp.trafficMetricsMap
+      })
+      return trafficData
     }
 }
 

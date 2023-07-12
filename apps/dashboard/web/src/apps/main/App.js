@@ -16,6 +16,7 @@ import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import About from "../dashboard/pages/settings/about/About";
+import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 
 const router = createBrowserRouter([
   {
@@ -47,6 +48,10 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/settings/about",
         element: <About />,
+      },
+      {
+        path: "/dashboard/settings/metrics",
+        element: <Metrics />,
       },
       {
         path: "/dashboard/settings/integrations/burp",
