@@ -147,6 +147,8 @@ const func = {
       case 'HIGH': return 'critical';
       case 'MEDIUM': return 'warning';
       case 'LOW': return 'neutral';
+      default:
+        return '';
     }
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
@@ -227,6 +229,9 @@ prepareFilters: (data, filters) => {
     localFilters[index].choices = choiceList
   })
   return localFilters
+},
+timeNow: () => {
+  return parseInt(new Date().getTime()/1000)
 },
 
 }

@@ -1,9 +1,7 @@
-import GithubTable from "../../../components/tables/GithubTable"
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
-  Button,
-  VerticalStack,
-  HorizontalStack} from '@shopify/polaris';
+  Button} from '@shopify/polaris';
 import {
   CircleCancelMinor,
   CalendarMinor,
@@ -19,55 +17,59 @@ import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 
+/*
+  {
+    text:"", // req. -> The text to be shown wherever the header is being shown
+    value:"", // req. -> which key in the data does this header refer to.
+    itemOrder:0, // optional -> needed if all headers are shown differently.
+    icon:"", // optional -> needed if a header has a custom icon associated with it.
+    showFilter:true, // optional, default -> false
+    filterKey:"" // optional, default -> value
+    filterLabel:"" // optional, default -> title
+    filterValues:[], // optional, default to a list of all data in value key.
+    // If value is an object then defaults to object of all keys in the value.
+    showSort:false, // optional -> if you want to show show sort on this field, defaults to false. 
+    sortKey:"", // optional -> using a different key than "value" for sorting.
+    sortLabel: "", // optional, defaults to text -> if you want a different sort label than text.
+    sortDirectionLabel: { asc:"", desc:"" }, // optional , defaults to new/old if text/sortLabel contains "time", else high/low
+  }
+*/
+
 let headers = [
   {
-    icon: {
-      text: "",
-      value: "icon",
-      row_order: 0,
-    },
-    name: {
-      text: "Test name",
-      value: "name",
-      item_order: 0,
-
-    }
+    text:"",
+    value:"icon",
+    itemOrder:0
   },
   {
-    severityList: {
-      text: 'Severity',
-      value: 'severity',
-      item_order: 1,
-    }
+    text:"Text name",
+    value:"name",
+    itemOrder:1
   },
   {
-    icon: {
-      text: "",
-      value: "",
-      row_order: 0,
-    },
-    details: [
-      {
-        text: "Number of tests",
-        value: "number_of_tests_str",
-        item_order: 2,
-        icon: FraudProtectMinor,
-      },
-      {
-        text: 'Run type',
-        value: 'run_type',
-        item_order: 2,
-        icon: PlayMinor
-      },
-      {
-        text: 'Run time',
-        value: 'run_time',
-        item_order: 2,
-        sortKey: 'run_time_epoch',
-        icon: ClockMinor
-      },
-    ]
-  }
+    text:"Severity",
+    value: 'severity',
+    filterKey:"severityStatus",
+    itemOrder:2,
+  },
+  {
+    text: "Number of tests",
+    value: "number_of_tests_str",
+    itemOrder: 3,
+    icon: FraudProtectMinor,
+  },
+  {
+    text: 'Run type',
+    value: 'run_type',
+    itemOrder: 3,
+    icon: PlayMinor
+  },
+  {
+    text: 'Run time',
+    value: 'run_time',
+    itemOrder: 3,
+    icon: ClockMinor
+  },
 ]
 
 const sortOptions = [
@@ -216,7 +218,7 @@ useEffect(()=>{
     }
     primaryAction={<Button primary>New test run</Button>}
     components={[
-      <GithubTable 
+      <GithubSimpleTable 
         key="table"
         data={testRuns} 
         sortOptions={sortOptions} 

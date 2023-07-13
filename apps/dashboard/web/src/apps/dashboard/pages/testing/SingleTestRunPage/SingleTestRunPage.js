@@ -1,4 +1,4 @@
-import GithubTable from "../../../components/tables/GithubTable"
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
   Button,
@@ -9,7 +9,6 @@ import {
   Box,
 } from '@shopify/polaris';
 import {
-  MobileBackArrowMajor,
   SearchMinor,
   FraudProtectMinor,
   LinkMinor
@@ -25,47 +24,34 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 
 let headers = [
   {
-    name: {
-      text: "Test name",
-      value: "name",
-      item_order: 0,
+    text: "Test name",
+    value: "name",
+    itemOrder: 1,
 
-    }
   },
   {
-    severityList: {
-      text: 'Severity',
-      value: 'severity',
-      item_order: 1,
-    }
+    text: 'Severity',
+    value: 'severity',
+    itemOrder: 2,
   },
   {
-    icon: {
-      text: "",
-      value: "",
-      row_order: 0,
-    },
-    details: [
-      {
-        text: "Detected time",
-        value: "detected_time",
-        item_order: 2,
-        icon: SearchMinor,
-      },
-      {
-        text: 'Test category',
-        value: 'testCategory',
-        item_order: 2,
-        icon: FraudProtectMinor
-      },
-      {
-        text: 'url',
-        value: 'url',
-        item_order: 2,
-        icon: LinkMinor
-      },
-    ]
-  }
+    text: "Detected time",
+    value: "detected_time",
+    itemOrder: 3,
+    icon: SearchMinor,
+  },
+  {
+    text: 'Test category',
+    value: 'testCategory',
+    itemOrder: 3,
+    icon: FraudProtectMinor
+  },
+  {
+    text: 'url',
+    value: 'url',
+    itemOrder: 3,
+    icon: LinkMinor
+  },
 ]
 
 const sortOptions = [
@@ -206,7 +192,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     backAction = {{onAction:navigateBack}}
     primaryAction={<Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button>}
     components = {[
-      <GithubTable 
+      <GithubSimpleTable 
       key="table"
       data={testRunResults} 
       sortOptions={sortOptions} 

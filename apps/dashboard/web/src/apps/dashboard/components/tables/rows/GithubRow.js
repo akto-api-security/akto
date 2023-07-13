@@ -60,6 +60,26 @@ function GithubRow(props) {
                         </div>
                     {/* </div> */}
                         </IndexTable.Cell>
+            {
+                props?.headers?.filter((header) => {
+                    return header.itemCell == 2
+                }).map((header) => {
+                    return (
+                        <IndexTable.Cell key={header.text}>
+                            <VerticalStack>
+                                <Text>
+                                    {header.text}
+                                </Text>
+                                <HorizontalStack>
+                                <Badge key={header.text} size="small">
+                                    {props.data[header.value]}
+                                </Badge>
+                                </HorizontalStack>
+                            </VerticalStack>
+                        </IndexTable.Cell>
+                    )
+                })
+            }
                         <IndexTable.Cell>
                     <VerticalStack align="center" inlineAlign="center">
                     {

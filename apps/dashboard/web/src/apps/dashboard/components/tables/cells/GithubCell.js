@@ -8,51 +8,68 @@ import {
     Box} from '@shopify/polaris';
 
 function GithubCell(props){
-    return (<>
+    return (
     <HorizontalStack gap="1">
     {
-        props?.headers[0]?.icon &&
-        <div style={{marginBottom:"auto"}}>
-        <Box padding="05">
-            <Icon source={props.data[props?.headers[0]?.icon['value']]} color="primary" />
-        </Box>
-        </div>
+        props?.headers?.filter((header) => {
+            return header.itemOrder==0
+        }).map((header) => {
+            return (
+                <div style={{ marginBottom: "auto" }} key={header.value}>
+                    <Box padding="05">
+                        <Icon source={props.data[header.value]} color="primary" />
+                    </Box>
+                </div>
+            )
+        })
     }
     <VerticalStack gap="2">
         <HorizontalStack gap="2" align='start'>
-            <Text as="span" variant="headingMd">
+            <Box maxWidth='50vw'>
+            <Text as="span" variant="headingMd" truncate={true}>
                 {
-                    props?.headers[0]?.name &&
-                    props.data[props?.headers[0]?.name['value']]
+                    props?.headers?.filter((header) => {
+                        return header.itemOrder==1
+                    }).map((header) => {
+                        return props.data[header.value]
+                    }) 
                 }
             </Text>
+            </Box>
             {
-                props?.headers[1]?.severityList &&
-                    props.data[props?.headers[1]?.severityList['value']] ? props.data[props?.headers[1]?.severityList['value']].map((item) =>
-                        <Badge key={item.confidence} status={func.getStatus(item)}>{item.count ? item.count: ""} {item.confidence}</Badge>) :
-                    []}
+                props?.headers?.filter((header) => {
+                    return header.itemOrder==2
+                }).map((header) => {
+                    console.log(props?.data?.[header?.value], props.data)
+                    return props?.data?.[header?.value]
+                    ?.map((item) =>
+                    <Badge key={item.confidence} status={func.getStatus(item)}>
+                        {item.count ? item.count: ""} {item.confidence}
+                    </Badge>
+                )}) 
+            }
         </HorizontalStack>
         <HorizontalStack gap='2' align="start" >
             {
-                props?.headers[2]?.details &&
-                props?.headers[2]?.details.map((detail) => {
+                props?.headers?.filter((header) => {
+                    return header.itemOrder==3
+                }).map((header) => {
                     return (
-                        <HorizontalStack key={detail.value} gap="1">
+                        <HorizontalStack key={header.value} gap="1">
                             <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                                <Icon source={detail.icon} color="subdued" />
+                                <Icon source={header.icon} color="subdued" />
                             </div>
                             <Text as="div" variant="bodySm" color="subdued">
-                                {props.data[detail.value]}
+                                {props.data[header.value]}
                             </Text>
                         </HorizontalStack>
                     )
-                })
+                }) 
             }
         </HorizontalStack>
     </VerticalStack>
 </HorizontalStack>
-
-    </>)
+)
 }
 
 export default GithubCell
