@@ -15,23 +15,34 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicyNew;
+import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
+
+import org.json.JSONArray;
 
 public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicyNew aktoPolicyNew = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
+    public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
+    public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
 
     private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
 
@@ -44,6 +55,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
         try {
             initialiseDemoCollections();
+            addSampleData();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
@@ -115,6 +127,79 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.DEMO_COLLECTION_CREATE_TIME, Context.now())
         );
+    }
+
+    public static void addSampleData() {
+        List<String> result = new ArrayList<>();
+
+        ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(VULNERABLE_API_COLLECTION_NAME);
+        if (sameNameCollection == null){
+            ApiCollection apiCollection = new ApiCollection(VULNERABLE_API_COLLECTION_ID, VULNERABLE_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, VULNERABLE_API_COLLECTION_ID);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
+        }
+
+        try {
+            String data = convertStreamToString(InitializerListener.class.getResourceAsStream("/SampleApiData.json"));
+            JSONArray dataobject = new JSONArray(data);
+            for (Object obj: dataobject) {
+
+                Map<String, Object> json = new Gson().fromJson(obj.toString(), Map.class);
+                Map<String, Object> sampleDataMap = (Map)json.get("sampleData");
+                String testId = (String) json.get("id");
+
+                int ts = Context.now();
+                sampleDataMap.put("akto_account_id", "1000000");
+                sampleDataMap.put("ip", "null");
+                sampleDataMap.put("time", String.valueOf(ts));
+                sampleDataMap.put("type", "HTTP/1.1");
+                sampleDataMap.put("contentType", "application/json");
+                sampleDataMap.put("source", "HAR");
+                sampleDataMap.put("akto_vxlan_id", VULNERABLE_API_COLLECTION_ID);
+
+                String jsonInString = new Gson().toJson(sampleDataMap);
+                result.add(jsonInString);
+
+                VulnerableRequestForTemplate vulnerableRequestForTemplate = new VulnerableRequestForTemplate();
+                List<String> testList = new ArrayList<>();
+                testList.add(testId);
+                vulnerableRequestForTemplate.setTemplateIds(testList);
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
+                    VULNERABLE_API_COLLECTION_ID, (String) sampleDataMap.get("path"), Method.fromString((String) sampleDataMap.get("method"))
+                );
+                vulnerableRequestForTemplate.setId(apiInfoKey);
+
+                UpdateOptions updateOptions = new UpdateOptions();
+                updateOptions.upsert(true);
+
+                VulnerableRequestForTemplateDao.instance.getMCollection().updateOne(
+                        Filters.in("templateIds", testId),
+                        Updates.combine(
+                                Updates.set("_id", apiInfoKey),
+                                Updates.set("templateIds", testList)
+                        ),
+                        updateOptions
+                );
+            }
+
+            Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+        } catch (Exception e) {
+            System.out.println("error");
+        }
+
+        System.out.println("hi");
+
+    }
+
+private static String convertStreamToString(InputStream in) throws Exception {
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        StringBuilder stringbuilder = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            stringbuilder.append(line + "\n");
+        }
+        in.close();
+        return stringbuilder.toString();
     }
 
     private void insertVulnerableRequestsForDemo() {
