@@ -1,15 +1,18 @@
 id: WGETRC_CONFIG
 info:
   name: Wgetrc Configuration File Exposure
-  description: tft tft tfyt 
-  details: jhfj
-  impact: fjhfy
+  description: "Exposes the Wgetrc configuration file used by Wget utility, containing potentially sensitive information." 
+  details: >
+              "The Wgetrc configuration file, which may store sensitive information such as proxy settings and authentication credentials, is exposed. Unauthorized access to this file can lead to the compromise of sensitive data and system security."
+  impact: "Exposing the Wgetrc configuration file can lead to unauthorized access and potential compromise of sensitive information, posing security risks to the system."
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: WGETRC_CONFIG
   severity: MEDIUM
+  references:
+    - https://ubuntu.com/security/notices/USN-982-1
 
 api_selection_filters:
   response_code:

@@ -1,15 +1,19 @@
 id: PROMETHEUS_METRICS
 info:
   name: Exposed Prometheus metrics
-  description: hhkij
-  details: jhfj
-  impact: fjhfy
+  description: "Exposed Prometheus metrics endpoint found."
+  details: >
+              "The Prometheus metrics endpoint is publicly accessible, allowing anyone to access and view detailed system and application metrics, potentially revealing sensitive information."
+  impact: "Exposing Prometheus metrics can provide insights into the system, potentially aiding attackers in identifying vulnerabilities and exploiting them."
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: PROMETHEUS_METRICS
   severity: LOW
+  references:
+    - https://github.com/prometheus/prometheus
+    - https://hackerone.com/reports/1026196
 
 api_selection_filters:
   response_code:

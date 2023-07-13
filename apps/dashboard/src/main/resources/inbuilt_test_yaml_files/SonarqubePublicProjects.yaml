@@ -1,15 +1,18 @@
 id: SONARQUBE_PUBLIC_PROJECTS
 info:
   name: Sonarqube with public projects
-  description: hhkij
-  details: jhfj
-  impact: fjhfy
+  description: "Detects publicly accessible SonarQube projects."
+  details: >
+              "Checks for SonarQube instances where project suggestions are publicly available. It looks for API endpoints like "/api/components/suggestions?recentlyBrowsed=" that reveal project-related information."
+  impact: "Publicly accessible SonarQube projects expose sensitive code quality and security information, increasing the risk of unauthorized access and targeted attacks."
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: SONARQUBE_PUBLIC_PROJECTS
   severity: LOW
+  references:
+    - https://next.sonarqube.com/sonarqube/web_api/api/components/suggestions?internal=true
 
 api_selection_filters:
   response_code:
