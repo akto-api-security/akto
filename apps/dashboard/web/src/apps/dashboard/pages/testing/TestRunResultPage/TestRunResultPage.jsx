@@ -112,7 +112,6 @@ function TestRunResultPage(props) {
       await api.fetchTestRunResultDetails(hexId2).then(({ testingRunResult }) => {
         testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
         setSelectedTestRunResult(testRunResult)
-        console.log(testRunResult);
       })
       
       await api.fetchIssueFromTestRunResultDetails(hexId2).then((resp) => {

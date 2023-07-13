@@ -40,7 +40,6 @@ function GithubCell(props){
                 props?.headers?.filter((header) => {
                     return header.itemOrder==2
                 }).map((header) => {
-                    console.log(props?.data?.[header?.value], props.data)
                     return props?.data?.[header?.value]
                     ?.map((item) =>
                     <Badge key={item.confidence} status={func.getStatus(item)}>

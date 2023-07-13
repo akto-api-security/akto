@@ -48,6 +48,15 @@ const resourceName = {
     plural: 'Sensitive data types',
   };
 
+const getActions = (item) => {
+    return [{
+        items: [{
+            content: 'Edit',
+            onAction: () => { console.log("edit function for", item) },
+        }]
+    }]
+}
+
 function AllSensitiveData(){
 
     const [data, setData] = useState([])
@@ -57,7 +66,6 @@ function AllSensitiveData(){
         async function fetchData(){
             let dataTypeMap={}
             await api.fetchDataTypes().then((res) => {
-                console.log(res.dataTypes)
                 res.dataTypes.aktoDataTypes.forEach((type) => {
                     dataTypeMap[type.name]={active:true}
                 })
@@ -65,13 +73,7 @@ function AllSensitiveData(){
                     dataTypeMap[type.name]={active:type.active, custom:true}
                 })
             })
-            console.log(dataTypeMap)
-
-            api.fetchDataTypeNames().then((res) => {
-                console.log(res);
-            })
             api.fetchSubTypeCountMap(0, func.timeNow()).then((res) => {
-                console.log(res);
                 let count = res.response.subTypeCountMap;
                 Object.keys(count.REQUEST).map((key) => {
                     tmp.push({
@@ -107,7 +109,6 @@ function AllSensitiveData(){
                     }
                     tmp[index]['icon'] = dataTypeMap[data.subType].active ? CircleTickMinor : CircleCancelMinor
                 })
-                console.log(tmp);
                 setData(tmp);
             })
         }
@@ -134,7 +135,7 @@ function AllSensitiveData(){
                 disambiguateLabel={()=>{}} 
                 headers={headers}
                 hasRowActions={true}
-                getActions={()=>{}}
+                getActions={getActions}
                 
                 />
             ]}

@@ -26,7 +26,6 @@ function GithubServerTable(props) {
   let filterOperators = props.headers.reduce((map, e) => {map[e.sortKey || e.value] = 'OR'; return map}, {})
 
   useEffect(() => {
-    console.log(props.sortOptions);
     let [sortKey, sortOrder] = sortSelected.length==0 ? ["",""]: sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => {map[e.filterKey || e.value] = []; return map}, {})
     appliedFilters.forEach((filter) => {
@@ -84,7 +83,6 @@ function GithubServerTable(props) {
   }
 
   let filters=formatFilters(props.filters)
-  // createFilters(props.headers, data);
   function formatFilters(filters) {
     return filters
       .filter((filter) => {
@@ -100,7 +98,7 @@ function GithubServerTable(props) {
               titleHidden
               choices={filter.choices}
               selected={
-                appliedFilters.filter((localFilter) => { console.log(localFilter); return localFilter.key == filter.key }).length == 1 ? 
+                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ? 
                 appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
                 }
               onChange={handleFilterStatusChange(filter.key)}

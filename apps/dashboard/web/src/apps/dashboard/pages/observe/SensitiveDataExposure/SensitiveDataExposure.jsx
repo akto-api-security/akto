@@ -89,6 +89,26 @@ const resourceName = {
     plural: 'Endpoints with sensitive data',
   };
 
+let promotedBulkActions = (selectedResources) => {
+    return [
+        {
+            content: 'Ignore',
+            onAction: () => console.log('Todo: implement function'),
+          },
+          {
+            content: 'Mark as false positive',
+            onAction: () => console.log('Todo: implement function'),
+          },
+          {
+            content: 'Create issue',
+            onAction: () => console.log('Todo: implement function'),
+          },
+          {
+            content: 'Configure data types',
+            onAction: () => console.log('Todo: implement function'),
+          },
+    ]
+}
 
 
 function SensitiveDataExposure() {
@@ -146,7 +166,7 @@ function SensitiveDataExposure() {
                 temp['url'] = endpoint.method + " " + endpoint.url
                 temp['detected_timestamp'] = "Detected " + func.prettifyEpoch(endpoint.timestamp)
                 temp['timestamp'] = endpoint.timestamp
-                temp['location'] = "Detected in" + endpoint.isHeader ? "Header" : endpoint.isUrlParam ? "Query param" : "Payload"
+                temp['location'] = "Detected in " + (endpoint.isHeader ? "Header" : endpoint.isUrlParam ? "Query param" : "Payload")
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
                 temp["hexId"] = temp['collection'] + temp['url'] + temp['location'] + temp['call'] + endpoint.param + endpoint.subTypeString
@@ -168,7 +188,7 @@ function navigateBack(){
         <PageWithMultipleCards
         title={
             <Text as="div" variant="headingLg">
-            {`${subType} in endpoints` }
+            {`Endpoints with ${subType}` }
           </Text>
         }
         backAction = {{onAction:navigateBack}}
@@ -186,7 +206,7 @@ function navigateBack(){
                 loading={loading}
                 fetchData={fetchData}
                 filters={filters}
-                promotedBulkActions={()=>{}}
+                promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
             />
         ]}

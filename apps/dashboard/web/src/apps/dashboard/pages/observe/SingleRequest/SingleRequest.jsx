@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useParams, useNavigate } from "react-router-dom"
-import { Button, Text, Box } from "@shopify/polaris"
+import { Button, Text, Box, Popover, ActionList } from "@shopify/polaris"
 import api from "../api";
 import { useEffect, useState } from "react";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -12,6 +12,11 @@ function SingleRequest(){
     const [url, method] = atob(params.urlAndMethod).split(" ")
     const endpoint = method + " " + url
     const [sampleData, setSampleData] = useState([])
+    const [popoverActive, setPopoverActive] = useState(false);
+    function togglePopoverActive() {
+        setPopoverActive(!popoverActive);
+    }
+
     useEffect(() => {
         async function fetchData(){
             await api.fetchSampleData(url, apiCollectionId, method).then((res) => {
@@ -38,7 +43,37 @@ function SingleRequest(){
             </Box>
             }
             backAction = {{onAction:navigateBack}}
-            secondaryActions = {<Button disclosure>Actions</Button>}
+            secondaryActions = {
+                <Popover
+                active={popoverActive}
+                activator={<Button onClick={togglePopoverActive} disclosure>Actions</Button>}
+                onClose={togglePopoverActive}
+            >
+                <ActionList
+                    actionRole="menuitem"
+                    items={
+                        [
+                            {
+                                content: 'Ignore',
+                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                            },
+                            {
+                                content: 'Mark as false positive',
+                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                            },
+                            {
+                                content: 'Create issue',
+                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                            },
+                            {
+                                content: 'Configure data types',
+                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                            },
+                        ]
+                    }
+                />
+            </Popover>
+            }
             components = {[
                 sampleData.length>0 && <SampleDataList
                 key="Sample values"
