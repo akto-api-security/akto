@@ -319,9 +319,9 @@ public class Utils {
             RuntimeListener.aktoPolicyNew.main(responses,true, false);
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
-                RuntimeListener.resourceAnalyser.analyse(responseParams);
+//                RuntimeListener.resourceAnalyser.analyse(responseParams);
             }
-            RuntimeListener.resourceAnalyser.syncWithDb();
+//            RuntimeListener.resourceAnalyser.syncWithDb();
         }
     }
 
