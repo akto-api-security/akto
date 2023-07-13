@@ -34,7 +34,7 @@ execute:
   requests:
     - req:
         - modify_query_param:
-            query_key: ${query_key}%0Aakto-header%3aakto-value
+            query_key: ${query_value}%0Aakto-header%3aakto-value
 
 validate:
   response_headers:
