@@ -47,10 +47,14 @@ public class FixMultiSTIs {
     public static void fixForCollection(int apiCollectionId) {
         int skip = 0;
         Set<URLStatic> allUrlsInCollection = new HashSet<>();
+        int limit = 100;
 
-        for (int i =0; i<10; i++) {
+        for (int i =0; i<1000; i++) { // creating max limit
             List<ObjectId> duplicates = new ArrayList<>();
-            List<SingleTypeInfo> stiBatch = fetchHostSTI(apiCollectionId, skip);
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(1, true);
+            Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+            List<SingleTypeInfo> stiBatch = SingleTypeInfoDao.instance.findAll(filterQ, skip,limit, null);
+
             loggerMaker.infoAndAddToDb("stiBatch size: " + stiBatch.size(), LoggerMaker.LogDb.DASHBOARD);
 
             for (SingleTypeInfo singleTypeInfo: stiBatch) {
@@ -80,8 +84,8 @@ public class FixMultiSTIs {
                 SingleTypeInfoDao.instance.deleteAll(Filters.in("_id", duplicates));
             }
 
-            if (stiBatch.size() == 10_000) {
-                skip += 10_000;
+            if (stiBatch.size() == limit) {
+                skip += limit;
             } else {
                 break;
             }
