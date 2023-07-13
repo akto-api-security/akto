@@ -147,6 +147,8 @@ const func = {
       case 'HIGH': return 'critical';
       case 'MEDIUM': return 'warning';
       case 'LOW': return 'neutral';
+      default:
+        return '';
     }
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
@@ -237,6 +239,32 @@ const func = {
     }
     return result
 },
+prepareFilters: (data, filters) => {
+  let localFilters = filters;
+  localFilters.forEach((filter, index) => {
+    localFilters[index].availableChoices = new Set()
+    localFilters[index].choices = []
+  })
+  data.forEach((obj) => {
+  localFilters.forEach((filter, index) => {
+    let key = filter["key"]
+    obj[key].map((item) => filter.availableChoices.add(item));
+    localFilters[index] = filter
+    })
+  })
+  localFilters.forEach((filter, index) => {
+    let choiceList = []
+    filter.availableChoices.forEach((choice) => {
+      choiceList.push({label:choice, value:choice})
+    })
+    localFilters[index].choices = choiceList
+  })
+  return localFilters
+},
+timeNow: () => {
+  return parseInt(new Date().getTime()/1000)
+},
+
 }
 
 export default func

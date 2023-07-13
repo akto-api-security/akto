@@ -1,4 +1,4 @@
-import GithubTable from "../../../components/tables/GithubTable"
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
   Button,
@@ -9,7 +9,6 @@ import {
   Box,
 } from '@shopify/polaris';
 import {
-  MobileBackArrowMajor,
   SearchMinor,
   FraudProtectMinor,
   LinkMinor
@@ -21,50 +20,38 @@ import { useParams } from 'react-router';
 import { useState, useEffect } from 'react';
 import TestingStore from "../testingStore";
 import transform from "../transform";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 
 let headers = [
   {
-    name: {
-      text: "Test name",
-      value: "name",
-      item_order: 0,
+    text: "Test name",
+    value: "name",
+    itemOrder: 1,
 
-    }
   },
   {
-    severityList: {
-      text: 'Severity',
-      value: 'severity',
-      item_order: 1,
-    }
+    text: 'Severity',
+    value: 'severity',
+    itemOrder: 2,
   },
   {
-    icon: {
-      text: "",
-      value: "",
-      row_order: 0,
-    },
-    details: [
-      {
-        text: "Detected time",
-        value: "detected_time",
-        item_order: 2,
-        icon: SearchMinor,
-      },
-      {
-        text: 'Test category',
-        value: 'testCategory',
-        item_order: 2,
-        icon: FraudProtectMinor
-      },
-      {
-        text: 'url',
-        value: 'url',
-        item_order: 2,
-        icon: LinkMinor
-      },
-    ]
-  }
+    text: "Detected time",
+    value: "detected_time",
+    itemOrder: 3,
+    icon: SearchMinor,
+  },
+  {
+    text: 'Test category',
+    value: 'testCategory',
+    itemOrder: 3,
+    icon: FraudProtectMinor
+  },
+  {
+    text: 'url',
+    value: 'url',
+    itemOrder: 3,
+    icon: LinkMinor
+  },
 ]
 
 const sortOptions = [
@@ -144,9 +131,8 @@ useEffect(()=>{
           })
       } else if(Object.keys(subCategoryMap)!=0 && Object.keys(subCategoryFromSourceConfigMap)!=0){
         await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-          let testRunResults = transform.prepareTestRunResults(testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+          let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
           setTestRunResults(testRunResults)
-          filters = transform.prepareFilters(testRunResults, filters);
           setLoading(false);
         })
       }
@@ -170,20 +156,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
 ]};
 
   return (
-    <VerticalStack gap="10">
-      <HorizontalStack align="space-between" blockAlign="center">
-        <HorizontalStack gap="4">
-          <div style={{marginBottom:"auto"}}>
-          <Button icon={MobileBackArrowMajor} onClick={navigateBack} textAlign="start" />
-          </div>
+    <PageWithMultipleCards
+    title={
           <VerticalStack gap="3">
             <HorizontalStack gap="2" align="start">
-              <Box>
-                {
-                  selectedTestRun?.icon && 
-                  <Icon color="primary" source={selectedTestRun.icon }></Icon>
-                }
+              { selectedTestRun?.icon && <Box>
+                <Icon color="primary" source={selectedTestRun.icon }></Icon>
               </Box>
+              }
               <Text variant='headingLg'>
                 {
                   selectedTestRun?.name || "Test run name"
@@ -193,10 +173,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
                 selectedTestRun?.severity && 
                 selectedTestRun.severity
                 .map((item) =>
-                <Badge key={item.confidence} status={func.getStatus(item)}>{item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}</Badge>
+                <Badge key={item.confidence} status={func.getStatus(item)}>
+                  <Text fontWeight="regular">
+                  {item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}
+                  </Text>
+                </Badge>
                 )}
             </HorizontalStack>
-            <Text color="subdued">
+            <Text color="subdued" fontWeight="regular" variant="bodyMd">
               {
                 selectedTestRun && 
                 selectedTestRun?.pickedUpTimestamp < selectedTestRun?.run_time_epoch &&
@@ -204,25 +188,25 @@ const promotedBulkActions = (selectedDataHexIds) => {
               }
             </Text>
           </VerticalStack>
-        </HorizontalStack>
-        <HorizontalStack gap="2">
-        <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button>
-        </HorizontalStack>
-      </HorizontalStack>
-    <GithubTable 
-    data={testRunResults} 
-    sortOptions={sortOptions} 
-    resourceName={resourceName} 
-    filters={filters} 
-    disambiguateLabel={disambiguateLabel} 
-    headers={headers}
-    getActions = {() => {}}
-    selectable = {true}
-    promotedBulkActions = {promotedBulkActions}
-    loading={loading}
-    page={2}
-  />
-  </VerticalStack>
+    }
+    backAction = {{onAction:navigateBack}}
+    primaryAction={<Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button>}
+    components = {[
+      <GithubSimpleTable 
+      key="table"
+      data={testRunResults} 
+      sortOptions={sortOptions} 
+      resourceName={resourceName} 
+      filters={filters} 
+      disambiguateLabel={disambiguateLabel} 
+      headers={headers}
+      getActions = {() => {}}
+      selectable = {true}
+      promotedBulkActions = {promotedBulkActions}
+      loading={loading}
+    />
+    ]}
+    />
   );
 }
 
