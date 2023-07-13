@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -29,10 +30,12 @@ import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 
 import org.apache.commons.lang3.math.NumberUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.slf4j.Logger;
@@ -271,7 +274,9 @@ public class APICatalogSync {
                 templateUrls.add(s);
             }
 
-            for(String staticURL: staticUrlToSti.keySet()) {
+            Iterator<String> iterator = staticUrlToSti.keySet().iterator();
+            while (iterator.hasNext()) {
+                String staticURL = iterator.next();
                 Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
                 String staticEndpoint = staticURL.split(" ")[1];
 
@@ -282,6 +287,7 @@ public class APICatalogSync {
                     URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
                     if (urlTemplate.match(staticEndpoint, staticMethod)) {
                         finalResult.deleteStaticUrls.add(staticURL);
+                        iterator.remove();
                         break;
                     }
                 }
