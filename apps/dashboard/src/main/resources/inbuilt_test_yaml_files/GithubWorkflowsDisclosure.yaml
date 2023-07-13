@@ -1,15 +1,18 @@
 id: GITHUB_WORKFLOW_DISCLOSURE
 info:
   name: Github Workflow Disclosure
-  description: UIDGUI GUIHDUG DHIVUD 
-  details: ydt
-  impact: tyjdf
+  description: "Searches for the presence of GitHub workflow files on provided URLs." 
+  details: >
+              "GitHub Workflow Disclosure refers to the vulnerability where the presence of GitHub workflow files is checked on provided URLs. These workflow files, located in the .github/workflows directory, define automation tasks and may contain sensitive information or misconfigurations. Identifying and addressing this vulnerability is crucial to prevent unauthorized access, protect secrets, and ensure the integrity of workflows and automation processes."
+  impact: "Exposing GitHub workflow files can reveal sensitive information, including secrets, API tokens, and configurations. Attackers can exploit this information to gain unauthorized access, manipulate workflows, escalate privileges, or perform unauthorized actions."
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: GITHUB_WORKFLOW_DISCLOSURE
   severity: MEDIUM
+  references:
+    - https://github.com/detectify/ugly-duckling/blob/master/modules/crowdsourced/github-workflows-disclosure.json
 
 api_selection_filters:
   response_code:

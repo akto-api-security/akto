@@ -1,15 +1,18 @@
 id: REDIS_CONFIG
 info:
   name: Redis Configuration File Exposure
-  description: hhkij
-  details: jhfj
-  impact: fjhfy
+  description: "Redis configuration file (redis.conf) was exposed."
+  details: >
+              "The Redis configuration file (redis.conf) was found at the specified URL. This file contains sensitive information such as server binding, protected mode settings, and port configuration."
+  impact: "The exposure of the Redis configuration file can potentially lead to unauthorized access, modification, or exploitation of the Redis server and its data."
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: REDIS_CONFIG
   severity: MEDIUM
+  references:
+    - https://redis.io/docs/manual/config/
 
 api_selection_filters:
   response_code:

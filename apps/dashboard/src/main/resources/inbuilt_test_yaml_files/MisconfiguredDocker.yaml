@@ -1,15 +1,18 @@
 id: MISCONFIGURED_DOCKER
 info:
   name: Docker Container - Misconfiguration Exposure
-  description: A Docker container misconfiguration was discovered. The Docker daemon can listen for Docker Engine API requests via three different types of Socket - unix, tcp, and fd. With tcp enabled, the default setup provides un-encrypted and un-authenticated direct access to the Docker daemon. It is conventional to use port 2375 for un-encrypted, and port 2376 for encrypted communication with the daemon.
-  details: jhfj
-  impact: fjhfy
+  description: "A Docker container misconfiguration was discovered."
+  details: >
+              "This vulnerability identifies misconfigured Docker containers by scanning the "/images/json" endpoint. Misconfigurations can include exposed parent IDs, container information, and labels. Such misconfigurations can lead to unauthorized access, data leaks, and potential compromise of the Docker environment."
+  impact: "Misconfigured Docker containers can lead to unauthorized access, data leaks, and compromise of the Docker environment, posing significant security risks to applications and sensitive data."
   category:
     name: SM
     shortName: Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: MISCONFIGURED_DOCKER
   severity: HIGH
+  references:
+    - https://madhuakula.com/content/attacking-and-auditing-docker-containers-using-opensource/attacking-docker-containers/misconfiguration.html
 
 api_selection_filters:
   response_code:
