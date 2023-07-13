@@ -206,7 +206,38 @@ const func = {
   epochToDateTime (timestamp) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  },
 
+  getListOfHosts(apiCollections) {
+    let result = []
+    if (!apiCollections || apiCollections.length === 0) return []
+    apiCollections.forEach((x) => {
+        let hostName = x['hostName']
+        if (!hostName) return
+        result.push(
+            {
+                "label": hostName,
+                "value": hostName
+            }
+        )
+    })
+    return result
+  },
+  convertTrafficMetricsToTrend(trafficMetricsMap) {
+    let result = []
+    for (const [key, countMap] of Object.entries(trafficMetricsMap)) {
+        let trafficArr = []
+        for (const [key, value] of Object.entries(countMap)) {
+            const epochHours = parseInt(key);
+            const epochMilliseconds = epochHours * 3600000;
+            trafficArr.push([epochMilliseconds, value]);
+        }
+
+        result.push(
+            {"data": trafficArr, "color": null, "name": key},
+        )
+    }
+    return result
 },
 prepareFilters: (data, filters) => {
   let localFilters = filters;

@@ -100,8 +100,17 @@ const settingRequests = {
             }
         })
     },
-
-
+    fetchLogsFromDb(startTime, endTime, logDb) {
+        return request({
+            url: '/api/fetchLogsFromDb',
+            method: 'post',
+            data: {
+                startTime,
+                endTime,
+                logDb
+            }
+        })
+    },
     fetchAdminSettings() {
         return request({
             url: '/api/fetchAdminSettings',
@@ -114,6 +123,22 @@ const settingRequests = {
             url: '/api/fetchUserLastLoginTs',
             method: 'post',
             data: {}
+        })
+    },
+
+
+    fetchTrafficMetricsDesciptions() {
+        return request({
+            url: '/api/fetchTrafficMetricsDesciptions',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
+        return request({
+            url: '/api/fetchTrafficMetrics',
+            method: 'post',
+            data: {groupBy, startTimestamp, endTimestamp, names, host}
         })
     },
 }
