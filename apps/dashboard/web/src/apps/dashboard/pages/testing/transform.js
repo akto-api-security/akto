@@ -95,6 +95,7 @@ const transform = {
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
+      obj['nextUrl'] = "/dashboard/testing/"+data.hexId
       return obj;
     },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries) => {
@@ -107,7 +108,7 @@ const transform = {
     })
     return testRuns;
     },
-    prepareTestRunResult : (data, subCategoryMap, subCategoryFromSourceConfigMap) => {
+    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap) => {
       let obj = {};
       obj['hexId'] = data.hexId;
       obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
@@ -124,39 +125,18 @@ const transform = {
       obj['testResults'] = data['testResults'] || []
       obj['singleTypeInfos'] = data['singleTypeInfos'] || []
       obj['vulnerable'] = data['vulnerable'] || false
+      obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
       return obj;
     },
-    prepareTestRunResults : (testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
+    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
       let testRunResults = []
       testingRunResults.forEach((data) => {
-        let obj = transform.prepareTestRunResult(data, subCategoryMap, subCategoryFromSourceConfigMap);
+        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap);
         if(obj['name'] && obj['testCategory']){
           testRunResults.push(obj);
         }
       })
       return testRunResults;
-    },
-    prepareFilters: (data, filters) => {
-        let localFilters = filters;
-        localFilters.forEach((filter, index) => {
-          localFilters[index].availableChoices = new Set()
-          localFilters[index].choices = []
-        })
-        data.forEach((obj) => {
-        localFilters.forEach((filter, index) => {
-          let key = filter["key"]
-          obj[key].map((item) => filter.availableChoices.add(item));
-          localFilters[index] = filter
-          })
-        })
-        localFilters.forEach((filter, index) => {
-          let choiceList = []
-          filter.availableChoices.forEach((choice) => {
-            choiceList.push({label:choice, value:choice})
-          })
-          localFilters[index].choices = choiceList
-        })
-        return localFilters
     },
     issueSummaryTable(issuesDetails, subCategoryMap) {
       if (issuesDetails) {

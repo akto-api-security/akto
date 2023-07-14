@@ -68,6 +68,7 @@ export default function LeftNav(){
                   key: '2',
                 },
                 {   
+                  url: '#',
                   label: collapse? (
                     <Tooltip content="API Inventory" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={ProductsMinor} />
@@ -77,14 +78,22 @@ export default function LeftNav(){
                   onClick: ()=>{
                     if(!collapse){
                         handleSelect("inventory")
-                        navigate("/dashboard/observe/inventory")
                       }else{
+                        handleSelect("inventory")
                         toggleLeftBar()
                         handleSelect("inventory")
                         navigate("/dashboard/observe/inventory")
                       }
                     },
                     selected: selected === 'inventory',
+                    subNavigationItems:[
+                      {
+                        label: 'Sensitive data',
+                        onClick: ()=>{
+                          navigate('/dashboard/observe/sensitive')
+                        }
+                      }
+                    ],
                     key: '3',
                 },
                 {

@@ -6,55 +6,48 @@ import {
   IndexFiltersMode,
   useIndexResourceState,
   Pagination,  
-  Card, 
   HorizontalStack, 
   Key, 
   ChoiceList} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
-import func from "@/util/func";
 
-function GithubTable(props) {
+function GithubServerTable(props) {
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
   const [selected, setSelected] = useState(0);
-  const [sortSelected, setSortSelected] = useState([props.sortOptions[0].value]);
-  const [data, setData] = useState(props.data);
+  const [sortSelected, setSortSelected] = useState(props.sortOptions.length!=0 ? [props.sortOptions[0].value] : []);
+  const [data, setData] = useState([]);
+  const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
   const pageLimit = 20;
-  const [appliedFilters, setAppliedFilters] = useState([]);
+  const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
+  let filterOperators = props.headers.reduce((map, e) => {map[e.sortKey || e.value] = 'OR'; return map}, {})
 
   useEffect(() => {
-    let tempData = props.data;
-    let singleFilterData = tempData
-    appliedFilters.map((filter) => {
-      singleFilterData = props.data;
-      let filterSet = new Set(filter.value);
-      singleFilterData = singleFilterData.filter((value) => {
-        return [...value[filter.key]].filter(v => filterSet.has(v)).length > 0
-      })
-      tempData = tempData.filter(value => singleFilterData.includes(value));
+    let [sortKey, sortOrder] = sortSelected.length==0 ? ["",""]: sortSelected[0].split(" ");
+    let filters = props.headers.reduce((map, e) => {map[e.filterKey || e.value] = []; return map}, {})
+    appliedFilters.forEach((filter) => {
+      filters[filter.key]=filter.value
     })
-
-    tempData = tempData.filter((value) => {
-      return func.findInObjectValue(value, queryValue.toLowerCase(), ['hexId', 'time', 'icon', 'order']);
-    })
-
-    let sortKey = props.sortOptions.filter(value => {
-      return (value.value === sortSelected[0])
-    })[0].sortKey;
-    let sortDirection = sortSelected[0].split(" ")[1];
-    tempData.sort((a, b) => {
-      return (sortDirection == 'asc' ? -1 : 1) * (a[sortKey] - b[sortKey]);
-    })
-    setData([...tempData])
-  }, [sortSelected, appliedFilters, queryValue, props.data])
+    async function fetchData(){
+      let tempData = await props.fetchData(sortKey, sortOrder=='asc' ? -1 : 1, page*pageLimit, pageLimit, filters, filterOperators, queryValue);
+      setData([...tempData.value])
+      setTotal(tempData.total)
+    }
+    fetchData();
+  }, [sortSelected, appliedFilters, queryValue, page])
 
   const handleRemoveAppliedFilter = (key) => {
     let temp = appliedFilters
     temp = temp.filter((filter) => {
       return filter.key != key
+    })
+    props.appliedFilters.forEach((defaultAppliedFilter) => {
+      if(key == defaultAppliedFilter.key){
+        temp.push(defaultAppliedFilter)
+      }
     })
     setAppliedFilters(temp);
   }
@@ -72,6 +65,7 @@ function GithubTable(props) {
         value: value
       })
     }
+    setPage(0);
     setAppliedFilters(temp);
   };
 
@@ -88,7 +82,7 @@ function GithubTable(props) {
     changeAppliedFilters(key, value);
   }
 
-  let filters = formatFilters(props.filters)
+  let filters=formatFilters(props.filters)
   function formatFilters(filters) {
     return filters
       .filter((filter) => {
@@ -105,10 +99,10 @@ function GithubTable(props) {
               choices={filter.choices}
               selected={
                 appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ? 
-                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : []
+                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
                 }
               onChange={handleFilterStatusChange(filter.key)}
-              allowMultiple
+              {...(filter.singleSelect ? {} : {allowMultiple: true})}
             />
           ),
           // shortcut: true,
@@ -118,7 +112,7 @@ function GithubTable(props) {
   }
 
   const handleFiltersClearAll = useCallback(() => {
-    setAppliedFilters([])
+    setAppliedFilters(props.appliedFilters || [])
   }, []);
 
   const resourceIDResolver = (data) => {
@@ -134,11 +128,17 @@ function GithubTable(props) {
     console.log("func", sortSelected)
   }
   
-  let rowMarkup = data.slice(page*pageLimit, Math.min((page+1)*pageLimit, data.length)).map(
+  // sending all data in case of simple table because the select-all state is controlled from the data.
+  // not doing this affects bulk select functionality.
+  let tmp = data && data.length < pageLimit ? data : 
+  data.slice(page*pageLimit, Math.min((page+1)*pageLimit, data.length))
+  let rowMarkup = tmp
+  .map(
     (
       data,
       index,
     ) => (
+      // create a standard key field. index is standard but not preferred by react.
       <GithubRow 
         key={data.hexId}
         id={data.hexId}
@@ -169,9 +169,10 @@ function GithubTable(props) {
           sortOptions={props.sortOptions}
           sortSelected={sortSelected}
           queryValue={queryValue}
-          queryPlaceholder={`Searching in ${data.length} test run${data.length==1 ? '':'s'}`}
+          queryPlaceholder={`Searching in ${total} test run${total==1 ? '':'s'}`}
           onQueryChange={handleFiltersQueryChange}
           onQueryClear={handleFiltersQueryClear}
+          {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
           onSort={setSortSelected}
           // primaryAction={primaryAction}
           cancelAction={{
@@ -218,13 +219,13 @@ function GithubTable(props) {
             align="center">
             <Pagination
               label={
-                data.length == 0 ? 'No test runs found' :
-                  `Showing ${page * pageLimit + Math.min(1, data.length)}-${Math.min((page + 1) * pageLimit, data.length)} of ${data.length}`
+                total == 0 ? 'No data found' :
+                  `Showing ${page * pageLimit + Math.min(1, total)}-${Math.min((page + 1) * pageLimit, total)} of ${total}`
               }
               hasPrevious={page > 0}
               previousKeys={[Key.LeftArrow]}
               onPrevious={onPagePrevious}
-              hasNext={data.length > (page + 1) * pageLimit}
+              hasNext={total > (page + 1) * pageLimit}
               nextKeys={[Key.RightArrow]}
               onNext={onPageNext}
             />
@@ -236,4 +237,4 @@ function GithubTable(props) {
 
 }
 
-export default GithubTable
+export default GithubServerTable
