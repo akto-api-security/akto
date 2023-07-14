@@ -51,7 +51,7 @@ public class FixMultiSTIs {
 
         for (int i =0; i<1000; i++) { // creating max limit
             List<ObjectId> duplicates = new ArrayList<>();
-            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(1, true);
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
             Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
             List<SingleTypeInfo> stiBatch = SingleTypeInfoDao.instance.findAll(filterQ, skip,limit, null);
 
