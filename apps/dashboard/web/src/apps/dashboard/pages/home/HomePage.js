@@ -18,7 +18,6 @@ function HomePage() {
   useEffect(() => {
     const access_token = accessToken
     if (!access_token) {
-      console.log("navigate")
       navigate("/login")  
     } 
     else  {

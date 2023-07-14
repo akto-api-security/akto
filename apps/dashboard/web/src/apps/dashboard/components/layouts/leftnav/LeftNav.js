@@ -80,9 +80,8 @@ export default function LeftNav(){
                         handleSelect("inventory")
                       }else{
                         handleSelect("inventory")
-                        toggleLeftBar()
-                        handleSelect("inventory")
                         navigate("/dashboard/observe/inventory")
+                        toggleLeftBar()
                       }
                     },
                     selected: selected === 'inventory',

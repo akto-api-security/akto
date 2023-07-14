@@ -13,13 +13,18 @@ const Settings = () => {
     const setAllCollections = Store(state => state.setAllCollections)
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
+    const accessToken = Store(state => state.accessToken);
 
     const fetchAllCollections = async()=>{
         let apiCollections = await homeFunctions.getAllCollections()
         setAllCollections(apiCollections)
     }
     useEffect(() => {
-        fetchAllCollections()
+        if (!accessToken) {
+            navigate("/login")  
+        } else {
+            fetchAllCollections()
+        }
     }, [])
     
     const disableToast = () => {
