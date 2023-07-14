@@ -1,10 +1,11 @@
 package com.akto.action;
 
-import com.akto.dao.AccountsDao;
-import com.akto.dao.UsersDao;
+import com.akto.DaoInit;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.Account;
-import com.akto.dto.UserAccountEntry;
+import com.akto.dto.*;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.cloud.Utils;
@@ -13,9 +14,13 @@ import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
+import com.akto.runtime.Main;
 import com.amazonaws.services.lambda.model.*;
 import com.amazonaws.util.EC2MetadataUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
@@ -27,8 +32,13 @@ import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import static com.akto.dao.MCollection.ID;
 import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
@@ -39,6 +49,8 @@ public class AccountAction extends UserAction {
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    
     @Override
     public String execute() {
 
@@ -169,23 +181,92 @@ public class AccountAction extends UserAction {
 
     private boolean checkIfStairwayInstallation() {
         StackState stackStatus = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
-        return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus().toString());
+        return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus());
+    }
+
+    public static int createAccountRecord(String accountName) {
+
+        if (accountName == null || accountName.isEmpty()) {
+            throw new IllegalArgumentException("Account name can't be empty");
+        }
+        long existingAccountsCount = AccountsDao.instance.count(new BasicDBObject());
+        if(existingAccountsCount==0){
+            AccountsDao.instance.insertOne(new Account(1_000_000, accountName));
+            return 1_000_000;
+        }
+        int triesAllowed = 10;
+        int now = Context.now();
+        while(triesAllowed >=0) {
+            try {
+                now = now - 40000;
+                triesAllowed --;
+                AccountsDao.instance.insertOne(new Account(now, accountName));
+                return now;
+            } catch (Exception e) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e1) {
+                    // eat it
+                }
+            }
+        }
+
+        throw new IllegalStateException("Couldn't find a suitable account id. Please try after some time.");
     }
 
     public String createNewAccount() {
-        newAccountId = Context.getId();
-        AccountsDao.instance.insertOne(new Account(newAccountId, newAccountName));
-
-        UserAccountEntry uae = new UserAccountEntry();
-        uae.setAccountId(newAccountId);
-        BasicDBObject set = new BasicDBObject("$set", new BasicDBObject("accounts."+newAccountId, uae));
-
-        UsersDao.instance.getMCollection().updateOne(eq("login", getSUser().getLogin()), set);
-
+        User sessionUser = getSUser();
+        if (sessionUser.getAccounts().keySet().size() > 10) {//Do not allow account creation when user has 10 accounts
+            return Action.ERROR.toUpperCase();
+        }
+        String email = sessionUser.getLogin();
+        int newAccountId = createAccountRecord(newAccountName);
+        User user = initializeAccount(email, newAccountId, newAccountName,true);
+        getSession().put("user", user);
         getSession().put("accountId", newAccountId);
-        Context.accountId.set(newAccountId);
-
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public static User initializeAccount(String email, int newAccountId,String newAccountName,  boolean isNew) {
+        UsersDao.addAccount(email, newAccountId, newAccountName);
+        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+        RBAC.Role role = isNew ? RBAC.Role.ADMIN : RBAC.Role.MEMBER;
+        RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
+        Context.accountId.set(newAccountId);
+        if (isNew) intializeCollectionsForTheAccount(newAccountId);
+        return user;
+    }
+
+    private static void intializeCollectionsForTheAccount(int newAccountId) {
+        executorService.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(newAccountId);
+                ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
+                BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+                if (backwardCompatibility == null) {
+                    backwardCompatibility = new BackwardCompatibility();
+                    BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
+                }
+                InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                Main.createIndices();
+                Main.insertRuntimeFilters();
+                RuntimeListener.initialiseDemoCollections();
+                AccountSettingsDao.instance.updateOnboardingFlag(true);
+                InitializerListener.insertPiiSources();
+                InitializerListener.saveTestEditorYaml();
+                try {
+                    InitializerListener.executeTestSourcesFetch();
+                    InitializerListener.editTestSourceConfig();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                try {
+                    InitializerListener.executePIISourceFetch();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
     }
 
     public String goToAccount() {

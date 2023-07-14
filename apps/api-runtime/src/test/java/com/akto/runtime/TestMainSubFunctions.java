@@ -29,6 +29,7 @@ public class TestMainSubFunctions extends MongoBasedTest{
     public void changeAccountId() {
         Context.accountId.set(currAccountId);
         currAccountId += 1;
+        Context.accountId.set(currAccountId);
     }
 
     @Test
@@ -71,6 +72,7 @@ public class TestMainSubFunctions extends MongoBasedTest{
         m.put(Main.GROUP_NAME, group_name);
         m.put(Main.VXLAN_ID, vxlan_id);
         m.put(Main.VPC_CIDR, vpc_cidr);
+        m.put(Main.ACCOUNT_ID, ""+Context.accountId.get());
         
         String message = mapper.writeValueAsString(m);
         Main.tryForCollectionName(message);

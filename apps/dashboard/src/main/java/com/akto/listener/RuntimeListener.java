@@ -9,6 +9,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
+import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
@@ -21,6 +22,8 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
+import com.akto.util.AccountTask;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,36 +40,43 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class RuntimeListener extends AfterMongoConnectListener {
-
-    public static HttpCallParser httpCallParser = null;
-    public static AktoPolicyNew aktoPolicyNew = null;
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
     public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
     public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
 
-    private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
+    public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
 
+    private static final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
     @Override
     public void runMainFunction() {
-        Context.accountId.set(1_000_000);
-        Main.initializeRuntime();
-        httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-        aktoPolicyNew = new AktoPolicyNew(false);
+        AccountTask.instance.executeTask(new Consumer<Account>() {
+            @Override
+            public void accept(Account account) {
+                Main.initializeRuntime();
+                AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                info.setHttpCallParser(callParser);
+                info.setPolicy(new AktoPolicyNew(false));
+                accountHTTPParserMap.put(account.getId(), info);
 
-        try {
-            initialiseDemoCollections();
-            addSampleData();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
-        }
+                try {
+                    initialiseDemoCollections();
+                    addSampleData();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
+                }
+            }
+        }, "runtime-listner-task");
     }
 
-    public void initialiseDemoCollections() {
+    public static void initialiseDemoCollections() {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         if (accountSettings != null && accountSettings.getDemoCollectionCreateTime() > 0) {
             long count = VulnerableRequestForTemplateDao.instance.count(new BasicDBObject());
@@ -249,7 +259,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         return stringbuilder.toString();
     }
 
-    private void insertVulnerableRequestsForDemo() {
+    private static void insertVulnerableRequestsForDemo() {
         ApiCollection collection = ApiCollectionsDao.instance.findByName(JUICE_SHOP_DEMO_COLLECTION_NAME);
         if (collection == null) {
             loggerMaker.errorAndAddToDb("Error: collection not found", LoggerMaker.LogDb.DASHBOARD);
