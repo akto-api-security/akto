@@ -12,8 +12,17 @@ export default function Header() {
     
     const storeAccessToken = Store(state => state.storeAccessToken)
     const navigate = useNavigate()
-    let hideFullNav = Store((state) => state.hideFullNav)
-    const toggleNavbar = Store(state => state.toggleLeftNav)
+
+    const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
+    const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
+    const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
+    const handleLeftNavCollapse = () => {
+        if (!leftNavCollapsed) {
+            setLeftNavSelected('')
+        }
+
+        toggleLeftNavCollapsed()
+    }
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -29,11 +38,6 @@ export default function Header() {
         storeAccessToken(null)
         await api.logout()
         navigate("/login")  
-    }
-
-    const toggleLeftBar = () =>{
-        hideFullNav = !hideFullNav
-        toggleNavbar(hideFullNav)
     }
 
     const userMenuMarkup = (
@@ -82,13 +86,11 @@ export default function Header() {
         />
     );
 
-    let icon = hideFullNav ? CircleChevronRightMinor : CircleChevronLeftMinor
-
     const topBarMarkup = (
         <div className='topbar'>
-            <div className='collapse_btn' onClick={toggleLeftBar}>
-                <Tooltip content={hideFullNav ? 'Show Navbar' : 'Hide Navbar'}>
-                    <Icon source= {hideFullNav ? CircleChevronRightMinor : CircleChevronLeftMinor }/>
+            <div className='collapse_btn' onClick={handleLeftNavCollapse}>
+                <Tooltip content={leftNavCollapsed ? 'Show Navbar' : 'Hide Navbar'}>
+                    <Icon source= {leftNavCollapsed ? CircleChevronRightMinor : CircleChevronLeftMinor }/>
                 </Tooltip>
             </div>
             <TopBar

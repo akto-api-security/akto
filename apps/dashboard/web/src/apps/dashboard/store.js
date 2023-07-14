@@ -2,9 +2,11 @@ import {create} from "zustand"
 import {devtools, persist, createJSONStorage} from "zustand/middleware"
 
 let store = (set)=>({
-    hideFullNav: true,
-    toggleLeftNav: (hideFullNav) => {
-        set({hideFullNav: hideFullNav})
+    leftNavSelected: '',
+    setLeftNavSelected: (selected) =>  set({ leftNavSelected: selected }), 
+    leftNavCollapsed: true,
+    toggleLeftNavCollapsed: () => {
+        set(state => ({ leftNavCollapsed: !state.leftNavCollapsed }))
     },
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),

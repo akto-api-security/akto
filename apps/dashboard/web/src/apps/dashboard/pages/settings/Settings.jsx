@@ -43,7 +43,7 @@ const Settings = () => {
                     <Text variant="headingLg">
                         Settings
                     </Text>
-                    <div onClick={() => navigate("/dashboard")}>
+                    <div onClick={() => navigate(-1)}>
                         <Icon source={CancelMajor} color="base" />
                     </div>
                 </div>
