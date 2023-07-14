@@ -1,6 +1,8 @@
 package com.akto.listener;
 
 
+import com.akto.ApiRequest;
+import com.akto.TimeoutObject;
 import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -21,6 +23,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.utils.Utils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -31,10 +34,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.*;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class RuntimeListener extends AfterMongoConnectListener {
 
@@ -139,6 +144,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         }
 
         try {
+            String mockServiceUrl = "http://127.0.0.1:8000"; //System.getenv("VULNERABLE_MOCKSERVER_SERVICE_URL");
             String data = convertStreamToString(InitializerListener.class.getResourceAsStream("/SampleApiData.json"));
             JSONArray dataobject = new JSONArray(data);
             for (Object obj: dataobject) {
@@ -156,6 +162,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 sampleDataMap.put("source", "HAR");
                 sampleDataMap.put("akto_vxlan_id", VULNERABLE_API_COLLECTION_ID);
 
+                String path = (String) sampleDataMap.get("path");
+                sampleDataMap.put("path", mockServiceUrl + path);
+
                 String jsonInString = new Gson().toJson(sampleDataMap);
                 result.add(jsonInString);
 
@@ -171,18 +180,27 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 UpdateOptions updateOptions = new UpdateOptions();
                 updateOptions.upsert(true);
 
-                VulnerableRequestForTemplateDao.instance.getMCollection().updateOne(
+                VulnerableRequestForTemplate vul = VulnerableRequestForTemplateDao.instance.findOne(
+                    Filters.in("templateIds", testList)
+                );
+                if (vul == null) {
+                    VulnerableRequestForTemplateDao.instance.getMCollection().updateOne(
                         Filters.in("templateIds", testId),
                         Updates.combine(
                                 Updates.set("_id", apiInfoKey),
                                 Updates.set("templateIds", testList)
                         ),
                         updateOptions
-                );
-            }
+                    );
+                }
 
+                Map<String, Object> testDataMap = (Map)json.get("testData");
+                addDataToMockserver(testDataMap, mockServiceUrl);
+            }
             Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+
         } catch (Exception e) {
+            // add log
             System.out.println("error");
         }
 
@@ -190,7 +208,36 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
     }
 
-private static String convertStreamToString(InputStream in) throws Exception {
+    private static void addDataToMockserver(Map<String, Object> testDataMap, String mockServiceUrl) {
+        String url = (String) testDataMap.get("url");
+        // URI uri = null;
+        // try {
+        //     uri = new URI(path);
+        // } catch (Exception e) {
+        // }
+        // String url = uri.getPath();
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("url", url);
+
+        JSONObject data = new JSONObject();
+        data.put("method", testDataMap.get("method"));
+        data.put("responsePayload", testDataMap.get("responsePayload"));
+        data.put("statusCode", testDataMap.get("statusCode"));
+        data.put("responseHeaders", testDataMap.get("responseHeaders"));
+
+        requestBody.put("data", data);
+        String reqData = requestBody.toString();
+
+        TimeoutObject timeoutObj = new TimeoutObject(300, 300, 300);
+        JsonNode node = null;
+        try {
+            node = ApiRequest.postRequestWithTimeout(new HashMap<>(), mockServiceUrl + "/api/add_sample_data/", reqData, timeoutObj);            
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+    }
+
+    private static String convertStreamToString(InputStream in) throws Exception {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();
