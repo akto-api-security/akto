@@ -52,9 +52,7 @@ function HomePage() {
 
   return (
       <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
-        <Box padding="8">
           <Outlet />
-        </Box>
         {toastMarkup}
       </Frame>
   );
