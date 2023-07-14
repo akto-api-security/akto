@@ -17,13 +17,14 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
 public class TestFixMultiSTIs extends MongoBasedTest {
 
     @Test
-    public void test() {
+    public void testRun() {
         ApiCollectionsDao.instance.getMCollection().drop();
         SingleTypeInfoDao.instance.getMCollection().drop();
 
@@ -78,7 +79,16 @@ public class TestFixMultiSTIs extends MongoBasedTest {
         long duplicateCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.gt(SingleTypeInfo._TIMESTAMP, 0));
         assertEquals(urlsCount * (paramCountWithoutHost+1) * (totalCountPerUrl-1), duplicateCount);
 
-        FixMultiSTIs.run();
+        Set<Integer> whiteList = new HashSet<>();
+        whiteList.add(1000000);
+        FixMultiSTIs.run(whiteList);
+
+        // shouldn't affect because whiteList
+        duplicateCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.gt(SingleTypeInfo._TIMESTAMP, 0));
+        assertEquals(urlsCount * (paramCountWithoutHost+1) * (totalCountPerUrl-1), duplicateCount);
+
+        whiteList.add(apiCollection.getId());
+        FixMultiSTIs.run(whiteList);
 
         estimatedDocumentCount = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(urlsCount * (paramCountWithoutHost + 1), estimatedDocumentCount);

@@ -27,10 +27,10 @@ public class FixMultiSTIs {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class);
 
-    public static void run() {
+    public static void run(Set<Integer> whiteList) {
         List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.getMetaAll();
         for (ApiCollection apiCollection: apiCollectionList) {
-            if (apiCollection.getHostName() != null) {
+            if (apiCollection.getHostName() != null && whiteList.contains(apiCollection.getId())) {
                 // because we want to run only for mirroring collections
                 try {
                     int start = Context.now();
