@@ -50,21 +50,16 @@ const router = createBrowserRouter([
         ]
       },
       {
-        path: "results",
-        children:[
-          {
-            path: "data-types",
-            element: <DataTypes />
-          }
-        ]
-      },
-      {
         path: "/dashboard/observe",
         element: <PageObserve/>,
         children: [
           {
             path: "/dashboard/observe/sensitive",
             element: <AllSensitiveData/>
+          },
+          {
+            path: "/dashboard/observe/data-types",
+            element: <DataTypes/>
           },
           {
             path: "/dashboard/observe/sensitive/:subType",

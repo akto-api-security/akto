@@ -1,14 +1,18 @@
 import { Button, ButtonGroup, LegacyCard, TextField, VerticalStack } from '@shopify/polaris'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Dropdown from './layouts/Dropdown';
 import {DeleteMinor} from "@shopify/polaris-icons"
 
 function ConditionsPicker(props) {
 
-    const {title, param, items, initialItems} = props
+    const {title, param, items, initialItems, conditionOp} = props
+    const [condition, setCondition] = useState('')
+    const [textFields, setTextFields] = useState([]);
 
-    const [condition, setCondition] = useState("OR")
-    const [textFields, setTextFields] = useState(initialItems);
+    useEffect(()=>{
+        setTextFields(initialItems)
+        setCondition(conditionOp)
+    },[initialItems,conditionOp])
 
     const handleChange = (value, index) => {
         const updatedFields = [...textFields];
@@ -23,7 +27,7 @@ function ConditionsPicker(props) {
     };
 
     const handleAddTextField = () => {
-        const updatedFields = [...textFields, { value: '', param: param, regex: items[0].value }];
+        const updatedFields = [...textFields, { type: items[0].value, value: '', }];
         setTextFields(updatedFields);
     };
 
@@ -40,11 +44,10 @@ function ConditionsPicker(props) {
 
     const handleConditionSelected = (val) =>{
         setCondition(val)
-        console.log(textFields)
     }
     const handleRegexSelected = (value,index) =>{
         const updatedFields = [...textFields];
-        updatedFields[index].regex = value;
+        updatedFields[index].type = value;
         setTextFields(updatedFields);
     }
 

@@ -1,3 +1,4 @@
 .control-frame-padding > .Polaris-Frame > .Polaris-Frame__Main {
     padding: 0 !important;
+    padding-bottom: 30px !important;
 }
