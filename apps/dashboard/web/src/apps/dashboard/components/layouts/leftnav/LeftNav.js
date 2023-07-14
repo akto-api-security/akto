@@ -33,13 +33,15 @@ export default function LeftNav(){
                       <Icon source={HomeMinor} />
                     </Tooltip>
                   ) : 'Quick Start',
-                  icon: collapse ? '' : HomeMinor,
+                  icon: HomeMinor,
                   onClick: ()=>{
                     if(!collapse){
                       handleSelect("quick_start")
                       navigate("/dashboard/quick-start")
                     }else{
                       toggleLeftBar()
+                      handleSelect("quick_start")
+                      navigate("/dashboard/quick-start")
                     }
                   },
                   selected: selected === 'quick_start',
@@ -58,6 +60,8 @@ export default function LeftNav(){
                       navigate("/dashboard")
                     }else{
                       toggleLeftBar()
+                      handleSelect("dashboard")
+                      navigate("/dashboard")
                     }
                   },
                   selected: selected === 'dashboard',
@@ -76,6 +80,8 @@ export default function LeftNav(){
                         navigate("/dashboard/observe/inventory")
                       }else{
                         toggleLeftBar()
+                        handleSelect("inventory")
+                        navigate("/dashboard/observe/inventory")
                       }
                     },
                     selected: selected === 'inventory',
@@ -127,6 +133,8 @@ export default function LeftNav(){
                       navigate("/dashboard/test-editor")
                     }else{
                       toggleLeftBar()
+                      handleSelect("test-editor")
+                      navigate("/dashboard/test-editor")
                     }
                   },
                   selected: selected === 'test-editor',
@@ -145,6 +153,8 @@ export default function LeftNav(){
                         navigate("/dashboard/issues")
                       }else{
                         toggleLeftBar()
+                        handleSelect("issues")
+                        navigate("/dashboard/issues")
                       }
                     },
                     selected: selected === 'issues',
@@ -155,7 +165,6 @@ export default function LeftNav(){
           <Navigation.Section 
                items={[
                 {
-                  url: '',
                   label: collapse? (
                     <Tooltip content="Settings" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={SettingsMinor} />
@@ -168,6 +177,8 @@ export default function LeftNav(){
                       navigate("/dashboard/settings/integrations")
                     }else{
                       toggleLeftBar()
+                      handleSelect("settings")
+                      navigate("/dashboard/settings/integrations")
                     }
                   },
                   selected: selected === 'settings',
