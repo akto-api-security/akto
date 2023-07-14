@@ -116,6 +116,7 @@ public class ExportSampleDataAction extends UserAction {
             }
         } else {
             if (!originalHttpRequest.getHeaders().containsKey("host")) {
+                // this is because Cloudfront requires host header else gives 4xx
                 try {
                     URI uri = new URI(url);
                     String host = uri.getHost();
@@ -188,7 +189,7 @@ public class ExportSampleDataAction extends UserAction {
 
     private  void addHeadersBurp(Map<String, List<String>> headers, StringBuilder builder) {
         for (String headerName: headers.keySet()) {
-            if (headerName.startsWith(":")) continue;
+            if (headerName.startsWith(":")) continue; // pseudo-headers need to be removed before sending to burp
             List<String> values = headers.get(headerName);
             if (values == null || values.isEmpty() || headerName.length()<1) continue;
             String prettyHeaderName = headerName.substring(0, 1).toUpperCase() + headerName.substring(1);
