@@ -1,4 +1,4 @@
-import { Frame, Toast, Box} from "@shopify/polaris"
+import { Frame, Toast, Box } from "@shopify/polaris"
 import Header from "../../components/layouts/header/Headers"
 import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
@@ -7,28 +7,19 @@ import { useEffect } from "react";
 import homeFunctions from "./module";
 
 function HomePage() {
-  const navigate = useNavigate();
-  const accessToken = Store(state => state.accessToken);
   const setAllCollections = Store(state => state.setAllCollections)
 
-  const fetchAllCollections = async()=>{
+  const fetchAllCollections = async () => {
     let apiCollections = await homeFunctions.getAllCollections()
     setAllCollections(apiCollections)
   }
   useEffect(() => {
-    const access_token = accessToken
-    if (!access_token) {
-      navigate("/login")  
-    } 
-    else  {
-      fetchAllCollections()
-    }
-
+    fetchAllCollections()
   }, [])
 
   const toastConfig = Store(state => state.toastConfig)
   const setToastConfig = Store(state => state.setToastConfig)
-  
+
   const disableToast = () => {
     setToastConfig({
       isActive: false,
@@ -50,10 +41,10 @@ function HomePage() {
   };
 
   return (
-      <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
-          <Outlet />
-        {toastMarkup}
-      </Frame>
+    <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
+      <Outlet />
+      {toastMarkup}
+    </Frame>
   );
 }
 

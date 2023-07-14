@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import './Headers.css'
+import api from '../../../../signup/api';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -24,10 +25,10 @@ export default function Header() {
         [],
     );
 
-    const handleLogOut = () => {
+    const handleLogOut = async () => {
         storeAccessToken(null)
-        // localStorage.removeItem("access_token")
-        navigate("/login")
+        await api.logout()
+        navigate("/login")  
     }
 
     const toggleLeftBar = () =>{
