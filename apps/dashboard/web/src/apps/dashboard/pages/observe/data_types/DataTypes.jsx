@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import PageWithMultipleCards from '../../../components/PageWithMultipleCards'
+import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import { Button, Frame, LegacyCard, ContextualSaveBar, HorizontalGrid, TextField, Box } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"

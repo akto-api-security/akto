@@ -20,7 +20,7 @@ import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
-import DataTypes from "../dashboard/pages/testing/data_types/DataTypes";
+import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 
 const router = createBrowserRouter([
   {
