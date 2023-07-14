@@ -118,7 +118,6 @@
                 return (x.isHappy && x.attemptResult.errorCode > 299) || (!x.isHappy && x.attemptResult.errorCode < 300) && x.attemptResult.errorCode > 0
             },
             rowClicked (x, y) {
-                console.log(x, y)
                 this.$parent.$emit('rowClicked', item)
             }
         },

@@ -1,0 +1,54 @@
+id: COMMAND_INJECTION_BY_ADDING_QUERY_PARAM
+info:
+  name: "Command injection by adding query parameters"
+  description: "This test explores various query parameter names for potential command injection, such as cmd, exec, command, execute, ping, and query."
+  details: >
+    "This test aims to identify command injection vulnerabilities by adding query parameters that resemble common command execution keywords.
+    For example, parameters like "cmd," "exec," or "command" may be susceptible. If the application fails to properly sanitize or validate these inputs, an attacker could inject arbitrary commands.
+    Successful exploitation could lead to unauthorized command execution, data manipulation, and potential system compromise."
+  impact: "Command injection allows an attacker to execute arbitrary commands on a vulnerable system, leading to unauthorized access, data theft, system compromise, and potential disruption of services, making it a severe security risk."
+  category:
+    name: COMMAND_INJECTION
+    shortName: Command Injection
+    displayName: Command Injection
+  subCategory: COMMAND_INJECTION_BY_ADDING_QUERY_PARAM
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://twitter.com/trbughunters/status/1283133356922884096"
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+execute:
+  type: single
+  requests:
+    - req:
+        - add_query_param:
+            cmd: "echo 'hello world'"
+        - add_query_param:
+            exec: "echo 'hello world'"
+        - add_query_param:
+            command: "echo 'hello world'"
+        - add_query_param:
+            execute: "echo 'hello world'"
+        - add_query_param:
+            ping: "echo 'hello world'"
+        - add_query_param:
+            query: "echo 'hello world'"
+        - add_query_param:
+            code: "echo 'hello world'"
+        - add_query_param:
+            func: "echo 'hello world'"
+        - add_query_param:
+            exe: "echo 'hello world'"
+        - add_query_param:
+            exe: "echo 'hello world'"
+        - add_query_param:
+            run: "echo 'hello world'"
+validate:
+  response_payload:
+    contains_either: hello world

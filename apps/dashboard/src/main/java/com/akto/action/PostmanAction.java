@@ -230,6 +230,7 @@ public class PostmanAction extends UserAction {
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String importDataFromPostman() throws Exception {
+        int accountId = Context.accountId.get();
         if (api_key == null || api_key.length() == 0) {
             addActionError("Invalid postman key");
             return ERROR.toUpperCase();
@@ -239,7 +240,7 @@ public class PostmanAction extends UserAction {
             addActionError("Invalid workspace id");
             return ERROR.toUpperCase();
         }
-        
+
         try {
             String result = addOrUpdateApiKey();
             if ( result == null || !result.equals(SUCCESS.toUpperCase())) throw new Exception("Returned Error");
@@ -253,7 +254,6 @@ public class PostmanAction extends UserAction {
 
         loggerMaker.infoAndAddToDb("Fetched postman creds", LogDb.DASHBOARD);
 
-        int accountId = Context.accountId.get();
         ObjectId loaderId = createPostmanLoader();
 
         executorService.schedule( new Runnable() {
@@ -423,6 +423,7 @@ public class PostmanAction extends UserAction {
     }
 
     private static List<String> generateMessages(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay) {
+        int accountId = Context.accountId.get();
         List<String> msgs = new ArrayList<>();
         Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
         ArrayList<JsonNode> jsonNodes = new ArrayList<>();
@@ -435,7 +436,7 @@ public class PostmanAction extends UserAction {
         for(JsonNode item: jsonNodes){
             String apiName = item.get("name").asText();
             loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName), LogDb.DASHBOARD);
-            Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000), allowReplay);
+            Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay);
             if(apiInAktoFormat != null){
                 try{
                     apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
@@ -447,7 +448,7 @@ public class PostmanAction extends UserAction {
                 }
             }
         }
-        
+
         return msgs;
     }
 

@@ -1,0 +1,48 @@
+id: STRUTS_OGNL_CONSOLE_ENABLED
+info:
+  name: Struts OGNL Console Enabled 
+  description: "Detection of Struts OGNL console enabled misconfiguration, which can lead to remote code execution vulnerabilities."
+  details: >
+          The Struts OGNL Console Enabled test identifies a security misconfiguration where the OGNL 
+          (Object-Graph Navigation Language) console in Struts framework is accessible. By modifying the URL and 
+          appending "struts/webconsole.html?debug=console," the test checks if the OGNL console is enabled and 
+          accessible. Enabling the OGNL console can lead to remote code execution vulnerabilities, allowing 
+          attackers to execute arbitrary code on the server. This misconfiguration falls under the Security 
+          Misconfiguration category with a low severity level. Disabling the OGNL console is essential to prevent 
+          potential remote code execution and enhance application security.
+  impact: "Enabling Struts OGNL console exposes the application to remote code execution, allowing attackers to execute arbitrary code on the server."
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://struts.apache.org/core-developers/development-mode"
+    - "https://nvd.nist.gov/vuln/detail/CVE-2020-17530"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/struts/webconsole.html?debug=console
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all: 
+      - 'Welcome to the OGNL console!'
+      
