@@ -146,6 +146,23 @@ public class Main {
         }
     }
 
+    private void handleMongoConnect(String mongoURI) {
+        boolean isMongoConnected = false;
+        while (!isMongoConnected) {
+            try {
+                DaoInit.init(new ConnectionString(mongoURI));
+                try {
+                    AccountsDao.instance.getStats();
+                    isMongoConnected = true;
+                }catch (Exception e) {
+                    Thread.sleep(1000);
+                }
+            } catch (Exception e) {
+                logger.error("Error while Thread.sleep");
+            }
+        }
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
