@@ -9,6 +9,8 @@ import {
     CircleTickMinor
   } from '@shopify/polaris-icons';
 
+import { useNavigate } from "react-router-dom"
+
 const headers = [
     {
         text: "",
@@ -48,31 +50,41 @@ const resourceName = {
     plural: 'Sensitive data types',
   };
 
-const getActions = (item) => {
-    return [{
-        items: [{
-            content: 'Edit',
-            onAction: () => { console.log("edit function for", item) },
-        }]
-    }]
-}
-
 function AllSensitiveData(){
 
     const [data, setData] = useState([])
+    const [mapData, setMapData] = useState({})
+    const navigate = useNavigate()
+
+    const getActions = (item) => {
+        return [{
+            items: [{
+                content: 'Edit',
+                onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),
+            }]
+        }]
+    }
+
+    const handleRedirect = () => {
+        navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
+    }
     
     useEffect(() => {
         let tmp=[]
         async function fetchData(){
             let dataTypeMap={}
+            let mapDataToKey = {}
             await api.fetchDataTypes().then((res) => {
                 res.dataTypes.aktoDataTypes.forEach((type) => {
+                    mapDataToKey[type.name] = type
                     dataTypeMap[type.name]={active:true}
                 })
                 res.dataTypes.customDataTypes.forEach((type) => {
+                    mapDataToKey[type.name] = type
                     dataTypeMap[type.name]={active:type.active, custom:true}
                 })
             })
+            setMapData(mapDataToKey)
             api.fetchSubTypeCountMap(0, func.timeNow()).then((res) => {
                 let count = res.response.subTypeCountMap;
                 Object.keys(count.REQUEST).map((key) => {
@@ -124,7 +136,7 @@ function AllSensitiveData(){
             }
         </Text>
             }
-            primaryAction={<Button primary>Create custom data types</Button>}
+            primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
             components={[
                 <GithubSimpleTable
                 key="table"

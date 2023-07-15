@@ -1,6 +1,6 @@
 import { Autocomplete, Box, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import {CircleRightMajor} from "@shopify/polaris-icons"
+import {CircleRightMajor, SelectMinor} from "@shopify/polaris-icons"
 
 function Dropdown(props) {
     const deselectedOptions = useMemo(() => props.menuItems,[props.menuItems],);
@@ -36,12 +36,14 @@ function Dropdown(props) {
     },[deselectedOptions])
 
     const textField = (
-    <Autocomplete.TextField
-        value={inputValue}
-        autoComplete="off"
-        helpText={props.helpText}
-        {...props.placeHolder ? {placeholder : props.placeHolder} : null}
-    />
+        <Autocomplete.TextField
+            value={inputValue}
+            autoComplete="off"
+            {...props.label ? {label : props.label} : null}
+            {...props.helpText ? {helpText : props.helpText} : null}
+            {...props.placeHolder ? {placeholder : props.placeHolder} : null}
+            suffix={<Icon source={SelectMinor} />}
+        />
 
     );
     return (
