@@ -171,5 +171,9 @@ export default {
     
     toSuperType: subType => {
         return (patterns()[subType]) ? "STRING" : subType
-    }
+    },
+
+    isSensitive: str => {
+        return !!(patterns()[str])
+    }  
 }

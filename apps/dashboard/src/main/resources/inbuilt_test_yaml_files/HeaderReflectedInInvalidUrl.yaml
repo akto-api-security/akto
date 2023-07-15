@@ -1,0 +1,49 @@
+id: HEADER_REFLECTED_IN_INVALID_URLS
+info:
+  name: Header Reflection in Invalid URLs
+  description: "Adds a random header to a request for a non-existent page and checks if it is reflected in the response."
+  details: >
+            "By adding a random header to a request for a non-existent page, we check if the response is reflecting all headers, including http-only cookies.
+             If (when) an XSS is found on the domain, this page can be used to fetch all cookies for an administrator and take over their session on the site."
+  impact: "If XSS is found on the website then hacker can steal http-only cookies and can gain unauthorized access to the system"
+  category:
+    name: SM
+    shortName: Security Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: HEADER_REFLECTED_IN_INVALID_URLS
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://hackerone.com/reports/792998"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  response_payload:
+    contains_either:
+      - <!doctype html>
+  method:
+    eq: GET
+
+execute:
+  type: single
+  requests:
+    - req:
+      - add_header:
+          test-header: akto
+      - modify_url: ${urlVar}/
+      - modify_url:
+          regex_replace:
+            regex: \/+$
+            replace_with: '/random-url'
+
+
+validate:
+  response_payload:
+    contains_either: akto

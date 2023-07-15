@@ -1,0 +1,47 @@
+id: COOKIE_MISCONFIGURATION
+info:
+  name: Cookie misconfiguration
+  description: "This test verifies if the 'secure' attribute is properly set in HTTP response header 'set-cookie' field to ensure secure cookie transmission."
+  details: >
+            "Validates presence of 'secure' attribute in HTTP response headers' 'set-cookie' field. If not found, sensitive cookie data may be transmitted over insecure connections, exposing it to potential interception and compromising the security and privacy of user information."
+  impact: "Without the secure flag in the set-cookie header, sensitive cookie data can be intercepted, potentially leading to unauthorized access, session hijacking, and compromise of user privacy and security."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: COOKIE_MISCONFIGURATION
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://hackerone.com/reports/58679"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    for_one:
+      key:
+        eq: Set-Cookie
+      value: 
+        regex: ^(?!.*\bsecure\b).*
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_headers:
+    for_one:
+      key:
+        eq: Set-Cookie
+      value: 
+        regex: ^(?!.*\bsecure\b).*
+
