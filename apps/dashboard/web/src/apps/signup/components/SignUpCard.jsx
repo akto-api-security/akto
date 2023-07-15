@@ -48,13 +48,11 @@ const SignUpCard = () => {
   }
 
   const handleContinueWithEmail = async () => {
-    api.login(email, password).then((resp)=>{
-      storeUsername(email)
-      console.log(resp);
-    }).catch((err) => {
-      console.log(err);
+    try {
+      await api.login(email, password)
+    } catch {
       setLoginErrorToast()
-    })
+    }
   }
 
   return (

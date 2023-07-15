@@ -4,15 +4,30 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import './Headers.css'
+import api from '../../../../signup/api';
+import func from '../../../../../util/func';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
     
-    const storeAccessToken = Store(state => state.storeAccessToken)
     const navigate = useNavigate()
-    let hideFullNav = Store((state) => state.hideFullNav)
-    const toggleNavbar = Store(state => state.toggleLeftNav)
+
+    const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
+    const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
+    const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
+    const username = Store((state) => state.username)
+    const storeAccessToken = Store(state => state.storeAccessToken)
+
+    console.log(username)
+
+    const handleLeftNavCollapse = () => {
+        if (!leftNavCollapsed) {
+            setLeftNavSelected('')
+        }
+
+        toggleLeftNavCollapsed()
+    }
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -24,15 +39,10 @@ export default function Header() {
         [],
     );
 
-    const handleLogOut = () => {
+    const handleLogOut = async () => {
         storeAccessToken(null)
-        // localStorage.removeItem("access_token")
-        navigate("/login")
-    }
-
-    const toggleLeftBar = () =>{
-        hideFullNav = !hideFullNav
-        toggleNavbar(hideFullNav)
+        await api.logout()
+        navigate("/login")  
     }
 
     const userMenuMarkup = (
@@ -45,7 +55,7 @@ export default function Header() {
                     items: [{content: 'Documentation'},{content: 'Tutorials'},{content: 'Changelog'},{content: 'Discord Support'},{content: 'Star On Github'}],
                 },
             ]}
-            initials="AK"
+            initials={func.initials(username)}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
         />
@@ -81,13 +91,11 @@ export default function Header() {
         />
     );
 
-    let icon = hideFullNav ? CircleChevronRightMinor : CircleChevronLeftMinor
-
     const topBarMarkup = (
         <div className='topbar'>
-            <div className='collapse_btn' onClick={toggleLeftBar}>
-                <Tooltip content={hideFullNav ? 'Show Navbar' : 'Hide Navbar'}>
-                    <Icon source= {hideFullNav ? CircleChevronRightMinor : CircleChevronLeftMinor }/>
+            <div className='collapse_btn' onClick={handleLeftNavCollapse}>
+                <Tooltip content={leftNavCollapsed ? 'Show Navbar' : 'Hide Navbar'}>
+                    <Icon source= {leftNavCollapsed ? CircleChevronRightMinor : CircleChevronLeftMinor }/>
                 </Tooltip>
             </div>
             <TopBar

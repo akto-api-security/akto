@@ -8,105 +8,97 @@ import Store from "../../../store"
 
 export default function LeftNav(){
 
-  const [selected, setSelected] = useState('');
   const navigate = useNavigate();
-  let collapse = Store((state) => state.hideFullNav)
-  const toggleNavbar = Store(state => state.toggleLeftNav)
-
-  const toggleLeftBar = () =>{
-    collapse = !collapse
-    toggleNavbar(collapse)
-}
+  
+  const leftNavSelected = Store((state) => state.leftNavSelected)
+  const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
+  const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
+  const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
 
   const handleSelect = (selectedId) => {
-    setSelected(selected => selected === selectedId ? null : selectedId);
+    setLeftNavSelected(selectedId);
   };
 
     const navigationMarkup = (
-      <div className={collapse ? 'collapse' : ''}>
+      <div className={leftNavCollapsed ? 'collapse' : ''}>
         <Navigation location="/"> 
           <Navigation.Section
             items={[
                 {
-                  label: collapse? (
+                  label: leftNavCollapsed? (
                     <Tooltip content="Quick Start" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={HomeMinor} />
                     </Tooltip>
                   ) : 'Quick Start',
-                  icon: collapse ? '' : HomeMinor,
+                  icon: leftNavCollapsed ? '' : HomeMinor,
                   onClick: ()=>{
-                    if(!collapse){
-                      handleSelect("quick_start")
-                      navigate("/dashboard/quick-start")
-                    }else{
-                      toggleLeftBar()
-                    }
+                    if (leftNavCollapsed) {
+                      toggleLeftNavCollapsed()
+                    } 
+                    handleSelect("quick_start")
+                    navigate("/dashboard/quick-start")
                   },
-                  selected: selected === 'quick_start',
+                  selected: leftNavSelected === 'quick_start',
                   key: '1',
                 },
                 {
-                  label: collapse ? (
+                  label: leftNavCollapsed ? (
                     <Tooltip content="Dashboard" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={OrdersMinor} />
                     </Tooltip>
                   ) : 'Dashboard',
-                  icon: collapse ? '' : OrdersMinor,
+                  icon: leftNavCollapsed ? '' : OrdersMinor,
                   onClick: ()=>{
-                    if(!collapse){
-                      handleSelect("dashboard")
-                      navigate("/dashboard")
-                    }else{
-                      toggleLeftBar()
-                    }
+                    if (leftNavCollapsed) {
+                      toggleLeftNavCollapsed()
+                    } 
+                    handleSelect("dashboard")
+                    navigate("/dashboard")
                   },
-                  selected: selected === 'dashboard',
+                  selected: leftNavSelected === 'dashboard',
                   key: '2',
                 },
                 {   
                   url: '#',
-                  label: collapse? (
+                  label: leftNavCollapsed? (
                     <Tooltip content="API Inventory" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={ProductsMinor} />
                     </Tooltip>
                   ) : 'API Inventory',
-                  icon: collapse ? '' : ProductsMinor,
+                  icon: leftNavCollapsed ? '' : ProductsMinor,
                   onClick: ()=>{
-                    if(!collapse){
-                        handleSelect("inventory")
-                      }else{
-                        handleSelect("inventory")
-                        toggleLeftBar()
+                      if (leftNavCollapsed) {
+                        toggleLeftNavCollapsed()
                       }
+                      handleSelect("inventory")
                     },
-                    selected: selected === 'inventory',
+                    selected: leftNavSelected === 'inventory',
                     subNavigationItems:[
                       {
                         label: 'Sensitive data',
                         onClick: ()=>{
                           navigate('/dashboard/observe/sensitive')
-                        }
+                        },
+                        
                       }
                     ],
                     key: '3',
                 },
                 {
                   url: '#',
-                  label: collapse? (
+                  label: leftNavCollapsed? (
                     <Tooltip content="Testing" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={CustomersMinor} />
                     </Tooltip>
                   ) : 'Testing',
-                  icon: collapse ? '' : CustomersMinor,
+                  icon: leftNavCollapsed ? '' : CustomersMinor,
                   onClick: ()=>{
-                    if(!collapse){
+                      if(leftNavCollapsed){
+                        toggleLeftNavCollapsed()
+                      } 
                       handleSelect('testing')
-                    }else{
-                      handleSelect('testing')
-                      toggleLeftBar()
-                    }
                   },
-                  selected: selected === 'testing',
+                  selected: leftNavSelected === 'testing',
                   subNavigationItems:[
                     {
                       label: 'Create Tests',
@@ -124,39 +116,37 @@ export default function LeftNav(){
                   key: '4',
                 },
                 {
-                  label: collapse? (
+                  label: leftNavCollapsed? (
                     <Tooltip content="Test Editor" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={DiscountsMinor} />
                     </Tooltip>
                   ) : 'Test Editor',
-                  icon: collapse ? '' : DiscountsMinor,
+                  icon: leftNavCollapsed ? '' : DiscountsMinor,
                   onClick: ()=>{
-                    if(!collapse){
-                      handleSelect("test-editor")
-                      navigate("/dashboard/test-editor")
-                    }else{
-                      toggleLeftBar()
-                    }
+                    if (leftNavCollapsed) {
+                      toggleLeftNavCollapsed()
+                    } 
+                    handleSelect("test-editor")
+                    navigate("/dashboard/test-editor")
                   },
-                  selected: selected === 'test-editor',
+                  selected: leftNavSelected === 'test-editor',
                   key: '5',
                 },
                 {
-                  label: collapse? (
+                  label: leftNavCollapsed ? (
                       <Tooltip content="Issues" preferredPosition="bottom" dismissOnMouseOut>
                         <Icon source={AnalyticsMinor} />
                       </Tooltip>
                     ) : 'Issues',
-                  icon: collapse ? '' : AnalyticsMinor,
+                  icon: leftNavCollapsed ? '' : AnalyticsMinor,
                   onClick: ()=>{
-                      if(!collapse){
-                        handleSelect("issues")
-                        navigate("/dashboard/issues")
-                      }else{
-                        toggleLeftBar()
-                      }
+                      if (leftNavCollapsed) {
+                        toggleLeftNavCollapsed()
+                      } 
+                      handleSelect("issues")
+                      navigate("/dashboard/issues")
                     },
-                    selected: selected === 'issues',
+                    selected: leftNavSelected === 'issues',
                     key: '6',
                 },
               ]}
@@ -164,22 +154,16 @@ export default function LeftNav(){
           <Navigation.Section 
                items={[
                 {
-                  url: '',
-                  label: collapse? (
+                  label: leftNavCollapsed   ? (
                     <Tooltip content="Settings" preferredPosition="bottom" dismissOnMouseOut>
                       <Icon source={SettingsMinor} />
                     </Tooltip>
                   ) : 'Settings',
-                  icon: collapse ? '' : SettingsMinor,
+                  icon: leftNavCollapsed ? '' : SettingsMinor,
                   onClick: ()=>{
-                    if(!collapse){
-                      handleSelect("settings")
-                      navigate("/dashboard/settings/integrations")
-                    }else{
-                      toggleLeftBar()
-                    }
+                    navigate("/dashboard/settings/about")
                   },
-                  selected: selected === 'settings',
+                  selected: leftNavSelected === 'settings',
                   key: '7',
                 }
               ]}
