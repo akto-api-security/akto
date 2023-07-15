@@ -1,17 +1,14 @@
 import { Text, Button } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import api from "../api"
 import Store from "../../../store"
 import func from "@/util/func"
-import { useNavigate } from "react-router-dom"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
     SearchMinor,
-    FraudProtectMinor,
-    LinkMinor
-  } from '@shopify/polaris-icons';
+    FraudProtectMinor  } from '@shopify/polaris-icons';
 
 const headers = [
     {
@@ -166,11 +163,11 @@ function SensitiveDataExposure() {
                 temp['url'] = endpoint.method + " " + endpoint.url
                 temp['detected_timestamp'] = "Detected " + func.prettifyEpoch(endpoint.timestamp)
                 temp['timestamp'] = endpoint.timestamp
-                temp['location'] = "Detected in " + (endpoint.isHeader ? "Header" : endpoint.isUrlParam ? "Query param" : "Payload")
+                temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "query param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
                 temp["hexId"] = temp['collection'] + temp['url'] + temp['location'] + temp['call'] + endpoint.param + endpoint.subTypeString
-                temp['nextUrl'] = "/dashboard/observe/inventory/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
+                temp['nextUrl'] = "/dashboard/observe/sensitive/"+subType+"/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
                 ret.push(temp);
             })
             total = res.total;

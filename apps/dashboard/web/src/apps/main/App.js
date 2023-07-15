@@ -61,7 +61,7 @@ const router = createBrowserRouter([
             element: <SensitiveDataExposure/>
           },
           {
-            path: "/dashboard/observe/inventory/:apiCollectionId/:urlAndMethod",
+            path: "/dashboard/observe/sensitive/:subType/:apiCollectionId/:urlAndMethod",
             element: <SingleRequest/>
           }
         ]

@@ -7,7 +7,7 @@ import {
   HorizontalStack, Icon, Box, LegacyCard, HorizontalGrid,
   Pagination, Key
 } from '@shopify/polaris';
-import { editor } from "monaco-editor/esm/vs/editor/editor.api"
+import { editor, Range } from "monaco-editor/esm/vs/editor/editor.api"
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
@@ -24,6 +24,8 @@ import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighligh
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
 
+import "./style.css";
+
 function formatJSON(val = {}) {
     try {
       const res = typeof val == 'object' ? val : JSON.parse(val);
@@ -36,21 +38,46 @@ function formatJSON(val = {}) {
     }
   }
 
+function highlightPaths(highlightPathMap, refText){
+  highlightPathMap && Object.keys(highlightPathMap).forEach((type) => {
+    Object.keys(highlightPathMap[type]).forEach((key) => {
+      if (highlightPathMap[type][key].highlight) {
+        let path = key.split("#");
+        let mainKey = path[path.length - 1];
+        let matches = refText[type].getModel().findMatches(mainKey, false, false, false, null, true);
+        matches.forEach((match) => {
+          refText[type]
+            .createDecorationsCollection([
+              {
+                range: new Range(match.range.startLineNumber, match.range.startColumn - 1, match.range.endLineNumber + 1, 0),
+                options: {
+                  inlineClassName: "highlight",
+                },
+              }
+            ])
+        })
+      }
+    })
+  })
+}
+
 function SampleDataList(props) {
     const requestRef = useRef("");
     const responseRef = useRef("");
-    const [refText, setRefText] = useState([])
+    const [refText, setRefText] = useState({})
     const [page, setPage] = useState(0);
   
-    function createEditor(ref, options) {
+    function createEditor(ref, options, type) {
       let text = null
       text = editor.create(ref, options)
       text.setValue("");
-      setRefText((old) => [...old, text]);
+      setRefText((old) => ({
+        ...old, [type]:text
+      }) )
     }
     useEffect(()=>{
-      if(refText.length==0){
-        [requestRef, responseRef].map((ref) => {
+      if(Object.keys(refText).length==0){
+        [requestRef, responseRef].map((ref, index) => {
           createEditor(ref.current, {
             language: "json",
             minimap: { enabled: false },
@@ -59,10 +86,13 @@ function SampleDataList(props) {
             colorDecorations: true,
             scrollBeyondLastLine: false,
             readOnly: true,
-          })
+          },index == 0 ? "request" : "response" )
         })
+      } else {
+        refText.request.setValue("")
+        refText.response.setValue("")
       }
-      if (props.sampleData?.[page] && refText.length==2) {
+      if (props.sampleData?.[page] && Object.keys(refText).length==2) {
         let message = formatJSON(props.sampleData?.[page]);
         let res = {}, req = {}
         Object.keys(message).forEach((key) => {
@@ -72,10 +102,12 @@ function SampleDataList(props) {
             res[key] = message[key]
           }
         })
-          refText[0].setValue(JSON.stringify(req, null, 2))
-          refText[1].setValue(JSON.stringify(res, null, 2))
+        refText.request.setValue(JSON.stringify(req, null, 2))
+        refText.response.setValue(JSON.stringify(res, null, 2))
+
+        highlightPaths(props.highlightPathMap, refText);
       }
-    }, [props.sampleData, page, refText])
+    }, [props.sampleData, props.highlightPathMap, page, refText])
   
     return (
       <VerticalStack gap="4">
