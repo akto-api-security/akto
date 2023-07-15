@@ -11,7 +11,7 @@ info:
     displayName: Security Misconfiguration (SM)
   subCategory: SFTP_CONFIG_EXPOSURE
   severity: HIGH
-   references:
+  references:
     - https://blog.sucuri.net/2012/11/psa-sftpftp-password-exposure-via-sftp-config-json.html
     - https://www.acunetix.com/vulnerabilities/web/sftp-ftp-credentials-exposure/
     - https://codexns.io/products/sftp_for_sublime/settings
