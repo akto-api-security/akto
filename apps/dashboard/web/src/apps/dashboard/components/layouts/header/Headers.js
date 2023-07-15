@@ -5,17 +5,22 @@ import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import './Headers.css'
 import api from '../../../../signup/api';
+import func from '../../../../../util/func';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
     
-    const storeAccessToken = Store(state => state.storeAccessToken)
     const navigate = useNavigate()
 
     const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
     const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
     const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
+    const username = Store((state) => state.username)
+    const storeAccessToken = Store(state => state.storeAccessToken)
+
+    console.log(username)
+
     const handleLeftNavCollapse = () => {
         if (!leftNavCollapsed) {
             setLeftNavSelected('')
@@ -50,7 +55,7 @@ export default function Header() {
                     items: [{content: 'Documentation'},{content: 'Tutorials'},{content: 'Changelog'},{content: 'Discord Support'},{content: 'Star On Github'}],
                 },
             ]}
-            initials="AK"
+            initials={func.initials(username)}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
         />

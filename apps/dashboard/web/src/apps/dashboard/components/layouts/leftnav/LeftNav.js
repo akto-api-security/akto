@@ -8,14 +8,12 @@ import Store from "../../../store"
 
 export default function LeftNav(){
 
-  const [selected, setSelected] = useState('');
   const navigate = useNavigate();
+  
   const leftNavSelected = Store((state) => state.leftNavSelected)
   const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
   const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
   const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
-
-  console.log(leftNavSelected)
 
   const handleSelect = (selectedId) => {
     setLeftNavSelected(selectedId);
