@@ -65,6 +65,9 @@ const func = {
     }
   },
   initials(str) {
+    if (!str)
+      return ''
+      
     let ret = str.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
 
     if (ret.length == 1) {
