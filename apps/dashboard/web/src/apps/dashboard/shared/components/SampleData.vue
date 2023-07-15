@@ -224,9 +224,9 @@ export default {
                 if (x["responseCode"] !== -1) {
                     let key = ""
                     if (x["header"]) {
-                        key = "root#"+"responseheaders#"+x["param"]
+                        key = "root#"+"responseHeaders#"+x["param"]
                     } else {
-                        key = "root#"+"responsepayload#"+x["param"];
+                        key = "root#"+"responsePayload#"+x["param"];
                     }
                     key = key.toLowerCase();
                     result["highlightPaths"][key] = x["highlightValue"]
