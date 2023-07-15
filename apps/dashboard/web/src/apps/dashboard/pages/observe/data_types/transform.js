@@ -21,7 +21,7 @@ const func = {
         }
         let resultObj= {
             sensitiveAlways: sensitiveAlways,
-            sensitivePositions: sensitivePosition
+            sensitivePosition: sensitivePosition
         }
 
         return resultObj;
@@ -34,6 +34,44 @@ const func = {
         else{ return '2'}
     },
 
+    convertDataForCustomPayload : function(keyConditions,keyOp,valueConditions,valueOp,operator,typeName,sensitiveState,status,id){
+
+        const keyArr = keyConditions.map((element)=> {
+            return{
+                type: element.type,
+                valueMap:{
+                    value: element.value
+                }
+            }
+        })
+
+        const valueArr = valueConditions.map((element)=> {
+            return{
+                type: element.type,
+                valueMap:{
+                    value: element.value
+                }
+            }
+        })
+
+        let sensitiveObj = this.convertToSensitiveData(sensitiveState)
+
+        let finalObj = {
+            active: JSON.parse(status),
+            createNew: id ? false : true,
+            id: id,
+            keyConditionFromUsers: keyArr,
+            keyOperator: keyOp,
+            name: typeName,
+            operator: operator,
+            sensitiveAlways: sensitiveObj.sensitiveAlways,
+            sensitivePosition: sensitiveObj.sensitivePosition,
+            valueConditionFromUsers: valueArr,
+            valueOperator: valueOp,
+        }
+
+        return finalObj
+    },
 }
 
 export default func

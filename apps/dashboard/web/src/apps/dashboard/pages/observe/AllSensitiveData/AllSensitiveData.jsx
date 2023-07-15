@@ -60,7 +60,7 @@ function AllSensitiveData(){
         return [{
             items: [{
                 content: 'Edit',
-                onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType]}}),
+                onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),
             }]
         }]
     }

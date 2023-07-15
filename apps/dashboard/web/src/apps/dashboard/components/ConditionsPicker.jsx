@@ -5,7 +5,7 @@ import {DeleteMinor} from "@shopify/polaris-icons"
 
 function ConditionsPicker(props) {
 
-    const {title, param, items, initialItems, conditionOp} = props
+    const {title, param, items, initialItems, conditionOp, fetchChanges, setChange} = props
     const [condition, setCondition] = useState('')
     const [textFields, setTextFields] = useState([]);
 
@@ -17,12 +17,24 @@ function ConditionsPicker(props) {
     const handleChange = (value, index) => {
         const updatedFields = [...textFields];
         updatedFields[index].value = value;
+        let obj = {
+            predicates: updatedFields,
+            operator: condition,
+        }
+        fetchChanges(obj)
+        setChange(true)
         setTextFields(updatedFields);
     };
 
     const handleDelete = (index) => {
         const updatedFields = [...textFields];
         updatedFields.splice(index, 1);
+        let obj = {
+            predicates: updatedFields,
+            operator: condition,
+        }
+        fetchChanges(obj)
+        setChange(true)
         setTextFields(updatedFields);
     };
 
@@ -43,11 +55,21 @@ function ConditionsPicker(props) {
     ]
 
     const handleConditionSelected = (val) =>{
+        let obj = {
+            predicates: textFields,
+            operator: val,
+        }
+        fetchChanges(obj)
         setCondition(val)
     }
     const handleRegexSelected = (value,index) =>{
         const updatedFields = [...textFields];
         updatedFields[index].type = value;
+        let obj = {
+            predicates: updatedFields,
+            operator: condition,
+        }
+        fetchChanges(obj)
         setTextFields(updatedFields);
     }
 
@@ -55,7 +77,7 @@ function ConditionsPicker(props) {
         <ButtonGroup>
             {index > 0 ? (<Dropdown menuItems={orAndConditions} initial={condition} selected={handleConditionSelected}/>) : null}
             <TextField value={param} />
-            <Dropdown menuItems={items} initial={items[0].value} selected={(val) => handleRegexSelected(val,index)}/>
+            <Dropdown menuItems={items} initial={textFields[index].type} selected={(val) => handleRegexSelected(val,index)}/>
         </ButtonGroup>
     )
 
