@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dto.type.AccountDataTypesInfo;
+import org.checkerframework.checker.units.qual.A;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
@@ -40,7 +42,14 @@ public class TestIgnoreFalsePositivesAction extends MongoBasedTest{
         ignoreData.setIgnoredKeysInSelectedAPIs(ignoredKeysInSelectedAPIs);
         falsePositives.put("UUID",ignoreData);
         ignoreTest.setFalsePositives(falsePositives);
-        SingleTypeInfo.aktoDataTypeMap.put("UUID",aktoDataType);
+        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
+        if (info == null) {
+            info = new AccountDataTypesInfo();
+        }
+        Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
+        aktoDataTypeMap.put("UUID",aktoDataType);
+        info.setAktoDataTypeMap(aktoDataTypeMap);
+        SingleTypeInfo.getAccountToDataTypesInfo().put(ACCOUNT_ID, info);
 
         String result = ignoreTest.setFalsePositivesInSensitiveData();
         aktoDataType = AktoDataTypeDao.instance.findOne("name","UUID");

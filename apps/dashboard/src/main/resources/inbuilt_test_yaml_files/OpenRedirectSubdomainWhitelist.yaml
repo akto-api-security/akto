@@ -1,0 +1,77 @@
+id: OPEN_REDIRECT_SUBDOMAIN_WHITELIST
+info:
+  name: "Open redirect subdomain whitelist"
+  description: "An attacker can construct a URL within the application that causes a redirection to an arbitrary external domain by leveraging subdomain whitelisting."
+  details: > 
+            "Open redirection vulnerabilities arise when an application incorporates user-controllable data into the target of a redirection in an unsafe way.
+            The ability to use an authentic application URL, targeting the correct domain and with a valid SSL certificate (if SSL is used), lends credibility 
+            to the phishing attack because many users, even if they verify these features, will not notice the subsequent redirection to a different domain"
+  impact: "This behavior can be leveraged to facilitate phishing attacks against users of the application."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: OPEN_REDIRECT_SUBDOMAIN_WHITELIST
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
+api_selection_filters:
+  response_code:
+    eq: 302
+  response_headers:
+    for_one:
+      key: 
+        eq: location
+      value:
+        regex: .*
+        extract: location_value
+  or:
+    - request_payload:
+        for_one:
+          value:
+            eq: "${sample_response_headers.location}"
+            extract: payload_location_value
+          key:
+            extract: payload_location_key
+    - query_param:
+        for_one:
+          value:
+            eq: "${sample_response_headers.location}"
+            extract: payload_location_value
+          key:
+            extract: payload_location_key
+    - request_headers:
+        for_one:
+          value:
+            eq: "${sample_response_headers.location}"
+            extract: payload_location_value
+          key:
+            extract: payload_location_key
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          payload_location_key: http://${payload_location_value}.evil.com/
+      - modify_body_param:
+          payload_location_key: http://${payload_location_value}.evil.com/
+      - modify_header:
+          payload_location_key: http://${payload_location_value}.evil.com/
+      - follow_redirect: false
+
+
+validate:
+  response_code:
+    eq: 302
+  response_headers:
+    for_one:
+      key:
+        eq: location
+      value:
+        contains_either:
+          - evil.com

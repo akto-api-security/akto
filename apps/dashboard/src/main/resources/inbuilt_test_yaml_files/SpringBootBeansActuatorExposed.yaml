@@ -1,0 +1,50 @@
+id: SPRING_BOOT_BEANS_ACTUATOR_EXPOSED
+info:
+  name: Spring Boot Beans Actuator Exposed 
+  description: Spring Boot Beans Actuator Exposed Misconfiguration.
+  details: >
+       The Spring Boot Beans Actuator Exposed misconfiguration occurs when the Actuator endpoint, which provides 
+       information about application beans, is accessible to unauthorized users. This misconfiguration can lead to 
+       potential security risks as sensitive information, such as bean details, dependencies, and scopes, can be 
+       exposed. It falls under the Security Misconfiguration category with a low severity level. Proper access 
+       control and secure configuration of the Actuator endpoints are crucial to prevent unauthorized access and 
+       protect sensitive information.
+  impact: Exposing Spring Boot Beans Actuator can lead to unauthorized access and disclosure of sensitive application information.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Spring Boot
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/actuator/beans
+
+validate:
+  response_code: 
+    eq: 200
+  response_payload:
+    contains_all:
+      - type
+      - beans
+      - dependencies
+      - scope
+        
