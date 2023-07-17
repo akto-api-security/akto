@@ -40,7 +40,7 @@ jobs:
 
           REPOSITORY_OWNER = 'akto-api-security'
           REPOSITORY_NAME = 'akto'
-          BRANCH_NAME = 'master'
+          BRANCH_NAME = ${{ github.ref_name }}
           FOLDER_PATH = 'apps/dashboard/src/main/resources/inbuilt_test_yaml_files'
           FILE_EXTENSION = '.yaml'
 
