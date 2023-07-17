@@ -233,9 +233,9 @@ export default {
         link: '/dashboard/issues'
       },
       {
-        title: 'Tests library',
-        icon: '$bookBookmark',
-        link: '/dashboard/library'
+        title: 'Test Editor',
+        icon: '$testEditorIcon',
+        link: '/dashboard/test-editor'
       }
     ]
 
