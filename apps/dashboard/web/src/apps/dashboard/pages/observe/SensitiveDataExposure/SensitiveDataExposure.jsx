@@ -70,6 +70,17 @@ const filters = [
     availableChoices: new Set(),
     singleSelect:true
   },
+  {
+    key:'location',
+    label:'Location',
+    title:'Location',
+    choices:[
+        {label:"Header", value:"header"},
+        {label:"Payload", value:"payload"},
+        {label:"Query string", value:"queryString"}
+    ],
+    availableChoices: new Set('Header', 'Payload', 'Query string')
+  }
 ]
 
 const appliedFilters = [
