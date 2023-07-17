@@ -7,6 +7,8 @@ import java.util.Map;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -14,8 +16,8 @@ import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.*;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.ApiExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -245,7 +247,45 @@ public class Executor {
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
-                return Operations.modifyHeader(rawApi, key.toString(), value.toString());
+                String keyStr = key.toString();
+                String valStr = value.toString();
+
+                String ACCESS_ROLES_CONTEXT = "${roles_access_context.";
+                if (keyStr.startsWith(ACCESS_ROLES_CONTEXT)) {
+
+                    keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
+                    keyStr = keyStr.substring(0,keyStr.length()-1).trim();
+
+                    TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+                    Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
+                    for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
+
+                        boolean allSatisfied = true;
+                        for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
+                            String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
+
+                            List<String> rawHeaderValue = rawHeaders.getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
+                            if (!rawHeaderValue.contains(headerVal)) {
+                                allSatisfied = false;
+                                break;
+                            }
+                        }
+
+                        if (allSatisfied) {
+                            List<AuthParam> authParamList = authWithCond.getAuthMechanism().getAuthParams();
+                            if (!authParamList.isEmpty()) {
+                                AuthParam authParam1 = authParamList.get(0);
+                                return Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                            }
+                        }
+                    }
+
+                    return new ExecutorSingleOperationResp(true, "Unable to match request headers " + key);
+                } else {
+                    return Operations.modifyHeader(rawApi, keyStr, valStr);
+                }
+
+
             case "delete_header":
                 return Operations.deleteHeader(rawApi, key.toString());
             case "add_query_param":
