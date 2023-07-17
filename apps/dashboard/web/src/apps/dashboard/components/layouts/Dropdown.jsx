@@ -56,7 +56,7 @@ function Dropdown(props) {
             {...props.subItems ? {actionBefore:{
                 content: props.subContent,
                 wrapOverflow: true,
-                onAction: props.subclick,
+                onAction: props.subClick,
                 suffix: <Box><Icon source={CircleRightMajor}/></Box>
             }} : null}
         />

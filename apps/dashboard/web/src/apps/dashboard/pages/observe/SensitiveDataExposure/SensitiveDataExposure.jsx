@@ -1,17 +1,14 @@
 import { Text, Button } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import api from "../api"
 import Store from "../../../store"
 import func from "@/util/func"
-import { useNavigate } from "react-router-dom"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
     SearchMinor,
-    FraudProtectMinor,
-    LinkMinor
-  } from '@shopify/polaris-icons';
+    FraudProtectMinor  } from '@shopify/polaris-icons';
 
 const headers = [
     {
@@ -73,6 +70,17 @@ const filters = [
     availableChoices: new Set(),
     singleSelect:true
   },
+  {
+    key:'location',
+    label:'Location',
+    title:'Location',
+    choices:[
+        {label:"Header", value:"header"},
+        {label:"Payload", value:"payload"},
+        {label:"Query string", value:"queryString"}
+    ],
+    availableChoices: new Set('Header', 'Payload', 'Query string')
+  }
 ]
 
 const appliedFilters = [
@@ -126,6 +134,8 @@ function SensitiveDataExposure() {
                 return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
             case "isRequest":
                 return value[0] ? "In request" : "In response"
+            case "dateRange":
+                return value.since.toDateString() + " - " + value.until.toDateString();
             default:
                 return value;
         }
@@ -158,7 +168,15 @@ function SensitiveDataExposure() {
         filterOperators['subType']="OR"
         let ret = []
         let total = 0; 
-        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, func.timeNow(), true,isRequest).then((res)=> {
+        let dateRange = filters['dateRange'] || false;
+        delete filters['dateRange']
+        let startTimestamp = 0;
+        let endTimestamp = func.timeNow()
+        if(dateRange){
+            startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
+            endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
+        }
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
             res.endpoints.forEach((endpoint) => {
                 let temp = {}
                 temp['collection'] = apiCollectionMap[endpoint.apiCollectionId]
@@ -166,11 +184,11 @@ function SensitiveDataExposure() {
                 temp['url'] = endpoint.method + " " + endpoint.url
                 temp['detected_timestamp'] = "Detected " + func.prettifyEpoch(endpoint.timestamp)
                 temp['timestamp'] = endpoint.timestamp
-                temp['location'] = "Detected in " + (endpoint.isHeader ? "Header" : endpoint.isUrlParam ? "Query param" : "Payload")
+                temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "query param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
                 temp["hexId"] = temp['collection'] + temp['url'] + temp['location'] + temp['call'] + endpoint.param + endpoint.subTypeString
-                temp['nextUrl'] = "/dashboard/observe/inventory/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
+                temp['nextUrl'] = "/dashboard/observe/sensitive/"+subType+"/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
                 ret.push(temp);
             })
             total = res.total;
@@ -208,6 +226,7 @@ function navigateBack(){
                 filters={filters}
                 promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
+                calenderFilter={true}
             />
         ]}
         />

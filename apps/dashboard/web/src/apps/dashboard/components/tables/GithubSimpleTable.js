@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import GithubServerTable from "./GithubServerTable";
 import func from "@/util/func";
 

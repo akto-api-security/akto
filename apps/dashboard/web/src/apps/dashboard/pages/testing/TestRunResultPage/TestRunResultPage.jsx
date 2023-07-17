@@ -15,10 +15,9 @@ import {
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import func from "@/util/func"
 import parse from 'html-react-parser';
-import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import SampleDataList from '../../../components/shared/SampleDataList';
 
@@ -209,8 +208,7 @@ function TestRunResultPage(props) {
           </HorizontalStack>
           <HorizontalStack gap='2' align="start" >
             {
-              headerDetails &&
-              headerDetails.map((header) => {
+              headerDetails?.map((header) => {
                 return (
                   <HorizontalStack key={header.value} gap="1">
                     <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
@@ -238,7 +236,9 @@ function TestRunResultPage(props) {
     selectedTestRunResult.testResults &&
     <SampleDataList
       key="attempt"
-      sampleData={selectedTestRunResult?.testResults.map((result) => {
+      sampleData={selectedTestRunResult?.testResults.filter((result) => {
+        return result.message
+      }).map((result) => {
         return result.message
       })}
       vulnerable={selectedTestRunResult?.vulnerable}

@@ -71,7 +71,7 @@ function GithubRow(props) {
                                     {header.text}
                                 </Text>
                                 <HorizontalStack>
-                                <Badge key={header.text} size="small">
+                                <Badge key={header.text}>
                                     {props.data[header.value]}
                                 </Badge>
                                 </HorizontalStack>
@@ -80,25 +80,23 @@ function GithubRow(props) {
                     )
                 })
             }
-                        <IndexTable.Cell>
-                    <VerticalStack align="center" inlineAlign="center">
-                    {
-                        props.hasRowActions &&
-                        <Popover
-                            active={popoverActive == props.data.hexId}
-                            activator={<Button onClick={togglePopoverActive(props.data.hexId)} plain icon={HorizontalDotsMinor} />}
-                            autofocusTarget="first-node"
-                            onClose={togglePopoverActive(popoverActive)}
-                        >
-                            <ActionList
-                                actionRole="menuitem"
-                                sections={props.getActions(props.data)}
-                            />
-                        </Popover>
-                    }
-                    </VerticalStack>
-                {/* </HorizontalStack> */}
-                {/* </div> */}
+            <IndexTable.Cell >
+                <HorizontalStack align='end'>
+                {
+                    props.hasRowActions &&
+                    <Popover
+                        active={popoverActive == props.data.hexId}
+                        activator={<Button onClick={togglePopoverActive(props.data.hexId)} plain icon={HorizontalDotsMinor} />}
+                        autofocusTarget="first-node"
+                        onClose={togglePopoverActive(popoverActive)}
+                    >
+                        <ActionList
+                            actionRole="menuitem"
+                            sections={props.getActions(props.data)}
+                        />
+                    </Popover>
+                }
+                </HorizontalStack>
             </IndexTable.Cell>
         </IndexTable.Row>
     )

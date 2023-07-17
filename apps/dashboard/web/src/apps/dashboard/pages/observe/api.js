@@ -69,6 +69,19 @@ export default {
             data: { }
         })
     },
+    async loadSensitiveParameters (apiCollectionId, url, method, subType) {
+        const resp = await request({
+            url: '/api/loadSensitiveParameters',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method,
+                subType
+            }
+        })
+        return resp
+    },
 
     saveCustomDataType(dataObj) {
         return request({

@@ -38,9 +38,15 @@ const headers = [
         value: "request",
         itemCell: 2,
     },
+    {
+        text:"Sensitive count",
+        value: "sensitiveCount"
+    }
 ] 
 
 const sortOptions = [
+    { label: 'Sensitive data', value: 'sensitiveCount asc', directionLabel: 'More exposure', sortKey: 'sensitiveCount' },
+    { label: 'Sensitive data', value: 'sensitiveCount desc', directionLabel: 'Less exposure', sortKey: 'sensitiveCount' },
     { label: 'Data type', value: 'subType asc', directionLabel: 'A-Z', sortKey: 'subType' },
     { label: 'Data type', value: 'subType desc', directionLabel: 'Z-A', sortKey: 'subType' },
   ];
@@ -72,54 +78,52 @@ function AllSensitiveData(){
     useEffect(() => {
         let tmp=[]
         async function fetchData(){
-            let dataTypeMap={}
             let mapDataToKey = {}
             await api.fetchDataTypes().then((res) => {
                 res.dataTypes.aktoDataTypes.forEach((type) => {
                     mapDataToKey[type.name] = type
-                    dataTypeMap[type.name]={active:true}
+                    tmp.push({
+                        subType:type.name,
+                        request:0,
+                        response:0,
+                        hexId:type.name,
+                        nextUrl:type.name,
+                        icon: CircleTickMinor,
+                        sensitiveCount:0
+                    })
                 })
                 res.dataTypes.customDataTypes.forEach((type) => {
                     mapDataToKey[type.name] = type
-                    dataTypeMap[type.name]={active:type.active, custom:true}
+                    tmp.push({
+                        subType:type.name,
+                        isCustomType:[{confidence : 'Custom'}],
+                        request:0,
+                        response:0,
+                        hexId:type.name,
+                        nextUrl:type.name,
+                        icon: type.active ? CircleTickMinor : CircleCancelMinor,
+                        sensitiveCount:0
+                    })
                 })
+                setMapData(mapDataToKey)
             })
-            setMapData(mapDataToKey)
-            api.fetchSubTypeCountMap(0, func.timeNow()).then((res) => {
+            await api.fetchSubTypeCountMap(0, func.timeNow()).then((res) => {
                 let count = res.response.subTypeCountMap;
                 Object.keys(count.REQUEST).map((key) => {
-                    tmp.push({
-                        subType:key,
-                        request:count.REQUEST[key],
-                        response:0,
+                    tmp.forEach((obj) => {
+                        if(obj.subType==key){
+                            obj.request=count.REQUEST[key]
+                            obj.sensitiveCount=obj.request
+                        }
                     })
                 })
                 Object.keys(count.RESPONSE).map((key) => {
-                    let data = tmp.filter((data) => {
-                        return data.subType==key
-                    })
-                    tmp = tmp.filter((data) => {
-                        return data.subType!=key
-                    }) 
-                    if(data.length==0){
-                        data={
-                            subType:key,
-                            request:0,
-                            response:count.RESPONSE[key],
+                    tmp.forEach((obj) => {
+                        if(obj.subType==key){
+                            obj.response=count.RESPONSE[key]
+                            obj.sensitiveCount=(obj.response*100000)
                         }
-                    } else {
-                        data = data[0]
-                        data.response=count.RESPONSE[key]
-                    }
-                    tmp.push(data);
-                })
-                tmp.forEach((data, index) => {
-                    tmp[index]["hexId"] = data.subType
-                    tmp[index]["nextUrl"] = data.subType
-                    if(dataTypeMap[data.subType].custom){
-                        tmp[index]['isCustomType']= [{confidence : 'Custom'}]
-                    }
-                    tmp[index]['icon'] = dataTypeMap[data.subType].active ? CircleTickMinor : CircleCancelMinor
+                    })
                 })
                 setData(tmp);
             })

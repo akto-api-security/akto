@@ -1,6 +1,6 @@
 import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
-import DateRangePicker from '../../../components/layouts/DateRangePicker'
+import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
 
 import func from '@/util/func'
@@ -37,7 +37,6 @@ function Metrics() {
         
 
     const getGraphData = async(startTime,endTime) =>{
-        console.log(names,metricsList)
         let host = null
         const metricData = await settingFunctions.fetchGraphData(groupBy,startTime,endTime,names,host)
         let result = {}
@@ -129,9 +128,9 @@ function Metrics() {
             <LegacyCard >
                 <LegacyCard.Section>
                     <LegacyCard.Header title="Metrics">
-                        <DateRangePicker getDate={handleDate}/>
+                        <DateRangeFilter getDate={handleDate}/>
                         <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
-                                    subItems={hosts.length > 0} subContent="Group by Id" subclick={changeItems}
+                                    subItems={hosts.length > 0} subContent="Group by Id" subClick={changeItems}
                         />
                     </LegacyCard.Header>
                 </LegacyCard.Section>
