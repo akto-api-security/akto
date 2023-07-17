@@ -50,6 +50,10 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public static boolean connectedToMongo = false;
+
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
 
@@ -146,19 +150,21 @@ public class Main {
         }
     }
 
-    private void handleMongoConnect(String mongoURI) {
+    private static void handleMongoConnect(String mongoURI) {
         boolean isMongoConnected = false;
         while (!isMongoConnected) {
             try {
-                DaoInit.init(new ConnectionString(mongoURI));
                 try {
                     AccountsDao.instance.getStats();
                     isMongoConnected = true;
+                    continue;
                 }catch (Exception e) {
-                    Thread.sleep(1000);
+                    logger.error("Error while connecting mongo");
                 }
-            } catch (Exception e) {
-                logger.error("Error while Thread.sleep");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         }
     }
@@ -185,6 +191,12 @@ public class Main {
         if (topicName == null) topicName = "akto.api.logs";
 
         DaoInit.init(new ConnectionString(mongoURI));
+        executorService.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                handleMongoConnect(mongoURI);
+            }
+        }, 0, 2, TimeUnit.MINUTES);
         initializeRuntime();
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
