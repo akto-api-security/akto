@@ -82,7 +82,7 @@ jobs:
               column.append(yaml_data['info']['impact'])
               column.append(yaml_data['info']['category']['displayName'])
               column.append(yaml_data['info']['severity'])
-  
+              print("column: ", column)
               references = []
   
               if 'references' in yaml_data['info']:
@@ -92,6 +92,7 @@ jobs:
               else:
                   column.append("")
 
+              print("references: ", references)
               column.append(yaml_content)
 
               url_path = ''
@@ -99,8 +100,11 @@ jobs:
               column.append(yaml_data['id'])
               
               rlink1 = "" if len(references) <= 0 else references[0]
+              print("rlink1", rlink1)
               rlink2 = "" if len(references) <= 1 else references[1]
+              print("rlink2", rlink3)
               rlink3 = "" if len(references) <= 2 else references[2]
+              print("rlink2", rlink3)
               
               column.append(rlink1)
               column.append(rlink2)
