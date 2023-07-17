@@ -24,6 +24,7 @@ import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
+import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 
 const router = createBrowserRouter([
   {
@@ -109,6 +110,10 @@ const router = createBrowserRouter([
         element: <HealthLogs />,
       }
   ]
+  },
+  {
+    path: "/dashboard/test-editor",
+    element: <TestEditor />
   },
 {
   path: "/login",
