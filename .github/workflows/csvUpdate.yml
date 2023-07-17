@@ -88,6 +88,8 @@ jobs:
               if 'references' in yaml_data['info']:
                   column.append(yaml_data['info']['references'])
                   references = yaml_data['info']['references']
+                  if references is None:
+                    references = []
                   
               else:
                   column.append("")
