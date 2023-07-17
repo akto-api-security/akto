@@ -59,9 +59,12 @@ jobs:
               repository = g.get_repo(f"{REPOSITORY_OWNER}/{REPOSITORY_NAME}")
 
               try:
+                  print("trying to download: ", yaml_url)
                   rr = requests.get(yaml_url, allow_redirects=True)
                   data = rr.content
+                  print("received: ", data)
                   yaml_data = yaml.safe_load(data)
+                  
                   print(f"Successfully fetched the template: {repository_parts[-1]}")
                   return yaml_data, data
               except Exception as e:
