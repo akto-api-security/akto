@@ -9,6 +9,8 @@ import {
     CircleTickMinor
   } from '@shopify/polaris-icons';
 
+import { useNavigate } from "react-router-dom"
+
 const headers = [
     {
         text: "",
@@ -54,24 +56,32 @@ const resourceName = {
     plural: 'Sensitive data types',
   };
 
-const getActions = (item) => {
-    return [{
-        items: [{
-            content: 'Edit',
-            onAction: () => { console.log("edit function for", item) },
-        }]
-    }]
-}
-
 function AllSensitiveData(){
 
     const [data, setData] = useState([])
+    const [mapData, setMapData] = useState({})
+    const navigate = useNavigate()
+
+    const getActions = (item) => {
+        return [{
+            items: [{
+                content: 'Edit',
+                onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),
+            }]
+        }]
+    }
+
+    const handleRedirect = () => {
+        navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
+    }
     
     useEffect(() => {
         let tmp=[]
         async function fetchData(){
+            let mapDataToKey = {}
             await api.fetchDataTypes().then((res) => {
                 res.dataTypes.aktoDataTypes.forEach((type) => {
+                    mapDataToKey[type.name] = type
                     tmp.push({
                         subType:type.name,
                         request:0,
@@ -83,6 +93,7 @@ function AllSensitiveData(){
                     })
                 })
                 res.dataTypes.customDataTypes.forEach((type) => {
+                    mapDataToKey[type.name] = type
                     tmp.push({
                         subType:type.name,
                         isCustomType:[{confidence : 'Custom'}],
@@ -94,6 +105,7 @@ function AllSensitiveData(){
                         sensitiveCount:0
                     })
                 })
+                setMapData(mapDataToKey)
             })
             await api.fetchSubTypeCountMap(0, func.timeNow()).then((res) => {
                 let count = res.response.subTypeCountMap;
@@ -128,7 +140,7 @@ function AllSensitiveData(){
             }
         </Text>
             }
-            primaryAction={<Button primary>Create custom data types</Button>}
+            primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
             components={[
                 <GithubSimpleTable
                 key="table"

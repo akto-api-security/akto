@@ -1,7 +1,7 @@
 import { Button, Card, Frame, HorizontalStack, Icon, Modal, Navigation, Scrollable, Text, Toast } from "@shopify/polaris"
 import { HomeMinor, OrdersMinor, ProductsMinor, CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { tokens } from "@shopify/polaris-tokens"
-import { Outlet, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
 import homeFunctions from "../home/module";
@@ -10,10 +10,13 @@ import { useEffect } from "react";
 
 const Settings = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+
     const setAllCollections = Store(state => state.setAllCollections)
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
 
+    
     const fetchAllCollections = async()=>{
         let apiCollections = await homeFunctions.getAllCollections()
         setAllCollections(apiCollections)
@@ -30,6 +33,10 @@ const Settings = () => {
         })
     }
 
+    const handleSettingsClose = () => {
+        navigate('/dashboard/testing')
+    }
+
     const toastMarkup = toastConfig.isActive ? (
         <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={1500} />
     ) : null;
@@ -42,7 +49,7 @@ const Settings = () => {
                     <Text variant="headingLg">
                         Settings
                     </Text>
-                    <div onClick={() => navigate("/dashboard")}>
+                    <div onClick={handleSettingsClose}>
                         <Icon source={CancelMajor} color="base" />
                     </div>
                 </div>

@@ -20,5 +20,13 @@ export default {
             }
         }
         window.location.href = redirectLink
+    },
+    logout: async function () {
+        const res = await request({
+            url: '/api/logout',
+            method: 'post',
+            data: {}
+        })
+        return res
     }
 }

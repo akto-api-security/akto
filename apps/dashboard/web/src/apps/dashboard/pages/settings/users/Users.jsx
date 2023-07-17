@@ -47,7 +47,7 @@ const Users = () => {
     }
 
     const handleRemoveUser = async (login) => {
-        const removeUsersResponse = await settingRequests.removeUser(login)
+        await settingRequests.removeUser(login)
     }
 
     return (
