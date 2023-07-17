@@ -59,8 +59,8 @@ jobs:
               repository = g.get_repo(f"{REPOSITORY_OWNER}/{REPOSITORY_NAME}")
 
               try:
-                  content_of_file = repository.get_contents(file_path)
-                  data = content_of_file.decoded_content.decode("utf-8")
+                  rr = requests.get(yaml_url, allow_redirects=True)
+                  data = rr.content
                   yaml_data = yaml.safe_load(data)
                   print(f"Successfully fetched the template: {repository_parts[-1]}")
                   return yaml_data, data
@@ -128,7 +128,7 @@ jobs:
                       writer.writerow(['Name', 'Slug', 'Description', 'Details', 'Impact', 'OWASP Category', 'Severity', 'References', 'Content', 'URL Path', 'Test_ID', 'RLink1', 'RLink2', 'RLink3'])
 
                       for yaml_file in yaml_files:
-                          yaml_url = yaml_file['html_url']
+                          yaml_url = yaml_file['download_url']
                           yaml_data, yaml_content = fetch_yaml_data(access_token, yaml_url)
                           if yaml_data:
                               write_to_csv(writer, yaml_data, yaml_content)
