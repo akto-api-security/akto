@@ -99,13 +99,30 @@ jobs:
               column.append(url_path)
               column.append(yaml_data['id'])
               
-              rlink1 = "" if len(references) <= 0 else references[0]
-              print("rlink1", rlink1)
-              rlink2 = "" if len(references) <= 1 else references[1]
-              print("rlink2", rlink3)
-              rlink3 = "" if len(references) <= 2 else references[2]
-              print("rlink2", rlink3)
+              rlink1 = "" 
               
+              if len(references) >= 1:
+                  rlink1 = references[0]
+              
+              print("rlink1", rlink1)
+
+
+              rlink2 = "" 
+              
+              if len(references) >= 2:
+                  rlink2 = references[1]
+              
+              print("rlink2", rlink2)
+
+
+              rlink3 = "" 
+              
+              if len(references) >= 3:
+                  rlink3 = references[2]
+              
+              print("rlink3", rlink3)
+
+
               column.append(rlink1)
               column.append(rlink2)
               column.append(rlink3)
