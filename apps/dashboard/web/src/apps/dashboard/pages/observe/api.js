@@ -98,4 +98,20 @@ export default {
             data: dataObj
         })
     },
+    async convertSampleDataToCurl(sampleData) {
+        const resp = await request({
+            url: '/api/convertSampleDataToCurl',
+            method: 'post',
+            data: { sampleData }
+        })
+        return resp
+    },
+    async convertSampleDataToBurpRequest(sampleData) {
+        const resp = await request({
+            url: '/api/convertSamleDataToBurpRequest',
+            method: 'post',
+            data: { sampleData }
+        })
+        return resp
+    },
 }

@@ -4,8 +4,8 @@ import {
 import {
   Text,
   VerticalStack,
-  HorizontalStack, Icon, Box, LegacyCard, HorizontalGrid,
-  Pagination, Key
+  HorizontalStack, Box, LegacyCard, HorizontalGrid,
+  Pagination, Key, Button, Popover, ActionList
 } from '@shopify/polaris';
 import { editor, Range } from "monaco-editor/esm/vs/editor/editor.api"
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
@@ -23,8 +23,9 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
-
+import api from '../../pages/observe/api';
 import "./style.css";
+import Store from '../../store';
 
 function formatJSON(val = {}) {
     try {
@@ -66,7 +67,56 @@ function SampleDataList(props) {
     const responseRef = useRef("");
     const [refText, setRefText] = useState({})
     const [page, setPage] = useState(0);
-  
+    const [popoverActive, setPopoverActive] = useState(false);
+    const setToastConfig = Store(state => state.setToastConfig)
+    const setToast = (isActive, isError, message) => {
+        setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+        })
+    }
+    async function copyRequest(type, completeData) {
+      let copyString = "";
+      let snackBarMessage = ""
+      completeData = JSON.parse(completeData);
+      if (type=="RESPONSE") {
+        let responsePayload = {}
+        let responseHeaders = {}
+        let statusCode = 0
+    
+        if (completeData) {
+          responsePayload = completeData["response"] ?  completeData["response"]["body"] : completeData["responsePayload"]
+          responseHeaders = completeData["response"] ?  completeData["response"]["headers"] : completeData["responseHeaders"]
+          statusCode = completeData["response"] ?  completeData["response"]["statusCode"] : completeData["statusCode"]
+        }
+        let b = {
+          "responsePayload": responsePayload,
+          "responseHeaders": responseHeaders,
+          "statusCode": statusCode
+        }
+    
+        copyString = JSON.stringify(b)
+        snackBarMessage = "Response data copied to clipboard"
+      } else {
+        if (type === "CURL") { 
+          snackBarMessage = "Curl request copied to clipboard"
+          let resp = await api.convertSampleDataToCurl(JSON.stringify(completeData))
+          copyString = resp.curlString
+        } else {
+          snackBarMessage = "Burp request copied to clipboard"
+          let resp = await api.convertSampleDataToBurpRequest(JSON.stringify(completeData))
+          copyString = resp.burpRequest
+        }
+      }
+    
+      if (copyString) {
+        navigator.clipboard.writeText(copyString)
+        setToast(true, false, snackBarMessage)
+        setPopoverActive(false)
+      }
+    }
+
     function createEditor(ref, options, type) {
       let text = null
       text = editor.create(ref, options)
@@ -138,9 +188,31 @@ function SampleDataList(props) {
                       <Box padding={"2"}>
                         <HorizontalStack padding="2" align='space-between'>
                           {index == 0 ? "Request" : "Response"}
-                          <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                            <Icon source={ClipboardMinor} />
-                          </div>
+                          {index == 0 ? (
+                            <Popover
+                              active={popoverActive}
+                              activator={<Button icon={ClipboardMinor} plain onClick={() => setPopoverActive(!popoverActive)} />}
+                              onClose={() => setPopoverActive(false)}
+
+                            >
+                              <ActionList
+                                actionRole="menuitem"
+                                items={[
+                                  {
+                                    content: 'Copy as CURL',
+                                    onAction: () => {copyRequest("CURL",props.sampleData?.[page])} ,
+                                  },
+                                  {
+                                    content: 'Copy as burp',
+                                    onAction: () => {copyRequest("BURP",props.sampleData?.[page])} ,
+                                  },
+                                ]}
+
+                              />
+                            </Popover>
+                          ) : (
+                            <Button icon={ClipboardMinor} plain  onClick={() => copyRequest("RESPONSE",props.sampleData?.[page])}/>
+                          )}
                         </HorizontalStack>
                       </Box>
                     </LegacyCard.Section>
