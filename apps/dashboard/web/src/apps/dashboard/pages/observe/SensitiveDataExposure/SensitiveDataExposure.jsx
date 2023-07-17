@@ -123,6 +123,8 @@ function SensitiveDataExposure() {
                 return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
             case "isRequest":
                 return value[0] ? "In request" : "In response"
+            case "dateRange":
+                return value.since.toDateString() + " - " + value.until.toDateString();
             default:
                 return value;
         }
@@ -155,7 +157,15 @@ function SensitiveDataExposure() {
         filterOperators['subType']="OR"
         let ret = []
         let total = 0; 
-        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, func.timeNow(), true,isRequest).then((res)=> {
+        let dateRange = filters['dateRange'] || false;
+        delete filters['dateRange']
+        let startTimestamp = 0;
+        let endTimestamp = func.timeNow()
+        if(dateRange){
+            startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
+            endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
+        }
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
             res.endpoints.forEach((endpoint) => {
                 let temp = {}
                 temp['collection'] = apiCollectionMap[endpoint.apiCollectionId]
@@ -205,6 +215,7 @@ function navigateBack(){
                 filters={filters}
                 promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
+                calenderFilter={true}
             />
         ]}
         />

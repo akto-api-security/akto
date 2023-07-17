@@ -11,6 +11,9 @@ import {
   ChoiceList} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
+import DateRangePicker from '../layouts/DateRangePicker';
+import values from '../../../../util/values';
+import "./style.css"
 
 function GithubServerTable(props) {
 
@@ -57,7 +60,7 @@ function GithubServerTable(props) {
     temp = temp.filter((filter) => {
       return filter.key != key
     })
-    if(value.length>0){
+    if(value.length>0 || Object.keys(value).length>0){
       temp.push({
         key: key,
         label: props.disambiguateLabel(key, value),
@@ -109,6 +112,19 @@ function GithubServerTable(props) {
           pinned: true
         }
       })
+  }
+  if (props.calenderFilter) {
+    filters.push({
+      key: "dateRange",
+      label: "Discovered",
+      filter:
+        (<DateRangePicker ranges={values.ranges}
+          getDate={handleFilterStatusChange("dateRange")}
+          setPopoverState={() => {}}
+          setButtonValue={() => {}}
+        />),
+      pinned: true
+    })
   }
 
   const handleFiltersClearAll = useCallback(() => {

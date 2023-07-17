@@ -36,9 +36,15 @@ const headers = [
         value: "request",
         itemCell: 2,
     },
+    {
+        text:"Sensitive count",
+        value: "sensitiveCount"
+    }
 ] 
 
 const sortOptions = [
+    { label: 'Sensitive data', value: 'sensitiveCount asc', directionLabel: 'More exposure', sortKey: 'sensitiveCount' },
+    { label: 'Sensitive data', value: 'sensitiveCount desc', directionLabel: 'Less exposure', sortKey: 'sensitiveCount' },
     { label: 'Data type', value: 'subType asc', directionLabel: 'A-Z', sortKey: 'subType' },
     { label: 'Data type', value: 'subType desc', directionLabel: 'Z-A', sortKey: 'subType' },
   ];
@@ -72,7 +78,8 @@ function AllSensitiveData(){
                         response:0,
                         hexId:type.name,
                         nextUrl:type.name,
-                        icon: CircleTickMinor
+                        icon: CircleTickMinor,
+                        sensitiveCount:0
                     })
                 })
                 res.dataTypes.customDataTypes.forEach((type) => {
@@ -83,7 +90,8 @@ function AllSensitiveData(){
                         response:0,
                         hexId:type.name,
                         nextUrl:type.name,
-                        icon: type.active ? CircleTickMinor : CircleCancelMinor
+                        icon: type.active ? CircleTickMinor : CircleCancelMinor,
+                        sensitiveCount:0
                     })
                 })
             })
@@ -93,6 +101,7 @@ function AllSensitiveData(){
                     tmp.forEach((obj) => {
                         if(obj.subType==key){
                             obj.request=count.REQUEST[key]
+                            obj.sensitiveCount=obj.request
                         }
                     })
                 })
@@ -100,6 +109,7 @@ function AllSensitiveData(){
                     tmp.forEach((obj) => {
                         if(obj.subType==key){
                             obj.response=count.RESPONSE[key]
+                            obj.sensitiveCount=(obj.response*100000)
                         }
                     })
                 })

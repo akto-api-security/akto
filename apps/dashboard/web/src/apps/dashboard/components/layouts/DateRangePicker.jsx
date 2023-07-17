@@ -1,51 +1,11 @@
-import { Box, Button, DatePicker, HorizontalGrid, HorizontalStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
+import { Box, Button, ButtonGroup, DatePicker, HorizontalGrid, HorizontalStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import { CalendarMinor, ArrowRightMinor } from "@shopify/polaris-icons"
 
 function DateRangePicker(props) {
       const { mdDown, lgUp } = useBreakpoints();
       const shouldShowMultiMonth = lgUp;
-      const today = new Date(new Date().setHours(0, 0, 0, 0));
-
-      const yesterday = new Date(
-        new Date(new Date().setDate(today.getDate() - 1)).setHours(0, 0, 0, 0)
-      );
-
-      const ranges = [
-        {
-          title: "Today",
-          alias: "today",
-          period: {
-            since: today,
-            until: today,
-          },
-        },
-        {
-          title: "Yesterday",
-          alias: "yesterday",
-          period: {
-            since: yesterday,
-            until: yesterday,
-          },
-        },
-        {
-          title: "Last 7 days",
-          alias: "last7days",
-          period: {
-            since: new Date(
-              new Date(new Date().setDate(today.getDate() - 7)).setHours(
-                0,
-                0,
-                0,
-                0
-              )
-            ),
-            until: yesterday,
-          },
-        },
-      ];
-
-      const [popoverActive, setPopoverActive] = useState(false);
+      const ranges = props.ranges;
       const [activeDateRange, setActiveDateRange] = useState(ranges[0]);
       const [inputValues, setInputValues] = useState({});
       const [{ month, year }, setDate] = useState({
@@ -142,7 +102,7 @@ function DateRangePicker(props) {
         if (isRelatedTargetWithinPopover) {
           return;
         }
-        setPopoverActive(false);
+        props.setPopoverState(false);
       }
       function handleMonthChange(month, year) {
         setDate({ month, year });
@@ -165,11 +125,11 @@ function DateRangePicker(props) {
       }
       function apply() {
         props.getDate(activeDateRange.period)
-        setPopoverActive(false);
+        props.setPopoverState(false);
       }
       function cancel() {
         setActiveDateRange(ranges[0])
-        setPopoverActive(false);
+        props.setPopoverState(false);
       }
       useEffect(() => {
         if (activeDateRange) {
@@ -198,33 +158,17 @@ function DateRangePicker(props) {
             });
           }
         }
+        const buttonValue =
+          activeDateRange.title === "Custom"
+            ? activeDateRange.period.since.toDateString() +
+              " - " +
+              activeDateRange.period.until.toDateString()
+            : activeDateRange.title;
+          props.setButtonValue(buttonValue);
       }, [activeDateRange]);
-      const buttonValue =
-        activeDateRange.title === "Custom"
-          ? activeDateRange.period.since.toDateString() +
-            " - " +
-            activeDateRange.period.until.toDateString()
-          : activeDateRange.title;
 
       return (
-        <Popover
-          active={popoverActive}
-          autofocusTarget="none"
-          preferredAlignment="left"
-          preferredPosition="below"
-          fluidContent
-          sectioned={false}
-          fullHeight
-          activator={
-            <Button
-              icon={CalendarMinor}
-              onClick={() => setPopoverActive(!popoverActive)}
-            >
-              {buttonValue}
-            </Button>
-          }
-          onClose={() => setPopoverActive(false)}
-        >
+        <Box>
           <Popover.Pane fixed>
             <HorizontalGrid
               columns={{
@@ -320,14 +264,16 @@ function DateRangePicker(props) {
           <Popover.Pane fixed>
             <Popover.Section>
               <HorizontalStack align="end">
+                <ButtonGroup>
                 <Button onClick={cancel}>Cancel</Button>
                 <Button primary onClick={apply}>
                   Apply
                 </Button>
+                </ButtonGroup>
               </HorizontalStack>
             </Popover.Section>
           </Popover.Pane>
-        </Popover>
+          </Box>
       );
 }
 
