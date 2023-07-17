@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
@@ -97,7 +98,8 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
+        String endpoint = DashboardMode.isSaasDeployment() ? "/addUserToAccount" : "/signup";
+        finalInviteCode = websiteHostName + endpoint + "?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
 
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);

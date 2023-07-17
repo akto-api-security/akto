@@ -77,6 +77,7 @@ public class SendgridEmail {
         personalization.addDynamicTemplateData("inviteeName",inviteeName);
         personalization.addDynamicTemplateData("orgName",extractOrgName(inviteFrom));
         personalization.addDynamicTemplateData("aktoUrl",invitiationUrl);
+        System.out.println("Invitation url: "+invitiationUrl);
         return mail;
     }
 

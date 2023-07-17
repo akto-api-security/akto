@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0;
     }
 
     ConfigType configType;
@@ -229,6 +229,71 @@ public abstract class Config {
 
         public void setResponse_type(String response_type) {
             this.response_type = response_type;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class Auth0Config extends Config {
+
+        String clientId;
+        String redirectUrl;
+        String clientSecret;
+        String domain;
+
+        String apiToken;
+
+        public Auth0Config() {
+            this.configType = ConfigType.AUTH0;
+            this.id = configType.name();
+        }
+
+        public Auth0Config(String clientId, String clientSecret, String domain, String redirectUrl) {
+            this.configType = ConfigType.AUTH0;
+            this.id = configType.name();
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+            this.domain = domain;
+            this.redirectUrl = redirectUrl;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getRedirectUrl() {
+            return redirectUrl;
+        }
+
+        public void setRedirectUrl(String redirectUrl) {
+            this.redirectUrl = redirectUrl;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
+        }
+
+        public String getApiToken() {
+            return apiToken;
+        }
+
+        public void setApiToken(String apiToken) {
+            this.apiToken = apiToken;
         }
     }
 }
