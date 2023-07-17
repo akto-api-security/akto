@@ -283,8 +283,7 @@ export default {
                 }
         },
         async createAccessMatrix(){
-            let apiCollectionIds = this.conditionCollections.map((collectionId) => parseInt(collectionId));
-            await api.createMultipleAccessMatrixTasks(apiCollectionIds)
+            await api.createMultipleAccessMatrixTasks(this.selectedRole.name || this.roleName)
         },
         async analyzeApiSamples(headerNames) {
           let apiCollectionIds = this.conditionCollections.map((collectionId) => parseInt(collectionId));

@@ -37,11 +37,11 @@ export default {
             return resp
         })
     },
-    createMultipleAccessMatrixTasks(apiCollectionIds){
+    createMultipleAccessMatrixTasks(roleName){
         return request({
             url: '/api/createMultipleAccessMatrixTasks',
             method: 'post',
-            data: {apiCollectionIds}
+            data: {roleName}
         }).then((resp) => {
             return resp
         })

@@ -10,10 +10,8 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 public class AccessMatrixTaskInfo {
  
     private ObjectId id;
-    public static final String API_INFO_KEYS = "apiInfoKeys";
-    private List<ApiInfoKey> apiInfoKeys;
-    public static final String API_COLLECTION_ID = "apiCollectionId";
-    private int apiCollectionId;
+    public static final String ENDPOINT_LOGICAL_GROUP_NAME = "endpointLogicalGroupName";
+    private String endpointLogicalGroupName;
     public static final String FREQUENCY_IN_SECONDS = "frequencyInSeconds";
     private int frequencyInSeconds;
     public static final String LAST_COMPLETED_TIMESTAMP = "lastCompletedTimestamp";
@@ -27,29 +25,13 @@ public class AccessMatrixTaskInfo {
     public AccessMatrixTaskInfo() {
     }
 
-    public AccessMatrixTaskInfo(List<ApiInfoKey> apiInfoKeys, int apiCollectionId, int frequencyInSeconds, int lastCompletedTimestamp, int nextScheduledTimestamp) {
-        this.apiInfoKeys = apiInfoKeys;
-        this.apiCollectionId = apiCollectionId;
+    public AccessMatrixTaskInfo(String endpointLogicalGroupName, int frequencyInSeconds, int lastCompletedTimestamp, int nextScheduledTimestamp) {
+        this.endpointLogicalGroupName = endpointLogicalGroupName;
         this.frequencyInSeconds = frequencyInSeconds;
         this.lastCompletedTimestamp = lastCompletedTimestamp;
         this.nextScheduledTimestamp = nextScheduledTimestamp;
     }
 
-    public List<ApiInfoKey> getApiInfoKeys() {
-        return this.apiInfoKeys;
-    }
-
-    public void setApiInfoKeys(List<ApiInfoKey> apiInfoKeys) {
-        this.apiInfoKeys = apiInfoKeys;
-    }
-
-    public int getApiCollectionId() {
-        return this.apiCollectionId;
-    }
-
-    public void setApiCollectionId(int apiCollectionId) {
-        this.apiCollectionId = apiCollectionId;
-    }
 
     public int getFrequencyInSeconds() {
         return this.frequencyInSeconds;
@@ -87,12 +69,23 @@ public class AccessMatrixTaskInfo {
         return this.id.toHexString();
     }
 
-    @Override
-    public String toString() {
-        return "{" +
-            " apiInfoKeys='" + getApiInfoKeys() + "'" +
-            ", apiCollectionId='" + getApiCollectionId() + "'" +
-            "}";
+    public String getEndpointLogicalGroupName() {
+        return endpointLogicalGroupName;
     }
 
+    public void setEndpointLogicalGroupName(String endpointLogicalGroupName) {
+        this.endpointLogicalGroupName = endpointLogicalGroupName;
+    }
+
+    @Override
+    public String toString() {
+        return "AccessMatrixTaskInfo{" +
+                "id=" + id +
+                ", endpointLogicalGroupName='" + endpointLogicalGroupName + '\'' +
+                ", frequencyInSeconds=" + frequencyInSeconds +
+                ", lastCompletedTimestamp=" + lastCompletedTimestamp +
+                ", nextScheduledTimestamp=" + nextScheduledTimestamp +
+                ", hexId='" + hexId + '\'' +
+                '}';
+    }
 }

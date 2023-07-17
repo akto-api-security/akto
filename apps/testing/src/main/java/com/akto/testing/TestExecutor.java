@@ -111,12 +111,9 @@ public class TestExecutor {
         return authMechanism;
     }
 
-    public static TestingUtil createTestingUtil(TestingEndpoints testingEndpoints, AuthMechanism authMechanism){
-
-        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
-        List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-        return new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
+    public static TestingUtil createTestingUtil(AuthMechanism authMechanism, SampleMessageStore sampleMessageStore, String email){
+        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+        return new TestingUtil(authMechanism, sampleMessageStore, testRoles, email);
     }
       
     public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
@@ -128,7 +125,7 @@ public class TestExecutor {
         AuthMechanism authMechanism = createAuthMechanism();
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
 
-        TestingUtil testingUtil = createTestingUtil(testingEndpoints, authMechanism);
+        TestingUtil testingUtil = createTestingUtil(authMechanism, sampleMessageStore, "system@akto.io");
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);

@@ -6,12 +6,10 @@ import java.util.List;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
+import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
-import com.akto.dto.testing.AccessMatrixTaskInfo;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.*;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -29,27 +27,12 @@ public class AccessMatrixAnalyzer {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixAnalyzer.class);
 
     public List<ApiInfoKey> getEndpointsToAnalyze(AccessMatrixTaskInfo task) {
-        final List<ApiInfoKey> endpoints = new ArrayList<>();
-        if(task.getApiInfoKeys() == null || task.getApiInfoKeys().isEmpty()) {
-            List<BasicDBObject> list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(task.getApiCollectionId(), 0, 10_000, 60 * 30 * 24 * 30);
+        EndpointLogicalGroup endpointLogicalGroup =
+                EndpointLogicalGroupDao.instance.findOne(EndpointLogicalGroup.GROUP_NAME, task.getEndpointLogicalGroupName());
 
-            if (list != null && !list.isEmpty()) {
-                list.forEach(element -> {
-                    BasicDBObject item = (BasicDBObject) element.get(Constants.ID);
-                    if (item == null) {
-                        return;
-                    }
-                    ApiInfoKey apiInfoKey = new ApiInfoKey(
-                            task.getApiCollectionId(),
-                            item.getString(ApiInfoKey.URL),
-                            Method.fromString(item.getString(ApiInfoKey.METHOD)));
-                    endpoints.add(apiInfoKey);
-                });
-            }
-        } else {
-            endpoints.addAll(task.getApiInfoKeys());
-        }
-        return endpoints;
+        if (endpointLogicalGroup == null) return new ArrayList<>();
+
+        return endpointLogicalGroup.getTestingEndpoints().returnApis();
     }
 
     public void run() {
@@ -62,15 +45,16 @@ public class AccessMatrixAnalyzer {
             List<ApiInfoKey> endpoints = getEndpointsToAnalyze(task);
             loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
 
-            TestingEndpoints testingEndpoints = new CollectionWiseTestingEndpoints(task.getApiCollectionId());
+            TestingEndpoints testingEndpoints = new CustomTestingEndpoints(endpoints);
             AuthMechanism authMechanism = TestExecutor.createAuthMechanism();
-            TestingUtil testingUtil = TestExecutor.createTestingUtil(testingEndpoints, authMechanism);
+            SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+            TestingUtil testingUtil = TestExecutor.createTestingUtil(authMechanism, sampleMessageStore, "system@akto.io");
 
             BFLATest bflaTest = new BFLATest();
 
             if(endpoints!=null && !endpoints.isEmpty()){
                 for(ApiInfoKey endpoint: endpoints){
-                    List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(endpoint, testingUtil.getSampleMessages());
+                    List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(endpoint);
                     if (messages!=null){
                         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
                         if (filteredMessages!=null){

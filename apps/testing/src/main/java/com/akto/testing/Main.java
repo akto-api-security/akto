@@ -118,8 +118,6 @@ public class Main {
             }
         }, 0, 12, TimeUnit.HOURS);
 
-        TestExecutor testExecutor = new TestExecutor();
-
         while (true) {
             AccountTask.instance.executeTask(account -> {
                 int delta = Context.now() - 20*60;

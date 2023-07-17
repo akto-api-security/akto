@@ -4,6 +4,7 @@ import java.util.*;
 
 import com.akto.dao.SampleDataDao;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.parsers.HttpCallParser;
@@ -31,8 +32,7 @@ public class AccessMatrixTaskAction extends UserAction{
     private List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
     private List<AccessMatrixUrlToRole> accessMatrixUrlToRoles;
     private Map<String,List<ApiInfoKey>> accessMatrixRoleToUrls = new HashMap<>();
-    private List<ApiInfoKey> apiInfoKeys;
-    private int apiCollectionId;
+    private String roleName;
     private List<Integer> apiCollectionIds;
     private int frequencyInSeconds;
     private String hexId;
@@ -56,11 +56,6 @@ public class AccessMatrixTaskAction extends UserAction{
     }
 
     private boolean sanityCheck(){
-        if (ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)) == null
-                && (apiInfoKeys == null || apiInfoKeys.isEmpty())) {
-            addActionError("No endpoints found to create access matrix");
-            return false;
-        }
         if (frequencyInSeconds <= 0) {
             frequencyInSeconds = 86400;
         }
@@ -68,21 +63,20 @@ public class AccessMatrixTaskAction extends UserAction{
     }
 
     public String createMultipleAccessMatrixTasks(){
-        if(apiCollectionIds==null || apiCollectionIds.isEmpty()){
-            addActionError("No endpoints found to create access matrix");
-            return ERROR.toUpperCase();
-        }
         List<WriteModel<AccessMatrixTaskInfo>> writes = new ArrayList<>();
-        for(int collectionId: apiCollectionIds){
-            Bson filter = Filters.eq(AccessMatrixTaskInfo.API_COLLECTION_ID, collectionId);
-            Bson update = Updates.combine(
-                    Updates.set(AccessMatrixTaskInfo.API_COLLECTION_ID, collectionId),
-                    Updates.set(AccessMatrixTaskInfo.FREQUENCY_IN_SECONDS, 86400),
-                    Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now()));
-            UpdateOptions opts = new UpdateOptions().upsert(true);
-            writes.add(new UpdateOneModel<>(filter, update,opts));
-        }
+        String endpointLogicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
+
+        Bson filter = Filters.eq(AccessMatrixTaskInfo.ENDPOINT_LOGICAL_GROUP_NAME, endpointLogicalGroupName);
+
+        Bson update = Updates.combine(
+                Updates.set(AccessMatrixTaskInfo.ENDPOINT_LOGICAL_GROUP_NAME, endpointLogicalGroupName),
+                Updates.set(AccessMatrixTaskInfo.FREQUENCY_IN_SECONDS, 86400),
+                Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now()));
+        UpdateOptions opts = new UpdateOptions().upsert(true);
+
+        writes.add(new UpdateOneModel<>(filter, update,opts));
         AccessMatrixTaskInfosDao.instance.getMCollection().bulkWrite(writes);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -151,17 +145,6 @@ public class AccessMatrixTaskAction extends UserAction{
         return SUCCESS.toUpperCase();
     }
 
-    public String createAccessMatrixTask(){
-        if(!sanityCheck()){
-            return ERROR.toUpperCase();
-        }
-
-        AccessMatrixTaskInfo accessMatrixTaskInfo = new AccessMatrixTaskInfo(apiInfoKeys, apiCollectionId, frequencyInSeconds, 0, Context.now());
-        AccessMatrixTaskInfosDao.instance.insertOne(accessMatrixTaskInfo);
-        
-        return SUCCESS.toUpperCase();
-    }
-
     public String updateAccessMatrixTask(){
         if (!sanityCheck()) {
             return ERROR.toUpperCase();
@@ -169,10 +152,11 @@ public class AccessMatrixTaskAction extends UserAction{
         try{
             ObjectId id = new ObjectId(hexId);
             Bson q = Filters.eq(Constants.ID, id);
+            String endpointLogicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
+
             Bson update = Updates.combine(
-                Updates.set(AccessMatrixTaskInfo.API_COLLECTION_ID,apiCollectionId),
-                Updates.set(AccessMatrixTaskInfo.FREQUENCY_IN_SECONDS,frequencyInSeconds),
-                Updates.set(AccessMatrixTaskInfo.API_INFO_KEYS,apiInfoKeys)
+                Updates.set(AccessMatrixTaskInfo.ENDPOINT_LOGICAL_GROUP_NAME,endpointLogicalGroupName),
+                Updates.set(AccessMatrixTaskInfo.FREQUENCY_IN_SECONDS,frequencyInSeconds)
             );
             UpdateOptions opts = new UpdateOptions().upsert(true);
             AccessMatrixTaskInfosDao.instance.getMCollection().updateOne(q, update, opts);
@@ -219,18 +203,6 @@ public class AccessMatrixTaskAction extends UserAction{
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
     }
-    public List<ApiInfoKey> getApiInfoKeys() {
-        return apiInfoKeys;
-    }
-    public void setApiInfoKeys(List<ApiInfoKey> apiInfoKeys) {
-        this.apiInfoKeys = apiInfoKeys;
-    }
-    public int getApiCollectionId() {
-        return apiCollectionId;
-    }
-    public void setApiCollectionId(int apiCollectionId) {
-        this.apiCollectionId = apiCollectionId;
-    }
     public int getFrequencyInSeconds() {
         return frequencyInSeconds;
     }
@@ -252,5 +224,9 @@ public class AccessMatrixTaskAction extends UserAction{
 
     public Map<String, Map<String, Integer>> getHeaderValues() {
         return headerValues;
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
     }
 }
