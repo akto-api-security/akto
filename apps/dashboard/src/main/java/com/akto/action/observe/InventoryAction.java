@@ -62,6 +62,7 @@ public class InventoryAction extends UserAction {
         Bson filterQWithTs = Filters.and(Filters.gte("timestamp", startTimestamp), Filters.lte("timestamp", endTimestamp), hostFilterQ);
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
+            loggerMaker.infoAndAddToDb(sti.getUrl() + " discovered_ts: " + sti.getTimestamp() + " inserted_ts: " + sti.getId().getTimestamp(), LogDb.DASHBOARD);
             BasicDBObject id = 
                 new BasicDBObject("apiCollectionId", sti.getApiCollectionId())
                 .append("url", sti.getUrl())
