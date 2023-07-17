@@ -58,6 +58,9 @@ function GraphMetric(props) {
             height: `${height}px`,
             backgroundColor,
         },
+        credits:{
+            enabled: false,
+        },
         title: {
             text: title,
             align: 'left',

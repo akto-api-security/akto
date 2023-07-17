@@ -69,4 +69,20 @@ export default {
             data: { }
         })
     },
+
+    saveCustomDataType(dataObj) {
+        return request({
+            url: '/api/saveCustomDataType',
+            method: 'post',
+            data: dataObj
+        })
+    },
+
+    saveAktoDataType(dataObj) {
+        return request({
+            url:'/api/saveAktoDataType',
+            method:'post',
+            data: dataObj
+        })
+    },
 }

@@ -25,6 +25,7 @@ import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
+import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 
 const router = createBrowserRouter([
   {
@@ -32,21 +33,21 @@ const router = createBrowserRouter([
     element: <HomePage />,
     children: [
       {
-        path: "/dashboard/testing",
+        path: "testing",
         element: <PageTesting />,
         children:[
           {
-            path: "/dashboard/testing",
+            path: "",
             element: <TestRunsPage />
           },
           {
-            path: "/dashboard/testing/:hexId",
+            path: ":hexId",
             element: <SingleTestRunPage />
           },
           {
-            path: "/dashboard/testing/:hexId/result/:hexId2",
+            path: ":hexId/result/:hexId2",
             element: <TestRunResultPage />
-          }
+          },
         ]
       },
       {
@@ -56,6 +57,10 @@ const router = createBrowserRouter([
           {
             path: "/dashboard/observe/sensitive",
             element: <AllSensitiveData/>
+          },
+          {
+            path: "/dashboard/observe/data-types",
+            element: <DataTypes/>
           },
           {
             path: "/dashboard/observe/sensitive/:subType",
