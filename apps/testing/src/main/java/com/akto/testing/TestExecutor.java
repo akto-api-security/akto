@@ -63,224 +63,224 @@ public class TestExecutor {
     private static final Gson gson = new Gson();
 
     public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
-        if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
-        } else {
+//        if (testingRun.getTestIdConfig() != 1) {
+//            apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+//        } else {
             workflowInit(testingRun, summaryId);
-        }
+//        }
     }
 
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
-        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
-        if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
-            loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
-            return;
-        }
-
-        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingEndpoints;
-        WorkflowTest workflowTestOld = workflowTestingEndpoints.getWorkflowTest();
-
-        WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(
-                Filters.eq("_id", workflowTestOld.getId())
-        );
-
-        if (workflowTest == null) {
-            loggerMaker.errorAndAddToDb("Workflow test has been deleted", LogDb.TESTING);
-            return ;
-        }
-
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        try {
-            apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
-        }
-
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put("HIGH", 0);
-        totalCountIssues.put("MEDIUM", 0);
-        totalCountIssues.put("LOW", 0);
-
-        TestingRunResultSummariesDao.instance.updateOne(
-                Filters.eq("_id", summaryId),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
-                )
-        );
-    }
-
-    public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
-        int accountId = Context.accountId.get();
-        int now = Context.now();
-        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
-        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
-
-        sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
-        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-
-        List<AuthParam> authParams = authMechanism.getAuthParams();
-
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
-
-        authMechanism.setAuthParams(authParams);
-
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail());
-
-        try {
-            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
-            if (!loginFlowResponse.getSuccess()) {
-                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
-                throw new Exception("login flow failed");
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
-            return;
-        }
-
-        List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
-        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
-
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
-        Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
-        for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
-            if (apiInfoKeySet.contains(apiInfoKey)) {
-                sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, sampleMessages.get(apiInfoKey));
-            }
-        }
-
-        try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
-        }
-
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
-
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
-
-        CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
-        List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
-        Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
-
-        ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
-        Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
-        String hostName;
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-                continue;
-            }
-            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-                try {
-                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages());
-                    if (hostName == null) {
-                        continue;
-                    }
-                    apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-                    subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-                } catch (URISyntaxException e) {
-                    loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-                }
-            }
-        }
-
-        for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-            try {
-                String hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                if (hostName != null && hostsToApiCollectionMap.get(hostName) == null) {
-                    hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
-                }
-            } catch (URISyntaxException e) {
-                loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-            }
-            try {
-                 Future<List<TestingRunResult>> future = threadPool.submit(
-                         () -> startWithLatch(apiInfoKey,
-                                 testingRun.getTestIdConfig(),
-                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap));
-                 futureTestingRunResults.add(future);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
-            }
-        }
-
-        loggerMaker.infoAndAddToDb("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet(), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
-
-        try {
-            int maxRunTime = testingRun.getTestRunTime();
-            if (maxRunTime < 0) maxRunTime = 30*60; // if nothing specified wait for 30 minutes
-            boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
-            loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
-        loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
-
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
-        for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
-            if (!future.isDone()) continue;
-            try {
-                if (!future.get().isEmpty()) {
-                    testingRunResults.addAll(future.get());
-                }
-            } catch (InterruptedException | ExecutionException e) {
-                loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
-            }
-        }
-
-        for (String host: hostsToApiCollectionMap.keySet()) {
-            Integer apiCollectionId = hostsToApiCollectionMap.get(host);
-            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
-            if (nucleiResults != null && !nucleiResults.isEmpty()) {
-                testingRunResults.addAll(nucleiResults);
-            }
-        }
-
-        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
-
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
-        );
-
-        loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
-
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put("HIGH", 0);
-        totalCountIssues.put("MEDIUM", 0);
-        totalCountIssues.put("LOW", 0);
-
-        for (TestingRunResult testingRunResult: testingRunResults) {
-            if (testingRunResult.isVulnerable()) {
-                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.get(severity);
-                totalCountIssues.put(severity, initialCount + 1);
-            }
-        }
-
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.combine(
-                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
-            )
-        );
-
-        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-
+//        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+//        if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
+//            loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
+//            return;
+//        }
+//
+//        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingEndpoints;
+//        WorkflowTest workflowTestOld = workflowTestingEndpoints.getWorkflowTest();
+//
+//        WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(
+//                Filters.eq("_id", workflowTestOld.getId())
+//        );
+//
+//        if (workflowTest == null) {
+//            loggerMaker.errorAndAddToDb("Workflow test has been deleted", LogDb.TESTING);
+//            return ;
+//        }
+//
+//        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+//        try {
+//            apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+//        } catch (Exception e) {
+//            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
+//        }
+//
+//        Map<String, Integer> totalCountIssues = new HashMap<>();
+//        totalCountIssues.put("HIGH", 0);
+//        totalCountIssues.put("MEDIUM", 0);
+//        totalCountIssues.put("LOW", 0);
+//
+//        TestingRunResultSummariesDao.instance.updateOne(
+//                Filters.eq("_id", summaryId),
+//                Updates.combine(
+//                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+//                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+//                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+//                )
+//        );
+//    }
+//
+//    public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
+//        int accountId = Context.accountId.get();
+//        int now = Context.now();
+//        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
+//        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+//
+//        sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+//        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+//        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+//
+//        List<AuthParam> authParams = authMechanism.getAuthParams();
+//
+//        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
+//
+//        authMechanism.setAuthParams(authParams);
+//
+//        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail());
+//
+//        try {
+//            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
+//            if (!loginFlowResponse.getSuccess()) {
+//                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
+//                throw new Exception("login flow failed");
+//            }
+//        } catch (Exception e) {
+//            loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
+//            return;
+//        }
+//
+//        List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
+//        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+//        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+//
+//        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
+//        Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
+//        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
+//        for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
+//            if (apiInfoKeySet.contains(apiInfoKey)) {
+//                sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, sampleMessages.get(apiInfoKey));
+//            }
+//        }
+//
+//        try {
+//            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
+//        } catch (Exception e) {
+//            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+//        }
+//
+//        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
+//        loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+//
+//        TestingRunResultSummariesDao.instance.updateOne(
+//            Filters.eq("_id", summaryId),
+//            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
+//
+//        CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
+//        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
+//        List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
+//        Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
+//
+//        ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
+//        Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
+//        String hostName;
+//        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+//            TestConfig testConfig = testConfigMap.get(testSubCategory);
+//            if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
+//                continue;
+//            }
+////            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+//////                try {
+////////                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages());
+////////                    if (hostName == null) {
+////////                        continue;
+////////                    }
+////////                    apiInfoKeyToHostMap.put(apiInfoKey, hostName);
+////////                    subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
+//////                } catch (URISyntaxException e) {
+//////                    loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+//////                }
+////            }
+//        }
+//
+////        for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+////            try {
+////                String hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
+////                if (hostName != null && hostsToApiCollectionMap.get(hostName) == null) {
+////                    hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
+////                }
+////            } catch (URISyntaxException e) {
+////                loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+////            }
+////            try {
+////                 Future<List<TestingRunResult>> future = threadPool.submit(
+////                         () -> startWithLatch(apiInfoKey,
+////                                 testingRun.getTestIdConfig(),
+////                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
+////                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap));
+////                 futureTestingRunResults.add(future);
+////            } catch (Exception e) {
+////                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
+////            }
+//        }
+//
+//        loggerMaker.infoAndAddToDb("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet(), LogDb.TESTING);
+//        loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
+//
+//        try {
+//            int maxRunTime = testingRun.getTestRunTime();
+//            if (maxRunTime < 0) maxRunTime = 30*60; // if nothing specified wait for 30 minutes
+//            boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
+//            loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
+//
+//        loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
+//
+//        List<TestingRunResult> testingRunResults = new ArrayList<>();
+//        for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
+//            if (!future.isDone()) continue;
+//            try {
+//                if (!future.get().isEmpty()) {
+//                    testingRunResults.addAll(future.get());
+//                }
+//            } catch (InterruptedException | ExecutionException e) {
+//                loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
+//            }
+//        }
+//
+//        for (String host: hostsToApiCollectionMap.keySet()) {
+//            Integer apiCollectionId = hostsToApiCollectionMap.get(host);
+//            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+//            if (nucleiResults != null && !nucleiResults.isEmpty()) {
+//                testingRunResults.addAll(nucleiResults);
+//            }
+//        }
+//
+//        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
+//
+//        TestingRunResultSummariesDao.instance.updateOne(
+//            Filters.eq("_id", summaryId),
+//            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
+//        );
+//
+//        loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
+//
+//        Map<String, Integer> totalCountIssues = new HashMap<>();
+//        totalCountIssues.put("HIGH", 0);
+//        totalCountIssues.put("MEDIUM", 0);
+//        totalCountIssues.put("LOW", 0);
+//
+//        for (TestingRunResult testingRunResult: testingRunResults) {
+//            if (testingRunResult.isVulnerable()) {
+//                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
+//                int initialCount = totalCountIssues.get(severity);
+//                totalCountIssues.put(severity, initialCount + 1);
+//            }
+//        }
+//
+//        TestingRunResultSummariesDao.instance.updateOne(
+//            Filters.eq("_id", summaryId),
+//            Updates.combine(
+//                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+//                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+//                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+//            )
+//        );
+//
+//        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
+//
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){

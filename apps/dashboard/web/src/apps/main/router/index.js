@@ -40,14 +40,9 @@ const router =  new Router({
     routes: [
         {
             path: '/',
-            redirect: 'login',
-            component: PageLogin
+            redirect: 'dashboard',
         },
-        {
-            path: '/login',
-            name: 'login',
-            component: PageLogin
-        },
+       
         {
             path: '/signup',
             name: 'signup',
