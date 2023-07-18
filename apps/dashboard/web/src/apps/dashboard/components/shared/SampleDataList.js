@@ -143,7 +143,7 @@ function SampleDataList(props) {
         refText.response.setValue("")
       }
       if (props.sampleData?.[page] && Object.keys(refText).length==2) {
-        let message = formatJSON(props.sampleData?.[page]);
+        let message = formatJSON(props.sampleData?.[page].message);
         let res = {}, req = {}
         Object.keys(message).forEach((key) => {
           if (key.startsWith("req") || key.startsWith("query")) {
@@ -155,9 +155,9 @@ function SampleDataList(props) {
         refText.request.setValue(JSON.stringify(req, null, 2))
         refText.response.setValue(JSON.stringify(res, null, 2))
 
-        highlightPaths(props.highlightPathMap, refText);
+        highlightPaths(props.sampleData?.[page].highlightPathMap, refText);
       }
-    }, [props.sampleData, props.highlightPathMap, page, refText])
+    }, [props.sampleData, page, refText])
   
     return (
       <VerticalStack gap="4">
@@ -200,18 +200,18 @@ function SampleDataList(props) {
                                 items={[
                                   {
                                     content: 'Copy as CURL',
-                                    onAction: () => {copyRequest("CURL",props.sampleData?.[page])} ,
+                                    onAction: () => {copyRequest("CURL",props.sampleData?.[page].message)} ,
                                   },
                                   {
                                     content: 'Copy as burp',
-                                    onAction: () => {copyRequest("BURP",props.sampleData?.[page])} ,
+                                    onAction: () => {copyRequest("BURP",props.sampleData?.[page].message)} ,
                                   },
                                 ]}
 
                               />
                             </Popover>
                           ) : (
-                            <Button icon={ClipboardMinor} plain  onClick={() => copyRequest("RESPONSE",props.sampleData?.[page])}/>
+                            <Button icon={ClipboardMinor} plain  onClick={() => copyRequest("RESPONSE",props.sampleData?.[page].message)}/>
                           )}
                         </HorizontalStack>
                       </Box>

@@ -239,7 +239,7 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.filter((result) => {
         return result.message
       }).map((result) => {
-        return result.message
+        return {message:result.message, highlightPathMap:{}}
       })}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
