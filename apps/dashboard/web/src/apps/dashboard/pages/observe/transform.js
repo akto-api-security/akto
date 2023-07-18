@@ -1,35 +1,33 @@
 import func from "@/util/func";
 
-function convertHighlightPathToMap(paths){
+function convertHighlightPathToMap(highlightPaths){
 
     let highlightPathMap = { request: {}, response: {} }
-    paths.forEach((path) => {
-        for (const x of path.highlightPaths) {
-            if (x["responseCode"] === -1) {
-                let keys = []
-                if (x["header"]) {
-                    keys.push("requestHeaders#" + x["param"])
-                } else {
-                    keys.push("requestPayload#" + x["param"])
-                    keys.push("queryParams#" + x["param"])
-                }
-    
-                keys.forEach((key) => {
-                    key = key.toLowerCase()
-                    highlightPathMap.request[key] = x["highlightValue"]
-                })
+    for (const x of highlightPaths) {
+        if (x["responseCode"] === -1) {
+            let keys = []
+            if (x["header"]) {
+                keys.push("requestHeaders#" + x["param"])
             } else {
-                let key = ""
-                if (x["header"]) {
-                    key = "responseHeaders#" + x["param"]
-                } else {
-                    key = "responsePayload#" + x["param"];
-                }
-                key = key.toLowerCase();
-                highlightPathMap.response[key] = x["highlightValue"]
+                keys.push("requestPayload#" + x["param"])
+                keys.push("queryParams#" + x["param"])
             }
+
+            keys.forEach((key) => {
+                key = key.toLowerCase()
+                highlightPathMap.request[key] = x["highlightValue"]
+            })
+        } else {
+            let key = ""
+            if (x["header"]) {
+                key = "responseHeaders#" + x["param"]
+            } else {
+                key = "responsePayload#" + x["param"];
+            }
+            key = key.toLowerCase();
+            highlightPathMap.response[key] = x["highlightValue"]
         }
-    })
+    }
     return highlightPathMap;
 }
 
@@ -51,7 +49,7 @@ const transform = {
         tmp.location =  "Detected in " + [...locations].join(" ");
         return tmp;
     },
-    prepareHighlightParamMap: (res, subType) => {
+    prepareSampleData: (res, subType) => {
         let paths = []
         for (const c in res.sensitiveSampleData) {
             let paramInfoList = res.sensitiveSampleData[c]
@@ -70,9 +68,9 @@ const transform = {
                     return x
                 }
             })
-            paths.push({message:c, highlightPaths:highlightPaths})
+            paths.push({message:c, highlightPathMap:convertHighlightPathToMap(highlightPaths)})
         }
-        return convertHighlightPathToMap(paths);
+        return paths;
     }
 }
 

@@ -40,7 +40,6 @@ function SingleRequest(){
     function togglePopoverActive() {
         setPopoverActive(!popoverActive);
     }
-    const [highlightPathMap, setHighlightPathMap]=useState({request:{}, response:{}})
 
     const allCollections = Store(state => state.allCollections);
     const apiCollectionMap = allCollections.reduce(
@@ -50,20 +49,11 @@ function SingleRequest(){
 
     useEffect(() => {
         async function fetchData(){
-            await api.fetchSampleData(url, apiCollectionId, method).then((res) => {
-                setSampleData(res.sampleDataList[0].samples);
-            })
             await api.loadSensitiveParameters(apiCollectionId, url, method, subType).then((res) => {
                 setEndpointData(transform.prepareEndpointData(apiCollectionMap, res));
             })
             await api.fetchSensitiveSampleData(url, apiCollectionId, method).then((res) => {
-                /* 
-                info: previously the sample data and sensitive sample data were two different columns
-                with only the sensitive sample data column showing highlights. Moreover, the entries in
-                both the columns were different. Here we are combining them by taking the normal sample data
-                and only the highlight paths from sensitive sample data.
-                */
-                setHighlightPathMap(transform.prepareHighlightParamMap(res, subType));
+                setSampleData(transform.prepareSampleData(res, subType))
             })
         } 
         fetchData();
@@ -141,7 +131,6 @@ function SingleRequest(){
                 key="Sample values"
                 sampleData={sampleData}
                 heading={"Sample values"}
-                highlightPathMap={highlightPathMap}
               />,
             ]}
         />
