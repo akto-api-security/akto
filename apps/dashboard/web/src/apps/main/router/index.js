@@ -42,7 +42,13 @@ const router =  new Router({
     routes: [
         {
             path: '/',
-            redirect: 'dashboard',
+            redirect: 'login',
+            component: PageLogin
+        },
+        {
+            path: '/login',
+            name: 'login',
+            component: PageLogin
         },
        
         {

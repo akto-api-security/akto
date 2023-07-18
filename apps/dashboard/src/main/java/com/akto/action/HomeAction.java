@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.listener.InitializerListener;
 import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
 import com.auth0.AuthorizeUrl;
@@ -40,6 +41,8 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     @Override
     public String execute() {
 
+        servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
+        System.out.println("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
         if(DashboardMode.isSaasDeployment()){
             //Use Auth0
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
@@ -53,8 +56,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     }
 
     public static String redirectToAuth0(HttpServletRequest servletRequest, HttpServletResponse servletResponse, String accessToken,BasicDBObject state) {
+
         if(checkIfAccessTokenExists(servletRequest, accessToken)) {
-            return "SUCCESS";
+            if (!servletRequest.getRequestURI().startsWith("/login")) {
+                return "SUCCESS";
+            }
+
         }
         String redirectUri = servletRequest.getScheme() + "://" + servletRequest.getServerName();
         if ((servletRequest.getScheme().equals("http") && servletRequest.getServerPort() != 80) ||

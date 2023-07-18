@@ -24,6 +24,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
@@ -46,6 +47,7 @@ import java.io.IOException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
+import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.all;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.combine;
@@ -199,6 +201,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         SignupInfo.Auth0SignupInfo auth0SignupInfo = new SignupInfo.Auth0SignupInfo(accessToken, refreshToken,name, email);
         shouldLogin = "true";
         User user = UsersDao.instance.findOne(new BasicDBObject(User.LOGIN, email));
+        if(user != null && user.getSignupInfoMap() != null && !user.getSignupInfoMap().containsKey(Config.ConfigType.AUTH0.name())){
+            BasicDBObject setQ = new BasicDBObject(User.SIGNUP_INFO_MAP + "." +Config.ConfigType.AUTH0.name(), auth0SignupInfo);
+            UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, email), new BasicDBObject(SET, setQ));
+        }
         String decodedState = new String(base64Url.decode(state));
         BasicDBObject parsedState = BasicDBObject.parse(decodedState);
 
@@ -207,22 +213,21 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             // Case 1: New user
             // Case 2: Existing user - Just add this new account to this user
             String signupInvitationCode = parsedState.getString("signupInvitationCode");
-            String emailFromInvitationCode = getEmailFromInvitationCode(signupInvitationCode);
-            if (emailFromInvitationCode.equalsIgnoreCase(email) || true) {
-                Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, signupInvitationCode);
-                PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
-                if (pendingInviteCode == null) {
-                    code = "Invalid invitation";
-                    return ERROR.toUpperCase();
-                }
+            Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, signupInvitationCode);
+            PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
+            if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                 PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId());
-            } else {
+            } else if(pendingInviteCode == null){
                 // invalid code
-                code = "Invalid invitation";
+                code = "Please ask admin to invite you!";
+                return ERROR.toUpperCase();
+            } else {
+                // invalid email
+                code = "This invitation doesn't belong to you!";
                 return ERROR.toUpperCase();
             }
 
