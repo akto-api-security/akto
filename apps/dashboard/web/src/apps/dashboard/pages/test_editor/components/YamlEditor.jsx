@@ -51,7 +51,7 @@ const YamlEditor = () => {
       }, [])
 
     return (
-        <div style={{ height: "100%", borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
+        <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
             <div style={{display: "grid", gridTemplateColumns: "max-content max-content max-content auto max-content", gap: "5px",  alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
                 <Text variant="bodyMd">BOLA in old api version.yaml</Text>
                 <Icon source={InfoMinor}/> 
@@ -60,7 +60,7 @@ const YamlEditor = () => {
                 <Button>Save</Button>
             </div>
             <Divider />
-            <Box ref={yamlEditorRef} minHeight="100%">
+            <Box ref={yamlEditorRef} minHeight="80vh">
             </Box>
         </div>
     )

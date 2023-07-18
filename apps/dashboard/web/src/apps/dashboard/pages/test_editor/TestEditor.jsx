@@ -30,8 +30,7 @@ const TestEditor = () => {
 
     return (
         <Frame>
-             <Card>
-                <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto max-content", alignItems: "center", gap:"5px"}}>
+                <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto max-content", alignItems: "center", gap:"5px", height: "10vh", padding: "10px", background: "#ffffff"}}>
                     <div onClick={handleExit}>
                         <Icon source={ExitMajor} color="base" />
                     </div>
@@ -46,11 +45,10 @@ const TestEditor = () => {
                         Create custom test
                     </Button>
                 </div>
-            </Card>
 
             <Divider  />
 
-            <div style={{ display: "grid", gridTemplateColumns: "20vw auto", height: "100%"}}>
+            <div style={{ display: "grid", gridTemplateColumns: "20vw auto"}}>
                 <TestEditorFileExplorer />
                 
                 <div style={{ display: "grid", gridTemplateColumns: "50% 50%"}}>

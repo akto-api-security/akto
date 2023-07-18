@@ -1,5 +1,6 @@
 import { Box, Button, Divider, EmptyState, LegacyCard, LegacyTabs, Modal, TextContainer } from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
+
 import { useEffect, useRef, useState } from "react";
 
 import { editor } from "monaco-editor/esm/vs/editor/editor.api"
@@ -18,18 +19,27 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
+
 import Store from "../../../store";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
-import Dropdown from "../../../components/layouts/Dropdown";
 import testEditorRequests from "../api";
 import func from "../../../../../util/func";
 
 const SampleApi = () => {
 
+    const allCollections = Store(state => state.allCollections);
     const [editorInstance, setEditorInstance] = useState(null);
+    const [selected, setSelected] = useState(0);
+    const [selectApiActive, setSelectApiActive] = useState(false)
+    const [selectedCollectionId, setSelectedCollectionId] = useState(null)
+    const [apiEndpoints, setApiEndpoints] = useState([])
+    const [selectedApiEndpoint, setSelectedApiEndpoint] = useState(null)
+    const [sampleData, setSampleData] = useState(null)
 
     const jsonEditorRef = useRef(null)
+
+    const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
 
     useEffect(() => {
         const jsonEditorOptions = {
@@ -53,7 +63,16 @@ const SampleApi = () => {
         setEditorInstance(editor.create(jsonEditorRef.current, jsonEditorOptions))    
     }, [])
 
-    const [selected, setSelected] = useState(0);
+    useEffect(() => {
+        fetchApiEndpoints(selectedCollectionId)
+    }, [selectedCollectionId])
+
+    useEffect(() => {
+        if (selectedCollectionId && selectedApiEndpoint) {
+            fetchSampleData(selectedCollectionId, selectedApiEndpoint.url, selectedApiEndpoint.method)
+        }
+    }, [selectApiActive])
+
 
     const handleTabChange = (selectedTabIndex) => {
         setSelected(selectedTabIndex)
@@ -67,27 +86,13 @@ const SampleApi = () => {
         }
     }
 
-    const tabs = [
-        {
-            id: 'request',
-            content: 'Request',
-        },
-        {
-            id: 'response',
-            content: 'Response',
-        }
-    ];
 
-    const allCollections = Store(state => state.allCollections);
-    const [selectedCollectionId, setSelectedCollectionId] = useState(null)
     const allCollectionsOptions = allCollections.map(collection => {
         return {
             label: collection.displayName,
             value: String(collection.id)
         }
     })
-
-    const [apiEndpoints, setApiEndpoints] = useState([])
 
     const fetchApiEndpoints = async (collectionId) => {
         const apiEndpointsResponse = await api.fetchCollectionWiseApiEndpoints(collectionId)
@@ -106,16 +111,6 @@ const SampleApi = () => {
             }
         }
     })
-    const [selectedApiEndpoint, setSelectedApiEndpoint] = useState(null)
-
-    useEffect(() => {
-        fetchApiEndpoints(selectedCollectionId)
-    }, [selectedCollectionId])
-
-    const [selectApiActive, setSelectApiActive] = useState(false)
-    const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
-
-    const [sampleData, setSampleData] = useState(null)
 
     const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
         const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
@@ -135,26 +130,20 @@ const SampleApi = () => {
         }
     }
 
-    useEffect(() => {
-        if (selectedCollectionId && selectedApiEndpoint) {
-            fetchSampleData(selectedCollectionId, selectedApiEndpoint.url, selectedApiEndpoint.method)
-        }
-    }, [selectApiActive])
+    const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
 
     return (
-        <div style={{ height: "100%", borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5" }}>
+        <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5" }}>
             <div style={{ display: "grid", gridTemplateColumns: "auto max-content max-content", alignItems: "center", gap: "10px", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px" }}>
-                <div></div>
+                <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted>
+                </LegacyTabs>
                 <Button onClick={toggleSelectApiActive}>Select Sample API</Button>
                 <Button primary>Run Test</Button>
             </div>
 
             <Divider />
-
-            <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted>
-            </LegacyTabs>
-
-            <Box ref={jsonEditorRef} minHeight="100%">
+            
+            <Box ref={jsonEditorRef} minHeight="80vh">
             </Box>
                 
             <Modal
