@@ -25,7 +25,7 @@ import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
-import IssuesPage from "../dashboard/pages/issues/issuesPage/IssuesPage";
+import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 
 const router = createBrowserRouter([
   {

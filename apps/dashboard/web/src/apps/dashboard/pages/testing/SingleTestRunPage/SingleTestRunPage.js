@@ -200,7 +200,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
       filters={filters} 
       disambiguateLabel={disambiguateLabel} 
       headers={headers}
-      getActions = {() => {}}
       selectable = {true}
       promotedBulkActions = {promotedBulkActions}
       loading={loading}

@@ -1,6 +1,4 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import GithubServerTable from "../../../components/tables/GithubServerTable"
-
 
 function IssuesPage(){
     return (
