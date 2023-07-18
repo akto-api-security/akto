@@ -50,7 +50,7 @@ function highlightPaths(highlightPathMap, refText){
           refText[type]
             .createDecorationsCollection([
               {
-                range: new Range(match.range.startLineNumber, match.range.startColumn - 1, match.range.endLineNumber + 1, 0),
+                range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
                 options: {
                   inlineClassName: "highlight",
                 },

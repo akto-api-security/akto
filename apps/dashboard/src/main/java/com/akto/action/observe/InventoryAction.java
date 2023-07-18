@@ -514,7 +514,7 @@ public class InventoryAction extends UserAction {
                     break;
                 case "location":
                     boolean isHeader = value.contains("header");
-                    boolean isUrlParam = value.contains("queryString");
+                    boolean isUrlParam = value.contains("urlParam");
                     boolean isPayload = value.contains("payload");
                     ArrayList<Bson> locationFilters = new ArrayList<>();
                     if (isHeader) {

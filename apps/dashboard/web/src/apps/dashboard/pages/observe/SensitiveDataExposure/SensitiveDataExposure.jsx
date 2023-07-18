@@ -77,9 +77,9 @@ const filters = [
     choices:[
         {label:"Header", value:"header"},
         {label:"Payload", value:"payload"},
-        {label:"Query string", value:"queryString"}
+        {label:"URL param", value:"urlParam"}
     ],
-    availableChoices: new Set('Header', 'Payload', 'Query string')
+    availableChoices: new Set('Header', 'Payload', 'URL param')
   }
 ]
 
@@ -130,6 +130,8 @@ function SensitiveDataExposure() {
 
     function disambiguateLabel(key, value) {
         switch (key) {
+            case "location":
+                return (value).map((val) => val).join(', ');
             case "apiCollectionId": 
                 return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
             case "isRequest":
@@ -184,7 +186,7 @@ function SensitiveDataExposure() {
                 temp['url'] = endpoint.method + " " + endpoint.url
                 temp['detected_timestamp'] = "Detected " + func.prettifyEpoch(endpoint.timestamp)
                 temp['timestamp'] = endpoint.timestamp
-                temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "query param" : "payload"))
+                temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "URL param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
                 temp["hexId"] = temp['collection'] + temp['url'] + temp['location'] + temp['call'] + endpoint.param + endpoint.subTypeString
