@@ -82,7 +82,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             long count = VulnerableRequestForTemplateDao.instance.count(new BasicDBObject());
             if (count < 1) {
                 //initialise vulnerable requests for templates in case its not present in db
-                insertVulnerableRequestsForDemo();
+                //insertVulnerableRequestsForDemo();
                 loggerMaker.infoAndAddToDb("map created in db for vulnerable requests and corresponding templates", LoggerMaker.LogDb.DASHBOARD);
             }
             loggerMaker.infoAndAddToDb("Demo collections already initialised", LoggerMaker.LogDb.DASHBOARD);
@@ -187,65 +187,53 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 );
                 vulnerableRequestForTemplate.setId(apiInfoKey);
 
-                UpdateOptions updateOptions = new UpdateOptions();
-                updateOptions.upsert(true);
-
                 VulnerableRequestForTemplate vul = VulnerableRequestForTemplateDao.instance.findOne(
                     Filters.in("templateIds", testList)
                 );
                 if (vul == null) {
-                    VulnerableRequestForTemplateDao.instance.getMCollection().updateOne(
-                        Filters.in("templateIds", testId),
-                        Updates.combine(
-                                Updates.set("_id", apiInfoKey),
-                                Updates.set("templateIds", testList)
-                        ),
-                        updateOptions
-                    );
+                    VulnerableRequestForTemplateDao.instance.getMCollection().insertOne(new VulnerableRequestForTemplate(apiInfoKey, testList));
                 }
 
                 Map<String, Object> testDataMap = (Map)json.get("testData");
-                addDataToMockserver(testDataMap, mockServiceUrl);
+                //addDataToMockserver(testDataMap, mockServiceUrl);
             }
             Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
 
         } catch (Exception e) {
             // add log
-            System.out.println("error");
+            loggerMaker.errorAndAddToDb("error inserting vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
-
-        System.out.println("hi");
 
     }
 
-    private static void addDataToMockserver(Map<String, Object> testDataMap, String mockServiceUrl) {
-        String url = (String) testDataMap.get("url");
-        // URI uri = null;
-        // try {
-        //     uri = new URI(path);
-        // } catch (Exception e) {
-        // }
-        // String url = uri.getPath();
-        JSONObject requestBody = new JSONObject();
-        requestBody.put("url", url);
+    // private static void addDataToMockserver(Map<String, Object> testDataMap, String mockServiceUrl) {
+    //     String url = (String) testDataMap.get("url");
+    //     // URI uri = null;
+    //     // try {
+    //     //     uri = new URI(path);
+    //     // } catch (Exception e) {
+    //     // }
+    //     // String url = uri.getPath();
+    //     JSONObject requestBody = new JSONObject();
+    //     requestBody.put("url", url);
 
-        JSONObject data = new JSONObject();
-        data.put("method", testDataMap.get("method"));
-        data.put("responsePayload", testDataMap.get("responsePayload"));
-        data.put("statusCode", testDataMap.get("statusCode"));
-        data.put("responseHeaders", testDataMap.get("responseHeaders"));
+    //     JSONObject data = new JSONObject();
+    //     data.put("method", testDataMap.get("method"));
+    //     data.put("responsePayload", testDataMap.get("responsePayload"));
+    //     data.put("statusCode", testDataMap.get("statusCode"));
+    //     data.put("responseHeaders", testDataMap.get("responseHeaders"));
 
-        requestBody.put("data", data);
-        String reqData = requestBody.toString();
+    //     requestBody.put("data", data);
+    //     String reqData = requestBody.toString();
 
-        TimeoutObject timeoutObj = new TimeoutObject(300, 300, 300);
-        JsonNode node = null;
-        try {
-            node = ApiRequest.postRequestWithTimeout(new HashMap<>(), mockServiceUrl + "/api/add_sample_data/", reqData, timeoutObj);            
-        } catch (Exception e) {
-            // TODO: handle exception
-        }
-    }
+    //     TimeoutObject timeoutObj = new TimeoutObject(300, 300, 300);
+    //     JsonNode node = null;
+    //     try {
+    //         node = ApiRequest.postRequestWithTimeout(new HashMap<>(), mockServiceUrl + "/api/add_sample_data/", reqData, timeoutObj);            
+    //     } catch (Exception e) {
+    //         // TODO: handle exception
+    //     }
+    // }
 
     private static String convertStreamToString(InputStream in) throws Exception {
 
