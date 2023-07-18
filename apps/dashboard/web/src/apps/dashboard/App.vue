@@ -287,6 +287,10 @@ export default {
           label: "Logout",
           click: () => {
             api.logout().then((resp) => {
+              if(resp.logoutUrl){
+                window.location.href = resp.logoutUrl;
+                return;
+              }
               window.location.href = "/login"
             })
           }

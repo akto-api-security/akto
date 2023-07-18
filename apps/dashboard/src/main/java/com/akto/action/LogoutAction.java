@@ -23,6 +23,8 @@ import java.util.Map;
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 public class LogoutAction extends UserAction implements ServletRequestAware,ServletResponseAware {
+
+    private String logoutUrl;
     @Override
     public String execute() throws Exception {
         User user = getSUser();
@@ -31,14 +33,14 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
                 Updates.set("refreshTokens", new ArrayList<>())
         );
         Map<String, SignupInfo> signupInfoMap = user.getSignupInfoMap();
-        if(signupInfoMap.containsKey(Config.ConfigType.AUTH0.name())){
-            return auth0Logout();
-        }
         Cookie cookie = AccessTokenAction.generateDeleteCookie();
         servletResponse.addCookie(cookie);
         HttpSession session = servletRequest.getSession();
         if (session != null) {
             session.setAttribute("logout", Context.now());
+        }
+        if(signupInfoMap.containsKey(Config.ConfigType.AUTH0.name())){
+            return auth0Logout();
         }
         try {
             servletResponse.sendRedirect(LOGIN_URI);
@@ -72,21 +74,22 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
                 || (servletRequest.getScheme().equals("https") && servletRequest.getServerPort() != 443)) {
             returnUrl += ":" + servletRequest.getServerPort();
         }
-        returnUrl += "/login";
+        returnUrl += "/";
 
-        String logoutUrl = String.format(
+        logoutUrl = String.format(
                 "https://%s/v2/logout?client_id=%s&returnTo=%s",
                 Auth0.getDomain(),
                 Auth0.getClientId(),
                 returnUrl);
-        try {
-            // get rid of cors error
-            servletResponse.setHeader("Access-Control-Allow-Origin", "*");
-            servletResponse.sendRedirect(logoutUrl);
-        } catch (IOException e) {
-            System.out.println(e.toString());
-            e.printStackTrace();
-        }
-        return Action.SUCCESS;
+
+        return null;
+    }
+
+    public String getLogoutUrl() {
+        return logoutUrl;
+    }
+
+    public void setLogoutUrl(String logoutUrl) {
+        this.logoutUrl = logoutUrl;
     }
 }
