@@ -204,6 +204,10 @@ function navigateBack(){
   navigate("/dashboard/observe/sensitive")
 }
 
+const handleRedirect = () => {
+    navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
+}
+
     return (
         <PageWithMultipleCards
         title={
@@ -212,7 +216,7 @@ function navigateBack(){
           </Text>
         }
         backAction = {{onAction:navigateBack}}
-        primaryAction={<Button primary>Create custom data types</Button>}
+        primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
         components = {[
             <GithubServerTable
                 key="table"
