@@ -138,21 +138,15 @@ const func = {
     return Object.keys(countIssues).filter((key) => {
       return (countIssues[key] > 0)
     }).map((key) => {
-      return {
-        confidence: key,
-        count: countIssues[key]
-      }
+      return countIssues[key] + " " + key
     })
   },
   getStatus(item) {
-    let confidence = item.confidence.toUpperCase();
-    switch (confidence) {
-      case 'HIGH': return 'critical';
-      case 'MEDIUM': return 'warning';
-      case 'LOW': return 'neutral';
-      default:
-        return '';
-    }
+    let localItem = item.toUpperCase();
+    if(localItem.includes("HIGH")) return 'critical';
+    if(localItem.includes("MEDIUM")) return 'warning';
+    if(localItem.includes("LOW")) return 'neutral';
+    return "";
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
     if (subCategoryMap[runResult.testSubType] === undefined) {

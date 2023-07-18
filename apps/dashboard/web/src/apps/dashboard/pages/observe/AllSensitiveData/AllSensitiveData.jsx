@@ -96,7 +96,7 @@ function AllSensitiveData(){
                     mapDataToKey[type.name] = type
                     tmp.push({
                         subType:type.name,
-                        isCustomType:[{confidence : 'Custom'}],
+                        isCustomType:['Custom'],
                         request:0,
                         response:0,
                         hexId:type.name,

@@ -53,6 +53,7 @@ function SingleRequest(){
                 setEndpointData(transform.prepareEndpointData(apiCollectionMap, res));
             })
             await api.fetchSensitiveSampleData(url, apiCollectionId, method).then((res) => {
+                // FIX: highlight paths for some endpoints not showing up.
                 setSampleData(transform.prepareSampleData(res, subType))
             })
         } 

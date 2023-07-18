@@ -34,7 +34,7 @@ function getTotalSeverityTestRunResult(severity){
   if(severity==null || severity.length==0){
       return 0;
   }
-  let ts = MAX_SEVERITY_THRESHOLD*((severity[0].confidence=='High')*MAX_SEVERITY_THRESHOLD + (severity[0].confidence=='Medium')) + (severity[0].confidence=='Low')
+  let ts = MAX_SEVERITY_THRESHOLD*((severity[0].includes("High"))*MAX_SEVERITY_THRESHOLD + (severity[0].includes('Medium'))) + (severity[0].includes('Low'))
   return ts;
 }
 
@@ -116,9 +116,9 @@ const transform = {
       obj["endTimestamp"] = data.endTimestamp
       obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
       obj['url'] = "Detected in " + (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
-      obj['severity'] = data.vulnerable ? [{confidence : func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))}] : []
+      obj['severity'] = data.vulnerable ? [func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))] : []
       obj['total_severity'] = getTotalSeverityTestRunResult(obj['severity'])
-      obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0].confidence] : []
+      obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0]] : []
       obj['apiFilter'] = [(data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url]
       obj['categoryFilter'] = [obj['testCategory']]
       obj['testFilter'] = [obj['name']]
