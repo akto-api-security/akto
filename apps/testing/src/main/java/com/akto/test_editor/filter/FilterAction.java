@@ -1014,7 +1014,11 @@ public final class FilterAction {
         String roleName = querySet.get(0);
 
         AccessMatrixUrlToRole accessMatrixUrlToRole = AccessMatrixUrlToRolesDao.instance.findOne(filterQ);
-        List<String> rolesThatHaveAccessToApi = accessMatrixUrlToRole.getRoles();
+
+        List<String> rolesThatHaveAccessToApi = new ArrayList<>();
+        if (accessMatrixUrlToRole != null) {
+            rolesThatHaveAccessToApi = accessMatrixUrlToRole.getRoles();
+        }
 
         int indexOfRole = rolesThatHaveAccessToApi.indexOf(roleName);
 

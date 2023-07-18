@@ -7,6 +7,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
@@ -25,14 +26,45 @@ import org.bson.conversions.Bson;
 
 public class AccessMatrixAnalyzer {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixAnalyzer.class);
+    private static final int LIMIT = 2000;
 
+    private static final int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
     public List<ApiInfoKey> getEndpointsToAnalyze(AccessMatrixTaskInfo task) {
         EndpointLogicalGroup endpointLogicalGroup =
                 EndpointLogicalGroupDao.instance.findOne(EndpointLogicalGroup.GROUP_NAME, task.getEndpointLogicalGroupName());
 
         if (endpointLogicalGroup == null) return new ArrayList<>();
+        List<ApiInfoKey> ret = new ArrayList<>();
+        for(ApiCollection apiCollection: ApiCollectionsDao.instance.getMetaAll()) {
+            int lastBatchSize = 0;
+            int skip = 0;
+            do {
+                List<BasicDBObject> apiBatch =
+                        ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), skip, LIMIT, DELTA_PERIOD_VALUE);
+                skip += LIMIT;
+                lastBatchSize = apiBatch.size();
+                if (!apiBatch.isEmpty()) {
+                    apiBatch.forEach(element -> {
+                        BasicDBObject item = (BasicDBObject) element.get(Constants.ID);
+                        if (item == null) {
+                            return;
+                        }
+                        ApiInfoKey apiInfoKey = new ApiInfoKey(
+                                item.getInt(ApiInfoKey.API_COLLECTION_ID),
+                                item.getString(ApiInfoKey.URL),
+                                Method.fromString(item.getString(ApiInfoKey.METHOD)));
 
-        return endpointLogicalGroup.getTestingEndpoints().returnApis();
+                        if (endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                            ret.add(apiInfoKey);
+                        }
+                    });
+                }
+
+            } while (lastBatchSize == LIMIT);
+
+        }
+
+        return ret;
     }
 
     public void run() {
@@ -45,7 +77,6 @@ public class AccessMatrixAnalyzer {
             List<ApiInfoKey> endpoints = getEndpointsToAnalyze(task);
             loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
 
-            TestingEndpoints testingEndpoints = new CustomTestingEndpoints(endpoints);
             AuthMechanism authMechanism = TestExecutor.createAuthMechanism();
             SampleMessageStore sampleMessageStore = SampleMessageStore.create();
             TestingUtil testingUtil = TestExecutor.createTestingUtil(authMechanism, sampleMessageStore, "system@akto.io");
@@ -56,12 +87,11 @@ public class AccessMatrixAnalyzer {
                 for(ApiInfoKey endpoint: endpoints){
                     List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(endpoint);
                     if (messages!=null){
-                        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-                        if (filteredMessages!=null){
-                            for (RawApi rawApi: filteredMessages) {
-                                bflaTest.updateAllowedRoles(rawApi, endpoint, testingUtil);
-                            }
+
+                        for (RawApi rawApi: messages) {
+                            bflaTest.updateAllowedRoles(rawApi, endpoint, testingUtil);
                         }
+
                     }
                 }
             }
