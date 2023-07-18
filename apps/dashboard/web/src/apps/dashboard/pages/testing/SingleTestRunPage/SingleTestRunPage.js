@@ -86,28 +86,24 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [],
-    availableChoices: new Set()
   },
   {
     key: 'apiFilter',
     label: 'API',
     title: 'API',
     choices: [],
-    availableChoices: new Set()
   },
   {
     key: 'categoryFilter',
     label: 'Category',
     title: 'Category',
     choices: [],
-    availableChoices: new Set()
   },
   {
     key: 'testFilter',
     label: 'Test',
     title: 'Test',
     choices: [],
-    availableChoices: new Set()
   }
 ]
 
@@ -173,9 +169,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
                 selectedTestRun?.severity && 
                 selectedTestRun.severity
                 .map((item) =>
-                <Badge key={item.confidence} status={func.getStatus(item)}>
+                <Badge key={item} status={func.getStatus(item)}>
                   <Text fontWeight="regular">
-                  {item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}
+                    {item}
                   </Text>
                 </Badge>
                 )}

@@ -90,14 +90,12 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [],
-    availableChoices: new Set()
   },
   {
     key: 'runTypeStatus',
     label: 'Run type',
     title: 'Run type',
     choices: [],
-    availableChoices: new Set()
   }
 ]
 

@@ -54,20 +54,18 @@ const sortOptions = [
     
 ];
 
-const filters = [
+let filters = [
     {
     key: 'apiCollectionId',
     label: 'Collection',
     title: 'Collection',
     choices: [],
-    availableChoices: new Set()
   },
   {
     key: 'isRequest',
     label: 'API call',
     title: 'API call',
     choices: [],
-    availableChoices: new Set(),
     singleSelect:true
   },
   {
@@ -79,7 +77,6 @@ const filters = [
         {label:"Payload", value:"payload"},
         {label:"URL param", value:"urlParam"}
     ],
-    availableChoices: new Set('Header', 'Payload', 'URL param')
   }
 ]
 
@@ -142,16 +139,13 @@ function SensitiveDataExposure() {
                 return value;
         }
       }
-    Object.keys(apiCollectionMap).forEach((key) => {
-        filters[0].availableChoices.add(key)
-    });
     filters[0].choices=[];
-    filters[0].availableChoices.forEach((key) => {
+    Object.keys(apiCollectionMap).forEach((key) => { 
         filters[0].choices.push({
             label:apiCollectionMap[key],
             value:Number(key)
         })
-    })
+    });
     filters[1].choices=[{
         label:"In request",
         value:true
@@ -159,8 +153,6 @@ function SensitiveDataExposure() {
         label:"In response",
         value:false
     }]
-    filters[1].availableChoices.add(true)
-    filters[1].availableChoices.add(false)
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
@@ -179,7 +171,7 @@ function SensitiveDataExposure() {
             endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
         }
         await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
-            res.endpoints.forEach((endpoint) => {
+            res.endpoints.forEach((endpoint, index) => {
                 let temp = {}
                 temp['collection'] = apiCollectionMap[endpoint.apiCollectionId]
                 temp['apiCollectionId'] = endpoint.apiCollectionId
@@ -189,7 +181,7 @@ function SensitiveDataExposure() {
                 temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "URL param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
-                temp["hexId"] = temp['collection'] + temp['url'] + temp['location'] + temp['call'] + endpoint.param + endpoint.subTypeString
+                temp["hexId"] = index
                 temp['nextUrl'] = "/dashboard/observe/sensitive/"+subType+"/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
                 ret.push(temp);
             })

@@ -47,7 +47,7 @@ function GithubServerTable(props) {
     temp = temp.filter((filter) => {
       return filter.key != key
     })
-    props.appliedFilters.forEach((defaultAppliedFilter) => {
+    props?.appliedFilters?.forEach((defaultAppliedFilter) => {
       if(key == defaultAppliedFilter.key){
         temp.push(defaultAppliedFilter)
       }
@@ -88,9 +88,6 @@ function GithubServerTable(props) {
   let filters=formatFilters(props.filters)
   function formatFilters(filters) {
     return filters
-      .filter((filter) => {
-        return filter.availableChoices!=undefined ? filter.availableChoices.size > 0 : false;
-      })
       .map((filter) => {
         return {
           key: filter.key,

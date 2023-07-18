@@ -199,9 +199,9 @@ function TestRunResultPage(props) {
               selectedTestRunResult?.severity &&
               selectedTestRunResult.severity
                 .map((item) =>
-                  <Badge key={item.confidence} status={func.getStatus(item)}>
+                  <Badge key={item} status={func.getStatus(item)}>
                     <Text fontWeight="regular">
-                    {item.count ? item.count : ""} {func.toSentenceCase(item.confidence)}
+                    {item}
                     </Text></Badge>
                 )
             }
