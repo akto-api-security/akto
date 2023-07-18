@@ -128,6 +128,7 @@ function SampleDataList(props) {
     useEffect(()=>{
       if(Object.keys(refText).length==0){
         [requestRef, responseRef].map((ref, index) => {
+          // handle graphQL APIs
           createEditor(ref.current, {
             language: "json",
             minimap: { enabled: false },

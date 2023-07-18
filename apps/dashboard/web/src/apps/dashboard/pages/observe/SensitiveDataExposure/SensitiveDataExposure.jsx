@@ -223,7 +223,6 @@ const handleRedirect = () => {
                 headers={headers}
                 resourceName={resourceName} 
                 appliedFilters={appliedFilters}
-                getActions = {() => {}}
                 sortOptions={sortOptions}
                 disambiguateLabel={disambiguateLabel}
                 selectable = {true}

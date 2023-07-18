@@ -38,15 +38,15 @@ const transform = {
             return (max > item.lastSeen ? max : item.lastSeen );
             }, 0)
         let locations = res.data.endpoints.reduce((location, item) => {
-            if(item.isHeader) location.add("header");
-            if(item.isUrlParam) location.add("URL param");
-            location.add("payload");
+            if(item?.isHeader) location.add("header");
+            if(item?.isUrlParam) location.add("URL param");
+            if(!item?.isHeader && !item?.isUrlParam) location.add("payload");
             return location
         }, new Set())
         let tmp = {}
         tmp.collection = apiCollection;
         tmp.detected_timestamp = "Detected " + func.prettifyEpoch(lastSeen)
-        tmp.location =  "Detected in " + [...locations].join(" ");
+        tmp.location =  "Detected in " + [...locations].join(", ");
         return tmp;
     },
     prepareSampleData: (res, subType) => {
