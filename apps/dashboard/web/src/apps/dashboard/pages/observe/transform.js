@@ -39,7 +39,7 @@ const transform = {
             }, 0)
         let locations = res.data.endpoints.reduce((location, item) => {
             if(item.isHeader) location.add("header");
-            if(item.isUrlParam) location.add("query param");
+            if(item.isUrlParam) location.add("URL param");
             location.add("payload");
             return location
         }, new Set())
