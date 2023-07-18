@@ -6,17 +6,17 @@ import {
 import { saveAs } from 'file-saver'
 
 const func = {
-    toDateStr (date, needYear) {
-        let strArray=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        let d = date.getDate();
-        let m = strArray[date.getMonth()];
-        let y = date.getFullYear();
-        return m + ' ' + d + (needYear ? ' ' + y: '' );
-    },
-    prettifyEpoch(epoch) {
-        let diffSeconds = (+Date.now())/1000 - epoch
-        let sign = 1
-        if(diffSeconds < 0){sign = -1}
+  toDateStr(date, needYear) {
+    let strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let d = date.getDate();
+    let m = strArray[date.getMonth()];
+    let y = date.getFullYear();
+    return m + ' ' + d + (needYear ? ' ' + y : '');
+  },
+  prettifyEpoch(epoch) {
+    let diffSeconds = (+Date.now()) / 1000 - epoch
+    let sign = 1
+    if (diffSeconds < 0) { sign = -1 }
 
     if (diffSeconds < 120) {
       return '1 minute ago'
@@ -28,11 +28,11 @@ const func = {
       return Math.round(diffSeconds / 3600) + ' hours ago'
     }
 
-        let diffDays = diffSeconds/86400
-        let diffWeeks = diffDays/7
-        let diffMonths = diffDays/30
-        let count = Math.round(diffDays)
-        let unit = 'day'
+    let diffDays = diffSeconds / 86400
+    let diffWeeks = diffDays / 7
+    let diffMonths = diffDays / 30
+    let count = Math.round(diffDays)
+    let unit = 'day'
 
     if (diffMonths > 2) {
       return this.toDateStr(new Date(epoch * 1000), true)
@@ -48,7 +48,7 @@ const func = {
       return 'today'
     }
 
-        let plural = count <= 1 ? '' : 's'
+    let plural = count <= 1 ? '' : 's'
 
     return count + ' ' + unit + plural + ' ago'
   },
@@ -67,7 +67,7 @@ const func = {
   initials(str) {
     if (!str)
       return ''
-      
+
     let ret = str.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
 
     if (ret.length == 1) {
@@ -78,25 +78,25 @@ const func = {
   },
   valToString(val) {
     if (val instanceof Set) {
-        return [...val].join(" & ")
+      return [...val].join(" & ")
     } else {
-        return val || "-"
+      return val || "-"
     }
   },
   downloadAsCSV(data, selectedTestRun) {
     // use correct function, this does not expand objects.
     let headerTextToValueMap = Object.keys(data[0])
-  
-    let csv = headerTextToValueMap.join(",")+"\r\n"
+
+    let csv = headerTextToValueMap.join(",") + "\r\n"
     data.forEach(i => {
-        csv += Object.values(headerTextToValueMap).map(h => this.valToString(i[h])).join(",") + "\r\n"
+      csv += Object.values(headerTextToValueMap).map(h => this.valToString(i[h])).join(",") + "\r\n"
     })
     let blob = new Blob([csv], {
-        type: "application/csvcharset=UTF-8"
+      type: "application/csvcharset=UTF-8"
     });
     saveAs(blob, (selectedTestRun.name || "file") + ".csv");
   },
-  flattenObject (obj, prefix = '') {
+  flattenObject(obj, prefix = '') {
     return Object.keys(obj).reduce((acc, k) => {
       const pre = prefix.length ? `${prefix}.` : '';
       if (
@@ -107,14 +107,14 @@ const func = {
         Object.assign(acc, this.flattenObject(obj[k], pre + k));
       else acc[pre + k] = obj[k];
       return acc;
-    }, {}) 
+    }, {})
   },
-  findInObjectValue (obj, query, keysToIgnore=[]){
+  findInObjectValue(obj, query, keysToIgnore = []) {
     let flattenedObject = this.flattenObject(obj);
     let ret = false;
     Object.keys(flattenedObject).forEach((key) => {
-      ret |= !keysToIgnore.some(ignore => key.toLowerCase().includes(ignore.toLowerCase())) && 
-      flattenedObject[key].toString().toLowerCase().includes(query);
+      ret |= !keysToIgnore.some(ignore => key.toLowerCase().includes(ignore.toLowerCase())) &&
+        flattenedObject[key].toString().toLowerCase().includes(query);
     })
     return ret;
   },
@@ -206,7 +206,7 @@ const func = {
         console.error('Failed to copy text to clipboard:', err);
       });
   },
-  epochToDateTime (timestamp) {
+  epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
   },
@@ -215,58 +215,160 @@ const func = {
     let result = []
     if (!apiCollections || apiCollections.length === 0) return []
     apiCollections.forEach((x) => {
-        let hostName = x['hostName']
-        if (!hostName) return
-        result.push(
-            {
-                "label": hostName,
-                "value": hostName
-            }
-        )
+      let hostName = x['hostName']
+      if (!hostName) return
+      result.push(
+        {
+          "label": hostName,
+          "value": hostName
+        }
+      )
     })
     return result
   },
   convertTrafficMetricsToTrend(trafficMetricsMap) {
     let result = []
     for (const [key, countMap] of Object.entries(trafficMetricsMap)) {
-        let trafficArr = []
-        for (const [key, value] of Object.entries(countMap)) {
-            const epochHours = parseInt(key);
-            const epochMilliseconds = epochHours * 3600000;
-            trafficArr.push([epochMilliseconds, value]);
-        }
+      let trafficArr = []
+      for (const [key, value] of Object.entries(countMap)) {
+        const epochHours = parseInt(key);
+        const epochMilliseconds = epochHours * 3600000;
+        trafficArr.push([epochMilliseconds, value]);
+      }
 
-        result.push(
-            {"data": trafficArr, "color": null, "name": key},
-        )
+      result.push(
+        { "data": trafficArr, "color": null, "name": key },
+      )
     }
     return result
-},
-prepareFilters: (data, filters) => {
-  let localFilters = filters;
-  localFilters.forEach((filter, index) => {
-    localFilters[index].availableChoices = new Set()
-    localFilters[index].choices = []
-  })
-  data.forEach((obj) => {
-  localFilters.forEach((filter, index) => {
-    let key = filter["key"]
-    obj[key].map((item) => filter.availableChoices.add(item));
-    localFilters[index] = filter
+  },
+  prepareFilters: (data, filters) => {
+    let localFilters = filters;
+    localFilters.forEach((filter, index) => {
+      localFilters[index].availableChoices = new Set()
+      localFilters[index].choices = []
     })
-  })
-  localFilters.forEach((filter, index) => {
-    let choiceList = []
-    filter.availableChoices.forEach((choice) => {
-      choiceList.push({label:choice, value:choice})
+    data.forEach((obj) => {
+      localFilters.forEach((filter, index) => {
+        let key = filter["key"]
+        obj[key].map((item) => filter.availableChoices.add(item));
+        localFilters[index] = filter
+      })
     })
-    localFilters[index].choices = choiceList
-  })
-  return localFilters
-},
-timeNow: () => {
-  return parseInt(new Date().getTime()/1000)
-},
+    localFilters.forEach((filter, index) => {
+      let choiceList = []
+      filter.availableChoices.forEach((choice) => {
+        choiceList.push({ label: choice, value: choice })
+      })
+      localFilters[index].choices = choiceList
+    })
+    return localFilters
+  },
+  timeNow: () => {
+    return parseInt(new Date().getTime() / 1000)
+  },
+  requestJson: function (message, highlightPaths) {
+    let result = {}
+    let requestHeaders = {}
+
+    let requestHeadersString = "{}"
+    let requestPayloadString = "{}"
+    let queryParamsString = ""
+    if (message["request"]) {
+      queryParamsString = message["request"]["queryParams"]
+      requestHeadersString = message["request"]["headers"] || "{}"
+      requestPayloadString = message["request"]["body"] || "{}"
+    } else {
+      let url = message["path"]
+      let urlSplit = url.split("?")
+      queryParamsString = urlSplit.length > 1 ? urlSplit[1] : ""
+
+      requestHeadersString = message["requestHeaders"] || "{}"
+      requestPayloadString = message["requestPayload"] || "{}"
+    }
+
+    const queryParams = {}
+    if (queryParamsString) {
+      let urlSearchParams = new URLSearchParams(queryParamsString)
+      for (const [key, value] of urlSearchParams) {
+        queryParams[key] = value;
+      }
+    }
+
+    try {
+      requestHeaders = JSON.parse(requestHeadersString)
+    } catch (e) {
+      // eat it
+    }
+
+    let requestPayload = {}
+    try {
+      requestPayload = JSON.parse(requestPayloadString)
+    } catch (e) {
+      requestPayload = requestPayloadString
+    }
+
+    result["json"] = { "queryParams": queryParams, "requestHeaders": requestHeaders, "requestPayload": requestPayload }
+    result["highlightPaths"] = {}
+    for (const x of highlightPaths) {
+      if (x["responseCode"] === -1) {
+        let keys = []
+        if (x["header"]) {
+          keys.push("root#" + "requestheaders#" + x["param"])
+        } else {
+          keys.push("root#" + "requestpayload#" + x["param"])
+          keys.push("root#" + "queryParams#" + x["param"])
+        }
+
+        keys.forEach((key) => {
+          key = key.toLowerCase()
+          result["highlightPaths"][key] = x["highlightValue"]
+        })
+      }
+    }
+    return result
+  },
+  responseJson: function (message, highlightPaths) {
+    let result = {}
+
+    let responseHeadersString = "{}"
+    let responsePayloadString = "{}"
+    if (message["request"]) {
+      responseHeadersString = message["response"]["headers"] || "{}"
+      responsePayloadString = message["response"]["body"] || "{}"
+    } else {
+      responseHeadersString = message["responseHeaders"] || "{}"
+      responsePayloadString = message["responsePayload"] || "{}"
+    }
+
+    let responseHeaders = {};
+    try {
+      responseHeaders = JSON.parse(responseHeadersString)
+    } catch (e) {
+      // eat it
+    }
+    let responsePayload = {}
+    try {
+      responsePayload = JSON.parse(responsePayloadString)
+    } catch (e) {
+      responsePayload = responsePayloadString
+    }
+    result["json"] = { "responseHeaders": responseHeaders, "responsePayload": responsePayload }
+    result["highlightPaths"] = {}
+    for (const x of highlightPaths) {
+      if (x["responseCode"] !== -1) {
+        let key = ""
+        if (x["header"]) {
+          key = "root#" + "responseheaders#" + x["param"]
+        } else {
+          key = "root#" + "responsepayload#" + x["param"];
+        }
+        key = key.toLowerCase();
+        result["highlightPaths"][key] = x["highlightValue"]
+      }
+    }
+    return result
+  }
 
 }
 

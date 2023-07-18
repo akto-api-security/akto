@@ -1,7 +1,7 @@
 
 const TestEditorFileExplorer = () => {
     return (
-        <div>
+        <div style={{background: "#FFFFFF"}}>
             Test File Explorer
         </div>
     )

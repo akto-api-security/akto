@@ -1,11 +1,197 @@
+import { Box, Button, Divider, EmptyState, LegacyCard, LegacyTabs, Modal, TextContainer } from "@shopify/polaris"
+import { tokens } from "@shopify/polaris-tokens"
+import { useEffect, useRef, useState } from "react";
 
+import { editor } from "monaco-editor/esm/vs/editor/editor.api"
+import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
+import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
+import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
+import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
+import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
+// import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
+import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
+import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
+import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
+// import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
+import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
+import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
+import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
+import "monaco-editor/esm/vs/language/json/monaco.contribution"
+import "monaco-editor/esm/vs/language/json/json.worker"
+import Store from "../../../store";
+import DropdownSearch from "../../../components/shared/DropdownSearch";
+import api from "../../testing/api"
+import Dropdown from "../../../components/layouts/Dropdown";
+import testEditorRequests from "../api";
+import func from "../../../../../util/func";
 
 const SampleApi = () => {
-    return (
-        <div>
-            <Card color>
 
-            </Card>
+    const [editorInstance, setEditorInstance] = useState(null);
+
+    const jsonEditorRef = useRef(null)
+
+    useEffect(() => {
+        const jsonEditorOptions = {
+            language: "json",
+            minimap: { enabled: false },
+            wordWrap: true,
+            automaticLayout: false,
+            colorDecorations: true,
+            scrollBeyondLastLine: false,
+            readOnly: true
+        }
+
+        editor.defineTheme('subdued', {
+            base: 'vs',
+            inherit: true,
+            rules: [],
+            colors: {
+                'editor.background': '#FAFBFB',
+            },
+        });
+        setEditorInstance(editor.create(jsonEditorRef.current, jsonEditorOptions))    
+    }, [])
+
+    const [selected, setSelected] = useState(0);
+
+    const handleTabChange = (selectedTabIndex) => {
+        setSelected(selectedTabIndex)
+
+        if (sampleData) {
+            if (selectedTabIndex == 0) {
+                editorInstance.setValue(JSON.stringify(sampleData.requestJson["json"], null, 2))
+            } else {
+                editorInstance.setValue(JSON.stringify(sampleData.responseJson["json"], null, 2))
+            }
+        }
+    }
+
+    const tabs = [
+        {
+            id: 'request',
+            content: 'Request',
+        },
+        {
+            id: 'response',
+            content: 'Response',
+        }
+    ];
+
+    const allCollections = Store(state => state.allCollections);
+    const [selectedCollectionId, setSelectedCollectionId] = useState(null)
+    const allCollectionsOptions = allCollections.map(collection => {
+        return {
+            label: collection.displayName,
+            value: String(collection.id)
+        }
+    })
+
+    const [apiEndpoints, setApiEndpoints] = useState([])
+
+    const fetchApiEndpoints = async (collectionId) => {
+        const apiEndpointsResponse = await api.fetchCollectionWiseApiEndpoints(collectionId)
+        if (apiEndpointsResponse) {
+            setApiEndpoints(apiEndpointsResponse.listOfEndpointsInCollection)
+        }
+    }
+
+    const apiEndpointsOptions = apiEndpoints.map(apiEndpoint => {
+        return {
+            id: apiEndpoint.method + " " + apiEndpoint.url,
+            label: apiEndpoint.method + " " + apiEndpoint.url,
+            value: {
+                method: apiEndpoint.method,
+                url: apiEndpoint.url
+            }
+        }
+    })
+    const [selectedApiEndpoint, setSelectedApiEndpoint] = useState(null)
+
+    useEffect(() => {
+        fetchApiEndpoints(selectedCollectionId)
+    }, [selectedCollectionId])
+
+    const [selectApiActive, setSelectApiActive] = useState(false)
+    const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
+
+    const [sampleData, setSampleData] = useState(null)
+
+    const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
+        const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
+        if (sampleDataResponse) {
+            if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
+                const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[0])
+                const requestJson = func.requestJson(sampleDataJson, [])
+                const responseJson = func.responseJson(sampleDataJson, [])
+                setSampleData({ requestJson, responseJson })
+
+                if (editorInstance) {
+                    editorInstance.setValue(JSON.stringify(requestJson["json"], null, 2))
+                }
+
+                setSelected(0)
+            }
+        }
+    }
+
+    useEffect(() => {
+        if (selectedCollectionId && selectedApiEndpoint) {
+            fetchSampleData(selectedCollectionId, selectedApiEndpoint.url, selectedApiEndpoint.method)
+        }
+    }, [selectApiActive])
+
+    return (
+        <div style={{ height: "100%", borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "auto max-content max-content", alignItems: "center", gap: "10px", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px" }}>
+                <div></div>
+                <Button onClick={toggleSelectApiActive}>Select Sample API</Button>
+                <Button primary>Run Test</Button>
+            </div>
+
+            <Divider />
+
+            <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted>
+            </LegacyTabs>
+
+            <Box ref={jsonEditorRef} minHeight="100%">
+            </Box>
+                
+            <Modal
+                open={selectApiActive}
+                onClose={toggleSelectApiActive}
+                title="Select sample API"
+                primaryAction={{
+                    content: 'Save',
+                    onAction: toggleSelectApiActive,
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: toggleSelectApiActive,
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <DropdownSearch
+                        label="Select collection"
+                        placeholder="Select API collection"
+                        optionsList={allCollectionsOptions}
+                        setSelected={setSelectedCollectionId}
+                    />
+
+                    <br />
+
+                    <DropdownSearch
+                        disabled={apiEndpointsOptions.length === 0}
+                        label="API"
+                        placeholder="Select API endpoint"
+                        optionsList={apiEndpointsOptions}
+                        setSelected={setSelectedApiEndpoint}
+                    />
+
+                </Modal.Section>
+            </Modal>
         </div>
     )
 }

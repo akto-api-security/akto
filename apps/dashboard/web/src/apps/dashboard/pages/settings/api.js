@@ -2,7 +2,7 @@ import request from "@/util/request"
 
 const settingRequests = {
     inviteUsers: async (apiSpec) => {
-        const res = request({
+        const res = await request({
             url: '/api/inviteUsers',
             method: 'post',
             data: { 

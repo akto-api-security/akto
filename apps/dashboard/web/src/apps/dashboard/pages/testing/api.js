@@ -78,4 +78,13 @@ export default {
             }
         })
     },
+    fetchCollectionWiseApiEndpoints (apiCollectionId) {
+        return request({
+            url: '/api/fetchCollectionWiseApiEndpoints',
+            method: 'post',
+            data: {apiCollectionId}
+        }).then((resp) => {
+            return resp
+        })        
+    }
 }
