@@ -1,0 +1,39 @@
+id: AIRFLOW_CONFIGURATION_EXPOSURE
+info:
+  name: Apache Airflow Configuration Exposure
+  description: "Attacker can get unauthorized access to Apache Airflow configuration files."
+  details: >
+              "Apache Airflow Configuration Exposure is a vulnerability that arises from misconfigured settings in Apache Airflow, an open-source workflow management platform. The misconfiguration exposes critical configuration files containing sensitive information, such as API keys and database credentials. This vulnerability could lead to unauthorized access and potential data breaches. Attackers can exploit the exposed configurations to gain unauthorized access, manipulate workflows, and compromise the integrity and confidentiality of the system. It is crucial to address this issue promptly to mitigate the risk of unauthorized access and protect sensitive data."
+  impact: "Attackers can exploit exposed configurations to gain unauthorized access and compromise the system's integrity and confidentiality."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: AIRFLOW_CONFIGURATION_EXPOSURE
+  severity: MEDIUM
+  references:
+    - https://beaglesecurity.com/blog/vulnerability/apache-airflow-configuration-exposure.html
+    - https://www.acunetix.com/vulnerabilities/web/apache-airflow-exposed-configuration/
+    - https://thehackernews.com/2021/10/poorly-configured-apache-airflow.html
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/airflow.cfg
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    contains_all:
+      - '[core]'
+      - '[api]'
