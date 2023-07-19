@@ -278,7 +278,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "api/college/employee/config.json",
+            "url": "/api/college/employee/config.json",
             "responsePayload": "{\"api_keys\":{\"key1\":\"value1\",\"key2\":\"value2\"}}",
             "responseHeaders": {},
             "statusCode": 200
@@ -1594,7 +1594,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "api/college/redirect",
+            "url": "/api/college/redirect",
             "responsePayload": {
                 "message": "Welcome to the Evil home page"
             },
@@ -1978,7 +1978,7 @@
         },
         "testData": {
             "method": "POST",
-            "url": "api/college/prof/upload-marks?file=https://ssrf.localdomain.pw/csv-without-body/301-http-169.254.169.254:80-.c.csv",
+            "url": "/api/college/prof/upload-marks?file=https://ssrf.localdomain.pw/csv-without-body/301-http-169.254.169.254:80-.c.csv",
             "responsePayload": {
                 "ami-id": "ami-871423645",
                 "ami-launch-index": 3
@@ -2001,7 +2001,7 @@
         },
         "testData": {
             "method": "POST",
-            "url": "api/college/dashboard/upload-profilePic?imageFile=https://ssrf.localdomain.pw/img-without-body/301-http-169.254.169.254:80-.i.jpg",
+            "url": "/api/college/dashboard/upload-profilePic",
             "responsePayload": {
                 "ami-id": "ami-236871445",
                 "ami-launch-index": 2
@@ -2024,7 +2024,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "api/college/dept/chemical/resources/books?book=https://ssrf.localdomain.pw/pdf-without-body/301-http-169.254.169.254:80-.p.pdf",
+            "url": "/api/college/dept/chemical/resources/books",
             "responsePayload": {
                 "ami-id": "ami-287144365",
                 "ami-launch-index": 1
@@ -2047,7 +2047,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/library/homepage?redirect=http://make-127-0-0-1-rr.1u.ms/admin",
+            "url": "/api/college/library/homepage",
             "responsePayload": {
                 "role": "admin",
                 "message": "Welcome Admin",
@@ -2097,7 +2097,7 @@
         },
         "testData": {
             "method": "POST",
-            "url": "api/college/depart/mech/prof/upload-data?file=https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml",
+            "url": "/api/college/depart/mech/prof/upload-data",
             "responsePayload": {
                 "ami-id": "ami-234456871",
                 "ami-launch-index": 7
@@ -2120,7 +2120,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/library/depart/books/eee?redirect=http://①②⑦。⓪⓪⓪。⓪⓪①/admin",
+            "url": "/api/college/library/depart/books/eee",
             "responsePayload": {
                 "role": "admin",
                 "message": "Welcome HOD of EEE Department",
@@ -2145,7 +2145,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/library/depart/books/chem?redirect=http://169.254.169.254/latest/meta-data/local-ipv4",
+            "url": "/api/college/library/depart/books/chem",
             "responsePayload": {
                 "ami-id": "ami-287144365",
                 "ami-launch-index": 1
@@ -2168,7 +2168,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "api/college/dept/mech/resources/books-and-journals?file=///etc/passwd",
+            "url": "/api/college/dept/mech/resources/books-and-journals",
             "responsePayload": "root:x:0:0:root:/root:/bin/bash",
             "responseHeaders": {},
             "statusCode": 200
@@ -2188,7 +2188,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/library/depart/journals/mech?redirect=http://⑯⑨。②⑤④。⑯⑨｡②⑤④/latest/meta-data/local-ipv4",
+            "url": "/api/college/library/depart/journals/mech",
             "responsePayload": {
                 "ami-id": "ami-234468711",
                 "ami-launch-index": 4
@@ -2630,7 +2630,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "api/college/info/department/branch/struts/webconsole.html",
+            "url": "/api/college/info/department/branch/struts/webconsole.html",
             "responsePayload": "<html>\n<head>\n  <title>Struts OGNL Console</title>\n</head>\n<body>\n  <h1>Welcome to the OGNL console!</h1>\n</body>\n</html>",
             "responseHeaders": {
                 "Content-Type": "text/html"
@@ -2735,7 +2735,7 @@
     },
     "testData": {
       "method": "GET",
-      "url": "api/college/graphql",
+      "url": "/api/college/graphql",
       "responsePayload": {
         "data": null,
         "errors": [
@@ -2796,7 +2796,7 @@
     },
     "testData": {
       "method": "GET",
-      "url": "api/college/graphql",
+      "url": "/api/college/graphql",
       "responsePayload": {
         "message1": "At line 6:28, Did you mean GRAPHQL",
         "message2": "Expected value of type string"
@@ -2891,7 +2891,7 @@
     },
     "testData": {
       "method": "GET",
-      "url": "api/college/graphql",
+      "url": "/api/college/graphql",
       "responsePayload": {
         "data": {
           "department": "PIE",
@@ -2943,7 +2943,7 @@
     },
     "testData": {
       "method": "GET",
-      "url": "api/college/graphql",
+      "url": "/api/college/graphql",
       "responsePayload": {
         "message": "Welcome to GraphQL Console"
       },
@@ -2991,7 +2991,7 @@
     },
     "testData": {
       "method": "GET",
-      "url": "api/college/info/departments/branch.json",
+      "url": "/api/college/info/departments/branch.json",
       "responsePayload": "{\"departments\": [{\"id\": 1,\"name\": \"Computer Science\",\"students\": 150},{\"id\": 2,\"name\": \"Electrical Engineering\",\"students\": 120},{\"id\": 3,\"name\": \"Mechanical Engineering\",\"students\": 180},{\"id\": 4,\"name\": \"Civil Engineering\",\"students\": 100},{\"id\": 5,\"name\": \"Chemical Engineering\",\"students\": 90},{\"id\": 6,\"name\": \"Biomedical Engineering\",\"students\": 80},{\"id\": 7,\"name\": \"Aerospace Engineering\",\"students\": 70}]}",
       "responseHeaders": {
 
@@ -3013,7 +3013,7 @@
     },
     "testData": {
       "method": "GET",
-      "url": "api/college/graphql",
+      "url": "/api/college/graphql",
       "responsePayload": {
         "data": {
           "department": "MNC",
