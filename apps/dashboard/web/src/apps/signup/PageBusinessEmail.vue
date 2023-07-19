@@ -7,19 +7,31 @@
             <div class="title">Please sign up with a business email only</div>
             <div class="message">Try again with a different email id</div>
             <div class="login-link">
-                <a href="/signup">
+                <div @click="redirectToLogin">
                     <v-icon size="8">$fas_arrow-left</v-icon>
                     <span>Back to signup</span>
-                </a>
+                </div>
             </div>
         </div>
     </div>
 </template>
 
 <script>
+import axios from 'axios';
 
 export default {
-    name: "PageCheckInbox"
+    name: "PageBusinessEmail",
+    methods: {
+        redirectToLogin(){
+            axios.get("/auth0-logout").then((resp) => {
+              if(resp.data.logoutUrl){
+                window.location.href = resp.data.logoutUrl;
+                return;
+              }
+              window.location.href = "/login"
+            })
+        }
+    }
 }
 
 </script>
@@ -58,5 +70,6 @@ export default {
     color: #2C6ECB
     font-size: 14px
     font-weight: 400
+    cursor: pointer
 
 </style>
