@@ -106,6 +106,11 @@ export default {
       }
       this.disableButtons = !formModel.valid
     }
+  },
+  async mounted() {
+    if(window.IS_SAAS && window.IS_SAAS==="true"){
+      window.location.href = "/";
+    }
   }
 }
 </script>

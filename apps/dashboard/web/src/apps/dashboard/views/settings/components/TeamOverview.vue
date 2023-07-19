@@ -188,7 +188,7 @@
             removedFailure (err, user) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
-                    text: `There was an error while removing ${user.email}!`,
+                    text: `There was an error while removing the user!`,
                     color: 'red'
                 })
             },
