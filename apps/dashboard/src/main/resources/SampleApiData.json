@@ -259,10 +259,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/about-us/.circleci/config.yml",
-            "responsePayload": {
-                "version:": "5.1.5",
-                "jobs:": "job1.. job2 .. job 3"
-            },
+            "responsePayload": "version: 1.0\njobs:\n  - name: build\n    steps:\n      - run: echo 'Building...'\n",
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -282,10 +279,7 @@
         "testData": {
             "method": "GET",
             "url": "api/college/employee/config.json",
-            "responsePayload": {
-                "api_keys": "guebebeuybhjjjkkkshcbb",
-                "server": "notebook.com"
-            },
+            "responsePayload": "{\"api_keys\":{\"key1\":\"value1\",\"key2\":\"value2\"}}",
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1826,29 +1820,13 @@
             "method": "GET",
             "url": "/api/college/course-list",
             "responsePayload": {
-                "courses": [
-                    {
-                        "courseId": "CS101",
-                        "name": "Computer Science",
-                        "duration": "4 years",
-                        "faculty": "PROF-404",
-                        "description": "This course provides in-depth knowledge of computer science principles and applications."
-                    },
-                    {
-                        "courseId": "ENG201",
-                        "name": "English",
-                        "duration": "3 years",
-                        "faculty": "PROF-202",
-                        "description": "Explore the world of literature and develop critical thinking and analytical skills."
-                    },
-                    {
-                        "courseId": "MAT301",
-                        "name": "Mathematics",
-                        "duration": "3 years",
-                        "faculty": "PROF-505",
-                        "description": "Study advanced mathematical concepts and their real-world applications."
-                    }
-                ]
+                "courses":{
+                    "courseId_1": "CS101",
+                    "courseId_2": "CS102",
+                    "courseId_3": "CS103",
+                    "courseId_4": "CS104",
+                    "courseId_5": "CS105"
+                }
             },
             "responseHeaders": {
                 "Server": "Apache/2.4.18 (Ubuntu)"
@@ -2498,24 +2476,11 @@
             "url": "/api/college/campus-info/actuator/beans",
             "responsePayload": {
                 "type": "application",
-                "beans": [
-                    {
-                        "name": "bean1",
-                        "dependencies": [
-                            "dependency1",
-                            "dependency2"
-                        ],
-                        "scope": "singleton"
-                    },
-                    {
-                        "name": "bean2",
-                        "dependencies": [
-                            "dependency3",
-                            "dependency4"
-                        ],
-                        "scope": "prototype"
-                    }
-                ]
+                "beans": {
+                    "name": "bean1",
+                    "dependencies": "dependency1",
+                    "scope": "singleton"
+                }
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -2538,16 +2503,8 @@
             "url": "/api/college/info/about/campus/actuator/configprops",
             "responsePayload": {
                 "contexts": {
-                    "org.springframework.boot.actuate": {
-                        "beans": {
-                            "bean1": {
-                                "properties": {
-                                    "property1": "value1",
-                                    "property2": "value2"
-                                }
-                            }
-                        }
-                    }
+                    "org.springframework.boot.actuate": "beans",
+                    "beans":"properties"
                 }
             },
             "responseHeaders": {},
@@ -2600,13 +2557,11 @@
             "method": "GET",
             "url": "api/college/info/depart/branch/actuator/httptrace",
             "responsePayload": {
-                "traces": [
-                    {
-                        "timestamp": "2023-07-06T10:30:15.123Z",
-                        "principal": "user123",
-                        "session": "session123"
-                    }
-                ]
+                "traces":{
+                    "timestamp": "2023-07-06T10:30:15.123Z",
+                    "principal": "user123",
+                    "session": "session123"
+                }
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -2628,17 +2583,12 @@
             "method": "GET",
             "url": "/api/college/about/depart/branch/actuator/threaddump",
             "responsePayload": {
-                "threads": [
-                    {
-                        "threadName": "Thread-1",
-                        "threadId": "12345",
-                        "threadState": "RUNNABLE",
-                        "stackTrace": [
-                            "at com.example.MyClass.method1(MyClass.java:10)",
-                            "at com.example.MyClass.method2(MyClass.java:20)"
-                        ]
-                    }
-                ]
+                "threads":{
+                    "threadName": "Thread-1",
+                    "threadId": "12345",
+                    "threadState": "RUNNABLE",
+                    "stackTrace": "at com.example.MyClass.method1(MyClass.java:10)"
+                }
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -2685,6 +2635,66 @@
             "responseHeaders": {
                 "Content-Type": "text/html"
             },
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "JWT_SIGNING_IN_CLIENT_SIDE",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "const token = jwt.sign({ username: 'john_doe' }, 'your_secret_key');",
+            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\":\"application/json\",\"HOST\":\"vulnerableapi.com\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/chat/verify"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/chat/verify",
+            "responsePayload": "const token = jwt.sign({ username: 'john_doe' }, 'your_secret_key');",
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "PORT_SCANNING",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "Welcome to College Events!!",
+            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\":\"application/json\",\"HOST\":\"vulnerableapi.com\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/events?lookup=http://events-1.com"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/events?lookup=http://localhost:80",
+            "responsePayload": "Connection to MongoDB refused due to timeout, status=rejected",
+            "responseHeaders": {},
+            "statusCode": 204
+        }
+    },
+    {
+        "id": "FETCH_SENSITIVE_FILES",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "20 available networks for students ,connect to any using roll no as user id and phone number as password",
+            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\":\"application/json\",\"HOST\":\"vulnerableapi.com\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/network-info?view=http://net.com"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/network-info?view=/etc/passwd",
+            "responsePayload": "Sensitive Info ....",
+            "responseHeaders": {},
             "statusCode": 200
         }
     }
