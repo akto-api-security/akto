@@ -48,6 +48,7 @@ import com.akto.util.AccountTask;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
@@ -1099,6 +1100,14 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        if(isSaas){
+                            try {
+                                Auth0.getInstance();
+                                loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
+                            }
+                        }
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1111,7 +1120,6 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
-
     }
 
     public static void insertPiiSources(){
