@@ -42,8 +42,8 @@ function GithubCell(props){
                 }).map((header) => {
                     return props?.data?.[header?.value]
                     ?.map((item) =>
-                    <Badge key={item.confidence} status={func.getStatus(item)}>
-                        {item.count ? item.count: ""} {item.confidence}
+                    <Badge key={item} status={func.getStatus(item)}>
+                        {item}
                     </Badge>
                 )}) 
             }

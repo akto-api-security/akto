@@ -26,6 +26,7 @@ import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
+import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 
 const router = createBrowserRouter([
   {
@@ -51,26 +52,30 @@ const router = createBrowserRouter([
         ]
       },
       {
-        path: "/dashboard/observe",
+        path: "observe",
         element: <PageObserve/>,
         children: [
           {
-            path: "/dashboard/observe/sensitive",
+            path: "sensitive",
             element: <AllSensitiveData/>
           },
           {
-            path: "/dashboard/observe/data-types",
+            path: "data-types",
             element: <DataTypes/>
           },
           {
-            path: "/dashboard/observe/sensitive/:subType",
+            path: "sensitive/:subType",
             element: <SensitiveDataExposure/>
           },
           {
-            path: "/dashboard/observe/inventory/:apiCollectionId/:urlAndMethod",
+            path: "sensitive/:subType/:apiCollectionId/:urlAndMethod",
             element: <SingleRequest/>
           }
         ]
+      },
+      {
+        path:"issues",
+        element:<IssuesPage/>
       }
     ]
   },

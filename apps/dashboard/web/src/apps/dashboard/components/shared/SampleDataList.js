@@ -4,10 +4,10 @@ import {
 import {
   Text,
   VerticalStack,
-  HorizontalStack, Icon, Box, LegacyCard, HorizontalGrid,
-  Pagination, Key
+  HorizontalStack, Box, LegacyCard, HorizontalGrid,
+  Pagination, Key, Button, Popover, ActionList
 } from '@shopify/polaris';
-import { editor } from "monaco-editor/esm/vs/editor/editor.api"
+import { editor, Range } from "monaco-editor/esm/vs/editor/editor.api"
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
@@ -23,6 +23,9 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
+import api from '../../pages/observe/api';
+import "./style.css";
+import Store from '../../store';
 
 function formatJSON(val = {}) {
     try {
@@ -36,21 +39,96 @@ function formatJSON(val = {}) {
     }
   }
 
+function highlightPaths(highlightPathMap, refText){
+  highlightPathMap && Object.keys(highlightPathMap).forEach((type) => {
+    Object.keys(highlightPathMap[type]).forEach((key) => {
+      if (highlightPathMap[type][key].highlight) {
+        let path = key.split("#");
+        let mainKey = path[path.length - 1];
+        let matches = refText[type].getModel().findMatches(mainKey, false, false, false, null, true);
+        matches.forEach((match) => {
+          refText[type]
+            .createDecorationsCollection([
+              {
+                range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
+                options: {
+                  inlineClassName: "highlight",
+                },
+              }
+            ])
+        })
+      }
+    })
+  })
+}
+
 function SampleDataList(props) {
     const requestRef = useRef("");
     const responseRef = useRef("");
-    const [refText, setRefText] = useState([])
+    const [refText, setRefText] = useState({})
     const [page, setPage] = useState(0);
-  
-    function createEditor(ref, options) {
+    const [popoverActive, setPopoverActive] = useState(false);
+    const setToastConfig = Store(state => state.setToastConfig)
+    const setToast = (isActive, isError, message) => {
+        setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+        })
+    }
+    async function copyRequest(type, completeData) {
+      let copyString = "";
+      let snackBarMessage = ""
+      completeData = JSON.parse(completeData);
+      if (type=="RESPONSE") {
+        let responsePayload = {}
+        let responseHeaders = {}
+        let statusCode = 0
+    
+        if (completeData) {
+          responsePayload = completeData["response"] ?  completeData["response"]["body"] : completeData["responsePayload"]
+          responseHeaders = completeData["response"] ?  completeData["response"]["headers"] : completeData["responseHeaders"]
+          statusCode = completeData["response"] ?  completeData["response"]["statusCode"] : completeData["statusCode"]
+        }
+        let b = {
+          "responsePayload": responsePayload,
+          "responseHeaders": responseHeaders,
+          "statusCode": statusCode
+        }
+    
+        copyString = JSON.stringify(b)
+        snackBarMessage = "Response data copied to clipboard"
+      } else {
+        if (type === "CURL") { 
+          snackBarMessage = "Curl request copied to clipboard"
+          let resp = await api.convertSampleDataToCurl(JSON.stringify(completeData))
+          copyString = resp.curlString
+        } else {
+          snackBarMessage = "Burp request copied to clipboard"
+          let resp = await api.convertSampleDataToBurpRequest(JSON.stringify(completeData))
+          copyString = resp.burpRequest
+        }
+      }
+    
+      if (copyString) {
+        navigator.clipboard.writeText(copyString)
+        setToast(true, false, snackBarMessage)
+        setPopoverActive(false)
+      }
+    }
+
+    function createEditor(ref, options, type) {
       let text = null
       text = editor.create(ref, options)
       text.setValue("");
-      setRefText((old) => [...old, text]);
+      setRefText((old) => ({
+        ...old, [type]:text
+      }) )
     }
     useEffect(()=>{
-      if(refText.length==0){
-        [requestRef, responseRef].map((ref) => {
+      if(Object.keys(refText).length==0){
+        [requestRef, responseRef].map((ref, index) => {
+          // handle graphQL APIs
           createEditor(ref.current, {
             language: "json",
             minimap: { enabled: false },
@@ -59,11 +137,14 @@ function SampleDataList(props) {
             colorDecorations: true,
             scrollBeyondLastLine: false,
             readOnly: true,
-          })
+          },index == 0 ? "request" : "response" )
         })
+      } else {
+        refText.request.setValue("")
+        refText.response.setValue("")
       }
-      if (props.sampleData?.[page] && refText.length==2) {
-        let message = formatJSON(props.sampleData?.[page]);
+      if (props.sampleData?.[page] && Object.keys(refText).length==2) {
+        let message = formatJSON(props.sampleData?.[page].message);
         let res = {}, req = {}
         Object.keys(message).forEach((key) => {
           if (key.startsWith("req") || key.startsWith("query")) {
@@ -72,8 +153,10 @@ function SampleDataList(props) {
             res[key] = message[key]
           }
         })
-          refText[0].setValue(JSON.stringify(req, null, 2))
-          refText[1].setValue(JSON.stringify(res, null, 2))
+        refText.request.setValue(JSON.stringify(req, null, 2))
+        refText.response.setValue(JSON.stringify(res, null, 2))
+
+        highlightPaths(props.sampleData?.[page].highlightPathMap, refText);
       }
     }, [props.sampleData, page, refText])
   
@@ -106,9 +189,31 @@ function SampleDataList(props) {
                       <Box padding={"2"}>
                         <HorizontalStack padding="2" align='space-between'>
                           {index == 0 ? "Request" : "Response"}
-                          <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                            <Icon source={ClipboardMinor} />
-                          </div>
+                          {index == 0 ? (
+                            <Popover
+                              active={popoverActive}
+                              activator={<Button icon={ClipboardMinor} plain onClick={() => setPopoverActive(!popoverActive)} />}
+                              onClose={() => setPopoverActive(false)}
+
+                            >
+                              <ActionList
+                                actionRole="menuitem"
+                                items={[
+                                  {
+                                    content: 'Copy as CURL',
+                                    onAction: () => {copyRequest("CURL",props.sampleData?.[page].message)} ,
+                                  },
+                                  {
+                                    content: 'Copy as burp',
+                                    onAction: () => {copyRequest("BURP",props.sampleData?.[page].message)} ,
+                                  },
+                                ]}
+
+                              />
+                            </Popover>
+                          ) : (
+                            <Button icon={ClipboardMinor} plain  onClick={() => copyRequest("RESPONSE",props.sampleData?.[page].message)}/>
+                          )}
                         </HorizontalStack>
                       </Box>
                     </LegacyCard.Section>

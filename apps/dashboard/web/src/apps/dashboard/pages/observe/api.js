@@ -69,6 +69,19 @@ export default {
             data: { }
         })
     },
+    async loadSensitiveParameters (apiCollectionId, url, method, subType) {
+        const resp = await request({
+            url: '/api/loadSensitiveParameters',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method,
+                subType
+            }
+        })
+        return resp
+    },
 
     saveCustomDataType(dataObj) {
         return request({
@@ -84,5 +97,21 @@ export default {
             method:'post',
             data: dataObj
         })
+    },
+    async convertSampleDataToCurl(sampleData) {
+        const resp = await request({
+            url: '/api/convertSampleDataToCurl',
+            method: 'post',
+            data: { sampleData }
+        })
+        return resp
+    },
+    async convertSampleDataToBurpRequest(sampleData) {
+        const resp = await request({
+            url: '/api/convertSamleDataToBurpRequest',
+            method: 'post',
+            data: { sampleData }
+        })
+        return resp
     },
 }

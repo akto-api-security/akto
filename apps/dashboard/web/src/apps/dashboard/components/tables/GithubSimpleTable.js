@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import GithubServerTable from "./GithubServerTable";
 import func from "@/util/func";
 
@@ -32,13 +32,12 @@ function GithubSimpleTable(props) {
             label: label,
             title: label,
             choices: choices,
-            availableChoices: new Set(distinctItems)
           }
         )
       })
       localFilters = localFilters.concat(filtersFromHeaders)
+      localFilters = localFilters.filter((filter) => {return filter.choices.length>0})
       setFilters(localFilters);
-        // console.log("this", props.data, filters);
         let tempData = props.data;
         let singleFilterData = tempData
         Object.keys(filters).forEach((filterKey)=>{

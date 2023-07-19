@@ -1,17 +1,14 @@
 import { Text, Button } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import api from "../api"
 import Store from "../../../store"
 import func from "@/util/func"
-import { useNavigate } from "react-router-dom"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
     SearchMinor,
-    FraudProtectMinor,
-    LinkMinor
-  } from '@shopify/polaris-icons';
+    FraudProtectMinor  } from '@shopify/polaris-icons';
 
 const headers = [
     {
@@ -57,22 +54,30 @@ const sortOptions = [
     
 ];
 
-const filters = [
+let filters = [
     {
     key: 'apiCollectionId',
     label: 'Collection',
     title: 'Collection',
     choices: [],
-    availableChoices: new Set()
   },
   {
     key: 'isRequest',
     label: 'API call',
     title: 'API call',
     choices: [],
-    availableChoices: new Set(),
     singleSelect:true
   },
+  {
+    key:'location',
+    label:'Location',
+    title:'Location',
+    choices:[
+        {label:"Header", value:"header"},
+        {label:"Payload", value:"payload"},
+        {label:"URL param", value:"urlParam"}
+    ],
+  }
 ]
 
 const appliedFilters = [
@@ -122,24 +127,25 @@ function SensitiveDataExposure() {
 
     function disambiguateLabel(key, value) {
         switch (key) {
+            case "location":
+                return (value).map((val) => val).join(', ');
             case "apiCollectionId": 
                 return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
             case "isRequest":
                 return value[0] ? "In request" : "In response"
+            case "dateRange":
+                return value.since.toDateString() + " - " + value.until.toDateString();
             default:
                 return value;
         }
       }
-    Object.keys(apiCollectionMap).forEach((key) => {
-        filters[0].availableChoices.add(key)
-    });
     filters[0].choices=[];
-    filters[0].availableChoices.forEach((key) => {
+    Object.keys(apiCollectionMap).forEach((key) => { 
         filters[0].choices.push({
             label:apiCollectionMap[key],
             value:Number(key)
         })
-    })
+    });
     filters[1].choices=[{
         label:"In request",
         value:true
@@ -147,8 +153,6 @@ function SensitiveDataExposure() {
         label:"In response",
         value:false
     }]
-    filters[1].availableChoices.add(true)
-    filters[1].availableChoices.add(false)
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
@@ -158,19 +162,27 @@ function SensitiveDataExposure() {
         filterOperators['subType']="OR"
         let ret = []
         let total = 0; 
-        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, func.timeNow(), true,isRequest).then((res)=> {
-            res.endpoints.forEach((endpoint) => {
+        let dateRange = filters['dateRange'] || false;
+        delete filters['dateRange']
+        let startTimestamp = 0;
+        let endTimestamp = func.timeNow()
+        if(dateRange){
+            startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
+            endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
+        }
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
+            res.endpoints.forEach((endpoint, index) => {
                 let temp = {}
                 temp['collection'] = apiCollectionMap[endpoint.apiCollectionId]
                 temp['apiCollectionId'] = endpoint.apiCollectionId
                 temp['url'] = endpoint.method + " " + endpoint.url
                 temp['detected_timestamp'] = "Detected " + func.prettifyEpoch(endpoint.timestamp)
                 temp['timestamp'] = endpoint.timestamp
-                temp['location'] = "Detected in " + (endpoint.isHeader ? "Header" : endpoint.isUrlParam ? "Query param" : "Payload")
+                temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "URL param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
-                temp["hexId"] = temp['collection'] + temp['url'] + temp['location'] + temp['call'] + endpoint.param + endpoint.subTypeString
-                temp['nextUrl'] = "/dashboard/observe/inventory/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
+                temp["hexId"] = index
+                temp['nextUrl'] = "/dashboard/observe/sensitive/"+subType+"/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
                 ret.push(temp);
             })
             total = res.total;
@@ -184,6 +196,10 @@ function navigateBack(){
   navigate("/dashboard/observe/sensitive")
 }
 
+const handleRedirect = () => {
+    navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
+}
+
     return (
         <PageWithMultipleCards
         title={
@@ -192,14 +208,13 @@ function navigateBack(){
           </Text>
         }
         backAction = {{onAction:navigateBack}}
-        primaryAction={<Button primary>Create custom data types</Button>}
+        primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
         components = {[
             <GithubServerTable
                 key="table"
                 headers={headers}
                 resourceName={resourceName} 
                 appliedFilters={appliedFilters}
-                getActions = {() => {}}
                 sortOptions={sortOptions}
                 disambiguateLabel={disambiguateLabel}
                 selectable = {true}
@@ -208,6 +223,7 @@ function navigateBack(){
                 filters={filters}
                 promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
+                calenderFilter={true}
             />
         ]}
         />
