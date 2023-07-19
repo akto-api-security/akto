@@ -32,6 +32,6 @@ validate:
     eq: 200
   response_payload:
     contains_all:
-      - '"ParentId":'
-      - '"Container":'
-      - '"Labels":'
+      - 'ParentId'
+      - 'Container'
+      - 'Labels'

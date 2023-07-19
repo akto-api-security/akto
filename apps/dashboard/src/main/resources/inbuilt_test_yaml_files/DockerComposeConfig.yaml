@@ -43,4 +43,6 @@ validate:
   response_code:
     eq: 200
   response_payload:
-    regex: ^(?=.*^version:.*)(?=.*services:.*)
+    contains_all:
+      - 'version'
+      - 'services'

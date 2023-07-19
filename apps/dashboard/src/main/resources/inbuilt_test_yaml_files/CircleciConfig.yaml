@@ -32,4 +32,6 @@ validate:
   response_code:
     eq: 200
   response_payload:
-    regex: ^(?=.*^version:.*)(?=.*jobs:.*)
+    contains_all:
+      - 'version'
+      - 'jobs'
