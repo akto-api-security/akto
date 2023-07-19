@@ -1978,7 +1978,7 @@
         },
         "testData": {
             "method": "POST",
-            "url": "/api/college/prof/upload-marks?file=https://ssrf.localdomain.pw/csv-without-body/301-http-169.254.169.254:80-.c.csv",
+            "url": "/api/college/prof/upload-marks",
             "responsePayload": {
                 "ami-id": "ami-871423645",
                 "ami-launch-index": 3
