@@ -1,3 +1,4 @@
+import { Card } from "@shopify/polaris"
 
 
 const SampleApi = () => {
