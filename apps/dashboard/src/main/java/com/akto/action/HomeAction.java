@@ -20,6 +20,10 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import static com.akto.action.SignupAction.BUSINESS_EMAIL_URI;
+import static com.akto.action.SignupAction.CHECK_INBOX_URI;
+import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+
 // This is the first action that is triggered when the webpage is first fetched
 // Basically sets the access token from the session (saved by UserDetailsFilter)
 // Then the accessToken is accessed by login.jsp (the page being requested)
@@ -58,11 +62,16 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     public static String redirectToAuth0(HttpServletRequest servletRequest, HttpServletResponse servletResponse, String accessToken,BasicDBObject state) {
 
         if(checkIfAccessTokenExists(servletRequest, accessToken)) {
-            if (!servletRequest.getRequestURI().startsWith("/login")) {
+            if (!servletRequest.getRequestURI().startsWith(LOGIN_URI)) {
                 return "SUCCESS";
             }
-
         }
+
+        if(servletRequest.getRequestURI().equals(CHECK_INBOX_URI) ||
+            servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI)) {
+            return "SUCCESS";
+        }
+
         String redirectUri = servletRequest.getScheme() + "://" + servletRequest.getServerName();
         if ((servletRequest.getScheme().equals("http") && servletRequest.getServerPort() != 80) ||
                 (servletRequest.getScheme().equals("https") && servletRequest.getServerPort() != 443)) {
