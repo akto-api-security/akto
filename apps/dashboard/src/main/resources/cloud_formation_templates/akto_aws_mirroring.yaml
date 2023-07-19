@@ -407,7 +407,7 @@ Resources:
         - RegionMap
         - !Ref 'AWS::Region'
         - AMI
-      InstanceType: t3a.medium
+      InstanceType: m5a.xlarge
       KeyName: !Ref KeyPair
       AssociatePublicIpAddress: 'false'
       SecurityGroups:
@@ -549,7 +549,7 @@ Resources:
         - RegionMap
         - !Ref 'AWS::Region'
         - AMI
-      InstanceType: t3a.medium
+      InstanceType: m5a.xlarge
       KeyName: !Ref KeyPair
       AssociatePublicIpAddress: 'false'
       IamInstanceProfile: !Ref IamInstanceProfile
