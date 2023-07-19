@@ -37,7 +37,7 @@ const err = async (error) => {
 
     case 401:
       if (router.currentRoute.path !== "/login") {
-        router.push('/login').then(() => {
+        router.push('/').then(() => {
               window._AKTO.$emit('SHOW_SNACKBAR', {
                 show: true,
                 text: "Please login again",

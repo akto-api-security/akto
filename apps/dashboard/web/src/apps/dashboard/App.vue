@@ -231,11 +231,6 @@ export default {
         title: 'Issues',
         icon: '$fas_exclamation-triangle',
         link: '/dashboard/issues'
-      },
-      {
-        title: 'Test Editor',
-        icon: '$testEditorIcon',
-        link: '/dashboard/test-editor'
       }
     ]
 
@@ -287,6 +282,10 @@ export default {
           label: "Logout",
           click: () => {
             api.logout().then((resp) => {
+              if(resp.logoutUrl){
+                window.location.href = resp.logoutUrl;
+                return;
+              }
               window.location.href = "/login"
             })
           }
@@ -390,13 +389,11 @@ export default {
     }
   },
   async mounted() {
-    if (!this.isSaas) {
       this.myItems.push({
         title: 'Test Editor',
         icon: '$testEditorIcon',
         link: '/dashboard/test-editor'
       })
-    }
     this.myAccountItems.unshift(... ( this.isLocalDeploy ? this.myAccountLocalItems : [] ))
     window.Beamer.init();
     let i = setInterval(() => {

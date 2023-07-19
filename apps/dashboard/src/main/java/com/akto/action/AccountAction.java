@@ -237,6 +237,14 @@ public class AccountAction extends UserAction {
         return user;
     }
 
+    public static void addUserToExistingAccount(String email, int accountId){
+        Account account = AccountsDao.instance.findOne(eq("_id", accountId));
+        UsersDao.addNewAccount(email, account);
+        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+        //RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER, accountId));
+        Context.accountId.set(accountId);
+    }
+
     private static void intializeCollectionsForTheAccount(int newAccountId) {
         executorService.schedule(new Runnable() {
             public void run() {

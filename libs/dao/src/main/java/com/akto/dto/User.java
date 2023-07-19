@@ -21,6 +21,7 @@ public class User {
     public static final String ACCOUNTS = "accounts";
 
     private Map<String, SignupInfo> signupInfoMap;
+    public static final String SIGNUP_INFO_MAP = "signupInfoMap";
 
     public User() {}
 

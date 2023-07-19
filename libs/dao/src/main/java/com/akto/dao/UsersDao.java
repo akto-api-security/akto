@@ -1,9 +1,6 @@
 package com.akto.dao;
 
-import com.akto.dto.RBAC;
-import com.akto.dto.SignupInfo;
-import com.akto.dto.UserAccountEntry;
-import com.akto.dto.User;
+import com.akto.dto.*;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -38,6 +35,11 @@ public class UsersDao extends CommonContextDao<User> {
 
     public static void addAccount(String login, int accountId, String name) {
         BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + accountId,new UserAccountEntry(accountId, name));
+        UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ));
+    }
+
+    public static void addNewAccount(String login, Account account){
+        BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + account.getId(),new UserAccountEntry(account.getId(), account.getName()));
         UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ));
     }
 

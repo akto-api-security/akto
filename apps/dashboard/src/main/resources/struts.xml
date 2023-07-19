@@ -18,6 +18,10 @@
             <result name="SUCCESS">/pages/login.jsp</result>
         </action>
 
+        <action name="verify-email" class="com.akto.action.HomeAction" method="verifyEmail">
+            <result name="SUCCESS">/pages/verify_email.jsp</result>
+        </action>
+
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
@@ -506,7 +510,14 @@
         <action name="api/logout" class="com.akto.action.LogoutAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS">
+            <result name="SUCCESS" type="json">
+            </result>
+        </action>
+        
+        <action name="auth0-logout" class="com.akto.action.LogoutAction" method="auth0Logout">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
             </result>
         </action>
 
@@ -1797,6 +1808,27 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+<!--        <action name="callback" class="com.akto.action.Auth0CallbackAction">-->
+<!--            <result name="SUCCESS">/pages/login.jsp</result>-->
+<!--        </action>-->
+        <action name="callback" class="com.akto.action.SignupAction" method="registerViaAuth0">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="addUserToAccount" class="com.akto.action.AddUserToAccountAction" method="execute">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
             </result>
         </action>
     </package>
