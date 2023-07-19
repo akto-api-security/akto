@@ -15,7 +15,6 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.testing.NucleiExecutor;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.slf4j.Logger;
