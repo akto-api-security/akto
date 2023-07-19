@@ -1043,7 +1043,7 @@ public class InitializerListener implements ServletContextListener {
 
             insertPiiSources();
 
-            setUpPiiCleanerScheduler();
+//            setUpPiiCleanerScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
