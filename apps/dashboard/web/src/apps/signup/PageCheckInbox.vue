@@ -23,14 +23,28 @@ export default {
     name: "PageCheckInbox",
     methods: {
         redirectToLogin(){
-            axios.get("/auth0-logout").then((resp) => {
-              if(resp.data.logoutUrl){
-                window.location.href = resp.data.logoutUrl;
-                return;
-              }
-              window.location.href = "/login"
-            })
-        } 
+            const state = this.$route.query.state;
+            if(state){
+                let url = "/addUserToAccount?state=" + state;
+                axios.post("/auth0-logout", {"redirectUrl": url}).then((resp) => {
+                    if(resp.data.logoutUrl){
+                        window.location.href = resp.data.logoutUrl;
+                        return;
+                    }
+                    window.location.href = "/login"
+                });
+            } else {
+                axios.get("/auth0-logout").then((resp) => {
+                    if(resp.data.logoutUrl){
+                        window.location.href = resp.data.logoutUrl;
+                        return;
+                    }
+                    window.location.href = "/login"
+                });
+            }
+        
+        }
+        
     }
 }
 

@@ -7,6 +7,8 @@ import org.apache.struts2.interceptor.ServletResponseAware;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 public class AddUserToAccountAction implements Action, ServletResponseAware, ServletRequestAware {
 
@@ -14,6 +16,7 @@ public class AddUserToAccountAction implements Action, ServletResponseAware, Ser
     protected HttpServletResponse servletResponse;
     private String signupInvitationCode;
     private String signupEmailId;
+    private String state;
 
     public String getSignupInvitationCode() {
         return signupInvitationCode;
@@ -39,12 +42,24 @@ public class AddUserToAccountAction implements Action, ServletResponseAware, Ser
         return servletResponse;
     }
 
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
     @Override
     public String execute() throws Exception {
-        BasicDBObject state = new BasicDBObject("signupInvitationCode", signupInvitationCode)
+        if(state != null) {
+            String s = new String(Base64.getDecoder().decode(state.getBytes(StandardCharsets.UTF_8)));
+            return HomeAction.redirectToAuth0(servletRequest, servletResponse, null, s);
+        }
+        BasicDBObject stateObj = new BasicDBObject("signupInvitationCode", signupInvitationCode)
                 .append("signupEmailId", signupEmailId);
+        return HomeAction.redirectToAuth0(servletRequest, servletResponse, null, stateObj);
 
-        return HomeAction.redirectToAuth0(servletRequest, servletResponse, null, state);
     }
 
     @Override

@@ -177,17 +177,27 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     }
 
+    private BasicDBObject getParsedState(){
+        return BasicDBObject.parse(new String(java.util.Base64.getDecoder().decode(state)));
+    }
+
+    private String getErrorPageRedirectUrl(String url, BasicDBObject parsedState){
+        url +=  parsedState != null && parsedState.containsKey("signupInvitationCode")? "?state=" + state : "";
+        return url;
+    }
+
     public String registerViaAuth0() throws Exception {
         String error = servletRequest.getParameter(ERROR_STR);
         String errorDescription = servletRequest.getParameter(ERROR_DESCRIPTION);
+        BasicDBObject parsedState = getParsedState();
         if(StringUtils.isNotEmpty(error) || StringUtils.isNotEmpty(errorDescription)) {
             if(error.equals(ACCESS_DENIED_ERROR)) {
                 switch (errorDescription){
                     case VERIFY_EMAIL_ERROR:
-                        servletResponse.sendRedirect(CHECK_INBOX_URI);
+                        servletResponse.sendRedirect(getErrorPageRedirectUrl(CHECK_INBOX_URI, parsedState));
                         return SUCCESS;
                     case BUSINESS_EMAIL_REQUIRED_ERROR:
-                        servletResponse.sendRedirect(BUSINESS_EMAIL_URI);
+                        servletResponse.sendRedirect(getErrorPageRedirectUrl(BUSINESS_EMAIL_URI, parsedState));
                         return SUCCESS;
                     default:
                         return ERROR;
@@ -213,8 +223,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         jwt = verifier.verify(idToken);
 
-        com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64 base64Url = new Base64(true);
-        String body = new String(base64Url.decode(base64EncodedBody));
+        String body = new String(java.util.Base64.getDecoder().decode(base64EncodedBody));
         JSONObject jsonBody = new JSONObject(body);
         System.out.print(jsonBody);
         String email = jsonBody.getString("email");
@@ -227,8 +236,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             BasicDBObject setQ = new BasicDBObject(User.SIGNUP_INFO_MAP + "." +Config.ConfigType.AUTH0.name(), auth0SignupInfo);
             UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, email), new BasicDBObject(SET, setQ));
         }
-        String decodedState = new String(base64Url.decode(state));
-        BasicDBObject parsedState = BasicDBObject.parse(decodedState);
+        String decodedState = new String(java.util.Base64.getDecoder().decode(state));
+        parsedState = BasicDBObject.parse(decodedState);
 
         if(parsedState.containsKey("signupInvitationCode")){
             // User clicked on signup link
