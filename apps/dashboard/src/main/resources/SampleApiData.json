@@ -1587,10 +1587,10 @@
             "requestPayload": "",
             "responsePayload": "{\"message\": \"Welcome to the college home page\"}",
             "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "{\"Location\": \"http://vulnerableapi.com/api/college/redirect?url=https://college.com\"}",
+            "responseHeaders": "{\"Location\": \"https://college.com\"}",
             "status": "Found",
             "statusCode": "302",
-            "url": "/api/college/redirect?url=https://college.com"
+            "path": "/api/college/redirect?url=https://college.com"
         },
         "testData": {
             "method": "GET",
@@ -1712,7 +1712,7 @@
         },
         "testData": {
             "method": "POST",
-            "url": "/api/college/upload-file?file=testInvalidFile",
+            "url": "/api/college/upload-file",
             "responsePayload": {
                 "status": 404,
                 "message": "Access denied",
@@ -1874,6 +1874,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/course-registration",
+            "requestPayload": "",
             "responsePayload": {
                 "courseId": "MECH123",
                 "name": "Mechanical",
@@ -2422,7 +2423,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/cse-user12/courses/cy8Ku20LH6V6Yc0q0pJX",
+            "url": "/api/cse-user21/courses/cy8Ku20LH6V6Yc0q0pJX",
             "responsePayload": {
                 "debug_info": {
                     "Rails.root": "/path/to/rails/app",
@@ -2675,7 +2676,7 @@
             "url": "/api/college/events",
             "responsePayload": "Connection to MongoDB refused due to timeout, status=rejected",
             "responseHeaders": {},
-            "statusCode": 204
+            "statusCode": 200
         }
     },
     {
@@ -2860,7 +2861,7 @@
       "requestPayload": "{\"username\": \"STUD-0145\", \"password\":\"secretPass\"}",
       "responsePayload": "{\"message\":\"Welcome STUD-0145! Here you can check all things related to your college like grades, attendance, fee-payment etc.\"}",
       "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"CSRF\": \"abcdef1234567890\"}",
-      "responseHeaders": "{\"location\":\"http://vulnerableapi.com/api/erp/login?url=http://collegeErp.com\"}",
+      "responseHeaders": "{\"location\":\"http://collegeErp.com\"}",
       "status": "Found",
       "statusCode": "302",
       "path": "/api/erp/login?url=http://collegeErp.com"
@@ -2872,7 +2873,7 @@
         "message": "Welcome to evil.com"
       },
       "responseHeaders": {
-        "location": "/api/erp/login"
+        "location": "evil.com"
       },
       "statusCode": 302
     }
@@ -2915,11 +2916,11 @@
       "responseHeaders": "",
       "status": "Found",
       "statusCode": "302",
-      "path": "/api/erp/dashboard/login?url=https://collegeErp.com"
+      "path": "/api/erp/dashboard/login/https://collegeErp.com"
     },
     "testData": {
       "method": "POST",
-      "url": "/api/erp/dashboard/login",
+      "url": "/api/erp/dashboard/login/http://evil.com",
       "responsePayload": {
         "message": "Welcome to evil.com"
       },
