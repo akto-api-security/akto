@@ -68,7 +68,7 @@ execute:
           regex_replace:
             regex: \/$
             replace_with: ''
-      - modify_url: ${urlVar}/${filePaths}
+      - modify_url: ${urlVar}/etc/passwd
 
 validate:
   response_payload:
