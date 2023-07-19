@@ -214,9 +214,11 @@ public class ExportSampleDataAction extends UserAction {
         }
 
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
-
         StringBuilder builder = new StringBuilder("curl -v ");
 
+        Map<String, List<String>> headers = httpRequestParams.getHeaders();
+        List<String> values = headers.get("x-forwarded-proto");
+        String protocol = values != null && values.size() != 0 ? values.get(0) : "https";
         // Method
         builder.append("-X ").append(httpRequestParams.getMethod()).append(" \\\n  ");
 
@@ -241,8 +243,11 @@ public class ExportSampleDataAction extends UserAction {
             urlString = path;
         }
 
-        StringBuilder url = new StringBuilder(urlString);
+        if (!urlString.startsWith("http")) {
+            urlString = protocol + "://" + urlString;
+        }
 
+        StringBuilder url = new StringBuilder(urlString);
         // Body
         try {
             String payload = httpRequestParams.getPayload();
