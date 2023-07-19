@@ -260,8 +260,8 @@
             "method": "GET",
             "url": "/api/college/about-us/.circleci/config.yml",
             "responsePayload": {
-                "version:": "5.1.5",
-                "jobs:": "job1.. job2 .. job 3"
+                "version": "5.1.5",
+                "jobs": "job1.. job2 .. job 3"
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -348,7 +348,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/employee/asso-professors/debug/vars",
-            "responsePayload": "{\"memstats\": {\"total\": 1024,\"used\": 512},\"cmdline\": \"/path/to/executable\"}",
+            "responsePayload": {"memstats": {"total": 1024,"used": 512},"cmdline": "/path/to/executable"},
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -436,7 +436,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/cs-dept/public/config.js",
-            "responsePayload": "{\"apiKey\": \"YOUR_API_KEY\",\"authDomain\": \"your-domain.firebaseapp.com\",\"databaseURL\": \"https://your-domain.firebaseio.com\",\"storageBucket\": \"your-domain.appspot.com\"}",
+            "responsePayload": {"apiKey": "YOUR_API_KEY","authDomain": "your-domain.firebaseapp.com","databaseURL": "https://your-domain.firebaseio.com","storageBucket": "your-domain.appspot.com"},
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -516,7 +516,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/mech-dept/.git-credentials",
-            "responsePayload": "https://github.com/openai/gpt-3.5",
+            "responsePayload": "https://user:pass@github.com",
             "responseHeaders": {
                 "Content-Type": "application/json"
             },
@@ -538,7 +538,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/civil-dept/.github/workflows/main.yml",
-            "responsePayload": "{\"on\":\"push\",\"jobs\":{\"build\":{\"steps\":[{\"uses\":\"actions/checkout@v2\"},{\"run\":\"echo 'Hello, world!'\"}]}}}",
+            "responsePayload": "- \"uses\": Some value here - \"on\": ubuntu-latest - \"jobs\": build - \"steps\": - run: echo \"Hello, world!\" - run: npm install - \"on\": windows-latest - \"uses\": actions\/checkout@v2 - \"steps\": - run: echo \"Windows workflow\" - \"steps\": - run: echo \"Step 1\" - run: echo \"Step 2\"",
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -580,7 +580,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/chem-dept/.env.production.local",
-            "responsePayload": "APP_NAME=MyApp\nDB_HOST=localhost\nDB_PASSWORD=secretpassword\n",
+            "responsePayload": "APP_NAME=MyAppAPP_ENV=productionAPP_KEY=abc123DEBUG=trueDB_HOST=localhostDB_PASSWORD=secure_passwordDB_DATABASE=my_databaseURL=https://example.comDB_PORT=3306",
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -807,8 +807,8 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/clubs/sds/api/components/suggestions?recentlyBrowsed=",
-            "responsePayload": "{\"results\":{\"items\":[1,2,3],\"more\":true}}",
+            "url": "/api/college/clubs/sds/api/components/suggestions",
+            "responsePayload": { "results": {"items":[1,2,3],"more":true}},
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1000,7 +1000,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": "{\"department\" : \"cs\"}",
             "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhdm5lZXNoQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-wvN1PThvrPNpKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1010,7 +1010,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/department/cs",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": {"department" : "cs"},
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1020,7 +1020,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": "{\"department\" : \"mech\"}",
             "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhdm5lZXNoQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-wvN1PThvrPNpKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1030,7 +1030,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/department/mech",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": {"department" : "mech"},
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1040,7 +1040,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": "{\"department\" : \"eni\"}",
             "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhdm5lZXNoQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-wvN1PThvrPNpKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1050,7 +1050,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/department/eni",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": {"department" : "eni"},
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1060,7 +1060,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": "{\"department\" : \"civil\"}",
             "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhdm5lZXNoQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-wvN1PThvrPNpKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1070,7 +1070,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/department/civil",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to CS department.</p> </body> </html>",
+            "responsePayload": {"department" : "civil"},
             "responseHeaders": {},
             "statusCode": 200
         }

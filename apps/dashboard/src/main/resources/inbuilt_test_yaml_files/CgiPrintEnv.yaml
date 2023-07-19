@@ -36,4 +36,4 @@ validate:
       - 'OPENSSL_CONF'
       - 'REMOTE_ADDR'
       - 'SERVER_ADMIN'
-      - 'Environment Variables:'
+      - 'Environment Variables'

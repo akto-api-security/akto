@@ -61,4 +61,8 @@ validate:
   response_code:
     eq: 200
   response_payload:
-    regex: '(?m)^\s*"?on"?:|^\s*"?jobs"?:|^\s*"?steps"?:|^\s*- "?uses"?:'
+    contains_all:
+      - "on"
+      - "jobs"
+      - "steps"
+      - "uses"

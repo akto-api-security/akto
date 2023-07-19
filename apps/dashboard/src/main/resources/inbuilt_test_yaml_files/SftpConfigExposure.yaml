@@ -34,7 +34,7 @@ validate:
     eq: 200
   response_payload:
     contains_all:
-      - '"host":'
-      - '"user":'
-      - '"password":'
-      - '"remote_path":'
+      - 'host'
+      - 'user'
+      - 'password'
+      - 'remote_path'

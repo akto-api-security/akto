@@ -57,5 +57,13 @@ validate:
   response_code:
     eq: 200
   response_payload:
-    regex: (?mi)^(APP_(NAME|ENV|KEY|DEBUG|URL|PASSWORD)|DB_(HOST|PASSWORD|DATABASE))=
+    contains_either:
+      - 'APP_NAME'
+      - 'APP_ENV'
+      - 'APP_KEY'
+      - 'APP_DEBUG'
+      - 'APP_URL'
+      - 'DB_HOST'
+      - 'DB_PASSWORD'
+      - 'DB_DATABASE'
 

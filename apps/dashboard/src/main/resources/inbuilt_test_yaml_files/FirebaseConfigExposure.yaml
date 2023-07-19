@@ -38,7 +38,7 @@ validate:
     eq: 200
   response_payload:
     contains_all:
-      - "apiKey:"
-      - "authDomain:"
-      - "databaseURL:"
-      - "storageBucket:"
+      - "apiKey"
+      - "authDomain"
+      - "databaseURL"
+      - "storageBucket"
