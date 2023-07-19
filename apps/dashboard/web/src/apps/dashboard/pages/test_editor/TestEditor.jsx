@@ -1,16 +1,22 @@
-import { Badge, Button, Card, Divider, Frame, Icon, Text } from "@shopify/polaris"
+import { Badge, Button, Card, Frame, Icon, Text, Toast, Divider } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
 import Store from "../../store"
 import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
 import { useNavigate } from "react-router-dom"
+import testEditorRequests from "./api"
+import TestEditorStore from "./testEditorStore"
+import convertFunc from "./transform"
+import { useEffect } from "react"
 
 const TestEditor = () => {
     const navigate = useNavigate()
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
+
+    const setTestsObj = TestEditorStore(state => state.setTestsObj)
     
     const disableToast = () => {
         setToastConfig({
@@ -27,6 +33,17 @@ const TestEditor = () => {
     const handleExit = () => {
         navigate(-1)
     }
+
+    const fetchAllTests = async () =>{
+        await testEditorRequests.fetchAllSubCategories().then((resp)=>{
+            const obj = convertFunc.mapCategoryToSubcategory(resp.subCategories)
+            setTestsObj(obj)
+        })
+    }
+
+    useEffect(()=> {
+        fetchAllTests()
+    },[])
 
     return (
         <Frame>

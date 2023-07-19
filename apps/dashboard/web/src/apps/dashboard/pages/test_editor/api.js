@@ -13,6 +13,13 @@ const testEditorRequests = {
         })
         return res
     },
+    fetchAllSubCategories: async function () {
+        return request({
+            url: 'api/fetchAllSubCategories',
+            method: 'post',
+            data: {}
+        })
+    }
 }
 
 export default testEditorRequests
