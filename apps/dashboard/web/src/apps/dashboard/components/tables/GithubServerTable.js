@@ -143,7 +143,7 @@ function GithubServerTable(props) {
   
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
-  let tmp = data && data.length < pageLimit ? data : 
+  let tmp = data && data.length <= pageLimit ? data : 
   data.slice(page*pageLimit, Math.min((page+1)*pageLimit, data.length))
   let rowMarkup = tmp
   .map(

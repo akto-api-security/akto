@@ -52,7 +52,7 @@ function highlightPaths(highlightPathMap, refText){
               {
                 range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
                 options: {
-                  inlineClassName: "highlight",
+                  inlineClassName: highlightPathMap[type][key].other ? "highlightOther" : "highlight",
                 },
               }
             ])
