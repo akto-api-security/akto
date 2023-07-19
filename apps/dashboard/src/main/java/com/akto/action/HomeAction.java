@@ -59,6 +59,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     }
 
     public static String redirectToAuth0(HttpServletRequest servletRequest, HttpServletResponse servletResponse, String accessToken,BasicDBObject state) {
+        return redirectToAuth0(servletRequest, servletResponse, accessToken, state.toString());
+    }
+    public static String redirectToAuth0(HttpServletRequest servletRequest, HttpServletResponse servletResponse, String accessToken,String state) {
 
         if(checkIfAccessTokenExists(servletRequest, accessToken)) {
             if (!servletRequest.getRequestURI().startsWith(LOGIN_URI)) {
@@ -81,11 +84,11 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
 
         String authorizeUrlStr;
         try {
-            Base64 base64Url = new Base64(true);
             AuthorizeUrl authorizeUrl = Auth0.getInstance().buildAuthorizeUrl(servletRequest, servletResponse, redirectUri)
                     .withScope("openid profile email");
 
-            authorizeUrl.withState(base64Url.encodeAsString(state.toString().getBytes(StandardCharsets.UTF_8)));
+            String stateStr = java.util.Base64.getEncoder().encodeToString(state.getBytes(StandardCharsets.UTF_8));
+            authorizeUrl.withState(stateStr);
             authorizeUrlStr = authorizeUrl.build();
             servletResponse.sendRedirect(authorizeUrlStr);
         } catch (Exception e) {
