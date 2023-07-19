@@ -1241,67 +1241,6 @@
         }
     },
     {
-        "id": "ADD_USER_ID",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"user_id\": \"1234\", \"name\": \"user1\",\"SGPA\":\"8.21\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/user/results/view/sem4?user=1234"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/user/results/view/sem4?user=3245",
-            "responsePayload": {
-                "user_id": 3245,
-                "name": "user21",
-                "email": "user21@example.com",
-                "SGPA": 8.91,
-                "CGPA": 8.58,
-                "branch": "CSE",
-                "professor-incharge": "PROF-202",
-                "backlogs": "no",
-                "prev-active-backlogs": 1
-            },
-            "responseHeaders": {
-                "my_cus_header1": "custom_val1",
-                "Content-Type": "application/json"
-            },
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "PARAMETER_POLLUTION",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"private_var\": \"12345\", \"name\": \"user1\", \"email\": \"user1@example.com\", \"role\": \"user\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/users/profile?private_var=12345"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/users/profile?private_var=101",
-            "responsePayload": {
-                "private_var": 101,
-                "name": "admin-1",
-                "email": "admin1@example.com",
-                "role": "admin"
-            },
-            "responseHeaders": {
-                "my_cus_header1": "custom_val1",
-                "Content-Type": "application/json"
-            },
-            "statusCode": 200
-        }
-    },
-    {
         "id": "CSRF_LOGIN_ATTACK",
         "sampleData": {
             "method": "POST",
@@ -1340,52 +1279,6 @@
             "url": "/api/college/sem2/chem/student/grades",
             "responsePayload": {
                 "message": "Unable to fetch result due to absence of auth token"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "ADD_JKU_TO_JWT",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"student_id\": \"12345\",\"name\": \"student12\",\"GPA\": \"8.95\", \"CGPA\": \"8.12\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/student/dept/cse/info/student_id-12345"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/student/dept/cse/info/student_id-12345",
-            "responsePayload": {
-                "message": "Unable to fetch the resulta due to incorrect auth token"
-            },
-            "responseHeaders": {
-                "Content-Type": "application/json"
-            },
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "JWT_INVALID_SIGNATURE",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "{\"student_id\": \"00102\",\"name\": \"Student-2109 \",\"course\": \"Chemical\",\"enrollment_status\": \"Enrolled\"}",
-            "responsePayload": "{\"message\": \"Enrollment Successful\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/k23/admission/enrollment"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/k23/admission/enrollment",
-            "responsePayload": {
-                "message": "An unexpected error occured"
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -1436,28 +1329,6 @@
         }
     },
     {
-        "id": "JWT_NONE_ALGO",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"roll\": \"BTECH195\",\"name\": \"STUD-01\", \"branch\":\"ECE\", \"year\": \"3\", \"city\": \"Mumbai\", \"phone\":\"000000123\", \"email\": \"btech195@college.com\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c\",\"Content-Type\":\"application/json\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/depart/civil/students-details/BTECH195"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/depart/civil/students-details/BTECH195",
-            "responsePayload": {
-                "message": "Cannot fetch details, wrong Auth token used"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "PAGINATION_MISCONFIGURATION",
         "sampleData": {
             "method": "GET",
@@ -1483,52 +1354,6 @@
                 "CHEM": "PROF-190",
                 "BIOT": "PROF-891",
                 "MNC": "PROF-061"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "MASS_ASSIGNMENT_CHANGE_ACCOUNT",
-        "sampleData": {
-            "method": "PATCH",
-            "requestPayload": "{\"name\": \"user45\",\"email\": \"user-45@example.com\"}",
-            "responsePayload": "{\"message\": \"Profile updated successfully\", \"account\": \"987654321\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/student/profile"
-        },
-        "testData": {
-            "method": "PATCH",
-            "url": "/api/college/student/profile?account=98765432",
-            "responsePayload": {
-                "message": "Profile updated successfully",
-                "account": "98765432"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "MASS_ASSIGNMENT_CHANGE_ADMIN_ROLE",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "{\"name\": \"user1\", \"email\": \"user1@example.com\", \"role\": \"user\"}",
-            "responsePayload": "{\"message\":\"User Details Added Successfully\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/user?role=user"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/user?role=admin",
-            "responsePayload": {
-                "message": "User created successfully",
-                "role": "admin"
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -1625,52 +1450,6 @@
             "responseHeaders": {
                 "new_test_header": "test_val"
             },
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "RANDOM_METHOD_TEST",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "{\"user\":\"user21\"}",
-            "responsePayload": "{\"name\": \"user21\",\"email\": \"user_21@example.com\",\"role\": \"user\"}",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "Found",
-            "statusCode": "302",
-            "path": "/api/college/user-details"
-        },
-        "testData": {
-            "method": "TestMethod",
-            "url": "/api/college/user-details",
-            "responsePayload": {
-                "name": "user21",
-                "email": "user_21@example.com",
-                "role": "user"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "HEAD_METHOD_TEST",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "{\"role\": \"admin\"}",
-            "responsePayload": "{\"message\": \"Role changed successfully\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "Found",
-            "statusCode": "302",
-            "path": "/api/college/change-role"
-        },
-        "testData": {
-            "method": "HEAD",
-            "url": "/api/college/change-role",
-            "responsePayload": {
-                "message": "Role changed successfully"
-            },
-            "responseHeaders": {},
             "statusCode": 200
         }
     },
@@ -2640,26 +2419,6 @@
         }
     },
     {
-        "id": "JWT_SIGNING_IN_CLIENT_SIDE",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "const token = jwt.sign({ username: 'john_doe' }, 'your_secret_key');",
-            "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\":\"application/json\",\"HOST\":\"vulnerableapi.com\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/chat/verify"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/chat/verify",
-            "responsePayload": "const token = jwt.sign({ username: 'john_doe' }, 'your_secret_key');",
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "PORT_SCANNING",
         "sampleData": {
             "method": "GET",
@@ -2723,42 +2482,6 @@
     }
   },
   {
-    "id": "GRAPHQL_DEBUG_MODE_ENABLED",
-    "sampleData": {
-      "method": "GET",
-      "requestPayload": "",
-      "responsePayload": "{\"message\": \"Welcome to the homepage of computer science department\"}",
-      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-      "responseHeaders": "",
-      "status": "OK",
-      "statusCode": "200",
-      "path": "/api/college/graphql/dept/branches/cse"
-    },
-    "testData": {
-      "method": "GET",
-      "url": "/api/college/graphql",
-      "responsePayload": {
-        "data": null,
-        "errors": [
-          {
-            "message": "Internal Server Error",
-            "extensions": {
-              "code": "INTERNAL_SERVER_ERROR",
-              "exception": {
-                "stacktrace": [
-                  "at main (example.js:12:3)",
-                  "at processTicksAndRejections (internal/process/task_queues.js:95:5)"
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "responseHeaders": "",
-      "statusCode": 200
-    }
-  },
-  {
     "id": "HEADER_REFLECTED_IN_INVALID_URLS",
     "sampleData": {
       "method": "GET",
@@ -2780,29 +2503,6 @@
       "responseHeaders": {
         "Content-Type": "application/json"
       },
-      "statusCode": 200
-    }
-  },
-  {
-    "id": "GRAPHQL_FIELD_SUGGESTIONS_ENABLED",
-    "sampleData": {
-      "method": "GET",
-      "requestPayload": "",
-      "responsePayload": "{\"message\": \"Welcome to the homepage of Mecanical department\"}",
-      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-      "responseHeaders": "",
-      "status": "OK",
-      "statusCode": "200",
-      "path": "/api/college/graphql/branches/mech"
-    },
-    "testData": {
-      "method": "GET",
-      "url": "/api/college/graphql",
-      "responsePayload": {
-        "message1": "At line 6:28, Did you mean GRAPHQL",
-        "message2": "Expected value of type string"
-      },
-      "responseHeaders": "",
       "statusCode": 200
     }
   },
@@ -2879,34 +2579,6 @@
     }
   },
   {
-    "id": "GRAPHQL_TYPE_INTROSPECTION_ALLOWED",
-    "sampleData": {
-      "method": "GET",
-      "requestPayload": "",
-      "responsePayload": "{\"message\": \"Welcome to the homepage of Production department\"}",
-      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-      "responseHeaders": "",
-      "status": "OK",
-      "statusCode": "200",
-      "path": "/api/college/graphql/dept/prod"
-    },
-    "testData": {
-      "method": "GET",
-      "url": "/api/college/graphql",
-      "responsePayload": {
-        "data": {
-          "department": "PIE",
-          "name": "College"
-        },
-        "__type": "JSON"
-      },
-      "responseHeaders": {
-
-      },
-      "statusCode": 200
-    }
-  },
-  {
     "id": "OPEN_REDIRECT_IN_PATH",
     "sampleData": {
       "method": "POST",
@@ -2928,30 +2600,6 @@
         "location": "evil.com"
       },
       "statusCode": 302
-    }
-  },
-  {
-    "id": "GRAPHQL_DEVELOPMENT_CONSOLE_EXPOSED",
-    "sampleData": {
-      "method": "GET",
-      "requestPayload": "",
-      "responsePayload": "{\"message\": \"Welcome to the homepage of electronics department\"}",
-      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-      "responseHeaders": "",
-      "status": "OK",
-      "statusCode": "200",
-      "path": "/api/college/graphql/dept/ece"
-    },
-    "testData": {
-      "method": "GET",
-      "url": "/api/college/graphql",
-      "responsePayload": {
-        "message": "Welcome to GraphQL Console"
-      },
-      "responseHeaders": {
-
-      },
-      "statusCode": 200
     }
   },
   {
@@ -2994,34 +2642,6 @@
       "method": "GET",
       "url": "/api/college/info/departments/branch.json",
       "responsePayload": "{\"departments\": [{\"id\": 1,\"name\": \"Computer Science\",\"students\": 150},{\"id\": 2,\"name\": \"Electrical Engineering\",\"students\": 120},{\"id\": 3,\"name\": \"Mechanical Engineering\",\"students\": 180},{\"id\": 4,\"name\": \"Civil Engineering\",\"students\": 100},{\"id\": 5,\"name\": \"Chemical Engineering\",\"students\": 90},{\"id\": 6,\"name\": \"Biomedical Engineering\",\"students\": 80},{\"id\": 7,\"name\": \"Aerospace Engineering\",\"students\": 70}]}",
-      "responseHeaders": {
-
-      },
-      "statusCode": 200
-    }
-  },
-  {
-    "id": "GRAPHQL_INTROSPECTION_MODE_ENABLED",
-    "sampleData": {
-      "method": "GET",
-      "requestPayload": "",
-      "responsePayload": "{\"message\": \"Welcome to the homepage of MNC department\"}",
-      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-      "responseHeaders": "",
-      "status": "OK",
-      "statusCode": "200",
-      "path": "/api/college/graphql/info/dept/mnc"
-    },
-    "testData": {
-      "method": "GET",
-      "url": "/api/college/graphql",
-      "responsePayload": {
-        "data": {
-          "department": "MNC",
-          "name": "College"
-        },
-        "__schema": "GraphQL"
-      },
       "responseHeaders": {
 
       },
