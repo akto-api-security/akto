@@ -48,7 +48,7 @@ public class AccountAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
-    private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
+    private AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     
     @Override
