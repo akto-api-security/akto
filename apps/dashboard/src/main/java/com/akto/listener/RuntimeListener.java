@@ -181,11 +181,23 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 VulnerableRequestForTemplate vulnerableRequestForTemplate = new VulnerableRequestForTemplate();
                 List<String> testList = new ArrayList<>();
                 testList.add(testId);
-                vulnerableRequestForTemplate.setTemplateIds(testList);
+                //vulnerableRequestForTemplate.setTemplateIds(testList);
+
+                if (testId.equals("XSS_VIA_APPENDING_TO_QUERY_PARAMS")) {
+                    System.out.println("hi");
+                }
+
+                String p = (String) sampleDataMap.get("path");
+                String []split = p.split("\\?");
+
+                if (split.length > 1) {
+                    p = split[0];
+                }
+
                 ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
-                    VULNERABLE_API_COLLECTION_ID, (String) sampleDataMap.get("path"), Method.fromString((String) sampleDataMap.get("method"))
+                    VULNERABLE_API_COLLECTION_ID, p, Method.fromString((String) sampleDataMap.get("method"))
                 );
-                vulnerableRequestForTemplate.setId(apiInfoKey);
+                // vulnerableRequestForTemplate.setId(apiInfoKey);
 
                 VulnerableRequestForTemplate vul = VulnerableRequestForTemplateDao.instance.findOne(
                     Filters.in("templateIds", testList)

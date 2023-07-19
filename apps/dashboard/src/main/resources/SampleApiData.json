@@ -1996,7 +1996,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "api/college/prof/upload-marks?file=marks.csv"
+            "path": "/api/college/prof/upload-marks?file=marks.csv"
         },
         "testData": {
             "method": "POST",
@@ -2019,7 +2019,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "api/college/dashboard/upload-profilePic?imageFile=profile_pic.jpg"
+            "path": "/api/college/dashboard/upload-profilePic?imageFile=profile_pic.jpg"
         },
         "testData": {
             "method": "POST",
@@ -2042,7 +2042,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "api/college/dept/chemical/resources/books?book=book1.pdf"
+            "path": "/api/college/dept/chemical/resources/books?book=book1.pdf"
         },
         "testData": {
             "method": "GET",
@@ -2115,7 +2115,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "api/college/depart/mech/prof/upload-data?file=data.xml"
+            "path": "/api/college/depart/mech/prof/upload-data?file=data.xml"
         },
         "testData": {
             "method": "POST",
@@ -2186,7 +2186,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "api/college/dept/mech/resources/books-and-journals?file=book1.pdf"
+            "path": "/api/college/dept/mech/resources/books-and-journals?file=book1.pdf"
         },
         "testData": {
             "method": "GET",
@@ -2594,7 +2594,7 @@
             "responseHeaders": "{\"Content-Type\":\"application/json\"}",
             "status": "OK",
             "statusCode": "200",
-            "path": "api/college/info/depart/branch"
+            "path": "/api/college/info/depart/branch"
         },
         "testData": {
             "method": "GET",
