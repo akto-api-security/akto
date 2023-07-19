@@ -35,9 +35,9 @@ function GithubRow(props) {
 
     return (
         <IndexTable.Row
-            id={props.data.hexId}
-            key={props.data.hexId}
-            selected={props.selectedResources.includes(props.data.hexId)}
+            id={props.data.id}
+            key={props.data.id}
+            selected={props.selectedResources.includes(props.data.id)}
             position={props.index}
         >
                 {/* <div style={{ padding: '12px 16px', width: '100%' }}> */}
@@ -63,6 +63,8 @@ function GithubRow(props) {
             {
                 props?.headers?.filter((header) => {
                     return header.itemCell == 2
+                }).filter((header) => {
+                    return props.data[header.value]
                 }).map((header) => {
                     return (
                         <IndexTable.Cell key={header.text}>
@@ -85,8 +87,8 @@ function GithubRow(props) {
                 {
                     props.hasRowActions &&
                     <Popover
-                        active={popoverActive == props.data.hexId}
-                        activator={<Button onClick={togglePopoverActive(props.data.hexId)} plain icon={HorizontalDotsMinor} />}
+                        active={popoverActive == props.data.id}
+                        activator={<Button onClick={togglePopoverActive(props.data.id)} plain icon={HorizontalDotsMinor} />}
                         autofocusTarget="first-node"
                         onClose={togglePopoverActive(popoverActive)}
                     >

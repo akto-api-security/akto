@@ -181,7 +181,7 @@ function SensitiveDataExposure() {
                 temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "URL param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader
                 temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
-                temp["hexId"] = index
+                temp["id"] = index
                 temp['nextUrl'] = "/dashboard/observe/sensitive/"+subType+"/"+temp['apiCollectionId'] + "/" + btoa(endpoint.url + " " + endpoint.method);
                 ret.push(temp);
             })

@@ -86,7 +86,7 @@ function AllSensitiveData(){
                         subType:type.name,
                         request:0,
                         response:0,
-                        hexId:type.name,
+                        id:type.name,
                         nextUrl:type.name,
                         icon: CircleTickMinor,
                         sensitiveCount:0
@@ -99,7 +99,7 @@ function AllSensitiveData(){
                         isCustomType:['Custom'],
                         request:0,
                         response:0,
-                        hexId:type.name,
+                        id:type.name,
                         nextUrl:type.name,
                         icon: type.active ? CircleTickMinor : CircleCancelMinor,
                         sensitiveCount:0

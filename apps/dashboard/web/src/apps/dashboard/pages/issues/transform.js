@@ -38,10 +38,10 @@ function getCreationTime(creationTime) {
     if (numberOfDays < 31) {
         return parseInt(numberOfDays) + ' d';
     } else if (numberOfDays < 366) {
-        return parseInt(numberOfDays / 31) + ' m' + parseInt(numberOfDays % 31) + ' d';
+        return parseInt(numberOfDays / 31) + ' m ' + parseInt(numberOfDays % 31) + ' d';
     } else {
-        return parseInt(numberOfDays / 365) + ' y' + parseInt((numberOfDays % 365) / 31) + ' m'
-            + parseInt((numberOfDays % 365) % 31) + ' d';
+        return parseInt(numberOfDays / 365) + ' y ' + parseInt((numberOfDays % 365) / 31) + ' m '
+            + parseInt((numberOfDays % 365) % 31) + ' d ';
     }
 }
 
@@ -53,13 +53,13 @@ const transform = {
         apiCollectionMap = localApiCollectionMap
         res.issues.forEach((issue, index) => {
             let temp = {}
-            temp.hexId = index
+            temp.id = JSON.stringify(issue.id)
             temp.method = issue.id.apiInfoKey.method;
             temp.endpoint = issue.id.apiInfoKey.url;
             temp.url = temp.method + " " + temp.endpoint;
             temp.severity=[func.toSentenceCase(issue.severity)]
             temp.timestamp=issue.creationTime
-            temp.detected_timestamp= "Discovered " + func.prettifyEpoch(temp.timestamp)
+            temp.detected_timestamp= "Discovered " + getCreationTime(temp.timestamp) + " ago"
             temp.collection=apiCollectionMap[issue.id.apiInfoKey.apiCollectionId]
             temp.apiCollectionId=issue.id.apiInfoKey.apiCollectionId
             temp.categoryName=getCategoryName(issue.id)
@@ -67,7 +67,7 @@ const transform = {
             temp.testType=getTestType(issue.id.testErrorSource)
             temp.issueId=issue.id
             temp.issueStatus=issue.testRunIssueStatus
-            temp.ignoreReason=issue.ignoreReason
+            temp.issueStatus=="IGNORED" ? temp.ignoreReason=issue.ignoreReason : ""
             ret.push(temp);
         })
         return ret;

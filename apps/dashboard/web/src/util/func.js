@@ -262,6 +262,15 @@ timeNow: () => {
   return parseInt(new Date().getTime()/1000)
 },
 
+sortFunc: (data, sortKey, sortOrder) => {
+  return data.sort((a, b) => {
+    if(typeof a[sortKey] ==='number')
+    return (sortOrder) * (a[sortKey] - b[sortKey]);
+    if(typeof a[sortKey] ==='string')
+    return (sortOrder) * (b[sortKey].localeCompare(a[sortKey]));
+  })
+}
+
 }
 
 export default func

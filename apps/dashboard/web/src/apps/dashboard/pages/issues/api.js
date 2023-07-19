@@ -8,4 +8,11 @@ export default {
             data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch}
         })
     },
+    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
+        return request({
+            url: 'api/bulkUpdateIssueStatus',
+            method: 'post',
+            data: {issueIdArray, statusToBeUpdated, ignoreReason}
+        })
+    },
 }
