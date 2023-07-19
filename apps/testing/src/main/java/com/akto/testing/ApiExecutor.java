@@ -154,6 +154,7 @@ public class ApiExecutor {
             case DELETE:
             case OPTIONS:
             case PATCH:
+            case TRACK:
             case TRACE:
                 response = sendWithRequestBody(request, builder, followRedirects);
                 break;

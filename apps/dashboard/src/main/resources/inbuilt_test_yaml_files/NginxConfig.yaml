@@ -1,0 +1,39 @@
+id: NGINX_CONFIG
+info:
+  name: Nginx Config file disclosure
+  description: "Attacker can get unauthorized access of Nginx config file."
+  details: >
+              "The Nginx Config File Disclosure check is performed to detect the exposure of Nginx configuration files. These files contain crucial server settings, including listening ports and server names. If accessible, they can provide valuable information to attackers and potentially compromise the security of the web server. It is important to ensure that Nginx configuration files are properly secured and not publicly accessible."
+  impact: "Exposing Nginx configuration files can provide valuable information to attackers, compromising the security of the web server."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: NGINX_CONFIG
+  severity: LOW
+  references:
+    - https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/nginx
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/nginx.conf
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - "server"
+      - "listen"
+      - "server_name"
+    not_contains:
+      - "html>"

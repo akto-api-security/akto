@@ -1,0 +1,44 @@
+id: PARAMETERS_CONFIG
+info:
+  name: Parameters.yml - File Discovery
+  description: "Parameters.yml was discovered."
+  details: >
+              "The parameters.yml file is a configuration file used in Symfony-based applications to store sensitive information like database credentials, API keys, and encryption settings. Its exposure can lead to unauthorized access, data leaks, and potential security vulnerabilities if not properly protected or restricted.The parameters.yml file often contains critical information required for the functioning of the application, making it a prime target for attackers seeking to exploit misconfigurations or gain unauthorized access to sensitive resources."
+  impact: "Exposing parameters.yml can result in the compromise of sensitive information, including database credentials, jeopardizing the security and integrity of the application or system."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: PARAMETERS_CONFIG
+  severity: HIGH
+  references:
+    - https://www.exploit-db.com/ghdb/5986
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/parameters.yml
+    - ${urlVar}/app/config/parameters.yml
+    - ${urlVar}/parameters.yml.dist
+    - ${urlVar}/app/config/parameters.yml.dist
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'parameters:'
+      - 'database_user'
+      - 'database_password'

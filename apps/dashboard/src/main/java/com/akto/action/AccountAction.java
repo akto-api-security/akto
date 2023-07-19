@@ -263,12 +263,6 @@ public class AccountAction extends UserAction {
                 InitializerListener.insertPiiSources();
                 InitializerListener.saveTestEditorYaml();
                 try {
-                    InitializerListener.executeTestSourcesFetch();
-                    InitializerListener.editTestSourceConfig();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {
                     e.printStackTrace();
