@@ -195,7 +195,6 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 }
 
                 Map<String, Object> testDataMap = (Map)json.get("testData");
-                //addDataToMockserver(testDataMap, mockServiceUrl);
             }
             Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
 
@@ -205,35 +204,6 @@ public class RuntimeListener extends AfterMongoConnectListener {
         }
 
     }
-
-    // private static void addDataToMockserver(Map<String, Object> testDataMap, String mockServiceUrl) {
-    //     String url = (String) testDataMap.get("url");
-    //     // URI uri = null;
-    //     // try {
-    //     //     uri = new URI(path);
-    //     // } catch (Exception e) {
-    //     // }
-    //     // String url = uri.getPath();
-    //     JSONObject requestBody = new JSONObject();
-    //     requestBody.put("url", url);
-
-    //     JSONObject data = new JSONObject();
-    //     data.put("method", testDataMap.get("method"));
-    //     data.put("responsePayload", testDataMap.get("responsePayload"));
-    //     data.put("statusCode", testDataMap.get("statusCode"));
-    //     data.put("responseHeaders", testDataMap.get("responseHeaders"));
-
-    //     requestBody.put("data", data);
-    //     String reqData = requestBody.toString();
-
-    //     TimeoutObject timeoutObj = new TimeoutObject(300, 300, 300);
-    //     JsonNode node = null;
-    //     try {
-    //         node = ApiRequest.postRequestWithTimeout(new HashMap<>(), mockServiceUrl + "/api/add_sample_data/", reqData, timeoutObj);            
-    //     } catch (Exception e) {
-    //         // TODO: handle exception
-    //     }
-    // }
 
     private static String convertStreamToString(InputStream in) throws Exception {
 
