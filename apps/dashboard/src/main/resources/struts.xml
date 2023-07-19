@@ -513,6 +513,13 @@
             <result name="SUCCESS" type="json">
             </result>
         </action>
+        
+        <action name="auth0-logout" class="com.akto.action.LogoutAction" method="auth0Logout">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+            </result>
+        </action>
 
         <action name="api/getPostmanCredential" class="com.akto.action.PostmanAction" method="fetchPostmanCred">
             <interceptor-ref name="json"/>

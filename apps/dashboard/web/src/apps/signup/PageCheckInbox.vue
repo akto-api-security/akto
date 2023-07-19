@@ -7,19 +7,31 @@
             <div class="title">Check your email</div>
             <div class="message">We sent you a temporary verification link to your email. Please click on the link to activate your account.</div>
             <div class="login-link">
-                <a href="/login">
+                <div @click="redirectToLogin">
                     <v-icon size="8">$fas_arrow-left</v-icon>
                     <span>Back to login</span>
-                </a>
+                </div>
             </div>
         </div>
     </div>
 </template>
 
 <script>
-
+import axios from 'axios';
 export default {
-    name: "PageCheckInbox"
+
+    name: "PageCheckInbox",
+    methods: {
+        redirectToLogin(){
+            axios.get("/auth0-logout").then((resp) => {
+              if(resp.data.logoutUrl){
+                window.location.href = resp.data.logoutUrl;
+                return;
+              }
+              window.location.href = "/login"
+            })
+        } 
+    }
 }
 
 </script>
@@ -58,5 +70,6 @@ export default {
     color: #2C6ECB
     font-size: 14px
     font-weight: 400
+    cursor: pointer
 
 </style>
