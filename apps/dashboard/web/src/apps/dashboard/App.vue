@@ -231,11 +231,6 @@ export default {
         title: 'Issues',
         icon: '$fas_exclamation-triangle',
         link: '/dashboard/issues'
-      },
-      {
-        title: 'Tests library',
-        icon: '$bookBookmark',
-        link: '/dashboard/library'
       }
     ]
 
@@ -394,13 +389,11 @@ export default {
     }
   },
   async mounted() {
-    if (!this.isSaas) {
       this.myItems.push({
         title: 'Test Editor',
         icon: '$testEditorIcon',
         link: '/dashboard/test-editor'
       })
-    }
     this.myAccountItems.unshift(... ( this.isLocalDeploy ? this.myAccountLocalItems : [] ))
     window.Beamer.init();
     let i = setInterval(() => {

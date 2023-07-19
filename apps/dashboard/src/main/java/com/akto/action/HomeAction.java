@@ -20,8 +20,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-import static com.akto.action.SignupAction.BUSINESS_EMAIL_URI;
-import static com.akto.action.SignupAction.CHECK_INBOX_URI;
+import static com.akto.action.SignupAction.*;
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // This is the first action that is triggered when the webpage is first fetched
@@ -68,7 +67,8 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         }
 
         if(servletRequest.getRequestURI().equals(CHECK_INBOX_URI) ||
-            servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI)) {
+            servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI) ||
+            servletRequest.getRequestURI().contains(TEST_EDITOR_URL)) {
             return "SUCCESS";
         }
 
