@@ -84,8 +84,8 @@
                 if(tabName){
                     tabName = this.tabs[newVal].replace(" ", "-")
                 }
-                if (this.disableHash !== true) {
-                    window.location.hash = "#" + tabName
+                if (this.disableHash !== true && tabName) {
+                    window.history.replaceState(null, null, "#" + tabName)
                 }
             }
         },
