@@ -64,7 +64,7 @@ function GithubRow(props) {
                 props?.headers?.filter((header) => {
                     return header.itemCell == 2
                 }).filter((header) => {
-                    return props.data[header.value]
+                    return props.data[header.value]!=undefined
                 }).map((header) => {
                     return (
                         <IndexTable.Cell key={header.text}>
