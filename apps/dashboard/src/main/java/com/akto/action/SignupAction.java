@@ -56,7 +56,13 @@ import static com.mongodb.client.model.Updates.set;
 public class SignupAction implements Action, ServletResponseAware, ServletRequestAware {
 
     public static final String SIGN_IN = "signin";
-
+    public static final String CHECK_INBOX_URI = "/check-inbox";
+    public static final String BUSINESS_EMAIL_URI = "/business-email";
+    public static final String ACCESS_DENIED_ERROR = "access_denied";
+    public static final String VERIFY_EMAIL_ERROR = "VERIFY_EMAIL";
+    public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
+    public static final String ERROR_STR = "error";
+    public static final String ERROR_DESCRIPTION = "error_description";
     public String getCode() {
         return code;
     }
@@ -171,6 +177,22 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaAuth0() throws Exception {
+        String error = servletRequest.getParameter(ERROR_STR);
+        String errorDescription = servletRequest.getParameter(ERROR_DESCRIPTION);
+        if(StringUtils.isNotEmpty(error) || StringUtils.isNotEmpty(errorDescription)) {
+            if(error.equals(ACCESS_DENIED_ERROR)) {
+                switch (errorDescription){
+                    case VERIFY_EMAIL_ERROR:
+                        servletResponse.sendRedirect(CHECK_INBOX_URI);
+                        return SUCCESS;
+                    case BUSINESS_EMAIL_REQUIRED_ERROR:
+                        servletResponse.sendRedirect(BUSINESS_EMAIL_URI);
+                        return SUCCESS;
+                    default:
+                        return ERROR;
+                }
+            }
+        }
         Tokens tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
         String accessToken = tokens.getAccessToken();
         String refreshToken = tokens.getRefreshToken();
@@ -196,7 +218,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         System.out.print(jsonBody);
         String email = jsonBody.getString("email");
         String name = jsonBody.getString("name");
-
 
         SignupInfo.Auth0SignupInfo auth0SignupInfo = new SignupInfo.Auth0SignupInfo(accessToken, refreshToken,name, email);
         shouldLogin = "true";
@@ -236,17 +257,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         code = "";
         System.out.println("Executed registerViaAuth0");
         return SUCCESS.toUpperCase();
-    }
-
-    private String getEmailFromInvitationCode(String signupInvitationCode) {
-        Jws<Claims> jws;
-        try {
-            jws = JWT.parseJwt(signupInvitationCode, "");
-        } catch (Exception e) {
-            code = "Ask admin to invite you";
-            return ERROR.toUpperCase();
-        }
-        return jws.getBody().get("email").toString();
     }
 
     public String registerViaGoogle() {

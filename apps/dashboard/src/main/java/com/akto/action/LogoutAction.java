@@ -6,6 +6,7 @@ import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.User;
 import com.akto.utils.Auth0;
+import com.akto.utils.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -32,14 +33,13 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
                 Filters.eq("_id", user.getId()),
                 Updates.set("refreshTokens", new ArrayList<>())
         );
-        Map<String, SignupInfo> signupInfoMap = user.getSignupInfoMap();
         Cookie cookie = AccessTokenAction.generateDeleteCookie();
         servletResponse.addCookie(cookie);
         HttpSession session = servletRequest.getSession();
         if (session != null) {
             session.setAttribute("logout", Context.now());
         }
-        if(signupInfoMap.containsKey(Config.ConfigType.AUTH0.name())){
+        if(DashboardMode.isSaasDeployment()){
             return auth0Logout();
         }
         try {
@@ -82,7 +82,7 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
                 Auth0.getClientId(),
                 returnUrl);
 
-        return null;
+        return SUCCESS.toUpperCase();
     }
 
     public String getLogoutUrl() {
