@@ -129,7 +129,7 @@ function GithubServerTable(props) {
   }, []);
 
   const resourceIDResolver = (data) => {
-    return data.hexId;
+    return data.id;
   };
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
@@ -151,10 +151,9 @@ function GithubServerTable(props) {
       data,
       index,
     ) => (
-      // create a standard key field. index is standard but not preferred by react.
       <GithubRow 
-        key={data.hexId}
-        id={data.hexId}
+        key={data.id}
+        id={data.id}
         data={data} 
         index={index} 
         getActions={props.getActions} 
@@ -220,8 +219,8 @@ function GithubServerTable(props) {
               flush: true
             }
           ]}
-          bulkActions={props.bulkActions || []}
-          promotedBulkActions={props.selectable ? props.promotedBulkActions(selectedResources) : []}
+          bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
+          promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
 
         >
           {rowMarkup}
