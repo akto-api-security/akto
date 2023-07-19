@@ -380,6 +380,7 @@
         --askUs: #4A154B ;
         --backgroundColor1: #D500F9;
         --backgroundColor2: #2E006D;
+        --errorBackgroundColor: #FAFBFB;
         --borderColor: #e4e3e5;
         --colTableBackground:#EDECF0;
         --white2: #fcfcfd;

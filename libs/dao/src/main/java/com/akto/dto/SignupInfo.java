@@ -334,4 +334,57 @@ public abstract class SignupInfo {
 
     }
 
+    @BsonDiscriminator
+    public static class Auth0SignupInfo extends SignupInfo {
+        String accessToken;
+        String refreshToken;
+        String name;
+        String email;
+
+
+        public Auth0SignupInfo(){
+
+        }
+        public Auth0SignupInfo(String accessToken, String refreshToken, String name, String email) {
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+            this.name = name;
+            this.email = email;
+            this.configType = Config.ConfigType.AUTH0;
+            this.key = this.configType.name();
+        }
+
+        public String getAccessToken() {
+            return accessToken;
+        }
+
+        public void setAccessToken(String accessToken) {
+            this.accessToken = accessToken;
+        }
+
+        public String getRefreshToken() {
+            return refreshToken;
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+    }
+
 }

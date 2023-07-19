@@ -181,7 +181,7 @@ public class TestExecutor {
             }
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 try {
-                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), sampleMessageStore);
+                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages());
                     if (hostName == null) {
                         continue;
                     }
@@ -195,7 +195,7 @@ public class TestExecutor {
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
+                String hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
                 if (hostName != null && hostsToApiCollectionMap.get(hostName) == null) {
                     hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
                 }

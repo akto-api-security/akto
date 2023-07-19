@@ -12,6 +12,8 @@ const TestingRunResults  = () => import( "@/apps/dashboard/views/testing/compone
 const CreateTestingRun  = () => import( "@/apps/dashboard/views/testing/components/CreateTestingRun")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
+const PageCheckInbox = () => import("@/apps/signup/PageCheckInbox")
+const PageBusinessEmail = () => import("@/apps/signup/PageBusinessEmail")
 const PageSettings = () => import("@/apps/dashboard/views/settings/PageSettings")
 const Observe = () => import( "@/apps/dashboard/views/observe/inventory/Observe")
 const Inventory = () => import("@/apps/dashboard/views/observe/inventory/Inventory")
@@ -38,7 +40,7 @@ const router =  new Router({
     routes: [
         {
             path: '/',
-            redirect: 'login',
+            redirect: '/dashboard/observe/inventory',
             component: PageLogin
         },
         {
@@ -46,10 +48,21 @@ const router =  new Router({
             name: 'login',
             component: PageLogin
         },
+       
         {
             path: '/signup',
             name: 'signup',
             component: PageSignup
+        },
+        {
+            path: '/check-inbox',
+            name: 'check-inbox',
+            component: PageCheckInbox
+        },
+        {
+            path: '/business-email',
+            name: 'business-email',
+            component: PageBusinessEmail
         },
         {
             path: '/tools/test-editor',

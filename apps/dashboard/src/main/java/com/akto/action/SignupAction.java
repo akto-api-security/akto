@@ -4,17 +4,27 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.utils.Auth0;
 import com.akto.utils.JWT;
+import com.auth0.Tokens;
+import com.auth0.jwk.Jwk;
+import com.auth0.jwk.JwkProvider;
+import com.auth0.jwk.UrlJwkProvider;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.auth0.jwt.interfaces.JWTVerifier;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
@@ -29,12 +39,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
+import org.json.JSONObject;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
+import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.all;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.combine;
@@ -43,7 +56,14 @@ import static com.mongodb.client.model.Updates.set;
 public class SignupAction implements Action, ServletResponseAware, ServletRequestAware {
 
     public static final String SIGN_IN = "signin";
-
+    public static final String CHECK_INBOX_URI = "/check-inbox";
+    public static final String BUSINESS_EMAIL_URI = "/business-email";
+    public static final String TEST_EDITOR_URL = "/tools/test-editor";
+    public static final String ACCESS_DENIED_ERROR = "access_denied";
+    public static final String VERIFY_EMAIL_ERROR = "VERIFY_EMAIL";
+    public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
+    public static final String ERROR_STR = "error";
+    public static final String ERROR_DESCRIPTION = "error_description";
     public String getCode() {
         return code;
     }
@@ -155,6 +175,89 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
         }
 
+    }
+
+    public String registerViaAuth0() throws Exception {
+        String error = servletRequest.getParameter(ERROR_STR);
+        String errorDescription = servletRequest.getParameter(ERROR_DESCRIPTION);
+        if(StringUtils.isNotEmpty(error) || StringUtils.isNotEmpty(errorDescription)) {
+            if(error.equals(ACCESS_DENIED_ERROR)) {
+                switch (errorDescription){
+                    case VERIFY_EMAIL_ERROR:
+                        servletResponse.sendRedirect(CHECK_INBOX_URI);
+                        return SUCCESS;
+                    case BUSINESS_EMAIL_REQUIRED_ERROR:
+                        servletResponse.sendRedirect(BUSINESS_EMAIL_URI);
+                        return SUCCESS;
+                    default:
+                        return ERROR;
+                }
+            }
+        }
+        Tokens tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
+        String accessToken = tokens.getAccessToken();
+        String refreshToken = tokens.getRefreshToken();
+        String idToken = tokens.getIdToken();
+        String[] split_string = idToken.split("\\.");
+        String base64EncodedBody = split_string[1];
+
+        JwkProvider provider = new UrlJwkProvider("https://" + Auth0.getDomain() + "/");
+        DecodedJWT jwt = com.auth0.jwt.JWT.decode(idToken);
+        Jwk jwk = provider.get(jwt.getKeyId());
+
+        Algorithm algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey(), null);
+
+        JWTVerifier verifier = com.auth0.jwt.JWT.require(algorithm)
+                .withIssuer("https://" + Auth0.getDomain() + "/")
+                .build();
+
+        jwt = verifier.verify(idToken);
+
+        com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64 base64Url = new Base64(true);
+        String body = new String(base64Url.decode(base64EncodedBody));
+        JSONObject jsonBody = new JSONObject(body);
+        System.out.print(jsonBody);
+        String email = jsonBody.getString("email");
+        String name = jsonBody.getString("name");
+
+        SignupInfo.Auth0SignupInfo auth0SignupInfo = new SignupInfo.Auth0SignupInfo(accessToken, refreshToken,name, email);
+        shouldLogin = "true";
+        User user = UsersDao.instance.findOne(new BasicDBObject(User.LOGIN, email));
+        if(user != null && user.getSignupInfoMap() != null && !user.getSignupInfoMap().containsKey(Config.ConfigType.AUTH0.name())){
+            BasicDBObject setQ = new BasicDBObject(User.SIGNUP_INFO_MAP + "." +Config.ConfigType.AUTH0.name(), auth0SignupInfo);
+            UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, email), new BasicDBObject(SET, setQ));
+        }
+        String decodedState = new String(base64Url.decode(state));
+        BasicDBObject parsedState = BasicDBObject.parse(decodedState);
+
+        if(parsedState.containsKey("signupInvitationCode")){
+            // User clicked on signup link
+            // Case 1: New user
+            // Case 2: Existing user - Just add this new account to this user
+            String signupInvitationCode = parsedState.getString("signupInvitationCode");
+            Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, signupInvitationCode);
+            PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
+            if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
+                PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
+                if(user != null){
+                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
+                }
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId());
+            } else if(pendingInviteCode == null){
+                // invalid code
+                code = "Please ask admin to invite you!";
+                return ERROR.toUpperCase();
+            } else {
+                // invalid email
+                code = "This invitation doesn't belong to you!";
+                return ERROR.toUpperCase();
+            }
+
+        }
+        createUserAndRedirect(email, name, auth0SignupInfo, 0);
+        code = "";
+        System.out.println("Executed registerViaAuth0");
+        return SUCCESS.toUpperCase();
     }
 
     public String registerViaGoogle() {
