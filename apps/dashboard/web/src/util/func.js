@@ -362,8 +362,7 @@ const func = {
       }
     }
     return result
-  }
-
+  },
 sortFunc: (data, sortKey, sortOrder) => {
   return data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
