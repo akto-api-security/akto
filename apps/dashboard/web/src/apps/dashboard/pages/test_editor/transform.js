@@ -101,6 +101,28 @@ const convertFunc = {
             }
         }
         return arr
+    },
+    getTestInfo(testObj, testId) {
+        const testInfo = {
+            id: testId
+        }
+
+        const aktoTestsCheck = Object.values(testObj.aktoTests).flat().find(test => test.value === testId)
+        const customTestsCheck = Object.values(testObj.customTests).flat().find(test => test.value === testId)
+
+        if (aktoTestsCheck) {
+            testInfo.label = aktoTestsCheck.label
+            testInfo.category = aktoTestsCheck.category
+            testInfo.source = "akto"
+        } else if (customTestsCheck) {
+            testInfo.label = customTestsCheck.label
+            testInfo.category = customTestsCheck.category
+            testInfo.source = "custom"
+        } else {
+            return null
+        }
+
+        return testInfo
     }
 }
 

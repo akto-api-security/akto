@@ -46,20 +46,12 @@ const SampleApi = () => {
             language: "json",
             minimap: { enabled: false },
             wordWrap: true,
-            automaticLayout: false,
+            automaticLayout: true,
             colorDecorations: true,
             scrollBeyondLastLine: false,
             readOnly: true
         }
 
-        editor.defineTheme('subdued', {
-            base: 'vs',
-            inherit: true,
-            rules: [],
-            colors: {
-                'editor.background': '#FAFBFB',
-            },
-        });
         setEditorInstance(editor.create(jsonEditorRef.current, jsonEditorOptions))    
     }, [])
 

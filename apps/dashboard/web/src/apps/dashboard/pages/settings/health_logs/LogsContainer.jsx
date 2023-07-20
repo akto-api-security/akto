@@ -4,8 +4,6 @@ import { tokens } from "@shopify/polaris-tokens"
 
 const LogsContainer = ({ logs }) => {
 
-    console.log(logs)
-
     const logsFetchBetween = () => {
         let d1 = func.epochToDateTime(Math.floor(logs.startTime / 1000))
         let d2 = func.epochToDateTime(Math.floor(logs.endTime / 1000))

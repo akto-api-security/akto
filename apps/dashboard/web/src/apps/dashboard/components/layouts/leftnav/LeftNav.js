@@ -127,7 +127,7 @@ export default function LeftNav(){
                       toggleLeftNavCollapsed()
                     } 
                     handleSelect("test-editor")
-                    navigate("/dashboard/test-editor")
+                    navigate("/dashboard/test-editor/REMOVE_TOKENS")
                   },
                   selected: leftNavSelected === 'test-editor',
                   key: '5',

@@ -19,36 +19,53 @@ import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
+import { useParams } from "react-router-dom";
+import TestEditorStore from "../testEditorStore";
 
 
 const YamlEditor = () => {
 
+    const selectedTest = TestEditorStore(state => state.selectedTest)
+
     const [ editorInstance, setEditorInstance ] = useState(null);
 
     const yamlEditorRef = useRef(null)
+    
+    useEffect(()=>{        
+        let Editor = null
 
-    useEffect(()=>{
-        const yamlEditorOptions = {
-          language: "yaml",
-          minimap: { enabled: false },
-          wordWrap: true,
-          automaticLayout: false,
-          colorDecorations: true,
-          scrollBeyondLastLine: false,
+        if (!editorInstance) {
+            const yamlEditorOptions = {
+                language: "yaml",
+                minimap: { enabled: false },
+                wordWrap: true,
+                automaticLayout: true,
+                colorDecorations: true,
+                scrollBeyondLastLine: false,
+              }
+      
+              editor.defineTheme('subdued', {
+                  base: 'vs',
+                  inherit: true,
+                  rules: [],
+                  colors: {
+                      'editor.background': '#FAFBFB',
+                  },
+              });
+              
+              editor.setTheme('subdued')
+      
+              Editor = editor.create(yamlEditorRef.current, yamlEditorOptions)
+              setEditorInstance(Editor)
+        } else {
+            Editor = editorInstance
         }
 
-        editor.defineTheme('subdued', {
-            base: 'vs',
-            inherit: true,
-            rules: [],
-            colors: {
-                'editor.background': '#FAFBFB',
-            },
-        });
-        editor.setTheme('subdued')
-        setEditorInstance(editor.create(yamlEditorRef.current, yamlEditorOptions))
-
-      }, [])
+        if (selectedTest) {
+            Editor.setValue(selectedTest.content)
+        }
+    
+      }, [selectedTest])
 
     return (
         <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>

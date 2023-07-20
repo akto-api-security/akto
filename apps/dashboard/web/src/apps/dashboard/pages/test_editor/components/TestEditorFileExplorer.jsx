@@ -5,11 +5,15 @@ import { Badge, Box, Button, Icon, Navigation, TextField, Tooltip } from "@shopi
 
 import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
 import "../TestEditor.css"
+import { useNavigate } from "react-router-dom"
 
 const TestEditorFileExplorer = () => {
 
     const testObj = TestEditorStore(state => state.testsObj)
+    const selectedTest = TestEditorStore(state => state.selectedTest)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
+    const allSubCategories = TestEditorStore(state => state.allSubCategories)
+
 
     const [selectedCategory, setSelectedCategory] = useState('none')
     const [customItems, setCustomItems] = useState([])
@@ -17,6 +21,8 @@ const TestEditorFileExplorer = () => {
     const [searchText, setSearchText] = useState('')
     const [showCustom, setShowCustom] = useState(false)
     const [showAkto, setShowAkto] = useState(false)
+
+    const navigate = useNavigate()
 
     const selectedFunc = (val) =>{
         setSelectedCategory(val)
@@ -85,6 +91,24 @@ const TestEditorFileExplorer = () => {
         setAktoItems(convertFunc.getNavigationItems(testObj,"Akto",selectedFunc))
     },[testObj])
 
+    useEffect(() => {
+        if (selectedTest) {
+            const templateSource = selectedTest.templateSource._name
+    
+            if (templateSource === "AKTO_TEMPLATES") 
+            {
+                toggleFunc('AKTO_TEMPLATES')
+                setSelectedCategory(selectedTest.superCategory.name + "_akto")
+            }
+            else if (templateSource === "CUSTOM") 
+            {
+                toggleFunc('CUSTOM')
+                setSelectedCategory(selectedTest.superCategory.name + "_custom")
+            }            
+        }
+     
+    }, [])
+
     function getItems(aktoItems){
         const arr = aktoItems.map(obj => ({
             ...obj,
@@ -99,7 +123,13 @@ const TestEditorFileExplorer = () => {
                             </span>
                         </Tooltip>
                     ),
-                    onClick: (()=> setSelectedTest(item)),
+                    onClick: (()=> {
+                        navigate(`/dashboard/test-editor/${item.value}`)
+                        const testInfo = allSubCategories.find(test => test.name === item.value)
+                    
+                        setSelectedTest(testInfo)
+                        
+                    }),
                     key: item.value
                 }
             })

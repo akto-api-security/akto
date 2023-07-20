@@ -4,19 +4,24 @@ import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
 import Store from "../../store"
 import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import testEditorRequests from "./api"
 import TestEditorStore from "./testEditorStore"
 import convertFunc from "./transform"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import SpinnerCentered from "../../components/progress/SpinnerCentered"
 
 const TestEditor = () => {
     const navigate = useNavigate()
+    const { testId } = useParams()
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
+    const setTestsObj = TestEditorStore(state => state.setTestsObj)  
+    const setAllSubCategories = TestEditorStore(state => state.setAllSubCategories)  
+    const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
 
-    const setTestsObj = TestEditorStore(state => state.setTestsObj)
+    const [ loading, setLoading ] = useState(true)
     
     const disableToast = () => {
         setToastConfig({
@@ -31,14 +36,28 @@ const TestEditor = () => {
     ) : null;
 
     const handleExit = () => {
-        navigate(-1)
+        navigate("/dashboard/testing")
     }
 
     const fetchAllTests = async () =>{
-        await testEditorRequests.fetchAllSubCategories().then((resp)=>{
-            const obj = convertFunc.mapCategoryToSubcategory(resp.subCategories)
+        setLoading(true)
+
+        const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
+        if (allSubCategoriesResponse) {
+            setAllSubCategories(allSubCategoriesResponse.subCategories)
+
+            const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
             setTestsObj(obj)
-        })
+
+            const testInfo = allSubCategoriesResponse.subCategories.find(test => test.name === testId)
+            if (testInfo) {
+                setSelectedTest(testInfo)
+            }
+
+            // handle invalid test id in url
+
+            setLoading(false)
+        }
     }
 
     useEffect(()=> {
@@ -65,14 +84,18 @@ const TestEditor = () => {
 
             <Divider  />
 
-            <div style={{ display: "grid", gridTemplateColumns: "20vw auto"}}>
-                <TestEditorFileExplorer />
-                
-                <div style={{ display: "grid", gridTemplateColumns: "50% 50%"}}>
-                    <YamlEditor />
-                    <SampleApi />
+            { loading ? 
+                <SpinnerCentered />
+            :   <div style={{ display: "grid", gridTemplateColumns: "max-content auto"}}>
+                    <TestEditorFileExplorer />
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "50% 50%"}}>
+                        <YamlEditor />
+                        <SampleApi />
+                    </div>
                 </div>
-            </div>
+            }
+           
             {toastMarkup}            
         </Frame>
     )

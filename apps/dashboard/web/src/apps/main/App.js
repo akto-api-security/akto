@@ -122,8 +122,11 @@ const router = createBrowserRouter([
   ]
   },
   {
-    path: "/dashboard/test-editor",
+    path: "/dashboard/test-editor/:testId",
     element: <TestEditor />
+  },
+  {
+
   },
 {
   path: "/login",

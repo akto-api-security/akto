@@ -19,14 +19,14 @@ const Users = () => {
     const [users, setUsers] = useState([])
 
     const getTeamData = async () => {
+        setLoading(true);
         const usersResponse = await settingRequests.getTeamData()
         setUsers(usersResponse.users)
+        setLoading(false)
     };
 
     useEffect(() => {
-        setLoading(true);
         getTeamData();
-        setLoading(false)
     }, [])
 
     const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
