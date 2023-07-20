@@ -2,8 +2,6 @@ import {create} from "zustand"
 import {devtools} from "zustand/middleware"
 
 let testEditorStore = (set)=>({
-    allSubCategories: null,
-    setAllSubCategories: (allSubCategories) => { set({ allSubCategories: allSubCategories }) },
     testsObj : null,
     setTestsObj:(testsObj)=>{
         set({testsObj: testsObj})

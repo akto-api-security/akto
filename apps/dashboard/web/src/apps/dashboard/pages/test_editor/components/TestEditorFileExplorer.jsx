@@ -12,8 +12,6 @@ const TestEditorFileExplorer = () => {
     const testObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
-    const allSubCategories = TestEditorStore(state => state.allSubCategories)
-
 
     const [selectedCategory, setSelectedCategory] = useState('none')
     const [customItems, setCustomItems] = useState([])
@@ -93,18 +91,13 @@ const TestEditorFileExplorer = () => {
 
     useEffect(() => {
         if (selectedTest) {
-            const templateSource = selectedTest.templateSource._name
-    
-            if (templateSource === "AKTO_TEMPLATES") 
-            {
-                toggleFunc('AKTO_TEMPLATES')
-                setSelectedCategory(selectedTest.superCategory.name + "_akto")
+            const testData = testObj.mapTestToData[selectedTest.label]``
+            toggleFunc(testData.type)
+            if(testData.type === 'CUSTOM'){
+                setSelectedCategory(testData.superCategory + '_custom')
+            }else{
+                setSelectedCategory(testData.superCategory + '_akto')
             }
-            else if (templateSource === "CUSTOM") 
-            {
-                toggleFunc('CUSTOM')
-                setSelectedCategory(selectedTest.superCategory.name + "_custom")
-            }            
         }
      
     }, [])

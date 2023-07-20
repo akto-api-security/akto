@@ -11,8 +11,8 @@ const convertFunc = {
         let totalCustomTests = 0
         let totalAktoTests = 0
 
-        let mapTestToContent = {}
-        let mapTestToLastUpdated = {}
+        let mapTestToData = {}
+        let mapIdtoTest = {}
 
         categoriesArr.forEach(test => {
             let obj = {
@@ -34,12 +34,20 @@ const convertFunc = {
                 totalAktoTests++
             }
 
-            mapTestToContent[test.testName] = test.content
-            mapTestToLastUpdated[test.testName] = func.prettifyEpoch(test.updatedTs)
+            let dataObj = {
+                content: test.content,
+                lastUpdated: func.prettifyEpoch(test.updatedTs),
+                superCategory: test.superCategory.name,
+                type: test.templateSource._name,
+                category: test.superCategory.displayName
+            }
+
+            mapTestToData[test.testName] = dataObj
+            mapIdtoTest[test.name] = test.testName
         });
 
         let resultObj = {
-            aktoTests,customTests,totalAktoTests,totalCustomTests,mapTestToContent,mapTestToLastUpdated
+            aktoTests,customTests,totalAktoTests,totalCustomTests,mapTestToData,mapIdtoTest
         }
 
         return resultObj

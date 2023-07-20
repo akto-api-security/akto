@@ -64,8 +64,7 @@ const YamlEditor = () => {
         }
 
         if (selectedTest) {
-            const name = selectedTest.testName ? selectedTest.testName : selectedTest.label
-            const value = testsObj.mapTestToContent[name]
+            const value = testsObj.mapTestToData[selectedTest.label].content
             Editor.setValue(value)
         }
     

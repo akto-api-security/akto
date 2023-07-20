@@ -18,7 +18,6 @@ const TestEditor = () => {
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
     const setTestsObj = TestEditorStore(state => state.setTestsObj)  
-    const setAllSubCategories = TestEditorStore(state => state.setAllSubCategories)  
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
 
     const [ loading, setLoading ] = useState(true)
@@ -44,18 +43,16 @@ const TestEditor = () => {
 
         const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
         if (allSubCategoriesResponse) {
-            setAllSubCategories(allSubCategoriesResponse.subCategories)
-
             const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
             setTestsObj(obj)
 
-            const testInfo = allSubCategoriesResponse.subCategories.find(test => test.name === testId)
-            if (testInfo) {
-                setSelectedTest(testInfo)
+            const testName = obj.mapIdtoTest[testId]
+            const selectedTestObj = {
+                label: testName,
+                value: testId,
+                category: obj.mapTestToData[testName].category
             }
-
-            // handle invalid test id in url
-
+            setSelectedTest(selectedTestObj)
             setLoading(false)
         }
     }
