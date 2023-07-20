@@ -8,8 +8,9 @@
                 @changed="changed"
             />
         </div>
-        <div v-else class="fs-12">
-            {{finalName}} <v-btn icon plain color="var(--themeColorDark)" @click="editingInProcess = true"><v-icon size="12">$fas_edit</v-icon></v-btn>
+        <div v-else class="fs-12 name-editor" style="max-width: 400px">
+            {{finalName}}
+            <v-btn icon plain color="var(--themeColorDark)" @click="editingInProcess = true"><v-icon size="12" >$fas_edit</v-icon></v-btn>
         </div>
     </div>    
 </template>
@@ -65,5 +66,6 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-
+.name-editor > .v-btn--icon.v-size--default
+    height: 0px !important
 </style>
