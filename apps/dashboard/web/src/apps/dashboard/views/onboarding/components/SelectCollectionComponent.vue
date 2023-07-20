@@ -46,7 +46,7 @@ export default {
             if (this.apiCollections.length <=1 ){
                 await this.$store.dispatch('collections/loadAllApiCollections')
             }
-            if (this.demoCollections || this.demoCollections.size > 0) {
+            if (this.demoCollections.length > 0) {
                 this.$store.dispatch('onboarding/collectionSelected', this.demoCollections[0])
                 clearInterval(this.timer)
             }
