@@ -76,7 +76,7 @@ public class ProfileAction extends UserAction {
             }
             return;
         }
-        String username = user.getName();
+        String username = user.getLogin();
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
