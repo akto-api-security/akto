@@ -128,7 +128,7 @@ public class GraphQLUtils {//Singleton class
         return responseParamsList;
     }
 
-    public String graphqlDeleteField(String payload, String field) {
+    public String deleteGraphqlField(String payload, String field) {
         Object[] payloadList = (Object []) JSON.parse(payload);
         for (Object operationObj: payloadList) {
             Map<String, Object> operation = (Map) operationObj;
@@ -150,7 +150,7 @@ public class GraphQLUtils {//Singleton class
         return gson.toJson(payloadList);
     }
 
-    public String graphqlAddField(String payload, String field, String value) {
+    public String addGraphqlField(String payload, String field, String value) {
         String tempVariable = "__tempDummyVariableToReplace";
         Object[] payloadList = (Object []) JSON.parse(payload);
         for (Object operationObj: payloadList) {
@@ -169,6 +169,30 @@ public class GraphQLUtils {//Singleton class
             });
             String modifiedQuery = AstPrinter.printAst(result);
 
+            modifiedQuery = modifiedQuery.replace(tempVariable, value);
+            operation.replace("query", modifiedQuery);
+        }
+        return gson.toJson(payloadList);
+    }
+
+    public String modifyGraphqlField(String payload, String field, String value) {
+        String tempVariable = "__tempDummyVariableToReplace";
+        Object[] payloadList = (Object []) JSON.parse(payload);
+        for (Object operationObj: payloadList) {
+            Map<String, Object> operation = (Map) operationObj;
+            String query = (String) operation.get("query");
+            Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
+
+                @Override
+                public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                    if (node.getName().equals(field)) {
+                        return TreeTransformerUtil.changeNode(context, parser.parseValue(tempVariable));
+                    } else {
+                        return super.visitField(node, context);
+                    }
+                }
+            });
+            String modifiedQuery = AstPrinter.printAst(result);
             modifiedQuery = modifiedQuery.replace(tempVariable, value);
             operation.replace("query", modifiedQuery);
         }

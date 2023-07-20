@@ -119,20 +119,26 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
-    public static ExecutorSingleOperationResp graphqlDeleteField(RawApi rawApi, String key) {
+    public static ExecutorSingleOperationResp deleteGraphqlField(RawApi rawApi, String key) {
         String payload = rawApi.getRequest().getBody();
-        String modifiedPayload = GraphQLUtils.getUtils().graphqlDeleteField(payload, key);
+        String modifiedPayload = GraphQLUtils.getUtils().deleteGraphqlField(payload, key);
         rawApi.getRequest().setBody(modifiedPayload);
         return new ExecutorSingleOperationResp(true,"");
     }
 
-    public static ExecutorSingleOperationResp graphqlAddField (RawApi rawApi, String key, String value) {
+    public static ExecutorSingleOperationResp addGraphqlField(RawApi rawApi, String key, String value) {
         String payload = rawApi.getRequest().getBody();
-        String modifiedPayload = GraphQLUtils.getUtils().graphqlAddField(payload, key, value);
+        String modifiedPayload = GraphQLUtils.getUtils().addGraphqlField(payload, key, value);
         rawApi.getRequest().setBody(modifiedPayload);
         return new ExecutorSingleOperationResp(true,"");
     }
 
+    public static ExecutorSingleOperationResp modifyGraphqlField (RawApi rawApi, String key, String value) {
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().modifyGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
     public static ExecutorSingleOperationResp modifyBodyParam(RawApi rawApi, String key, Object value) {
         BasicDBObject payload = rawApi.fetchReqPayload();
         BasicDBObject obj = Utils.fetchJsonObjForString(value);
