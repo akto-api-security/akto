@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -8,20 +7,13 @@ import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.Main;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
-import com.akto.runtime.Main;
-import com.amazonaws.services.lambda.model.*;
-import com.amazonaws.util.EC2MetadataUtils;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import com.opensymphony.xwork2.Action;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.RefreshPreferences;
@@ -29,8 +21,11 @@ import com.amazonaws.services.autoscaling.model.StartInstanceRefreshRequest;
 import com.amazonaws.services.autoscaling.model.StartInstanceRefreshResult;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.amazonaws.services.lambda.model.*;
+import com.amazonaws.util.EC2MetadataUtils;
+import com.mongodb.BasicDBObject;
+import com.opensymphony.xwork2.Action;
+
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static com.akto.dao.MCollection.ID;
 import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
@@ -259,6 +253,7 @@ public class AccountAction extends UserAction {
                 Main.createIndices();
                 Main.insertRuntimeFilters();
                 RuntimeListener.initialiseDemoCollections();
+                RuntimeListener.addSampleData();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
                 InitializerListener.saveTestEditorYaml();

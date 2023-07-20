@@ -1,8 +1,6 @@
 package com.akto.listener;
 
 
-import com.akto.ApiRequest;
-import com.akto.TimeoutObject;
 import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -22,29 +20,24 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.AccountTask;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.utils.Utils;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.json.JSONArray;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.InputStream;
-import java.net.URI;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 public class RuntimeListener extends AfterMongoConnectListener {
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
@@ -164,7 +157,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 String testId = (String) json.get("id");
 
                 int ts = Context.now();
-                sampleDataMap.put("akto_account_id", "1000000");
+                sampleDataMap.put("akto_account_id", ""+Context.accountId.get());
                 sampleDataMap.put("ip", "null");
                 sampleDataMap.put("time", String.valueOf(ts));
                 sampleDataMap.put("type", "HTTP/1.1");
