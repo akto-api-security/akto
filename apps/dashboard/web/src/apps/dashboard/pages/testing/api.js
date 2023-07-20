@@ -86,5 +86,14 @@ export default {
         }).then((resp) => {
             return resp
         })        
+    },
+    addTestTemplate(content,originalTestId) {
+        return request({
+            url: '/api/saveTestEditorFile',
+            method: 'post',
+            data:{content, originalTestId}
+        }).then((resp) => {
+            return resp
+        })
     }
 }

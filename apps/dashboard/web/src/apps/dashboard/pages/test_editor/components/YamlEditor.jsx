@@ -21,17 +21,38 @@ import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighligh
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import { useParams } from "react-router-dom";
 import TestEditorStore from "../testEditorStore";
+import api from "../../testing/api";
 
 
 const YamlEditor = () => {
 
     const testsObj = TestEditorStore(state => state.testsObj)
-    
     const selectedTest = TestEditorStore(state => state.selectedTest)
 
-    const [ editorInstance, setEditorInstance ] = useState(null);
+    const [ isEdited, setIsEdited ] = useState(false)
+    const [ editorInstance, _setEditorInstance ] = useState()
+    const editorInstanceRef = useRef(editorInstance)
+    const setEditorInstance = (EditorInstance) => {
+        editorInstanceRef.current = EditorInstance
+        _setEditorInstance(EditorInstance)
+    }
 
     const yamlEditorRef = useRef(null)
+
+    const handleYamlUpdate = () => {
+        const Editor = editorInstanceRef.current
+        const currentYaml = Editor.getValue()
+        const existingYaml = testsObj.mapTestToData[selectedTest.label].content 
+        setIsEdited(currentYaml !== existingYaml)
+    }
+
+    const handleSave = async () => {
+        const selectedTestCurrent = TestEditorStore.getState().selectedTest
+        const Editor = editorInstanceRef.current
+
+        const addTestTemplateResponse = await api.addTestTemplate(Editor.getValue(), selectedTest.value)
+        
+    }
     
     useEffect(()=>{        
         let Editor = null
@@ -58,6 +79,7 @@ const YamlEditor = () => {
               editor.setTheme('subdued')
       
               Editor = editor.create(yamlEditorRef.current, yamlEditorOptions)
+              Editor.onDidChangeModelContent(handleYamlUpdate)
               setEditorInstance(Editor)
         } else {
             Editor = editorInstance
@@ -66,8 +88,8 @@ const YamlEditor = () => {
         if (selectedTest) {
             const value = testsObj.mapTestToData[selectedTest.label].content
             Editor.setValue(value)
-        }
-    
+            setIsEdited(false)
+        }    
       }, [selectedTest])
 
     const copyContent = () =>{
@@ -79,13 +101,13 @@ const YamlEditor = () => {
             <div style={{display: "grid", gridTemplateColumns: "max-content max-content max-content auto max-content", gap: "5px",  alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
                 <Text variant="bodyMd">{selectedTest.label}</Text>
                 <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="above" dismissOnMouseOut>
-                    <Icon source={InfoMinor} color="subdued"/> 
+                    <Icon source={InfoMinor}/> 
                 </Tooltip>
                 <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="above">
                     <Button icon={ClipboardMinor} plain onClick={copyContent} />
                 </Tooltip>       
                 <div />
-                <Button>Save</Button>
+                <Button disabled={!isEdited} onClick={handleSave}>Save</Button>
             </div>
             <Divider />
             <Box ref={yamlEditorRef} minHeight="80vh">
