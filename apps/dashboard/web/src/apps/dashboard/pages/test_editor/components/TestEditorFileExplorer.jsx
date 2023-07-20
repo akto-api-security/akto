@@ -91,7 +91,7 @@ const TestEditorFileExplorer = () => {
 
     useEffect(() => {
         if (selectedTest) {
-            const testData = testObj.mapTestToData[selectedTest.label]``
+            const testData = testObj.mapTestToData[selectedTest.label]
             toggleFunc(testData.type)
             if(testData.type === 'CUSTOM'){
                 setSelectedCategory(testData.superCategory + '_custom')
