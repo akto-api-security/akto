@@ -16,7 +16,7 @@
     white-space: nowrap !important;
     text-overflow: ellipsis !important;
     display: flex !important;
-    max-width: 180px;
+    max-width: 200px;
 }
 
 .test-header {
@@ -32,6 +32,10 @@
     align-items: flex-start;
     display: flex;
     padding-left: 5px;
+}
+
+.active{
+    background: #ECEBFF;
 }
 
 .editor-navbar .Polaris-Navigation__Icon{

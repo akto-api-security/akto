@@ -1,4 +1,4 @@
-import { Box, Button, Divider, Icon, Text } from "@shopify/polaris"
+import { Box, Button, Divider, Icon, Text, Tooltip } from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
 import { InfoMinor, ClipboardMinor } from "@shopify/polaris-icons"
 
@@ -10,11 +10,11 @@ import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
 import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
 import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
-// import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
+import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
 import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
 import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
 import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
-// import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
+import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
 import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
@@ -70,13 +70,21 @@ const YamlEditor = () => {
     
       }, [selectedTest])
 
+    const copyContent = () =>{
+        console.log("copy")
+    }
+
     return (
         <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
             <div style={{display: "grid", gridTemplateColumns: "max-content max-content max-content auto max-content", gap: "5px",  alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
-                <Text variant="bodyMd">BOLA in old api version.yaml</Text>
-                <Icon source={InfoMinor}/> 
-                <Icon source={ClipboardMinor}/> 
-                <div></div>
+                <Text variant="bodyMd">{selectedTest.label}</Text>
+                <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="above" dismissOnMouseOut>
+                    <Icon source={InfoMinor} color="subdued"/> 
+                </Tooltip>
+                <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="above">
+                    <Button icon={ClipboardMinor} plain onClick={copyContent} />
+                </Tooltip>       
+                <div />
                 <Button>Save</Button>
             </div>
             <Divider />

@@ -44,7 +44,7 @@ const TestEditorFileExplorer = () => {
                 let arr = obj.filter((test)=>{
                     let name = test.label.toString().toLowerCase().replace(/ /g, "")
                     let category = test.category.toString().toLowerCase().replace(/ /g, "")
-                    let content = cloneObj.mapTestToContent[test.label].toString().toLowerCase();
+                    let content = cloneObj.mapTestToData[test.label].content.toString().toLowerCase();
                     if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
                         aktoTotal++
                         return true
@@ -60,13 +60,13 @@ const TestEditorFileExplorer = () => {
                 let arr = obj.filter((test)=>{
                     let name = test.label.toString().toLowerCase().replace(/ /g, "")
                     let category = test.category.toString().toLowerCase().replace(/ /g, "")
-                    let content = cloneObj.mapTestToContent[test.label].toString().toLowerCase();
+                    let content = cloneObj.mapTestToData[test.label].content.toString().toLowerCase();
                     if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
                         customTotal++
                         return true
                     }
                 })
-                cloneObj.aktoTests[key] = arr
+                cloneObj.customTests[key] = arr
             }
         }
 
@@ -111,8 +111,8 @@ const TestEditorFileExplorer = () => {
                 return{
                     label: (
                         <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
-                            <span className="text-overflow" style={{'fontSize': '14px'}}>
-                                {item.label}
+                            <span className={"text-overflow " + (item.label === selectedTest.label ? "active" : "")} style={{'fontSize': '14px'}}>
+                                {item.label} 
                             </span>
                         </Tooltip>
                     ),
@@ -128,7 +128,7 @@ const TestEditorFileExplorer = () => {
     }
 
     return (
-        <div className="editor-navbar">
+        <div className="editor-navbar" style={{'maxHeight': '90vh', 'overflowY' : 'scroll'}}>
             <Navigation location="/">
                 <TextField  
                     prefix={<Icon source={SearchMinor} />} 
