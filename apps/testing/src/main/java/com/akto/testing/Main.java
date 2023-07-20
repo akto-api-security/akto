@@ -4,7 +4,6 @@ import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -18,23 +17,26 @@ import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mixpanel.AktoMixpanel;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
+import com.akto.util.EmailAccountName;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
@@ -160,10 +162,11 @@ public class Main {
                         StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore, testingRun.getTestingRunConfig());
                     }
 
-            ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
-            loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
+                    ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
+                    loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
 
                     testExecutor.init(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+                    raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -184,10 +187,42 @@ public class Main {
                         Filters.eq("_id", testingRun.getId()),  completedUpdate
                 );
 
-
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
             }, "testing");
             Thread.sleep(1000);
         }
+    }
+
+    private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun) {
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne
+                (
+                        Filters.eq(TestingRunResultSummary.ID, summaryId)
+                );
+        int totalApis = testingRunResultSummary.getTotalApis();
+
+        String testType = "ONE_TIME";
+        if(testingRun.getPeriodInSeconds()>0)
+        {
+            testType = "SCHEDULED DAILY";
+        }
+
+        String dashboardMode = "saas";
+
+        String userEmail = testingRun.getUserEmail();
+        String distinct_id = userEmail + "_" + dashboardMode.toUpperCase();
+
+        EmailAccountName emailAccountName = new EmailAccountName(userEmail);
+        String accountName = emailAccountName.getAccountName();
+
+        JSONObject props = new JSONObject();
+        props.put("Email ID", userEmail);
+        props.put("Dashboard Mode", dashboardMode);
+        props.put("Account Name", accountName);
+        props.put("Test type", testType);
+        props.put("Total APIs tested", totalApis);
+
+
+        AktoMixpanel aktoMixpanel = new AktoMixpanel();
+        aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
     }
 }
