@@ -15,4 +15,11 @@ export default {
             data: {issueIdArray, statusToBeUpdated, ignoreReason}
         })
     },
+    fetchTestingRunResult (issueId) {
+        return request({
+            url: 'api/fetchTestingRunResult',
+            method: 'post',
+            data: {issueId}
+        })
+    },
 }

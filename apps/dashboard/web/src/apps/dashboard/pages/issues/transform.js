@@ -67,7 +67,10 @@ const transform = {
             temp.testType=getTestType(issue.id.testErrorSource)
             temp.issueId=issue.id
             temp.issueStatus=issue.testRunIssueStatus
-            temp.issueStatus=="IGNORED" ? temp.ignoreReason=issue.ignoreReason : ""
+            if(temp.issueStatus=="IGNORED"){
+                temp.ignoreReason=issue.ignoreReason
+            }
+
             ret.push(temp);
         })
         return ret;
