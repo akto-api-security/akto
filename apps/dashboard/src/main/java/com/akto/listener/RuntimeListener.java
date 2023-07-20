@@ -52,9 +52,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account account) {
+                Main.initializeRuntimeHelper();
                 if (account.getId() != 1_000_000) return;
-
-                Main.initializeRuntime();
+                // only for 1M we want to run demo data
                 AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);

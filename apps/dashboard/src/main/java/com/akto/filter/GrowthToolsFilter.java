@@ -23,7 +23,15 @@ public class GrowthToolsFilter implements Filter {
             httpServletResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
             return;
         }
-        Context.accountId.set(1689829155);
+        String demoAccountIdStr = System.getenv("DEMO_ACCOUNT_ID");
+        int demoAccountId = 1_000_000;
+        if (demoAccountIdStr != null) {
+            try {
+                demoAccountId = Integer.parseInt(demoAccountIdStr);
+            } catch (Exception e) {
+            }
+        }
+        Context.accountId.set(demoAccountId);
         chain.doFilter(request, response);
     }
 
