@@ -161,6 +161,7 @@ function GithubServerTable(props) {
         headers={props.headers}
         hasRowActions={props.hasRowActions || false}
         page={props.page || 0}
+        getNextUrl={props?.getNextUrl}
         />
     ),
   );

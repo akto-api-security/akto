@@ -128,6 +128,12 @@ const resourceName = {
     plural: 'Issues',
 };
 
+async function getNextUrl(issueId){
+    console.log(issueId);
+    const res = await api.fetchTestingRunResult(JSON.parse(issueId))
+    return "/dashboard/testing/issues/result/"+res.testingRunResult.hexId;
+}
+
 function IssuesPage(){
 
     const [loading, setLoading] = useState(true);
@@ -300,6 +306,7 @@ function IssuesPage(){
                     filters={filtersOptions}
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
+                    getNextUrl={getNextUrl}
                 />
             ]}
         />

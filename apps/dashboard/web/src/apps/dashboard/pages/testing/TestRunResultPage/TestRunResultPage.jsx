@@ -178,7 +178,11 @@ function TestRunResultPage(props) {
 
   const navigate = useNavigate();
   function navigateBack() {
-    navigate("/dashboard/testing/" + hexId)
+    if (hexId == "issues") {
+      navigate("/dashboard/issues")
+    } else {
+      navigate("/dashboard/testing/" + hexId)
+    }
   }
 
   return (
