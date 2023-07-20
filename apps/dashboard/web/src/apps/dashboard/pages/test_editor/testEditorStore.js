@@ -11,6 +11,16 @@ let testEditorStore = (set)=>({
     setSelectedTest:(selectedTest)=>{
         set({selectedTest: selectedTest})
     },
+
+    vulnerableRequestsMap: null,
+    setVulnerableRequestMap:(vulnerableRequestsMap)=>{
+        set({vulnerableRequestsMap: vulnerableRequestsMap})
+    },
+
+    defaultRequest: null,
+    setDefaultRequest:(defaultRequest)=>{
+        set({defaultRequest: defaultRequest})
+    },
 })
 
 testEditorStore = devtools(testEditorStore)

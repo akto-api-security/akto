@@ -1,4 +1,4 @@
-import { Box, Button, Divider, EmptyState, LegacyCard, LegacyTabs, Modal, TextContainer } from "@shopify/polaris"
+import { Box, Button, Divider, LegacyTabs, Modal} from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
 
 import { useEffect, useRef, useState } from "react";
@@ -25,6 +25,7 @@ import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "../../../../../util/func";
+import TestEditorStore from "../testEditorStore"
 
 const SampleApi = () => {
 
@@ -36,10 +37,17 @@ const SampleApi = () => {
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [selectedApiEndpoint, setSelectedApiEndpoint] = useState(null)
     const [sampleData, setSampleData] = useState(null)
+    const [copyCollectionId, setCopyCollectionId] = useState(null)
+    const [copySelectedApiEndpoint, setCopySelectedApiEndpoint] = useState(null)
+
+    const selectedTest = TestEditorStore(state => state.selectedTest)
+    const vulnerableRequestsObj = TestEditorStore(state => state.vulnerableRequestsMap)
+    const defaultRequest = TestEditorStore(state => state.defaultRequest)
 
     const jsonEditorRef = useRef(null)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
+    const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
 
     useEffect(() => {
         const jsonEditorOptions = {
@@ -55,6 +63,24 @@ const SampleApi = () => {
         setEditorInstance(editor.create(jsonEditorRef.current, jsonEditorOptions))    
     }, [])
 
+    useEffect(()=>{
+        let testId = selectedTest.value
+        let selectedUrl = vulnerableRequestsObj?.[testId]
+        setSelectedCollectionId(null)
+        setSelectedApiEndpoint(null)
+        if(!selectedUrl){
+            selectedUrl = defaultRequest
+        }
+        setTimeout(()=> {
+            setSelectedCollectionId(selectedUrl.apiCollectionId)
+            let obj = {
+                method: selectedUrl.method._name,
+                url: selectedUrl.url
+            }
+            setSelectedApiEndpoint(obj)
+        },0)
+    },[selectedTest])
+
     useEffect(() => {
         fetchApiEndpoints(selectedCollectionId)
     }, [selectedCollectionId])
@@ -62,8 +88,10 @@ const SampleApi = () => {
     useEffect(() => {
         if (selectedCollectionId && selectedApiEndpoint) {
             fetchSampleData(selectedCollectionId, selectedApiEndpoint.url, selectedApiEndpoint.method)
+        }else{
+            editorInstance?.setValue("")
         }
-    }, [selectApiActive])
+    }, [selectedApiEndpoint])
 
 
     const handleTabChange = (selectedTabIndex) => {
@@ -106,6 +134,7 @@ const SampleApi = () => {
 
     const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
         const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
+        console.log(sampleDataResponse,collectionId,apiEndpointUrl)
         if (sampleDataResponse) {
             if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
                 const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[0])
@@ -123,6 +152,11 @@ const SampleApi = () => {
     }
 
     const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
+    const saveFunc = () =>{
+        setSelectedApiEndpoint(copySelectedApiEndpoint)
+        setSelectedCollectionId(copyCollectionId)
+        toggleSelectApiActive()
+    }
 
     return (
         <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5" }}>
@@ -136,15 +170,14 @@ const SampleApi = () => {
             <Divider />
             
             <Box ref={jsonEditorRef} minHeight="80vh">
-            </Box>
-                
+            </Box>    
             <Modal
                 open={selectApiActive}
                 onClose={toggleSelectApiActive}
                 title="Select sample API"
                 primaryAction={{
                     content: 'Save',
-                    onAction: toggleSelectApiActive,
+                    onAction: saveFunc,
                 }}
                 secondaryActions={[
                     {
@@ -158,7 +191,8 @@ const SampleApi = () => {
                         label="Select collection"
                         placeholder="Select API collection"
                         optionsList={allCollectionsOptions}
-                        setSelected={setSelectedCollectionId}
+                        setSelected={setCopyCollectionId}
+                        value={mapCollectionIdToName?.[selectedCollectionId]}
                     />
 
                     <br />
@@ -168,7 +202,8 @@ const SampleApi = () => {
                         label="API"
                         placeholder="Select API endpoint"
                         optionsList={apiEndpointsOptions}
-                        setSelected={setSelectedApiEndpoint}
+                        setSelected={setCopySelectedApiEndpoint}
+                        value={selectedApiEndpoint?.url}
                     />
 
                 </Modal.Section>

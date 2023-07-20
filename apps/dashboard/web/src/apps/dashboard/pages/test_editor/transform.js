@@ -110,28 +110,23 @@ const convertFunc = {
         }
         return arr
     },
-    getTestInfo(testObj, testId) {
-        const testInfo = {
-            id: testId
-        }
 
-        const aktoTestsCheck = Object.values(testObj.aktoTests).flat().find(test => test.value === testId)
-        const customTestsCheck = Object.values(testObj.customTests).flat().find(test => test.value === testId)
+    mapVulnerableRequests(vulnerableRequests){
+        let mapRequestsToId = {}
+        vulnerableRequests.forEach((x)=>{
+            let methodArr = x.templateIds
+            methodArr.forEach((method) => {
+                if (!mapRequestsToId[method]) {
+                    mapRequestsToId[method] = {}
+                }
 
-        if (aktoTestsCheck) {
-            testInfo.label = aktoTestsCheck.label
-            testInfo.category = aktoTestsCheck.category
-            testInfo.source = "akto"
-        } else if (customTestsCheck) {
-            testInfo.label = customTestsCheck.label
-            testInfo.category = customTestsCheck.category
-            testInfo.source = "custom"
-        } else {
-            return null
-        }
+                mapRequestsToId[method] = x.id
+            })
+        })
 
-        return testInfo
+        return mapRequestsToId
     }
+
 }
 
 export default convertFunc

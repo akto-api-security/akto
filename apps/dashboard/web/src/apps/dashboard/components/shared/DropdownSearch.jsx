@@ -1,15 +1,15 @@
 import { Autocomplete, Icon, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
-function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected }) {
+function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected, value }) {
 
     const deselectedOptions = optionsList
-
     const [selectedOptions, setSelectedOptions] = useState([]);
-    const [inputValue, setInputValue] = useState('');
+    const [inputValue, setInputValue] = useState(value);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
+
 
     useEffect(() => {
         setOptions(deselectedOptions)
