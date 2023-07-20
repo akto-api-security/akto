@@ -56,6 +56,7 @@
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
+                    window.ACCOUNT_NAME = '${requestScope.accountName}';
 
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
@@ -68,12 +69,16 @@
                     if (window.USER_NAME.length > 0) {
                         // Initialize mixpanel
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
-                        mixpanel.identify(window.USER_NAME);
-                        mixpanel.people.set({ "$email": window.USER_NAME });
+                        let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS ? "SAAS" : window.DASHBOARD_MODE);
+                        mixpanel.identify(distinct_id);
+                        mixpanel.people.set({ "$email": window.USER_NAME, "$account Name": window.ACCOUNT_NAME });
+
                         mixpanel.register({
                             'email': window.USER_NAME,
-                            'dashboard_mode': 'ON_PREM'
+                            'dashboard_mode': (window.IS_SAAS ? "SAAS" : window.DASHBOARD_MODE),
+                            'account_name': window.ACCOUNT_NAME
                         })
+
                         mixpanel.track('login');
 
                         //Initialize intercom
