@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.json.JSONObject;
+import com.akto.graphql.GraphQLUtils;
 
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
@@ -117,6 +117,20 @@ public class Operations {
         }
         rawApi.modifyReqPayload(payload);
         return new ExecutorSingleOperationResp(true, "");
+    }
+
+    public static ExecutorSingleOperationResp graphqlDeleteField(RawApi rawApi, String key) {
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().graphqlDeleteField(payload, key);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
+    public static ExecutorSingleOperationResp graphqlAddField (RawApi rawApi, String key, String value) {
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().graphqlAddField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
     }
 
     public static ExecutorSingleOperationResp modifyBodyParam(RawApi rawApi, String key, Object value) {
