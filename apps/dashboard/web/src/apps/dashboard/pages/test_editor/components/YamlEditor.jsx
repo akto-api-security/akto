@@ -25,6 +25,8 @@ import TestEditorStore from "../testEditorStore";
 
 const YamlEditor = () => {
 
+    const testsObj = TestEditorStore(state => state.testsObj)
+    
     const selectedTest = TestEditorStore(state => state.selectedTest)
 
     const [ editorInstance, setEditorInstance ] = useState(null);
@@ -62,7 +64,9 @@ const YamlEditor = () => {
         }
 
         if (selectedTest) {
-            Editor.setValue(selectedTest.content)
+            const name = selectedTest.testName ? selectedTest.testName : selectedTest.label
+            const value = testsObj.mapTestToContent[name]
+            Editor.setValue(value)
         }
     
       }, [selectedTest])

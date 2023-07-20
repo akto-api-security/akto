@@ -125,10 +125,7 @@ const TestEditorFileExplorer = () => {
                     ),
                     onClick: (()=> {
                         navigate(`/dashboard/test-editor/${item.value}`)
-                        const testInfo = allSubCategories.find(test => test.name === item.value)
-                    
-                        setSelectedTest(testInfo)
-                        
+                        setSelectedTest(item)                        
                     }),
                     key: item.value
                 }
