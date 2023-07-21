@@ -1,8 +1,8 @@
 import request from "@/util/request"
 
 const settingRequests = {
-    inviteUsers: async (apiSpec) => {
-        const res = await request({
+    inviteUsers(apiSpec) {
+        return request({
             url: '/api/inviteUsers',
             method: 'post',
             data: { 
@@ -12,36 +12,31 @@ const settingRequests = {
 
             }
         })
-        return res
     },
-    getTeamData: async () => {
-        const res = await request({
+    getTeamData() {
+        return request({
             url: '/api/getTeamData',
             method: 'post',
             data: {}
         })
-        return res
     },
-    removeUser: async (email) => {
-        const res = await request({
+    removeUser(email) {
+        return request({
             url: '/api/removeUser',
             method: 'post',
             data: {
                 email: email
             }
         })
-        
-        return res
     },
 
     
-    fetchApiTokens: async function() {
-        const resp = await request({
+    fetchApiTokens() {
+        return request({
             url: '/api/fetchApiTokens',
             method: 'post',
             data: {}
         })
-        return resp
     },
     addApiToken(tokenUtility) {
         return request({

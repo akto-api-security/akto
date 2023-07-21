@@ -1,17 +1,33 @@
-import { Badge, Button, Card, Divider, Frame, Icon, Text } from "@shopify/polaris"
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+
+import { Badge, Button, Card, Frame, Icon, Text, Toast, Divider } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
+
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
-import Store from "../../store"
 import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
-import { useNavigate } from "react-router-dom"
+import SpinnerCentered from "../../components/progress/SpinnerCentered"
+
+import Store from "../../store"
+import TestEditorStore from "./testEditorStore"
+
+import testEditorRequests from "./api"
+
+import convertFunc from "./transform"
 
 const TestEditor = () => {
     const navigate = useNavigate()
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
-    
+    const setTestsObj = TestEditorStore(state => state.setTestsObj)
+    const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
+    const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
+    const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
+
+    const [loading, setLoading] = useState(true)
+
     const disableToast = () => {
         setToastConfig({
             isActive: false,
@@ -25,38 +41,69 @@ const TestEditor = () => {
     ) : null;
 
     const handleExit = () => {
-        navigate(-1)
+        navigate("/dashboard/testing")
     }
+
+    const fetchAllTests = async () => {
+        const testId = window.location.pathname.split('/').pop();
+
+        const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
+        if (allSubCategoriesResponse) {
+            const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
+            setTestsObj(obj)
+
+            const testName = obj.mapIdtoTest[testId]
+            const selectedTestObj = {
+                label: testName,
+                value: testId,
+                category: obj.mapTestToData[testName].category
+            }
+            setSelectedTest(selectedTestObj)
+
+            const requestObj = convertFunc.mapVulnerableRequests(allSubCategoriesResponse.vulnerableRequests)
+            setVulnerableRequestMap(requestObj)
+            setDefaultRequest(allSubCategoriesResponse.vulnerableRequests[0].id)
+
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchAllTests()
+    }, [])
 
     return (
         <Frame>
-                <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto max-content", alignItems: "center", gap:"5px", height: "10vh", padding: "10px", background: "#ffffff"}}>
-                    <div onClick={handleExit}>
-                        <Icon source={ExitMajor} color="base" />
-                    </div>
-                    <Text variant="headingLg">
-                        Test Editor
-                    </Text>
-                    <Badge status="success">
-                        Beta
-                    </Badge>
-                    <div></div>
+            <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto", alignItems: "center", gap: "5px", height: "10vh", padding: "10px", background: "#ffffff" }}>
+                <Button icon={ExitMajor} plain onClick={handleExit} />
+                <Text variant="headingLg">
+                    Test Editor
+                </Text>
+                <Badge status="success">
+                    Beta
+                </Badge>
+                <div style={{ textAlign: "right" }}>
                     <Button>
                         Create custom test
                     </Button>
                 </div>
-
-            <Divider  />
-
-            <div style={{ display: "grid", gridTemplateColumns: "20vw auto"}}>
-                <TestEditorFileExplorer />
-                
-                <div style={{ display: "grid", gridTemplateColumns: "50% 50%"}}>
-                    <YamlEditor />
-                    <SampleApi />
-                </div>
             </div>
-            {toastMarkup}            
+
+            <Divider />
+
+            {loading ?
+                <SpinnerCentered />
+                : <div style={{ display: "grid", gridTemplateColumns: "max-content auto" }}>
+                    <TestEditorFileExplorer />
+
+                    <div style={{ display: "grid", gridTemplateColumns: "50% 50%" }}>
+                        <YamlEditor fetchAllTests={fetchAllTests} />
+                        <SampleApi />
+                    </div>
+                </div>
+            }
+
+            {toastMarkup}
         </Frame>
     )
 }

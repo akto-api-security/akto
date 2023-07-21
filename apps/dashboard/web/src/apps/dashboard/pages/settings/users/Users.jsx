@@ -1,7 +1,7 @@
 import { Avatar, Banner, Button, Card, LegacyCard, Modal, Page, ResourceItem, ResourceList, Scrollable, Text, TextContainer, TextField } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
 import settingRequests from "../api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
 
@@ -19,14 +19,14 @@ const Users = () => {
     const [users, setUsers] = useState([])
 
     const getTeamData = async () => {
+        setLoading(true);
         const usersResponse = await settingRequests.getTeamData()
         setUsers(usersResponse.users)
+        setLoading(false)
     };
 
     useEffect(() => {
-        setLoading(true);
         getTeamData();
-        setLoading(false)
     }, [])
 
     const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'

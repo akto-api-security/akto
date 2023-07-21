@@ -1,10 +1,9 @@
 import { Button, ButtonGroup, HorizontalGrid, HorizontalStack, LegacyCard, Page, Scrollable, Select, Spinner, Text } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
-import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5

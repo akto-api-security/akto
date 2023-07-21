@@ -1,8 +1,8 @@
 import request from "@/util/request"
 
 const testEditorRequests = {
-    fetchSampleData: async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
-        const res = await request({
+    fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod) {
+        return request({
             url: '/api/fetchSampleData',
             method: 'post',
             data: {
@@ -11,8 +11,32 @@ const testEditorRequests = {
                 method: apiEndpointMethod
             }
         })
-        return res
     },
+    fetchAllSubCategories() {
+        return request({
+            url: 'api/fetchAllSubCategories',
+            method: 'post',
+            data: {}
+        })
+    },
+    
+    runTestForTemplate(content, apiInfoKey, sampleDataList) {
+        return request({
+            url: '/api/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey, sampleDataList}
+        })
+    },
+
+    addTestTemplate(content,originalTestId) {
+        return request({
+            url: '/api/saveTestEditorFile',
+            method: 'post',
+            data:{content, originalTestId}
+        }).then((resp) => {
+            return resp
+        })
+    }
 }
 
 export default testEditorRequests
