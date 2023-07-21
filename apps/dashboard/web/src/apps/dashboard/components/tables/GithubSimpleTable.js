@@ -51,18 +51,13 @@ function GithubSimpleTable(props) {
           tempData = tempData.filter(value => singleFilterData.includes(value));
         })
         tempData = tempData.filter((value) => {
-          return func.findInObjectValue(value, queryValue.toLowerCase(), ['hexId', 'time', 'icon', 'order']);
+          return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order']);
         })
         let dataSortKey = props.sortOptions.filter(value => {
           return (value.value.startsWith(sortKey))
         })[0].sortKey;
 
-        tempData.sort((a, b) => {
-          if(typeof a[dataSortKey] ==='number')
-          return (sortOrder) * (a[dataSortKey] - b[dataSortKey]);
-          if(typeof a[dataSortKey] ==='string')
-          return (sortOrder) * (b[dataSortKey].localeCompare(a[dataSortKey]));
-        })
+        tempData = func.sortFunc(tempData, dataSortKey, sortOrder)
         return {value:tempData,total:tempData.length}
     }
     
@@ -79,6 +74,7 @@ function GithubSimpleTable(props) {
         hasRowActions={props.hasRowActions}
         loading={props.loading}
         selectable = {props.selectable}
+        rowClickable={props.rowClickable}
         promotedBulkActions = {props.promotedBulkActions}
         hideQueryField={props.hideQueryField}
     />

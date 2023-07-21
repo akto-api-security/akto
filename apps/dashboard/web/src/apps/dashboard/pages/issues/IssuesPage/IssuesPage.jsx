@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "../api"
 import testingApi from "../../testing/api"
 import Store from "../../../store";
@@ -48,12 +48,23 @@ const headers = [
         text:"Severity",
         value:"severity",
         itemOrder:2
+    },
+    {
+        text:"Status",
+        value:"issueStatus"
+    },
+    {
+        text:"Ignore reason",
+        value:"ignoreReason",
+        itemCell:2
     }
 ]
 
 const sortOptions = [
     { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp' },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' }
+    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' },
+    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName' },
+    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName' },    
 ];
 
 let filtersOptions = [
@@ -78,13 +89,35 @@ let filtersOptions = [
         label: "Issue category",
         title:"Issue category",
         choices:[]
+    },
+    {
+        key:"issueStatus",
+        label:"Status",
+        title:"Status",
+        singleSelect:true,
+        choices:[
+            { label:"Open", value:"OPEN" },
+            { label:"Fixed", value:"FIXED" },
+            { label:"Ignored", value:"IGNORED" },
+        ]
+    },
+    {
+        key:"startTimestamp",
+        label: "Time",
+        title:"Time",
+        singleSelect:true,
+        choices:[
+            { label:"Last 1 day", value:func.timeNow() - 24 * 60 * 60 },
+            { label:"Last week", value:func.timeNow() - 7 * 24 * 60 * 60 },
+            { label:"Last month", value:func.timeNow() + 60 - 30 * 24 * 60 * 60 },
+        ]
     }
 ]
 
-const appliedFilters = [
+let appliedFilters = [
     {
-        key: 'status',
-        label: 'Open issues',
+        key: 'issueStatus',
+        label: 'Open',
         value: ['OPEN'],
         onRemove: () => {}
     }
@@ -93,21 +126,11 @@ const appliedFilters = [
 const resourceName = {
     singular: 'Issue',
     plural: 'Issues',
-  };
+};
 
-  let promotedBulkActions = (selectedResources) => {
-    return [{
-        content: 'False positive',
-        onAction: () => { console.log("function") }
-    }, 
-    {
-        content: 'Acceptable risk',
-        onAction: () => { console.log("function") }
-    },
-    {
-        content: 'No time to fix',
-        onAction: () => { console.log("function") }
-    }]
+async function getNextUrl(issueId){
+    const res = await api.fetchTestingRunResult(JSON.parse(issueId))
+    return "/dashboard/testing/issues/result/"+res.testingRunResult.hexId;
 }
 
 function IssuesPage(){
@@ -118,9 +141,20 @@ function IssuesPage(){
     const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
     const setSubCategoryMap = TestingStore(state => state.setSubCategoryMap);
     const setSubCategoryFromSourceConfigMap = TestingStore(state => state.setSubCategoryFromSourceConfigMap);
+    const [issueStatus, setIssueStatus] = useState([]);
+    const [key, setKey] = useState(false);
     const apiCollectionMap = allCollections.reduce(
         (map, e) => {map[e.id] = e.displayName; return map}, {}
     )
+
+    const setToastConfig = Store(state => state.setToastConfig)
+    const setToast = (isActive, isError, message) => {
+        setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+        })
+    }
 
     filtersOptions[0].choices=[];
     Object.keys(apiCollectionMap).forEach((key) => { 
@@ -129,6 +163,60 @@ function IssuesPage(){
             value:Number(key)
         })
     });
+
+    let promotedBulkActions = (selectedResources) => {
+        selectedResources = selectedResources.map((item) => JSON.parse(item));
+        
+        
+        function ignoreAction(ignoreReason){
+            api.bulkUpdateIssueStatus(selectedResources, "IGNORED", ignoreReason ).then((res) => {
+                setToast(true, false, `Issue${selectedResources.length==1 ? "" : "s"} ignored`)
+                setKey(!key);
+            })
+        }
+        
+        function reopenAction(){
+            api.bulkUpdateIssueStatus(selectedResources, "OPEN", "" ).then((res) => {
+                setToast(true, false, `Issue${selectedResources.length==1 ? "" : "s"} re-opened`)
+                setKey(!key);
+            })
+        }
+        
+        let issues = [{
+            content: 'False positive',
+            onAction: () => { ignoreAction("False positive") }
+        },
+        {
+            content: 'Acceptable risk',
+            onAction: () => { ignoreAction("Acceptable risk") }
+        },
+        {
+            content: 'No time to fix',
+            onAction: () => { ignoreAction("No time to fix") }
+        }]
+        
+        let reopen =  [{
+            content: 'Reopen',
+            onAction: () => { reopenAction() }
+        }]
+        
+        let ret = [];
+        let status = issueStatus[0];
+        
+        switch (status) {
+            case "OPEN": ret = [].concat(issues); break;
+            case "IGNORED": if (selectedResources.length == 1) {
+                ret = [].concat(issues);
+            }
+                ret = ret.concat(reopen);
+                appliedFilters[0].label = "Ignored"
+                appliedFilters[0].value = ["IGNORED"]
+                break;
+            case "FIXED":
+        }
+
+        return ret;
+    }
     
     let store = {}
     let result = []
@@ -145,16 +233,13 @@ function IssuesPage(){
 
     function disambiguateLabel(key, value) {
         switch (key) {
+            case "startTimestamp": return (value).map((val) => func.prettifyEpoch(val)).join(" ");
+            case "issueStatus":
             case "severity": return (value).map((val) => func.toSentenceCase(val)).join(', ');
             case "issueCategory": 
-            case "location":
                 return (value).map((val) => val).join(', ');
             case "apiCollectionId": 
                 return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
-            case "isRequest":
-                return value[0] ? "In request" : "In response"
-            case "dateRange":
-                return value.since.toDateString() + " - " + value.until.toDateString();
             default:
                 return value;
         }
@@ -190,13 +275,16 @@ function IssuesPage(){
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
+        let filterStatus = filters.issueStatus
+        setIssueStatus(filterStatus);
+        let startTimestamp = filters?.startTimestamp?.[0] || 0;
 
-        await api.fetchIssues(skip, limit,[],filterCollectionsId,filterSeverity,filterSubCategory,0).then((res) => {
+        await api.fetchIssues(skip, limit,filterStatus,filterCollectionsId,filterSeverity,filterSubCategory,startTimestamp).then((res) => {
             total = res.totalIssuesCount;
             ret = transform.prepareIssues(res, c.subCategoryMap, c.subCategoryFromSourceConfigMap, apiCollectionMap);
             setLoading(false);
         })
-        // handle sort here.
+        ret = func.sortFunc(ret, sortKey, sortOrder)
         return {value:ret , total:total};
     }
 
@@ -205,7 +293,7 @@ function IssuesPage(){
             title="Issues"
             components = {[
                 <GithubServerTable
-                    key="table"
+                    key={key}
                     headers={headers}
                     resourceName={resourceName} 
                     appliedFilters={appliedFilters}
@@ -217,7 +305,8 @@ function IssuesPage(){
                     filters={filtersOptions}
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
-                    // calenderFilter={true}
+                    getNextUrl={getNextUrl}
+                    rowClickable={true}
                 />
             ]}
         />

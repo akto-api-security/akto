@@ -21,6 +21,11 @@ let testEditorStore = (set)=>({
     setDefaultRequest:(defaultRequest)=>{
         set({defaultRequest: defaultRequest})
     },
+
+    currentContent: null,
+    setCurrentContent:(currentContent)=>{
+        set({currentContent: currentContent})
+    },
 })
 
 testEditorStore = devtools(testEditorStore)

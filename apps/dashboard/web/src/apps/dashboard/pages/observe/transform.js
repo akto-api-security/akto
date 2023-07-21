@@ -56,15 +56,12 @@ const transform = {
             if (!paramInfoList) {
                 paramInfoList = []
             }
-
-            let highlightPaths = paramInfoList.filter((x) => {
-                return x?.subType?.name==subType
-            }).map((x) => {
-                let localSubType = x["subType"]
+            let highlightPaths = paramInfoList.map((x) => {
                 let val = {}
-                val["value"] = localSubType["name"]
+                val["value"] = x["subType"]["name"]
                 val["asterisk"] = false
                 val["highlight"] = true
+                val['other'] = x["subType"]["name"]!=subType ? true : false 
                 x["highlightValue"] = val
                 return x
             })

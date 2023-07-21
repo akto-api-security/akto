@@ -129,7 +129,7 @@ function GithubServerTable(props) {
   }, []);
 
   const resourceIDResolver = (data) => {
-    return data.hexId;
+    return data.id;
   };
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
@@ -143,7 +143,7 @@ function GithubServerTable(props) {
   
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
-  let tmp = data && data.length < pageLimit ? data : 
+  let tmp = data && data.length <= pageLimit ? data : 
   data.slice(page*pageLimit, Math.min((page+1)*pageLimit, data.length))
   let rowMarkup = tmp
   .map(
@@ -151,17 +151,18 @@ function GithubServerTable(props) {
       data,
       index,
     ) => (
-      // create a standard key field. index is standard but not preferred by react.
       <GithubRow 
-        key={data.hexId}
-        id={data.hexId}
+        key={data.id}
+        id={data.id}
         data={data} 
         index={index} 
         getActions={props.getActions} 
         selectedResources={selectedResources}
         headers={props.headers}
+        rowClickable={props.rowClickable}
         hasRowActions={props.hasRowActions || false}
         page={props.page || 0}
+        getNextUrl={props?.getNextUrl}
         />
     ),
   );
@@ -175,7 +176,7 @@ function GithubServerTable(props) {
   }
 
   return (
-    <div>
+    <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
       <LegacyCard>
         <LegacyCard.Section flush>
           <IndexFilters
@@ -220,8 +221,8 @@ function GithubServerTable(props) {
               flush: true
             }
           ]}
-          bulkActions={props.bulkActions || []}
-          promotedBulkActions={props.selectable ? props.promotedBulkActions(selectedResources) : []}
+          bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
+          promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
 
         >
           {rowMarkup}

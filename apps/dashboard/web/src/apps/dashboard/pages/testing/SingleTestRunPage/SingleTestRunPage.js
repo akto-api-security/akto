@@ -120,7 +120,7 @@ function SingleTestRunPage() {
 useEffect(()=>{
     const hexId = params.hexId;
     async function fetchData() {
-      if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.hexId != hexId){
+      if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.id != hexId){
         await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries }) => {
           let selectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
             setSelectedTestRun(selectedTestRun);
@@ -146,7 +146,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   {
     content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length==1 ? '' : 's'}`,
     onAction: () => {
-      func.downloadAsCSV(testRunResults.filter((data) => {return selectedDataHexIds.includes(data.hexId)}), selectedTestRun)
+      func.downloadAsCSV(testRunResults.filter((data) => {return selectedDataHexIds.includes(data.id)}), selectedTestRun)
     },
   },
 ]};
@@ -199,6 +199,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       selectable = {true}
       promotedBulkActions = {promotedBulkActions}
       loading={loading}
+      rowClickable={true}
     />
     ]}
     />

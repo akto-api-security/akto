@@ -41,3 +41,11 @@
 .editor-navbar .Polaris-Navigation__Icon{
     margin-right: 2px !important;
 }
+
+.show-results{
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    background: #fafbfb;
+    height: 5vh;
+}

@@ -19,6 +19,24 @@ const testEditorRequests = {
             method: 'post',
             data: {}
         })
+    },
+    
+    runTestForTemplate: async function (content, apiInfoKey, sampleDataList) {
+        return request({
+            url: '/api/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey, sampleDataList}
+        })
+    },
+
+    addTestTemplate: async function (content,originalTestId) {
+        return request({
+            url: '/api/saveTestEditorFile',
+            method: 'post',
+            data:{content, originalTestId}
+        }).then((resp) => {
+            return resp
+        })
     }
 }
 

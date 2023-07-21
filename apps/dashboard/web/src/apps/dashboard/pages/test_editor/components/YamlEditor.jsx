@@ -8,7 +8,9 @@ import { InfoMinor, ClipboardMinor } from "@shopify/polaris-icons"
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
 
+import testEditorRequests from "../api";
 import api from "../../testing/api";
+
 import func from "@/util/func";
 
 import { editor } from "monaco-editor/esm/vs/editor/editor.api"
@@ -27,14 +29,13 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 
-
-
 const YamlEditor = ({ fetchAllTests }) => {
     const navigate = useNavigate()
 
     const setToastConfig = Store(state => state.setToastConfig)
     const testsObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
+    const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
 
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
@@ -49,6 +50,7 @@ const YamlEditor = ({ fetchAllTests }) => {
     const handleYamlUpdate = () => {
         const Editor = editorInstanceRef.current
         const currentYaml = Editor.getValue()
+        setCurrentContent(currentYaml)
         const existingYaml = testsObj.mapTestToData[selectedTest.label].content 
         setIsEdited(currentYaml !== existingYaml)
     }
