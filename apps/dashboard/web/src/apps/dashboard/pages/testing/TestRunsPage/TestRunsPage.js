@@ -166,7 +166,7 @@ const getActionsList = (hexId) => {
 function getActions(item){
   let arr = []
   let section1 = {items:[]}
-  let actionsList = getActionsList(item.hexId);
+  let actionsList = getActionsList(item.id);
   if(item['run_type'] === 'One-time'){
     section1.items.push(actionsList[0])
   }else{

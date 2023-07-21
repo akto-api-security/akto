@@ -32,7 +32,7 @@ let headerDetails = [
 function SingleRequest(){
 
     const params = useParams()
-    const apiCollectionId = params.apiCollectionId
+    const apiCollectionId = Number(params.apiCollectionId)
     const [url, method] = atob(params.urlAndMethod).split(" ")
     const subType = params.subType
     const [sampleData, setSampleData] = useState([])

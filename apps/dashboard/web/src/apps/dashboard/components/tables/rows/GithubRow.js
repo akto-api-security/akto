@@ -4,8 +4,6 @@ import {
     Badge,
     VerticalStack,
     HorizontalStack,
-    Icon,
-    Box,
     Button, 
     Popover, 
     ActionList,
@@ -15,89 +13,86 @@ import {
     HorizontalDotsMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useCallback } from 'react';
+import { useState, useCallback} from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 
 function GithubRow(props) {
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
+    const [data, setData] = useState(props.data);
     const togglePopoverActive = (index) =>useCallback(
         () => setPopoverActive(index),
         [],
     );
-    
-    function nextPage(data){
-        navigate(data?.nextUrl)
+    async function nextPage(data){
+        navigate(data?.nextUrl) || (props.getNextUrl && navigate(await props.getNextUrl(data.id)));
     }
 
-    const [rowClickable, setRowClickable] = useState(props.page==2)
+    const [rowClickable, setRowClickable] = useState(props.rowClickable || false)
 
     return (
         <IndexTable.Row
-            id={props.data.hexId}
-            key={props.data.hexId}
-            selected={props.selectedResources.includes(props.data.hexId)}
+            id={data.id}
+            key={data.id}
+            selected={props.selectedResources.includes(data.id)}
             position={props.index}
         >
-                {/* <div style={{ padding: '12px 16px', width: '100%' }}> */}
-                {/* <HorizontalStack align='space-between'> */}
             <IndexTable.Cell>
-                {/* <div onClick={() => (props.nextPage && props.nextPage=='singleTestRunPage' ? navigateToTest(props.data) : {})} style={{cursor: 'pointer'}}> */}
                 <div className='linkClass'>
-                <Link
-                    {...(rowClickable ? {dataPrimaryLink: rowClickable} : {})}
-                    monochrome
-                    removeUnderline
-                    onClick={() => (nextPage(props.data))}
-                    // onClick={() => console.log("something")}
-                >
-                    <GithubCell
-                        headers = {props.headers}
-                        data = {props.data}
-                    />
-                        </Link>
-                        </div>
-                    {/* </div> */}
-                        </IndexTable.Cell>
-            {
-                props?.headers?.filter((header) => {
-                    return header.itemCell == 2
-                }).map((header) => {
-                    return (
-                        <IndexTable.Cell key={header.text}>
-                            <VerticalStack>
-                                <Text>
-                                    {header.text}
-                                </Text>
-                                <HorizontalStack>
-                                <Badge key={header.text}>
-                                    {props.data[header.value]}
-                                </Badge>
-                                </HorizontalStack>
-                            </VerticalStack>
-                        </IndexTable.Cell>
-                    )
-                })
-            }
-            <IndexTable.Cell >
-                <HorizontalStack align='end'>
-                {
-                    props.hasRowActions &&
-                    <Popover
-                        active={popoverActive == props.data.hexId}
-                        activator={<Button onClick={togglePopoverActive(props.data.hexId)} plain icon={HorizontalDotsMinor} />}
-                        autofocusTarget="first-node"
-                        onClose={togglePopoverActive(popoverActive)}
+                    <Link
+                        {...(rowClickable ? { dataPrimaryLink: rowClickable } : {})}
+                        monochrome
+                        removeUnderline
+                        onClick={() => (nextPage(data))}
                     >
-                        <ActionList
-                            actionRole="menuitem"
-                            sections={props.getActions(props.data)}
+                        <GithubCell
+                            headers={props.headers}
+                            data={data}
                         />
-                    </Popover>
-                }
-                </HorizontalStack>
+                    </Link>
+                </div>
             </IndexTable.Cell>
+            {props?.headers?.filter((header) => {
+                return header.itemCell == 2
+            }).filter((header) => {
+                return data[header.value] != undefined
+            }).map((header) => {
+                return (
+                    <IndexTable.Cell key={header.text}>
+                        <VerticalStack>
+                            <Text>
+                                {header.text}
+                            </Text>
+                            <HorizontalStack>
+                                <Badge key={header.text}>
+                                    {data[header.value]}
+                                </Badge>
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </IndexTable.Cell>
+                )
+            })
+            }
+            {props.hasRowActions &&
+                <IndexTable.Cell >
+                    <HorizontalStack align='end'>
+                        {
+                            <Popover
+                                active={popoverActive == data.id}
+                                activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                                autofocusTarget="first-node"
+                                onClose={togglePopoverActive(popoverActive)}
+                            >
+                                <ActionList
+                                    actionRole="menuitem"
+                                    sections={props.getActions(data)}
+                                />
+                            </Popover>
+                        }
+                    </HorizontalStack>
+                </IndexTable.Cell>
+            }
         </IndexTable.Row>
     )
 

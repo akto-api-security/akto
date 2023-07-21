@@ -80,7 +80,7 @@ const transform = {
           delete testingRunResultSummary.countIssues['MEDIUM']
           delete testingRunResultSummary.countIssues['LOW']
       }
-      obj['hexId'] = data.hexId;
+      obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary.hexId;
       obj['orderPriority'] = getOrderPriority(data.state)
       obj['icon'] = func.getTestingRunIcon(data.state);
@@ -110,7 +110,7 @@ const transform = {
     },
     prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap) => {
       let obj = {};
-      obj['hexId'] = data.hexId;
+      obj['id'] = data.hexId;
       obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
       obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
       obj["endTimestamp"] = data.endTimestamp

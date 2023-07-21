@@ -52,7 +52,7 @@ function highlightPaths(highlightPathMap, refText){
               {
                 range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
                 options: {
-                  inlineClassName: "highlight",
+                  inlineClassName: highlightPathMap[type][key].other ? "highlightOther" : "highlight",
                 },
               }
             ])
@@ -218,8 +218,7 @@ function SampleDataList(props) {
                       </Box>
                     </LegacyCard.Section>
                     <LegacyCard.Section flush>
-                      <Box padding={"2"} ref={ref} minHeight="300px">
-                      </Box>
+                      <Box padding={"2"} ref={ref} minHeight="300px"/>
                     </LegacyCard.Section>
                   </LegacyCard>
                 </Box>
