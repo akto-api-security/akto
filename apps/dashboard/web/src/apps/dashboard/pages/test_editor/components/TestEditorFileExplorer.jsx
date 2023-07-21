@@ -28,9 +28,11 @@ const TestEditorFileExplorer = () => {
 
     const toggleFunc = (param) =>{
         if(param === 'CUSTOM'){
-            setShowCustom(!showCustom)
+            setShowCustom(true)
+            setShowAkto(false)
         }else{
-            setShowAkto(!showAkto)
+            setShowAkto(true)
+            setShowCustom(false)
         }
     }
 
@@ -100,7 +102,7 @@ const TestEditorFileExplorer = () => {
             }
         }
      
-    }, [])
+    }, [selectedTest])
 
     function getItems(aktoItems){
         const arr = aktoItems.map(obj => ({

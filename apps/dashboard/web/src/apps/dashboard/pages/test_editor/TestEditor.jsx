@@ -4,7 +4,7 @@ import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
 import Store from "../../store"
 import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
-import { useNavigate, useParams } from "react-router-dom"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import testEditorRequests from "./api"
 import TestEditorStore from "./testEditorStore"
 import convertFunc from "./transform"
@@ -13,7 +13,6 @@ import SpinnerCentered from "../../components/progress/SpinnerCentered"
 
 const TestEditor = () => {
     const navigate = useNavigate()
-    const { testId } = useParams()
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
@@ -40,8 +39,8 @@ const TestEditor = () => {
         navigate("/dashboard/testing")
     }
 
-    const fetchAllTests = async () =>{
-        setLoading(true)
+    const fetchAllTests = async () => {
+        const testId = window.location.pathname.split('/').pop();
 
         const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
         if (allSubCategoriesResponse) {
@@ -92,7 +91,7 @@ const TestEditor = () => {
                     <TestEditorFileExplorer />
                     
                     <div style={{ display: "grid", gridTemplateColumns: "50% 50%"}}>
-                        <YamlEditor />
+                        <YamlEditor fetchAllTests={fetchAllTests}/>
                         <SampleApi />
                     </div>
                 </div>

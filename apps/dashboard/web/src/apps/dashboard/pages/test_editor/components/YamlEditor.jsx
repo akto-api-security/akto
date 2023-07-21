@@ -19,13 +19,14 @@ import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TestEditorStore from "../testEditorStore";
 import api from "../../testing/api";
 import func from "../../../../../util/func";
 
 
-const YamlEditor = () => {
+const YamlEditor = ({ fetchAllTests }) => {
+    const navigate = useNavigate()
 
     const testsObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
@@ -52,7 +53,8 @@ const YamlEditor = () => {
         const Editor = editorInstanceRef.current
 
         const addTestTemplateResponse = await api.addTestTemplate(Editor.getValue(), selectedTest.value)
-        
+        navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
+        fetchAllTests()
     }
     
     useEffect(()=>{        
