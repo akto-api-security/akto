@@ -14,6 +14,7 @@ public class TestingRunResult {
 
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
+    private String testRunHexId;
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
     public static final String TEST_SUPER_TYPE = "testSuperType";
@@ -86,6 +87,15 @@ public class TestingRunResult {
 
     public void setHexId(String hexId) {
         this.hexId = hexId;
+    }
+
+    public String getTestRunHexId() {
+        if (testRunHexId == null) return this.testRunId.toHexString();
+        return testRunHexId;
+    }
+
+    public void setTestRunHexId(String testRunHexId) {
+        this.testRunHexId = testRunHexId;
     }
 
     public int getStartTimestamp() {
