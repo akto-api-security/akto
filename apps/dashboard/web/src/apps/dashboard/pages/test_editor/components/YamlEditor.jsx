@@ -9,7 +9,6 @@ import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
 
 import testEditorRequests from "../api";
-import api from "../../testing/api";
 
 import func from "@/util/func";
 
@@ -58,19 +57,14 @@ const YamlEditor = ({ fetchAllTests }) => {
     const handleSave = async () => {
         const Editor = editorInstanceRef.current
 
-        try {
-            const addTestTemplateResponse = await api.addTestTemplate(Editor.getValue(), selectedTest.value)
-            setToastConfig({
-                isActive: true,
-                isError: false,
-                message: "Test saved successfully!"
-            })
-            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
-            fetchAllTests()
-        } catch (error) {
-            console.log(error)
-        }
-       
+        const addTestTemplateResponse = await testEditorRequests.addTestTemplate(Editor.getValue(), selectedTest.value)
+        setToastConfig({
+            isActive: true,
+            isError: false,
+            message: "Test saved successfully!"
+        })
+        navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
+        fetchAllTests()
     }
     
     useEffect(()=>{        
