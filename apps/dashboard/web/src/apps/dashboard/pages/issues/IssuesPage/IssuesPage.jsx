@@ -129,7 +129,6 @@ const resourceName = {
 };
 
 async function getNextUrl(issueId){
-    console.log(issueId);
     const res = await api.fetchTestingRunResult(JSON.parse(issueId))
     return "/dashboard/testing/issues/result/"+res.testingRunResult.hexId;
 }
@@ -307,6 +306,7 @@ function IssuesPage(){
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
+                    rowClickable={true}
                 />
             ]}
         />

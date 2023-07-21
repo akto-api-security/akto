@@ -218,8 +218,7 @@ function SampleDataList(props) {
                       </Box>
                     </LegacyCard.Section>
                     <LegacyCard.Section flush>
-                      <Box padding={"2"} ref={ref} minHeight="300px">
-                      </Box>
+                      <Box padding={"2"} ref={ref} minHeight="300px"/>
                     </LegacyCard.Section>
                   </LegacyCard>
                 </Box>
