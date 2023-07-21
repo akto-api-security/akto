@@ -1,5 +1,5 @@
-import { Button, Card, Frame, HorizontalStack, Icon, Modal, Navigation, Scrollable, Text, Toast } from "@shopify/polaris"
-import { HomeMinor, OrdersMinor, ProductsMinor, CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
+import { Button, Card, Frame, Icon, Text, Toast } from "@shopify/polaris"
+import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { tokens } from "@shopify/polaris-tokens"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import './settings.css'
@@ -49,9 +49,7 @@ const Settings = () => {
                     <Text variant="headingLg">
                         Settings
                     </Text>
-                    <div onClick={handleSettingsClose}>
-                        <Icon source={CancelMajor} color="base" />
-                    </div>
+                    <Button icon={CancelMajor} onClick={handleSettingsClose} plain/>
                 </div>
             </Card>
 

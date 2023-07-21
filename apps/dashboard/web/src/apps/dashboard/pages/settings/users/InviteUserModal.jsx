@@ -1,6 +1,6 @@
 import { Modal, Text, TextField } from "@shopify/polaris"
 import { useState } from "react"
-import func from "../../../../../util/func"
+import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
 

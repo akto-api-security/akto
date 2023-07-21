@@ -25,7 +25,7 @@ import Store from "../../../store";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import TestEditorStore from "../testEditorStore"
 import "../TestEditor.css"
 import { useNavigate } from "react-router-dom";
