@@ -21,8 +21,8 @@ import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighligh
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import { useNavigate, useParams } from "react-router-dom";
 import TestEditorStore from "../testEditorStore";
-import api from "../../testing/api";
-import func from "../../../../../util/func";
+import testEditorRequests from "../api";
+import func from "@/util/func";
 
 
 const YamlEditor = ({ fetchAllTests }) => {
@@ -30,6 +30,7 @@ const YamlEditor = ({ fetchAllTests }) => {
 
     const testsObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
+    const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
 
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
@@ -44,6 +45,7 @@ const YamlEditor = ({ fetchAllTests }) => {
     const handleYamlUpdate = () => {
         const Editor = editorInstanceRef.current
         const currentYaml = Editor.getValue()
+        setCurrentContent(currentYaml)
         const existingYaml = testsObj.mapTestToData[selectedTest.label].content 
         setIsEdited(currentYaml !== existingYaml)
     }
@@ -52,7 +54,7 @@ const YamlEditor = ({ fetchAllTests }) => {
         const selectedTestCurrent = TestEditorStore.getState().selectedTest
         const Editor = editorInstanceRef.current
 
-        const addTestTemplateResponse = await api.addTestTemplate(Editor.getValue(), selectedTest.value)
+        const addTestTemplateResponse = await testEditorRequests.addTestTemplate(Editor.getValue(), selectedTest.value)
         navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
         fetchAllTests()
     }

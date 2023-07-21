@@ -1,5 +1,6 @@
 import { Box, Button, Divider, LegacyTabs, Modal} from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
+import { UpdateInventoryMajor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
 
@@ -26,6 +27,8 @@ import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "../../../../../util/func";
 import TestEditorStore from "../testEditorStore"
+import "../TestEditor.css"
+import { useNavigate } from "react-router-dom";
 
 const SampleApi = () => {
 
@@ -39,7 +42,11 @@ const SampleApi = () => {
     const [sampleData, setSampleData] = useState(null)
     const [copyCollectionId, setCopyCollectionId] = useState(null)
     const [copySelectedApiEndpoint, setCopySelectedApiEndpoint] = useState(null)
+    const [sampleDataList, setSampleDataList] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [testResult,setTestResult] = useState(null)
 
+    const currentContent = TestEditorStore(state => state.currentContent)
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const vulnerableRequestsObj = TestEditorStore(state => state.vulnerableRequestsMap)
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
@@ -48,6 +55,8 @@ const SampleApi = () => {
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
+    
+    const navigate = useNavigate()
 
     useEffect(() => {
         const jsonEditorOptions = {
@@ -68,6 +77,7 @@ const SampleApi = () => {
         let selectedUrl = vulnerableRequestsObj?.[testId]
         setSelectedCollectionId(null)
         setSelectedApiEndpoint(null)
+        setTestResult(null)
         if(!selectedUrl){
             selectedUrl = defaultRequest
         }
@@ -79,11 +89,13 @@ const SampleApi = () => {
             }
             setSelectedApiEndpoint(obj)
         },0)
+        
     },[selectedTest])
 
     useEffect(() => {
-        fetchApiEndpoints(selectedCollectionId)
-    }, [selectedCollectionId])
+        fetchApiEndpoints(copyCollectionId)
+        setTestResult(null)
+    }, [copyCollectionId])
 
     useEffect(() => {
         if (selectedCollectionId && selectedApiEndpoint) {
@@ -91,6 +103,7 @@ const SampleApi = () => {
         }else{
             editorInstance?.setValue("")
         }
+        setTestResult(null)
     }, [selectedApiEndpoint])
 
 
@@ -110,7 +123,7 @@ const SampleApi = () => {
     const allCollectionsOptions = allCollections.map(collection => {
         return {
             label: collection.displayName,
-            value: String(collection.id)
+            value: collection.id
         }
     })
 
@@ -134,9 +147,9 @@ const SampleApi = () => {
 
     const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
         const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
-        console.log(sampleDataResponse,collectionId,apiEndpointUrl)
         if (sampleDataResponse) {
             if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
+                setSampleDataList(null)
                 const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[0])
                 const requestJson = func.requestJson(sampleDataJson, [])
                 const responseJson = func.responseJson(sampleDataJson, [])
@@ -145,6 +158,9 @@ const SampleApi = () => {
                 if (editorInstance) {
                     editorInstance.setValue(JSON.stringify(requestJson["json"], null, 2))
                 }
+                setTimeout(()=> {
+                    setSampleDataList(sampleDataResponse.sampleDataList)
+                },0)
 
                 setSelected(0)
             }
@@ -158,19 +174,42 @@ const SampleApi = () => {
         toggleSelectApiActive()
     }
 
+    const runTest = async()=>{
+        setLoading(true)
+        const apiKeyInfo = {
+            ...selectedApiEndpoint,
+            apiCollectionId: selectedCollectionId
+        }
+
+        await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList).then((resp)=>{
+            setTestResult(resp)
+            setLoading(false)
+        })
+    }
+
+    const showResults = () => {
+        let hexId = testResult.testingRunResult.hexId
+        navigate( "/dashboard/testing/editor/result/" + hexId , {state: {testResult : testResult}})
+    }
+    
+    const resultComponent = (
+        testResult ? <Button icon={UpdateInventoryMajor} plain onClick={showResults}>Show Results</Button>
+        : <span>Run test to see Results</span>
+    )
+
     return (
-        <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5" }}>
+        <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
             <div style={{ display: "grid", gridTemplateColumns: "auto max-content max-content", alignItems: "center", gap: "10px", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px" }}>
-                <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted>
-                </LegacyTabs>
+                <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 <Button onClick={toggleSelectApiActive}>Select Sample API</Button>
-                <Button primary>Run Test</Button>
+                <Button loading={loading} primary onClick={runTest}>Run Test</Button>
             </div>
 
             <Divider />
-            
-            <Box ref={jsonEditorRef} minHeight="80vh">
-            </Box>    
+            <Box ref={jsonEditorRef} minHeight="75vh"/>
+            <div className="show-results">
+                {resultComponent}
+            </div>
             <Modal
                 open={selectApiActive}
                 onClose={toggleSelectApiActive}
