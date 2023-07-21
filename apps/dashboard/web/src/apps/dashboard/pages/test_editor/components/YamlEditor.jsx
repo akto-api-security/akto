@@ -57,14 +57,19 @@ const YamlEditor = ({ fetchAllTests }) => {
     const handleSave = async () => {
         const Editor = editorInstanceRef.current
 
-        const addTestTemplateResponse = await testEditorRequests.addTestTemplate(Editor.getValue(), selectedTest.value)
-        setToastConfig({
-            isActive: true,
-            isError: false,
-            message: "Test saved successfully!"
-        })
-        navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
-        fetchAllTests()
+        try {
+            const addTestTemplateResponse = await testEditorRequests.addTestTemplate(Editor.getValue(), selectedTest.value)
+            setToastConfig({
+                isActive: true,
+                isError: false,
+                message: "Test saved successfully!"
+            })
+            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
+            fetchAllTests()
+        } catch(error) {
+            
+        }
+        
     }
     
     useEffect(()=>{        
