@@ -159,6 +159,7 @@ function GithubServerTable(props) {
         getActions={props.getActions} 
         selectedResources={selectedResources}
         headers={props.headers}
+        rowClickable={props.rowClickable}
         hasRowActions={props.hasRowActions || false}
         page={props.page || 0}
         getNextUrl={props?.getNextUrl}
@@ -175,7 +176,7 @@ function GithubServerTable(props) {
   }
 
   return (
-    <div>
+    <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
       <LegacyCard>
         <LegacyCard.Section flush>
           <IndexFilters

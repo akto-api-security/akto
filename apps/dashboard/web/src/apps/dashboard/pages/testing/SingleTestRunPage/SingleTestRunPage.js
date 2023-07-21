@@ -199,6 +199,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       selectable = {true}
       promotedBulkActions = {promotedBulkActions}
       loading={loading}
+      rowClickable={true}
     />
     ]}
     />
