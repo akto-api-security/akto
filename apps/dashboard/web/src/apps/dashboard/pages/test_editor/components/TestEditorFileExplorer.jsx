@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react"
-import TestEditorStore from "../testEditorStore"
-import convertFunc from "../transform"
-import { Badge, Box, Button, Icon, Navigation, TextField, Tooltip } from "@shopify/polaris"
-
-import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
-import "../TestEditor.css"
 import { useNavigate } from "react-router-dom"
+
+import { Box, Button, Icon, Navigation, TextField, Tooltip } from "@shopify/polaris"
+import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
+
+import TestEditorStore from "../testEditorStore"
+
+import convertFunc from "../transform"
+
+import "../TestEditor.css"
 
 const TestEditorFileExplorer = () => {
 

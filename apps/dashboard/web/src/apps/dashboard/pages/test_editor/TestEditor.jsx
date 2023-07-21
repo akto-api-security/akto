@@ -1,28 +1,33 @@
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+
 import { Badge, Button, Card, Frame, Icon, Text, Toast, Divider } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
+
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
-import Store from "../../store"
 import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
-import { useLocation, useNavigate, useParams } from "react-router-dom"
-import testEditorRequests from "./api"
-import TestEditorStore from "./testEditorStore"
-import convertFunc from "./transform"
-import { useEffect, useState } from "react"
 import SpinnerCentered from "../../components/progress/SpinnerCentered"
+
+import Store from "../../store"
+import TestEditorStore from "./testEditorStore"
+
+import testEditorRequests from "./api"
+
+import convertFunc from "./transform"
 
 const TestEditor = () => {
     const navigate = useNavigate()
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
-    const setTestsObj = TestEditorStore(state => state.setTestsObj)  
+    const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
 
-    const [ loading, setLoading ] = useState(true)
-    
+    const [loading, setLoading] = useState(true)
+
     const disableToast = () => {
         setToastConfig({
             isActive: false,
@@ -63,41 +68,42 @@ const TestEditor = () => {
         }
     }
 
-    useEffect(()=> {
+    useEffect(() => {
         fetchAllTests()
-    },[])
+    }, [])
 
     return (
         <Frame>
-                <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto max-content", alignItems: "center", gap:"5px", height: "10vh", padding: "10px", background: "#ffffff"}}>
-                    <Button icon={ExitMajor} plain onClick={handleExit} />
-                    <Text variant="headingLg">
-                        Test Editor
-                    </Text>
-                    <Badge status="success">
-                        Beta
-                    </Badge>
-                    <div></div>
+            <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto", alignItems: "center", gap: "5px", height: "10vh", padding: "10px", background: "#ffffff" }}>
+                <Button icon={ExitMajor} plain onClick={handleExit} />
+                <Text variant="headingLg">
+                    Test Editor
+                </Text>
+                <Badge status="success">
+                    Beta
+                </Badge>
+                <div style={{ textAlign: "right" }}>
                     <Button>
                         Create custom test
                     </Button>
                 </div>
+            </div>
 
-            <Divider  />
+            <Divider />
 
-            { loading ? 
+            {loading ?
                 <SpinnerCentered />
-            :   <div style={{ display: "grid", gridTemplateColumns: "max-content auto"}}>
+                : <div style={{ display: "grid", gridTemplateColumns: "max-content auto" }}>
                     <TestEditorFileExplorer />
-                    
-                    <div style={{ display: "grid", gridTemplateColumns: "50% 50%"}}>
-                        <YamlEditor fetchAllTests={fetchAllTests}/>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "50% 50%" }}>
+                        <YamlEditor fetchAllTests={fetchAllTests} />
                         <SampleApi />
                     </div>
                 </div>
             }
-           
-            {toastMarkup}            
+
+            {toastMarkup}
         </Frame>
     )
 }
