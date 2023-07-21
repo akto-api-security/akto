@@ -188,8 +188,8 @@ const SampleApi = () => {
     }
 
     const showResults = () => {
-        let hexId = testResult.testingRunResult.hexId
-        navigate( "/dashboard/testing/editor/result/" + hexId , {state: {testResult : testResult}})
+        let hexId = testResult?.testingRunResult?.hexId
+        navigate( "/dashboard/testing/editor/result/" + hexId , {state: {testingRunResult : testResult?.testingRunResult , runIssues : testResult?.testingRunIssues, testId:selectedTest.value}})
     }
     
     const resultComponent = (

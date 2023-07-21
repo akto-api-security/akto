@@ -10,12 +10,12 @@ import {
   Text,
   Button,
   VerticalStack,
-  HorizontalStack, Icon, Box, Badge, LegacyCard, Link, List
+  HorizontalStack, Icon, Box, Badge, LegacyCard
   } from '@shopify/polaris';
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import func from "@/util/func"
 import parse from 'html-react-parser';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -103,74 +103,37 @@ function TestRunResultPage(props) {
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
+  const location = useLocation();
+  const locationState = location.state;
   const [infoState, setInfoState] = useState(moreInfoSections)
   useEffect(() => {
     let testRunResult = selectedTestRunResult;
     async function fetchData() {
       if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0 ) {
-      await api.fetchTestRunResultDetails(hexId2).then(({ testingRunResult }) => {
-        testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
+      if(locationState){
+        testRunResult = transform.prepareTestRunResult(hexId, locationState.testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
         setSelectedTestRunResult(testRunResult)
-      })
-      
-      await api.fetchIssueFromTestRunResultDetails(hexId2).then((resp) => {
-        if (resp.runIssues) {
-          setIssueDetails(...[resp.runIssues]);
-          moreInfoSections[0].content = (
-            <Text color='subdued'>
-              {subCategoryMap[resp.runIssues.id?.testSubCategory]?.issueImpact || "No impact found"}
-            </Text>
-          )
-          moreInfoSections[1].content = (
-            <HorizontalStack gap="2">
-              {
-                subCategoryMap[resp.runIssues.id.testSubCategory]?.issueTags.map((tag, index) => {
-                  return (
-                    <Badge progress="complete" key={index}>{tag}</Badge>
-                  )
-                })
-              }
-            </HorizontalStack>
-          )
-          moreInfoSections[3].content = (
-            <List type='bullet' spacing="extraTight">
-              {
-                subCategoryMap[resp.runIssues.id?.testSubCategory]?.references.map((reference) => {
-                  return (
-                    <List.Item key={reference}>
-                      <Link key={reference} url={reference} monochrome removeUnderline>
-                        <Text color='subdued'>
-                          {reference}
-                        </Text>
-                      </Link>
-                    </List.Item>
-                  )
-                })
-              }
-            </List>
-          )
-          api.fetchAffectedEndpoints(resp.runIssues.id).then((resp1) => {
-            let similarlyAffectedIssues = resp1['similarlyAffectedIssues'];
-            moreInfoSections[2].content = (
-              <List type='bullet'>
-                {
-                  similarlyAffectedIssues.map((item, index) => {
-                    return (
-                      <List.Item key={index}>
-                        <Text color='subdued'>
-                          {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
-                        </Text>
-                      </List.Item>)
-                  })
-                }
-              </List>
-            )
-            setInfoState([...moreInfoSections]);
-          })
+        if (locationState.runIssues) {
+          setIssueDetails(...[locationState.runIssues]);
+          setInfoState(await transform.fillMoreInformation(locationState.runIssues, subCategoryMap, moreInfoSections))
         } else {
           setIssueDetails(...[{}]);
         }
-      })
+      } else {
+        await api.fetchTestRunResultDetails(hexId2).then(({ testingRunResult }) => {
+          testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
+          setSelectedTestRunResult(testRunResult)
+        })
+        
+        await api.fetchIssueFromTestRunResultDetails(hexId2).then(async (resp) => {
+          if (resp.runIssues) {
+            setIssueDetails(...[resp.runIssues]);
+            setInfoState(await transform.fillMoreInformation(resp.runIssues, subCategoryMap, moreInfoSections))
+          } else {
+            setIssueDetails(...[{}]);
+          }
+        })
+      }
     }
     }
     fetchData();
@@ -180,6 +143,8 @@ function TestRunResultPage(props) {
   function navigateBack() {
     if (hexId == "issues") {
       navigate("/dashboard/issues")
+    } else if(hexId=="editor"){
+      navigate("/dashboard/test-editor/"+location.state.testId)
     } else {
       navigate("/dashboard/testing/" + hexId)
     }
@@ -229,8 +194,8 @@ function TestRunResultPage(props) {
         </VerticalStack>
     }
     backAction = {{onAction:navigateBack}}
-    primaryAction = {<Button primary>Create issue</Button>}
-    secondaryActions = {<Button disclosure>Dismiss alert</Button>}
+    primaryAction = {hexId=="editor" ? "" : <Button primary>Create issue</Button>}
+    secondaryActions = {hexId=="editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {[
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
@@ -239,7 +204,7 @@ function TestRunResultPage(props) {
     ,
     selectedTestRunResult.testResults &&
     <SampleDataList
-      key="attempt"
+      key={hexId2}
       sampleData={selectedTestRunResult?.testResults.filter((result) => {
         return result.message
       }).map((result) => {

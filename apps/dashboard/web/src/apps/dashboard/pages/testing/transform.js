@@ -1,4 +1,10 @@
 import func from "@/util/func";
+import api from "./api";
+import React, {  } from 'react'
+import {
+  Text,
+  HorizontalStack, Badge, Link, List
+  } from '@shopify/polaris';
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -168,6 +174,60 @@ const transform = {
       }
       return []
   },
+  async fillMoreInformation(runIssues, subCategoryMap, moreInfoSections){
+    moreInfoSections[0].content = (
+        <Text color='subdued'>
+          {subCategoryMap[runIssues.id?.testSubCategory]?.issueImpact || "No impact found"}
+        </Text>
+      )
+      moreInfoSections[1].content = (
+        <HorizontalStack gap="2">
+          {
+            subCategoryMap[runIssues.id.testSubCategory]?.issueTags.map((tag, index) => {
+              return (
+                <Badge progress="complete" key={index}>{tag}</Badge>
+              )
+            })
+          }
+        </HorizontalStack>
+      )
+      moreInfoSections[3].content = (
+        <List type='bullet' spacing="extraTight">
+          {
+            subCategoryMap[runIssues.id?.testSubCategory]?.references.map((reference) => {
+              return (
+                <List.Item key={reference}>
+                  <Link key={reference} url={reference} monochrome removeUnderline>
+                    <Text color='subdued'>
+                      {reference}
+                    </Text>
+                  </Link>
+                </List.Item>
+              )
+            })
+          }
+        </List>
+      )
+      await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
+        let similarlyAffectedIssues = resp1['similarlyAffectedIssues'];
+        moreInfoSections[2].content = (
+          <List type='bullet'>
+            {
+              similarlyAffectedIssues.map((item, index) => {
+                return (
+                  <List.Item key={index}>
+                    <Text color='subdued'>
+                      {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
+                    </Text>
+                  </List.Item>)
+              })
+            }
+          </List>
+        )
+    })
+    return moreInfoSections;
+  }
+
 }
 
 export default transform

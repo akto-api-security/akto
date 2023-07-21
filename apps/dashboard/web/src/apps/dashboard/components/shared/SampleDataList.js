@@ -65,7 +65,7 @@ function highlightPaths(highlightPathMap, refText){
 function SampleDataList(props) {
     const requestRef = useRef("");
     const responseRef = useRef("");
-    const [refText, setRefText] = useState({})
+    const refText = useRef([])
     const [page, setPage] = useState(0);
     const [popoverActive, setPopoverActive] = useState(false);
     const setToastConfig = Store(state => state.setToastConfig)
@@ -121,12 +121,10 @@ function SampleDataList(props) {
       let text = null
       text = editor.create(ref, options)
       text.setValue("");
-      setRefText((old) => ({
-        ...old, [type]:text
-      }) )
+      refText.current[type]=text
     }
     useEffect(()=>{
-      if(Object.keys(refText).length==0){
+      if(Object.keys(refText.current).length==0){
         [requestRef, responseRef].map((ref, index) => {
           // handle graphQL APIs
           createEditor(ref.current, {
@@ -140,10 +138,10 @@ function SampleDataList(props) {
           },index == 0 ? "request" : "response" )
         })
       } else {
-        refText.request.setValue("")
-        refText.response.setValue("")
+        refText.current.request.setValue("")
+        refText.current.response.setValue("")
       }
-      if (props.sampleData?.[page] && Object.keys(refText).length==2) {
+      if (props.sampleData?.[page] && Object.keys(refText.current).length==2) {
         let message = formatJSON(props.sampleData?.[page].message);
         let res = {}, req = {}
         Object.keys(message).forEach((key) => {
@@ -153,12 +151,12 @@ function SampleDataList(props) {
             res[key] = message[key]
           }
         })
-        refText.request.setValue(JSON.stringify(req, null, 2))
-        refText.response.setValue(JSON.stringify(res, null, 2))
+        refText.current.request.setValue(JSON.stringify(req, null, 2))
+        refText.current.response.setValue(JSON.stringify(res, null, 2))
 
-        highlightPaths(props.sampleData?.[page].highlightPathMap, refText);
+        highlightPaths(props.sampleData?.[page].highlightPathMap, refText.current);
       }
-    }, [props.sampleData, page, refText])
+    }, [props.sampleData, page])
   
     return (
       <VerticalStack gap="4">
