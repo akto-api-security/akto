@@ -19,6 +19,8 @@ const TestEditor = () => {
     const setToastConfig = Store(state => state.setToastConfig)
     const setTestsObj = TestEditorStore(state => state.setTestsObj)  
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
+    const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
+    const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
 
     const [ loading, setLoading ] = useState(true)
     
@@ -53,6 +55,11 @@ const TestEditor = () => {
                 category: obj.mapTestToData[testName].category
             }
             setSelectedTest(selectedTestObj)
+
+            const requestObj = convertFunc.mapVulnerableRequests(allSubCategoriesResponse.vulnerableRequests)
+            setVulnerableRequestMap(requestObj)
+            setDefaultRequest(allSubCategoriesResponse.vulnerableRequests[0].id)
+
             setLoading(false)
         }
     }

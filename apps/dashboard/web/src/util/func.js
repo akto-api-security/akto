@@ -362,7 +362,18 @@ const func = {
       }
     }
     return result
-  }
+  },
+
+  mapCollectionIdToName(collections) {
+    let collectionsObj = {}
+    collections.forEach((collection)=>{
+      if(!collectionsObj[collection.id]){
+        collectionsObj[collection.id] = collection.displayName
+      }
+    })
+
+    return collectionsObj
+  },
 
 }
 
