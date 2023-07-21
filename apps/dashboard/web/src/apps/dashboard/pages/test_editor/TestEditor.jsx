@@ -64,9 +64,7 @@ const TestEditor = () => {
     return (
         <Frame>
                 <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto max-content", alignItems: "center", gap:"5px", height: "10vh", padding: "10px", background: "#ffffff"}}>
-                    <div onClick={handleExit}>
-                        <Icon source={ExitMajor} color="base" />
-                    </div>
+                    <Button icon={ExitMajor} plain onClick={handleExit} />
                     <Text variant="headingLg">
                         Test Editor
                     </Text>
