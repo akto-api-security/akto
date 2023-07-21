@@ -40,8 +40,6 @@ const err = async (error) => {
       })
       return service(originalRequest)
     case 422:
-      console.log(message)
-
       Store.getState().setToastConfig({
         isActive: true,
         isError: true,
