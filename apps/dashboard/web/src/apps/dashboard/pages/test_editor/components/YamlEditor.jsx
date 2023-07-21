@@ -22,6 +22,7 @@ import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import { useParams } from "react-router-dom";
 import TestEditorStore from "../testEditorStore";
 import api from "../../testing/api";
+import func from "../../../../../util/func";
 
 
 const YamlEditor = () => {
@@ -92,19 +93,22 @@ const YamlEditor = () => {
         }    
       }, [selectedTest])
 
-    const copyContent = () =>{
-        console.log("copy")
+    const copyTestName = () =>{
+        func.copyToClipboard(editorInstance.getValue())
+        //add toast here
     }
 
     return (
         <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
             <div style={{display: "grid", gridTemplateColumns: "max-content max-content max-content auto max-content", gap: "5px",  alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
-                <Text variant="bodyMd">{selectedTest.label}</Text>
+                <Tooltip content={selectedTest.label} preferredPosition="above" dismissOnMouseOut>
+                    <Text variant="bodyMd" truncate>{selectedTest.label}</Text>
+                </Tooltip>
                 <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="above" dismissOnMouseOut>
                     <Icon source={InfoMinor}/> 
                 </Tooltip>
                 <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="above">
-                    <Button icon={ClipboardMinor} plain onClick={copyContent} />
+                    <Button icon={ClipboardMinor} plain onClick={copyTestName} />
                 </Tooltip>       
                 <div />
                 <Button disabled={!isEdited} onClick={handleSave}>Save</Button>
