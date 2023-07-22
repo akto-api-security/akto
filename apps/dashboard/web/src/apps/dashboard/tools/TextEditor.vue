@@ -204,7 +204,7 @@
 
 <script>
 
-import { editor } from "monaco-editor/esm/vs/editor/editor.api"
+import { editor, KeyCode, KeyMod } from "monaco-editor/esm/vs/editor/editor.api"
 import Search from '../shared/components/inputs/Search.vue';
 import LayoutWithLeftPane from '../layouts/LayoutWithLeftPane.vue';
 import SampleData from '../shared/components/SampleData.vue';
