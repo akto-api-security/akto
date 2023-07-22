@@ -520,6 +520,31 @@ export default {
         },
         createEditor() {
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
+            this.textEditor.addAction({
+                id: "giveTypingEffect",
+                label: "Give typing effect",
+                keybindings: [KeyMod.Shift | KeyCode.KeyB],
+                run: () => {
+                    this.giveTypingEffect(false, true);
+                },
+            });
+
+        },
+        giveTypingEffect() {
+            let str = this.textEditor.getValue()
+            let prevStr = "";
+            this.textEditor.setValue(prevStr)
+            let i = 0;
+            let intI = setInterval(() => {
+                prevStr += str[i]
+                i++;
+                
+                this.textEditor.setValue(prevStr + "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                if (i == str.length) {
+                    clearInterval(intI)
+                }
+            }, 10);
+
         },
         findSuffixForNewTest(testId) {
             let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            
