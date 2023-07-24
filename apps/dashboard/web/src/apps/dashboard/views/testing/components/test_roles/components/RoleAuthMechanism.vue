@@ -17,7 +17,6 @@
   <script>
   
   import RoleHardcodedAuth from './RoleHardcodedAuth'
-  import RoleAutomatedAuth from './RoleAutomatedAuth'
   import RoleSingleAuth from './RoleSingleAuth'
   
   import { mapState } from "vuex";
@@ -27,7 +26,6 @@
     components: {
       SecondaryButton,
       RoleHardcodedAuth,
-      RoleAutomatedAuth,
       RoleSingleAuth
     },
     data() {
