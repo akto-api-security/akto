@@ -1,8 +1,13 @@
 package com.akto.graphql;
 
 import com.akto.dto.HttpResponseParams;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import graphql.language.*;
 import graphql.parser.Parser;
+import graphql.util.TraversalControl;
+import graphql.util.TraverserContext;
+import graphql.util.TreeTransformerUtil;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
 import org.mortbay.util.ajax.JSON;
@@ -11,6 +16,8 @@ import java.util.*;
 
 public class GraphQLUtils {//Singleton class
     Parser parser = new Parser();
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final Gson gson = new Gson();
     LanguageTraversal traversal = new LanguageTraversal();
     public static final String __ARGS = "__args";
     public static final String QUERY = "query";
@@ -121,6 +128,77 @@ public class GraphQLUtils {//Singleton class
         return responseParamsList;
     }
 
+    public String deleteGraphqlField(String payload, String field) {
+        Object[] payloadList = (Object []) JSON.parse(payload);
+        for (Object operationObj: payloadList) {
+            Map<String, Object> operation = (Map) operationObj;
+            String query = (String) operation.get("query");
+            Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
+
+                @Override
+                public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                    if (node.getName().equals(field)) {
+                        return TreeTransformerUtil.deleteNode(context);
+                    } else {
+                        return super.visitField(node, context);
+                    }
+                }
+            });
+            String modifiedQuery = AstPrinter.printAst(result);
+            operation.replace("query", modifiedQuery);
+        }
+        return gson.toJson(payloadList);
+    }
+
+    public String addGraphqlField(String payload, String field, String value) {
+        String tempVariable = "__tempDummyVariableToReplace";
+        Object[] payloadList = (Object []) JSON.parse(payload);
+        for (Object operationObj: payloadList) {
+            Map<String, Object> operation = (Map) operationObj;
+            String query = (String) operation.get("query");
+            Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
+
+                @Override
+                public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                    if (node.getName().equals(field)) {
+                        return TreeTransformerUtil.insertAfter(context, parser.parseValue(tempVariable));
+                    } else {
+                        return super.visitField(node, context);
+                    }
+                }
+            });
+            String modifiedQuery = AstPrinter.printAst(result);
+
+            modifiedQuery = modifiedQuery.replace(tempVariable, value);
+            operation.replace("query", modifiedQuery);
+        }
+        return gson.toJson(payloadList);
+    }
+
+    public String modifyGraphqlField(String payload, String field, String value) {
+        String tempVariable = "__tempDummyVariableToReplace";
+        Object[] payloadList = (Object []) JSON.parse(payload);
+        for (Object operationObj: payloadList) {
+            Map<String, Object> operation = (Map) operationObj;
+            String query = (String) operation.get("query");
+            Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
+
+                @Override
+                public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                    if (node.getName().equals(field)) {
+                        return TreeTransformerUtil.changeNode(context, parser.parseValue(tempVariable));
+                    } else {
+                        return super.visitField(node, context);
+                    }
+                }
+            });
+            String modifiedQuery = AstPrinter.printAst(result);
+            modifiedQuery = modifiedQuery.replace(tempVariable, value);
+            operation.replace("query", modifiedQuery);
+        }
+        return gson.toJson(payloadList);
+    }
+
     private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
         List<OperationDefinition> operationDefinitions = parseGraphQLRequest(mapOfRequestPayload);
 
@@ -177,6 +255,60 @@ public class GraphQLUtils {//Singleton class
             return result;
         }
         return result;
+    }
+
+
+
+    public static void main(String[] args) {
+        String gql1 = "mutation { login(input: {username: \"user\", password: \"12345\"}) {status}}";
+        String gql2 = "mutation UpdateLastWatchTime($videoId: ID!, $timestamp: Int) {\n  updateLastWatchTime(videoId: $videoId, timestamp: $timestamp) {\n    ... on UpdateWatchTimePayload {\n      success\n      __typename\n    }\n    __typename\n  }\n}\n";
+        String gql3 = "query GetWorkspaceSettings($names: [String!]) {\n  settings: getWorkspaceSettings(names: $names) {\n    ... on WorkspaceSettings {\n      memberInvitationAllowed\n      __typename\n    }\n    __typename\n  }\n}\n";
+        String gql4 = "query FetchChapters($videoId: ID!) {\n fetchVideoChapters(videoId: $videoId) {\n ... on VideoChapters {\n video_id\n content\n schema_version\n updatedAt\n edited_at\n auto_chapter_status\n __typename\n }\n ... on EmptyChaptersPayload {\n content\n __typename\n }\n ... on InvalidRequestWarning {\n message\n __typename\n }\n ... on Error {\n message\n __typename\n }\n __typename\n }\n}\n";
+        String gql = "query GetSuggestedWorkspaceBanner {\n result: getSuggestedWorkspaceForCurrentUser {\n __typename\n ... on JoinableWorkspace {\n ...SuggestedWorkspaceFragment\n __typename\n }\n }\n}\n\nfragment SuggestedWorkspaceFragment on JoinableWorkspace {\n id\n workspace {\n id\n counts {\n users\n __typename\n }\n name\n workspaceLogoPath\n members: membersConnection(first: 4) {\n nodes {\n id\n member_role\n user {\n id\n first_name\n display_name\n last_name\n avatars {\n thumb\n __typename\n }\n __typename\n }\n __typename\n }\n __typename\n }\n __typename\n }\n autoJoin\n isCurrentUserMember\n requestStatus\n hasPendingInvitation\n __typename\n}\n";
+        Parser parser = new Parser();
+        Document doc = parser.parseDocument(gql);
+        Document doc_temp = parser.parse("{token\n}");
+
+//        return TreeTransformerUtil.changeNode(context, changedNode);
+
+
+        Node ret = new AstTransformer().transform(doc, new NodeVisitorStub() {
+
+            @Override
+            public TraversalControl visitNode(Node node, TraverserContext<Node> context) {
+                System.out.println(node.toString());
+                return super.visitNode(node, context);
+            }
+            @Override
+            public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                System.out.println(node.getName());
+                if (node.getName().equals("avatars")) {
+//                    return TreeTransformerUtil.insertAfter(context, parser.parseValue("token"));
+                    return TreeTransformerUtil.insertAfter(context, parser.parseValue("temp_placeholder123"));
+                } else {
+                    return super.visitField(node, context);
+                }
+            }
+
+        });
+
+        System.out.println(AstPrinter.printAst(doc));
+        System.out.println(AstPrinter.printAst(ret).replaceAll("temp_placeholder123", "avatars2 {s1 s2 __typename}"));
+
+//        OperationDefinition definition = (OperationDefinition) doc.getDefinitions().get(0);
+//        SelectionSet set = definition.getSelectionSet();
+//        Field field = new Field("__type");
+//        List<Selection> selectionList = ((OperationDefinition) doc.getDefinitions().get(0)).getSelectionSet().getSelections();
+//        ImmutableList.Builder<Selection> builder = new ImmutableList.Builder<>();
+//
+//        builder.addAll(selectionList).add(field).build();
+//        definition.transform()
+//        SelectionSet set1 = new SelectionSet(ImmutableList.of(new Field("username")));
+//        System.out.println(AstPrinter.printAst(doc)); //which should print out a prettified query here
+//        System.out.println(definition.toString());
+//        System.out.println(set.toString());
+//        System.out.println(doc);
+
     }
 
 }

@@ -230,7 +230,6 @@ public class Executor {
         } catch(Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
         }
-        
     }
     
     private static boolean removeCustomAuth(RawApi rawApi) {
@@ -255,6 +254,12 @@ public class Executor {
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
+            case "delete_graphql_field":
+                return Operations.deleteGraphqlField(rawApi, key.toString());
+            case "add_graphql_field":
+                return Operations.addGraphqlField(rawApi, key.toString(), value.toString());
+            case "modify_graphql_field":
+                return Operations.modifyGraphqlField(rawApi, key.toString(), value.toString());
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":

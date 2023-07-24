@@ -199,7 +199,8 @@ public class TestEditorEnums {
         FOLLOW_REDIRECT,
         REMOVE_AUTH_HEADER,
         REPLACE_AUTH_HEADER,
-        REPLACE_BODY
+        REPLACE_BODY,
+        DELETE_GRAPHQL_FIELD
     }
 
     public enum NonTerminalExecutorDataOperands {
@@ -208,7 +209,9 @@ public class TestEditorEnums {
         ADD_QUERY_PARAM,
         MODIFY_HEADER,
         MODIFY_BODY_PARAM,
-        MODIFY_QUERY_PARAM
+        MODIFY_QUERY_PARAM,
+        ADD_GRAPHQL_FIELD,
+        MODIFY_GRAPHQL_FIELD
     }
 
     public enum ExecutorOperandTypes {
