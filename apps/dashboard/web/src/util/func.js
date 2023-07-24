@@ -305,6 +305,7 @@ const func = {
 
     result["json"] = { "queryParams": queryParams, "requestHeaders": requestHeaders, "requestPayload": requestPayload }
     result["highlightPaths"] = {}
+    result['firstLine'] = func.requestFirstLine(message)
     for (const x of highlightPaths) {
       if (x["responseCode"] === -1) {
         let keys = []
@@ -350,6 +351,7 @@ const func = {
     }
     result["json"] = { "responseHeaders": responseHeaders, "responsePayload": responsePayload }
     result["highlightPaths"] = {}
+    result['firstLine'] = func.responseFirstLine(message)
     for (const x of highlightPaths) {
       if (x["responseCode"] !== -1) {
         let key = ""
@@ -364,7 +366,21 @@ const func = {
     }
     return result
   },
-
+  requestFirstLine(message) {
+    if (message["request"]) {
+      let url = message["request"]["url"]
+      return message["request"]["method"] + " " + url + " " + message["request"]["type"]
+    } else {
+      return message.method + " " + message.path.split("?")[0] + " " + message.type
+    }
+  },
+  responseFirstLine(message) {
+    if (message["response"]) {
+      return message["response"]["statusCode"] + ""
+    } else {
+      return message.statusCode + " " + message.status
+    }
+  },
   mapCollectionIdToName(collections) {
     let collectionsObj = {}
     collections.forEach((collection)=>{
