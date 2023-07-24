@@ -2,15 +2,19 @@ package com.akto.testing;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -77,15 +81,29 @@ public class AccessMatrixAnalyzer {
             List<ApiInfoKey> endpoints = getEndpointsToAnalyze(task);
             loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
 
+            CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);
+            Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(tempTestingEndpoints);
+        
+
+            List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
+            if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+            loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+
+
+            Set<Integer> apiCollectionIds = TestExecutor.extractApiCollectionIds(apiInfoKeyList);
+
+            Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages(apiCollectionIds);
+            List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
+
+            
             AuthMechanism authMechanism = TestExecutor.createAuthMechanism();
-            SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-            TestingUtil testingUtil = TestExecutor.createTestingUtil(authMechanism, sampleMessageStore, "system@akto.io");
+            TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
             BFLATest bflaTest = new BFLATest();
 
             if(endpoints!=null && !endpoints.isEmpty()){
                 for(ApiInfoKey endpoint: endpoints){
-                    List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(endpoint);
+                    List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(endpoint, sampleMessages);
                     if (messages!=null){
 
                         for (RawApi rawApi: messages) {

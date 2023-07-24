@@ -64,14 +64,6 @@ public class TestRoles {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
     }
 
-    public AuthMechanism getAuthMechanism() {
-        return authMechanism;
-    }
-
-    public void setAuthMechanism(AuthMechanism authMechanism) {
-        this.authMechanism = authMechanism;
-    }
-
     public EndpointLogicalGroup getEndpointLogicalGroup() {
         return endpointLogicalGroup;
     }
