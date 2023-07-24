@@ -32,12 +32,16 @@
   
       <div class="fw-500">
         Hardcoded token
+        <v-btn icon plain @click="addAuthParam">
+            <v-icon color="var(--themeColorDark)">$fas_plus</v-icon>
+        </v-btn>  
+
       </div>
   
   
-      <v-row>
+      <v-row v-for="(nK, index) in newKey" :key="'auth_param_'+index">
         <v-col md="2" class="autocomplete-options fw-500 input-value">
-          <v-text-field v-model="newKey">
+          <v-text-field v-model="newKey[index]">
             <template slot="label">
               <div class="d-flex">
                 Header key
@@ -47,7 +51,7 @@
   
         </v-col>
         <v-col md="6" class="autocomplete-options input-value">
-          <v-text-field v-model="newVal">
+          <v-text-field v-model="newVal[index]">
             <template slot="label">
               <div class="d-flex">
                 Header value
@@ -55,6 +59,11 @@
             </template>
   
           </v-text-field>
+        </v-col>
+        <v-col md="1">
+            <v-btn icon plain @click="() => deleteAuthParam(index)">
+                <v-icon color="var(--themeColorDark)">$fas_trash</v-icon>
+            </v-btn>  
         </v-col>
       </v-row>
   
@@ -74,8 +83,8 @@
     components: {SecondaryButton},
     data() {
       return {
-        newKey: "",
-        newVal: "",
+        newKey: [],
+        newVal: [],
         headerKey: "",
         headerVal: ""
       }
@@ -86,11 +95,25 @@
       },
       closeNewAuth() {
         this.$emit('closeNewAuth')
+      },
+      deleteAuthParam(index) {
+        this.newKey.splice(index, 1)
+        this.newVal.splice(index, 1)
+        this.newKey = [...this.newKey]
+        this.newVal = [...this.newVal]
+      },
+      addAuthParam() {
+        this.newKey.push("")
+        this.newVal.push("")
       }
     },
     computed: {
       disableSave() {
-        if (!this.newKey || !this.newVal) return true
+        if (this.newKey.length == 0 || this.newVal.length == 0) return true
+        for (let index = 0; index < this.newKey.length; index++) {
+            if (!this.newKey[index] || !this.newVal[index]) return true
+        }
+        
   
         if (this.headerKey && !this.headerVal) return true
   

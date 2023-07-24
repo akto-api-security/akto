@@ -42,11 +42,17 @@
         if (headerKey && headerVal) {
           apiCond[headerKey] = headerVal
         }
-        await this.$store.dispatch('test_roles/addAuthToRole', {roleName: this.curr.name, apiCond, authParamData: [{
-            "key": newKey,
-            "value": newVal,
-            "where": "HEADER"
-          }]})
+        
+        let authParamData = []
+        for (let index = 0; index < newKey.length; index++) {
+            authParamData.push({
+                "key": newKey[index],
+                "value": newVal[index],
+                "where": "HEADER"
+            })
+        }
+
+        await this.$store.dispatch('test_roles/addAuthToRole', {roleName: this.curr.name, apiCond, authParamData})
         this.showEmptyAuth = false
       },
       async deleteAuthFromRole(index) {

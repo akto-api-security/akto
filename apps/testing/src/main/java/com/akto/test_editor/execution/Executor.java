@@ -289,8 +289,12 @@ public class Executor {
                         if (allSatisfied) {
                             List<AuthParam> authParamList = authWithCond.getAuthMechanism().getAuthParams();
                             if (!authParamList.isEmpty()) {
-                                AuthParam authParam1 = authParamList.get(0);
-                                return Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                                ExecutorSingleOperationResp ret = null;
+                                for (AuthParam authParam1: authParamList) {
+                                    ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                                }
+                                
+                                return ret;
                             }
                         }
                     }

@@ -74,9 +74,13 @@ public class TestRolesAction extends UserAction {
 
     public void addAuthMechanism(TestRoles role){
         if (authParamData != null) {
-            AuthParam param = new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(), authParamData.get(0).getValue(), true);
             List<AuthParam> authParams = new ArrayList<>();
-            authParams.add(param);
+
+            for (AuthParamData authParamDataElem: authParamData) {
+                AuthParam param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
+                authParams.add(param);
+            }
+
             AuthMechanism authM = new AuthMechanism(authParams, null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString());
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond);
             TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
