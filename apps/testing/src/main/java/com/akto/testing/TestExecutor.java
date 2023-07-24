@@ -35,10 +35,6 @@ import org.json.JSONObject;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 
 public class TestExecutor {
@@ -104,6 +100,15 @@ public class TestExecutor {
         return ret;
     }
 
+    public static AuthMechanism createAuthMechanism(){
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+
+        authMechanism.setAuthParams(authParams);
+        return authMechanism;
+    }
+
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
@@ -121,13 +126,10 @@ public class TestExecutor {
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages(apiCollectionIds);
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-
-        List<AuthParam> authParams = authMechanism.getAuthParams();
+        AuthMechanism authMechanism = createAuthMechanism();
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
 
-        authMechanism.setAuthParams(authParams);
 
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 

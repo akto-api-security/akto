@@ -68,7 +68,9 @@ public class TestEditorEnums {
     public enum ContextOperator {
         PRIVATE_VARIABLE_CONTEXT,
         PARAM_CONTEXT,
-        ENDPOINT_IN_TRAFFIC_CONTEXT
+        ENDPOINT_IN_TRAFFIC_CONTEXT,
+        INCLUDE_ROLES_ACCESS,
+        EXCLUDE_ROLES_ACCESS        
     }
 
 

@@ -58,6 +58,16 @@ public class Main {
         return summaryId;
     }
 
+    scheduler.scheduleAtFixedRate(new Runnable() {
+        public void run() {
+            String mongoURI = System.getenv("AKTO_MONGO_CONN");
+            DaoInit.init(new ConnectionString(mongoURI));
+            Context.accountId.set(1_000_000);
+            AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+            matrixAnalyzer.run();
+        }
+    }, 0, 12, TimeUnit.HOURS);
+
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
