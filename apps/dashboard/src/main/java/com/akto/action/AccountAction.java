@@ -42,7 +42,6 @@ public class AccountAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
-    private AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     
     @Override
@@ -108,7 +107,7 @@ public class AccountAction extends UserAction {
     public void asgInstanceRefresh(StartInstanceRefreshRequest refreshRequest, String stack, String asg){
         String autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(stack, asg);
         refreshRequest.setAutoScalingGroupName(autoScalingGroup);
-        StartInstanceRefreshResult result = asc.startInstanceRefresh(refreshRequest);
+        StartInstanceRefreshResult result = AwsStack.getInstance().getAsc().startInstanceRefresh(refreshRequest);
         loggerMaker.infoAndAddToDb(String.format("instance refresh called on %s with result %s", asg, result.toString()), LogDb.DASHBOARD);
     }
 

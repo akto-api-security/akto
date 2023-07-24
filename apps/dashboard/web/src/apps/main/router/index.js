@@ -40,7 +40,7 @@ const router =  new Router({
     routes: [
         {
             path: '/',
-            redirect: '/dashboard/observe/inventory',
+            redirect:  window.IS_SAAS && window.IS_SAAS === "true" ? '/dashboard/observe/inventory' : 'login',
             component: PageLogin
         },
         {
