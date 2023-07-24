@@ -19,8 +19,6 @@ export default function Header() {
     const username = Store((state) => state.username)
     const storeAccessToken = Store(state => state.storeAccessToken)
 
-    console.log(username)
-
     const handleLeftNavCollapse = () => {
         if (!leftNavCollapsed) {
             setLeftNavSelected('')
