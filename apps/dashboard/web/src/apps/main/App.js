@@ -27,6 +27,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 
 const router = createBrowserRouter([
   {
@@ -76,6 +77,10 @@ const router = createBrowserRouter([
       {
         path:"issues",
         element:<IssuesPage/>
+      },
+      {
+        path: "quick-start",
+        element: <QuickStart/>
       }
     ]
   },
@@ -124,9 +129,6 @@ const router = createBrowserRouter([
   {
     path: "/dashboard/test-editor/:testId",
     element: <TestEditor />
-  },
-  {
-
   },
 {
   path: "/login",
