@@ -18,31 +18,38 @@ const usePathname = () => {
 }
 
 const err = async (error) => {
-    const { status, data } = error.response
-    const { errors } = data
-    const { actionErrors } = data
-    let message = "OOPS! Something went wrong"
-    if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
-        message = actionErrors[0]
-      }
+  const { status, data } = error.response
+  const { errors } = data
+  const { actionErrors } = data
+  let message = "OOPS! Something went wrong"
+  if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
+    message = actionErrors[0]
+  }
 
 
-      switch(status){
-        case 403:
-          const originalRequest = error.config;
-          if (originalRequest._retry) {
-            console.log("access token error");
-          }
-          originalRequest._retry = true
-          await service({
-            url: '/dashboard/accessToken',
-            method: 'get',
-          })
-          return service(originalRequest)
-        default:
-          break;
+  switch (status) {
+    case 403:
+      const originalRequest = error.config;
+      if (originalRequest._retry) {
+        console.log("access token error");
       }
-    return Promise.reject(error) 
+      originalRequest._retry = true
+      await service({
+        url: '/dashboard/accessToken',
+        method: 'get',
+      })
+      return service(originalRequest)
+    case 422:
+      Store.getState().setToastConfig({
+        isActive: true,
+        isError: true,
+        message: message
+      })
+      break
+    default:
+      break;
+  }
+  return Promise.reject(error)
 }
 
 // request interceptor
@@ -50,9 +57,9 @@ const err = async (error) => {
 service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
-//   config.headers["access-token"] = store.getters["auth/getAccessToken"]
+  //   config.headers["access-token"] = store.getters["auth/getAccessToken"]
   config.headers["access-token"] = Store.getState().accessToken
-    // config.headers["access-token"] = localStorage.getItem("access_token")
+  // config.headers["access-token"] = localStorage.getItem("access_token")
 
 
   if (window.ACTIVE_ACCOUNT) {
@@ -69,7 +76,7 @@ service.interceptors.response.use((response) => {
     // store.commit('auth/SET_ACCESS_TOKEN',response.headers["access-token"])
     // localStorage.setItem("access_token", response.headers["access-token"])
     Store.getState().storeAccessToken(response.headers["access-token"])
-    
+
   }
 
   if (['put', 'post', 'delete', 'patch'].includes(response.method) && response.data.meta) {
@@ -81,16 +88,16 @@ service.interceptors.response.use((response) => {
   if (response.data.error !== undefined) {
     // window._AKTO.$emit('API_FAILED', response.data.error)
   } else {
-    if (window.mixpanel && window.mixpanel.track && response.config && response.config.url){
-        raiseMixpanelEvent(response.config.url);
+    if (window.mixpanel && window.mixpanel.track && response.config && response.config.url) {
+      raiseMixpanelEvent(response.config.url);
     }
   }
 
   return response.data
 }, err)
 
-async function raiseMixpanelEvent(api){
-  if (api && api.indexOf("/api/fetchActiveLoaders")==-1) {
+async function raiseMixpanelEvent(api) {
+  if (api && api.indexOf("/api/fetchActiveLoaders") == -1) {
     window.mixpanel.track(api)
   }
 }

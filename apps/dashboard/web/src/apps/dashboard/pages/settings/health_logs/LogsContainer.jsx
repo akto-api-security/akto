@@ -1,5 +1,5 @@
 import { Scrollable, Spinner } from "@shopify/polaris";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import { tokens } from "@shopify/polaris-tokens"
 
 const LogsContainer = ({ logs }) => {

@@ -25,7 +25,7 @@ import Store from "../../../store";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import TestEditorStore from "../testEditorStore"
 import "../TestEditor.css"
 import { useNavigate } from "react-router-dom";
@@ -188,8 +188,8 @@ const SampleApi = () => {
     }
 
     const showResults = () => {
-        let hexId = testResult.testingRunResult.hexId
-        navigate( "/dashboard/testing/editor/result/" + hexId , {state: {testResult : testResult}})
+        let hexId = testResult?.testingRunResult?.hexId
+        navigate( "/dashboard/testing/editor/result/" + hexId , {state: {testingRunResult : testResult?.testingRunResult , runIssues : testResult?.testingRunIssues, testId:selectedTest.value}})
     }
     
     const resultComponent = (

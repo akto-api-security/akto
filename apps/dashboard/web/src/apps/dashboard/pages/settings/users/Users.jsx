@@ -1,7 +1,7 @@
 import { Avatar, Banner, Button, Card, LegacyCard, Modal, Page, ResourceItem, ResourceList, Scrollable, Text, TextContainer, TextField } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
 import settingRequests from "../api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
 

@@ -1,8 +1,16 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
 import { Box, Button, Divider, Icon, Text, Tooltip } from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
 import { InfoMinor, ClipboardMinor } from "@shopify/polaris-icons"
 
-import { useEffect, useRef, useState } from "react";
+import Store from "../../../store";
+import TestEditorStore from "../testEditorStore";
+
+import testEditorRequests from "../api";
+
+import func from "@/util/func";
 
 import { editor } from "monaco-editor/esm/vs/editor/editor.api"
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
@@ -19,15 +27,11 @@ import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
-import { useNavigate, useParams } from "react-router-dom";
-import TestEditorStore from "../testEditorStore";
-import testEditorRequests from "../api";
-import func from "@/util/func";
-
 
 const YamlEditor = ({ fetchAllTests }) => {
     const navigate = useNavigate()
 
+    const setToastConfig = Store(state => state.setToastConfig)
     const testsObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
@@ -51,12 +55,21 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     const handleSave = async () => {
-        const selectedTestCurrent = TestEditorStore.getState().selectedTest
         const Editor = editorInstanceRef.current
 
-        const addTestTemplateResponse = await testEditorRequests.addTestTemplate(Editor.getValue(), selectedTest.value)
-        navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
-        fetchAllTests()
+        try {
+            const addTestTemplateResponse = await testEditorRequests.addTestTemplate(Editor.getValue(), selectedTest.value)
+            setToastConfig({
+                isActive: true,
+                isError: false,
+                message: "Test saved successfully!"
+            })
+            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
+            fetchAllTests()
+        } catch(error) {
+            
+        }
+        
     }
     
     useEffect(()=>{        
@@ -99,24 +112,30 @@ const YamlEditor = ({ fetchAllTests }) => {
 
     const copyTestName = () =>{
         func.copyToClipboard(editorInstance.getValue())
-        //add toast here
+        setToastConfig({
+            isActive: true,
+            isError: false,
+            message: "Test copied to clipboard"
+        })
     }
 
     return (
         <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
-            <div style={{display: "grid", gridTemplateColumns: "max-content max-content max-content auto max-content", gap: "5px",  alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
-                <Tooltip content={selectedTest.label} preferredPosition="above" dismissOnMouseOut>
-                    <Text variant="bodyMd" truncate>{selectedTest.label}</Text>
-                </Tooltip>
-                <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="above" dismissOnMouseOut>
-                    <Icon source={InfoMinor}/> 
-                </Tooltip>
-                <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="above">
-                    <Button icon={ClipboardMinor} plain onClick={copyTestName} />
-                </Tooltip>       
-                <div />
-                <Button disabled={!isEdited} onClick={handleSave}>Save</Button>
+            <div style={{ display: "grid", gridTemplateColumns: "max-content auto", alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
+                <div style={{ maxWidth: "30vw", display: "grid", gridTemplateColumns: "auto max-content max-content"}}>
+                    <Text variant="bodyMd" truncate>{selectedTest.label + '.yaml'}</Text>
+                    <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="below" dismissOnMouseOut>
+                        <Icon source={InfoMinor}/> 
+                    </Tooltip>
+                    <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
+                        <Button icon={ClipboardMinor} plain onClick={copyTestName} />
+                    </Tooltip>       
+                </div>
+                <div style={{ textAlign: "right"}}>
+                    <Button disabled={!isEdited} onClick={handleSave}>Save</Button>
+                </div>
             </div>
+
             <Divider />
             <Box ref={yamlEditorRef} minHeight="80vh">
             </Box>
