@@ -109,7 +109,7 @@ public class Main {
                 AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
                 matrixAnalyzer.run();
             }
-        }, 0, 12, TimeUnit.HOURS);
+        }, 0, 1, TimeUnit.MINUTES);
         
 
 
