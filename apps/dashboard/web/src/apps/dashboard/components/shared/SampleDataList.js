@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   ClipboardMinor} from '@shopify/polaris-icons';
 import {
@@ -7,65 +7,12 @@ import {
   HorizontalStack, Box, LegacyCard, HorizontalGrid,
   Pagination, Key, Button, Popover, ActionList
 } from '@shopify/polaris';
-import { editor, Range } from "monaco-editor/esm/vs/editor/editor.api"
-import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
-import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
-import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
-import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
-import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
-// import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
-import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
-import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
-import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
-// import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
-import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
-import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
-import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
-import "monaco-editor/esm/vs/language/json/monaco.contribution"
-import "monaco-editor/esm/vs/language/json/json.worker"
-import api from '../../pages/observe/api';
-import "./style.css";
 import Store from '../../store';
-
-function formatJSON(val = {}) {
-    try {
-      const res = typeof val == 'object' ? val : JSON.parse(val);
-      Object.keys(res).forEach((key) => {
-        res[key] = formatJSON(res[key])
-      })
-      return res;
-    } catch {
-      return val;
-    }
-  }
-
-function highlightPaths(highlightPathMap, refText){
-  highlightPathMap && Object.keys(highlightPathMap).forEach((type) => {
-    Object.keys(highlightPathMap[type]).forEach((key) => {
-      if (highlightPathMap[type][key].highlight) {
-        let path = key.split("#");
-        let mainKey = path[path.length - 1];
-        let matches = refText[type].getModel().findMatches(mainKey, false, false, false, null, true);
-        matches.forEach((match) => {
-          refText[type]
-            .createDecorationsCollection([
-              {
-                range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
-                options: {
-                  inlineClassName: highlightPathMap[type][key].other ? "highlightOther" : "highlight",
-                },
-              }
-            ])
-        })
-      }
-    })
-  })
-}
+import SampleData from './SampleData';
+import func from "@/util/func";
 
 function SampleDataList(props) {
-    const requestRef = useRef("");
-    const responseRef = useRef("");
-    const refText = useRef([])
+    const [sampleJsonData, setSampleJsonData] = useState({request:"",response:""});
     const [page, setPage] = useState(0);
     const [popoverActive, setPopoverActive] = useState(false);
     const setToastConfig = Store(state => state.setToastConfig)
@@ -76,40 +23,8 @@ function SampleDataList(props) {
           message: message
         })
     }
-    async function copyRequest(type, completeData) {
-      let copyString = "";
-      let snackBarMessage = ""
-      completeData = JSON.parse(completeData);
-      if (type=="RESPONSE") {
-        let responsePayload = {}
-        let responseHeaders = {}
-        let statusCode = 0
-    
-        if (completeData) {
-          responsePayload = completeData["response"] ?  completeData["response"]["body"] : completeData["responsePayload"]
-          responseHeaders = completeData["response"] ?  completeData["response"]["headers"] : completeData["responseHeaders"]
-          statusCode = completeData["response"] ?  completeData["response"]["statusCode"] : completeData["statusCode"]
-        }
-        let b = {
-          "responsePayload": responsePayload,
-          "responseHeaders": responseHeaders,
-          "statusCode": statusCode
-        }
-    
-        copyString = JSON.stringify(b)
-        snackBarMessage = "Response data copied to clipboard"
-      } else {
-        if (type === "CURL") { 
-          snackBarMessage = "Curl request copied to clipboard"
-          let resp = await api.convertSampleDataToCurl(JSON.stringify(completeData))
-          copyString = resp.curlString
-        } else {
-          snackBarMessage = "Burp request copied to clipboard"
-          let resp = await api.convertSampleDataToBurpRequest(JSON.stringify(completeData))
-          copyString = resp.burpRequest
-        }
-      }
-    
+    async function copyRequest(type, completeData){
+      let {copyString, snackBarMessage} = await func.copyRequest(type, completeData)
       if (copyString) {
         navigator.clipboard.writeText(copyString)
         setToast(true, false, snackBarMessage)
@@ -117,45 +32,11 @@ function SampleDataList(props) {
       }
     }
 
-    function createEditor(ref, options, type) {
-      let text = null
-      text = editor.create(ref, options)
-      text.setValue("");
-      refText.current[type]=text
-    }
     useEffect(()=>{
-      if(Object.keys(refText.current).length==0){
-        [requestRef, responseRef].map((ref, index) => {
-          // handle graphQL APIs
-          createEditor(ref.current, {
-            language: "json",
-            minimap: { enabled: false },
-            wordWrap: true,
-            automaticLayout: true,
-            colorDecorations: true,
-            scrollBeyondLastLine: false,
-            readOnly: true,
-          },index == 0 ? "request" : "response" )
-        })
-      } else {
-        refText.current.request.setValue("")
-        refText.current.response.setValue("")
-      }
-      if (props.sampleData?.[page] && Object.keys(refText.current).length==2) {
-        let message = formatJSON(props.sampleData?.[page].message);
-        let res = {}, req = {}
-        Object.keys(message).forEach((key) => {
-          if (key.startsWith("req") || key.startsWith("query")) {
-            req[key] = message[key]
-          } else if (key.startsWith("res")) {
-            res[key] = message[key]
-          }
-        })
-        refText.current.request.setValue(JSON.stringify(req, null, 2))
-        refText.current.response.setValue(JSON.stringify(res, null, 2))
-
-        highlightPaths(props.sampleData?.[page].highlightPathMap, refText.current);
-      }
+      let parsed = JSON.parse(props.sampleData?.[page].message);
+      let responseJson = func.responseJson(parsed, props.sampleData?.[page].highlightPaths)
+      let requestJson = func.requestJson(parsed, props.sampleData?.[page].highlightPaths)
+      setSampleJsonData({ request: requestJson, response: responseJson })
     }, [props.sampleData, page])
   
     return (
@@ -179,7 +60,7 @@ function SampleDataList(props) {
         </HorizontalStack>
         <HorizontalGrid columns="2" gap="2">
           {
-            [requestRef, responseRef].map((ref, index) => {
+            Object.keys(sampleJsonData).map((type, index) => {
               return (
                 <Box key={index}>
                   <LegacyCard>
@@ -216,7 +97,7 @@ function SampleDataList(props) {
                       </Box>
                     </LegacyCard.Section>
                     <LegacyCard.Section flush>
-                      <Box padding={"2"} ref={ref} minHeight="300px"/>
+                      <SampleData data={sampleJsonData[type]} minHeight={"300px"}/>
                     </LegacyCard.Section>
                   </LegacyCard>
                 </Box>
