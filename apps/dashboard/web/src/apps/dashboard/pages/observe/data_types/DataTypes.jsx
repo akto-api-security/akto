@@ -11,8 +11,8 @@ import api from '../api'
 function DataTypes() {
 
   const location = useLocation();
-  const mapData= location.state && location.state.dataObj ? location.state.dataObj : {}
-  const typename = location.state ? location.state.name : ''
+  const mapData =  (location.state && location.state.resp) ? location.state.resp :location.state && location.state.dataObj ? location.state.dataObj : {}
+  const typename = mapData.name ? mapData.name : ''
   const dataType = location.state?.type || "Custom"
 
   const pageTitle = typename.length > 0 ? "Configure Data Types" : "Add Data Type"
@@ -95,6 +95,7 @@ function DataTypes() {
     let updatedState = currState
     updatedState.sensitiveState = val
     setCurrentState(updatedState)
+    setChange(true)
   }
 
   const navigateBack = () =>{
@@ -106,6 +107,7 @@ function DataTypes() {
     let updatedState = currState
     updatedState.status = selected
     setCurrentState(updatedState)
+    setChange(true)
   }
 
   const handleOperator = (selected) =>{
@@ -113,6 +115,7 @@ function DataTypes() {
     let updatedState = currState
     updatedState.operator = selected
     setCurrentState(updatedState)
+    setChange(true)
   }
 
   const handleChange = (val) =>{
@@ -121,6 +124,7 @@ function DataTypes() {
       let updatedState = currState
       updatedState.typeName = val
       setCurrentState(updatedState)
+      setChange(true)
     }
   }
 
@@ -155,6 +159,7 @@ function DataTypes() {
       setKeyConditions(initialObj.keyConditions)
       setValueConditions(initialObj.valueConditions)
       setCurrentState(initialObj)
+      setChange(false)
   }
 
   useEffect(() => {
@@ -162,7 +167,7 @@ function DataTypes() {
   },[])
 
   const compareFunc = ()=>{
-    return (JSON.stringify(initialObj) === JSON.stringify(currState) && (!change))
+    return ((!change))
   }
 
   const saveAction = async() =>{
@@ -171,14 +176,20 @@ function DataTypes() {
         name: typeName,
         ...func.convertToSensitiveData(sensitiveState)
       }
-      await api.saveAktoDataType(obj)
+      await api.saveAktoDataType(obj).then((response) => {
+        navigate(null, {state: {resp: response.aktoDataType, type: "Akto"}})
+        setChange(false)
+      })
     }
     else{
       let keyOp = keyConditions.operator
       let valueOp = valueConditions.operator
       let id = mapData?.id
       let payloadObj = func.convertDataForCustomPayload(keyConditions.predicates,keyOp,valueConditions.predicates,valueOp,operator,typeName,sensitiveState,status,id)
-      await api.saveCustomDataType(payloadObj)
+      await api.saveCustomDataType(payloadObj).then((response)=> {
+        navigate(null, {state: {resp: response.customDataType}})
+        setChange(false)
+      })
     }
   }
 
