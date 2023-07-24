@@ -11,11 +11,12 @@ import com.akto.har.HAR;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.har.HAR;
+import com.akto.log.LoggerMaker;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
@@ -43,7 +44,7 @@ public class HarAction extends UserAction {
 
     private boolean skipKafka = DashboardMode.isLocalDeployment();
     private byte[] tcpContent;
-    private static final Logger logger = LoggerFactory.getLogger(HarAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HarAction.class);
 
     public String executeWithSkipKafka(boolean skipKafka) throws IOException {
         this.skipKafka = skipKafka;
@@ -54,6 +55,7 @@ public class HarAction extends UserAction {
     @Override
     public String execute() throws IOException {
         ApiCollection apiCollection = null;
+        loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             if (apiCollection == null) {
@@ -116,12 +118,13 @@ public class HarAction extends UserAction {
 
         try {
             HAR har = new HAR();
-            logger.info("Har file upload processing for collectionId : {}", apiCollectionId);
+            loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
+            loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
-            logger.error("Exception while parsing harString");
+            loggerMaker.errorAndAddToDb("Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
             return SUCCESS.toUpperCase();
         }

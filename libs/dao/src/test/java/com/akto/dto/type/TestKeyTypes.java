@@ -1,4 +1,5 @@
 package com.akto.dto.type;
+import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.IgnoreData;
@@ -57,39 +58,39 @@ public void testInitializer(){
 
         // not sensitive
         keyTypes.process(url,method,responseCode ,false ,"param1" ,"value1" ,
-                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false);
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.GENERIC).getExamples().size(), 0);
 
         // sensitive
         keyTypes.process(url,method,responseCode ,false ,"param1" ,"avneesh@akto.io" ,
-                        "u1" ,0 ,"rawMessage2" , sensitiveParamInfoBooleanMap, false);
+                        "u1" ,0 ,"rawMessage2" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.EMAIL).getExamples().size(), 1);
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.GENERIC).getExamples().size(), 0);
 
         // sensitive repeat (shouldn't add more examples)
         keyTypes.process(url,method,responseCode ,false ,"param1" ,"avneesh@akto.io" ,
-                "u1" ,0 ,"rawMessage3" , sensitiveParamInfoBooleanMap, false);
+                "u1" ,0 ,"rawMessage3" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.EMAIL).getExamples().size(), 1);
 
         // custom data type normal
         keyTypes.process(url,method,responseCode ,false ,"captain_id" ,"Kirk" ,
-                "u1" ,0 ,"rawMessage3" , sensitiveParamInfoBooleanMap, false);
+                "u1" ,0 ,"rawMessage3" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(customDataType2.toSubType()).getExamples().size(), 0);
 
         // custom data type sensitive
         keyTypes.process(url,method,responseCode ,false ,"ship_id" ,"NCC-1701" ,
-                "u1" ,0 ,"rawMessage3" , sensitiveParamInfoBooleanMap, false);
+                "u1" ,0 ,"rawMessage3" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(customDataType1.toSubType()).getExamples().size(), 1);
 
         // custom marked sensitive
         sensitiveParamInfoBooleanMap.put(sensitiveParamInfo1, false);
         keyTypes.process(url,method,responseCode ,false ,"param1" ,"value1" ,
-                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false);
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.GENERIC).getExamples().size(), 1);
         assertTrue(sensitiveParamInfoBooleanMap.get(sensitiveParamInfo1));
@@ -97,7 +98,7 @@ public void testInitializer(){
         // custom marked sensitive repeat (shouldn't add more examples)
         sensitiveParamInfoBooleanMap.put(sensitiveParamInfo1, false);
         keyTypes.process(url,method,responseCode ,false ,"param1" ,"value1" ,
-                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false);
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
 
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.GENERIC).getExamples().size(), 1);
         assertTrue(sensitiveParamInfoBooleanMap.get(sensitiveParamInfo1));

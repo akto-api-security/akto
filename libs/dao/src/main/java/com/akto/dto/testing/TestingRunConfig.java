@@ -17,15 +17,16 @@ public class TestingRunConfig {
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
 
+    private String overriddenTestAppUrl;
     public TestingRunConfig() {}
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
-                            ObjectId authMechanismId) {
-
+                            ObjectId authMechanismId, String overriddenTestAppUrl) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
         this.authMechanismId = authMechanismId;
+        this.overriddenTestAppUrl = overriddenTestAppUrl;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -58,5 +59,13 @@ public class TestingRunConfig {
 
     public void setAuthMechanismId(ObjectId authMechanismId) {
         this.authMechanismId = authMechanismId;
+    }
+
+    public String getOverriddenTestAppUrl() {
+        return overriddenTestAppUrl;
+    }
+
+    public void setOverriddenTestAppUrl(String overriddenTestAppUrl) {
+        this.overriddenTestAppUrl = overriddenTestAppUrl;
     }
 }

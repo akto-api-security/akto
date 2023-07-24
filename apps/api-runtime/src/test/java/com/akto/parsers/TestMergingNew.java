@@ -12,6 +12,7 @@ import com.akto.dto.IgnoreData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
+import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -22,6 +23,7 @@ import org.junit.Test;
 import java.util.*;
 
 import static com.akto.parsers.TestDump2.createList;
+import static com.akto.runtime.APICatalogSync.mergeUrlsAndSave;
 import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
@@ -795,6 +797,38 @@ public class TestMergingNew extends MongoBasedTest {
 
         SampleData sampleData4 = SampleDataDao.instance.findOne(filter3);
         assertEquals(1, sampleData4.getSamples().size());
+
+    }
+
+    @Test
+    public void testDuplicateSTI() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId("/api/books/1", "GET", -1, false, "someveryrandomUUID1", SingleTypeInfo.UUID, 1, false);
+        SingleTypeInfo singleTypeInfo1 = new SingleTypeInfo(paramId1, new HashSet<>(), new HashSet<>(),0,0,0,new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0 ,10);
+
+        SingleTypeInfo.ParamId paramId2 = new SingleTypeInfo.ParamId("/api/books/2", "GET", -1, false, "someveryrandomUUID1", SingleTypeInfo.UUID, 1, false);
+        SingleTypeInfo singleTypeInfo2 = new SingleTypeInfo(paramId2, new HashSet<>(), new HashSet<>(),0,0,0,new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0 ,10);
+
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo1);
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo2);
+
+        mergeUrlsAndSave(1, true);
+
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo1.copy());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo2.copy());
+
+        mergeUrlsAndSave(1, true);
+
+        long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
+        assertEquals(2, estimatedDocumentCount);
+
+        estimatedDocumentCount = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, estimatedDocumentCount);
+
+        SingleTypeInfo sti = SingleTypeInfoDao.instance.findOne(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+        assertNotNull(sti);
 
     }
 

@@ -6,6 +6,7 @@ public class TestEditorEnums {
         CONTAINS_EITHER,
         CONTAINS_ALL,
         NOT_CONTAINS,
+        NOT_CONTAINS_EITHER,
         REGEX,
         EQ,
         GTE,
@@ -195,7 +196,8 @@ public class TestEditorEnums {
         MODIFY_METHOD,
         FOLLOW_REDIRECT,
         REMOVE_AUTH_HEADER,
-        REPLACE_AUTH_HEADER
+        REPLACE_AUTH_HEADER,
+        REPLACE_BODY
     }
 
     public enum NonTerminalExecutorDataOperands {

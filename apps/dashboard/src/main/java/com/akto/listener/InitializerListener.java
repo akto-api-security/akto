@@ -2,6 +2,7 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
+import com.akto.action.ApiCollectionsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -30,25 +31,39 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.rate_limit.ApiRateLimit;
+import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
+import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.Main;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.Utils;
+import com.akto.utils.scripts.FixMultiSTIs;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
+import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.*;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
@@ -104,7 +119,172 @@ public class InitializerListener implements ServletContextListener {
         return domain;
     }
 
-    public void setUpPiiAndTestSourcesScheduler() {
+    public void setUpPiiCleanerScheduler(){
+        Set<Integer> whiteListCollectionSet = new HashSet<>();
+        whiteListCollectionSet.add(-122281555);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
+                try {
+                    executePiiCleaner(whiteListCollectionSet);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while running executePiiCleaner: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+
+                Set<Integer> whiteList = new HashSet<>();
+                whiteList.add(-1027775082);
+                whiteList.add(-1088931039);
+                whiteList.add(-1097655237);
+                whiteList.add(-1118670922);
+                whiteList.add(-1140971867);
+                whiteList.add(-1186432212);
+                whiteList.add(-1203891926);
+                whiteList.add(-1209406502);
+                whiteList.add(-1217614242);
+                whiteList.add(-1271633658);
+                whiteList.add(-1309163021);
+                whiteList.add(-1314472448);
+                whiteList.add(-1375943771);
+                whiteList.add(-1377024902);
+                whiteList.add(-1380042638);
+                whiteList.add(-1388740288);
+                whiteList.add(-1475376397);
+                whiteList.add(-1476745903);
+                whiteList.add(-1481427444);
+                whiteList.add(-1482846450);
+                whiteList.add(-1484484778);
+                whiteList.add(-1525973443);
+                whiteList.add(-153399999);
+                whiteList.add(-1625817190);
+                whiteList.add(-1681262209);
+                whiteList.add(-1711078378);
+                whiteList.add(-1711942201);
+                whiteList.add(-172432381);
+                whiteList.add(-1794391977);
+                whiteList.add(-1839474064);
+                whiteList.add(-1890904552);
+                whiteList.add(-192108566);
+                whiteList.add(-1959668442);
+                whiteList.add(-196500695);
+                whiteList.add(-2002390621);
+                whiteList.add(-2010737526);
+                whiteList.add(-2024915123);
+                whiteList.add(-2106083830);
+                whiteList.add(-211436318);
+                whiteList.add(-298709478);
+                whiteList.add(-354731142);
+                whiteList.add(-357559655);
+                whiteList.add(-400200158);
+                whiteList.add(-441065708);
+                whiteList.add(-456924262);
+                whiteList.add(-466725525);
+                whiteList.add(-48038533);
+                whiteList.add(-48796631);
+                whiteList.add(-554843054);
+                whiteList.add(-591275450);
+                whiteList.add(-670990607);
+                whiteList.add(-671936487);
+                whiteList.add(-672863319);
+                whiteList.add(-842565355);
+                whiteList.add(-880699618);
+                whiteList.add(-916813562);
+                whiteList.add(-943618203);
+                whiteList.add(-955905463);
+                whiteList.add(-976518501);
+                whiteList.add(-990322506);
+                whiteList.add(-995352132);
+                whiteList.add(1027418909);
+                whiteList.add(105174556);
+                whiteList.add(1100396685);
+                whiteList.add(1182226);
+                whiteList.add(1236801018);
+                whiteList.add(1242749826);
+                whiteList.add(125554525);
+                whiteList.add(126750582);
+                whiteList.add(1297169588);
+                whiteList.add(1336747391);
+                whiteList.add(1420676141);
+                whiteList.add(142929664);
+                whiteList.add(146111437);
+                whiteList.add(1500768650);
+                whiteList.add(1533695572);
+                whiteList.add(1632066865);
+                whiteList.add(1659693267);
+                whiteList.add(1660119032);
+                whiteList.add(16610327);
+                whiteList.add(1661396548);
+                whiteList.add(1679350553);
+                whiteList.add(1679752531);
+                whiteList.add(1685406);
+                whiteList.add(1689322334);
+                whiteList.add(1788237014);
+                whiteList.add(1818436373);
+                whiteList.add(1855045033);
+                whiteList.add(1957435020);
+                whiteList.add(200307236);
+                whiteList.add(2006838690);
+                whiteList.add(2012237417);
+                whiteList.add(2093029222);
+                whiteList.add(2134611839);
+                whiteList.add(225605510);
+                whiteList.add(242880073);
+                whiteList.add(29531932);
+                whiteList.add(30649496);
+                whiteList.add(307844703);
+                whiteList.add(312400629);
+                whiteList.add(342125588);
+                whiteList.add(363683299);
+                whiteList.add(366452191);
+                whiteList.add(410773812);
+                whiteList.add(419598135);
+                whiteList.add(435249936);
+                whiteList.add(500047679);
+                whiteList.add(524163174);
+                whiteList.add(542683879);
+                whiteList.add(585487033);
+                whiteList.add(598965837);
+                whiteList.add(616884866);
+                whiteList.add(652910700);
+                whiteList.add(711466550);
+                whiteList.add(765725407);
+                whiteList.add(790058525);
+                whiteList.add(821241207);
+                whiteList.add(823491229);
+                whiteList.add(836953198);
+                whiteList.add(841585854);
+                whiteList.add(846348890);
+                whiteList.add(895129364);
+                whiteList.add(901341288);
+                whiteList.add(913107144);
+                whiteList.add(939543314);
+                whiteList.add(946156679);
+                whiteList.add(995617404);
+                whiteList.add(998620205);
+
+                try {
+                    FixMultiSTIs.run(whiteList);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while running FixMultiSTIs: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+
+                for (Integer apiCollectionId: whiteList) {
+                    try {
+                        loggerMaker.infoAndAddToDb("Starting print multiple host for : " + apiCollectionId, LogDb.DASHBOARD);
+                        printMultipleHosts(apiCollectionId);
+                        loggerMaker.infoAndAddToDb("Finished print multiple host for : " + apiCollectionId, LogDb.DASHBOARD);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while running print multiple host: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
+
+
+    public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
@@ -248,6 +428,148 @@ public class InitializerListener implements ServletContextListener {
         }
 
 
+    }
+
+    static void executePiiCleaner(Set<Integer> whiteListCollectionSet) {
+        final int BATCH_SIZE = 100;
+        int currMarker = 0;
+        Bson filterSsdQ =
+                Filters.and(
+                        Filters.ne("_id.responseCode", -1),
+                        Filters.eq("_id.isHeader", false)
+                );
+
+        MongoCursor<SensitiveSampleData> cursor = null;
+        int dataPoints = 0;
+        List<SingleTypeInfo.ParamId> idsToDelete = new ArrayList<>();
+        do {
+            idsToDelete = new ArrayList<>();
+            cursor = SensitiveSampleDataDao.instance.getMCollection().find(filterSsdQ).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
+            currMarker += BATCH_SIZE;
+            dataPoints = 0;
+            loggerMaker.infoAndAddToDb("processing batch: " + currMarker, LogDb.DASHBOARD);
+            while(cursor.hasNext()) {
+                SensitiveSampleData ssd = cursor.next();
+                SingleTypeInfo.ParamId ssdId = ssd.getId();
+                Bson filterCommonSampleData =
+                        Filters.and(
+                                Filters.eq("_id.method", ssdId.getMethod()),
+                                Filters.eq("_id.url", ssdId.getUrl()),
+                                Filters.eq("_id.apiCollectionId", ssdId.getApiCollectionId())
+                        );
+
+
+                SampleData commonSampleData = SampleDataDao.instance.findOne(filterCommonSampleData);
+                List<String> commonPayloads = commonSampleData.getSamples();
+
+                if (!isSimilar(ssdId.getParam(), commonPayloads)) {
+                    idsToDelete.add(ssdId);
+                }
+
+                dataPoints++;
+            }
+
+            bulkSensitiveInvalidate(idsToDelete, whiteListCollectionSet);
+            bulkSingleTypeInfoDelete(idsToDelete, whiteListCollectionSet);
+
+        } while (dataPoints == BATCH_SIZE);
+    }
+
+    private static void bulkSensitiveInvalidate(List<SingleTypeInfo.ParamId> idsToDelete, Set<Integer> whiteListCollectionSet) {
+        ArrayList<WriteModel<SensitiveSampleData>> bulkSensitiveInvalidateUpdates = new ArrayList<>();
+        for(SingleTypeInfo.ParamId paramId: idsToDelete) {
+            String paramStr = "PII cleaner - invalidating: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
+            String url = "dashboard/observe/inventory/"+paramId.getApiCollectionId()+"/"+Base64.getEncoder().encodeToString((paramId.getUrl() + " " + paramId.getMethod()).getBytes());
+            loggerMaker.infoAndAddToDb(paramStr + url, LogDb.DASHBOARD);
+
+            if (!whiteListCollectionSet.contains(paramId.getApiCollectionId())) continue;
+
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq("url", paramId.getUrl()));
+            filters.add(Filters.eq("method", paramId.getMethod()));
+            filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
+            filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
+            filters.add(Filters.eq("param", paramId.getParam()));
+            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+
+            bulkSensitiveInvalidateUpdates.add(new UpdateOneModel<>(Filters.and(filters), Updates.set("invalid", true)));
+        }
+
+        if (!bulkSensitiveInvalidateUpdates.isEmpty()) {
+            BulkWriteResult bwr =
+                    SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkSensitiveInvalidateUpdates, new BulkWriteOptions().ordered(false));
+
+            loggerMaker.infoAndAddToDb("PII cleaner - modified " + bwr.getModifiedCount() + " from STI", LogDb.DASHBOARD);
+        }
+
+    }
+
+    private static void bulkSingleTypeInfoDelete(List<SingleTypeInfo.ParamId> idsToDelete, Set<Integer> whiteListCollectionSet) {
+        ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
+        for(SingleTypeInfo.ParamId paramId: idsToDelete) {
+            String paramStr = "PII cleaner - deleting: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
+            loggerMaker.infoAndAddToDb(paramStr, LogDb.DASHBOARD);
+
+            if (!whiteListCollectionSet.contains(paramId.getApiCollectionId())) continue;
+
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq("url", paramId.getUrl()));
+            filters.add(Filters.eq("method", paramId.getMethod()));
+            filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
+            filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
+            filters.add(Filters.eq("param", paramId.getParam()));
+            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+
+            bulkUpdatesForSingleTypeInfo.add(new DeleteOneModel<>(Filters.and(filters)));
+        }
+
+        if (!bulkUpdatesForSingleTypeInfo.isEmpty()) {
+            BulkWriteResult bwr =
+                    SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo, new BulkWriteOptions().ordered(false));
+
+            loggerMaker.infoAndAddToDb("PII cleaner - deleted " + bwr.getDeletedCount() + " from STI", LogDb.DASHBOARD);
+        }
+
+    }
+
+    private static final Gson gson = new Gson();
+
+    private static BasicDBObject extractJsonResponse(String message) {
+        Map<String, Object> json = gson.fromJson(message, Map.class);
+
+        String respPayload = (String) json.get("responsePayload");
+
+        if (respPayload == null || respPayload.isEmpty()) {
+            respPayload = "{}";
+        }
+
+        if(respPayload.startsWith("[")) {
+            respPayload = "{\"json\": "+respPayload+"}";
+        }
+
+        BasicDBObject payload;
+        try {
+            payload = BasicDBObject.parse(respPayload);
+        } catch (Exception e) {
+            payload = BasicDBObject.parse("{}");
+        }
+
+        return payload;
+    }
+
+    private static boolean isSimilar(String param, List<String> commonPayloads) {
+        for(String commonPayload: commonPayloads) {
+//            if (commonPayload.equals(sensitivePayload)) {
+//                continue;
+//            }
+
+            BasicDBObject commonPayloadObj = extractJsonResponse(commonPayload);
+            if (JSONUtils.flatten(commonPayloadObj).containsKey(param)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     static void executePIISourceFetch() {
@@ -453,7 +775,7 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request, true);
+            response = ApiExecutor.sendRequest(request, true, null);
             loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
         } catch (Exception e) {
             errors.add("API execution failed");
@@ -792,6 +1114,18 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void enableMergeAsyncOutside(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getEnableMergeAsyncOutside()== 0) {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.set(AccountSettings.MERGE_ASYNC_OUTSIDE, true));
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ENABLE_ASYNC_MERGE_OUTSIDE, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -870,6 +1204,23 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public static void printMultipleHosts(int apiCollectionId) {
+        Map<SingleTypeInfo, Integer> singleTypeInfoMap = new HashMap<>();
+        Bson filter = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 0,10_000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            int count = singleTypeInfoMap.getOrDefault(singleTypeInfo, 0);
+            singleTypeInfoMap.put(singleTypeInfo, count+1);
+        }
+
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoMap.keySet()) {
+            Integer count = singleTypeInfoMap.get(singleTypeInfo);
+            if (count == 1) continue;
+            String val = singleTypeInfo.getApiCollectionId() + " " + singleTypeInfo.getUrl() + " " + URLMethods.Method.valueOf(singleTypeInfo.getMethod());
+            loggerMaker.infoAndAddToDb(val + " - " + count, LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
     public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
@@ -901,6 +1252,7 @@ public class InitializerListener implements ServletContextListener {
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
             enableNewMerging(backwardCompatibility);
+            enableMergeAsyncOutside(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -928,6 +1280,7 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            setUpPiiCleanerScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -989,7 +1342,7 @@ public class InitializerListener implements ServletContextListener {
         String headers = "{\"Content-Type\": \"application/json\"}";
         OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(), "", "POST", body, OriginalHttpRequest.buildHeadersMap(headers), "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, false);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null);
             loggerMaker.infoAndAddToDb(String.format("Update deployment status reponse: %s", response.getBody()), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(String.format("Failed to update deployment status, will try again on next boot up : %s", e.toString()), LogDb.DASHBOARD);

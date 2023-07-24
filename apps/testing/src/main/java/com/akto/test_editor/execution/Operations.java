@@ -1,5 +1,6 @@
 package com.akto.test_editor.execution;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +8,7 @@ import java.util.Map;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
+import com.akto.util.CookieTransformer;
 import com.mongodb.BasicDBObject;
 
 public class Operations {
@@ -21,19 +23,48 @@ public class Operations {
 
     public static ExecutorSingleOperationResp deleteHeader(RawApi rawApi, String key) {
         Map<String, List<String>> headers = rawApi.fetchReqHeaders();
+        boolean modified = false;
+        modified = deleteCookie(headers, key, null);
+
         if (headers.containsKey(key)) {
             headers.remove(key);
-        } else {
+        } else if (!modified) {
             return new ExecutorSingleOperationResp(true, "header key not present " + key);
         }
         rawApi.modifyReqHeaders(headers);
         return new ExecutorSingleOperationResp(true, "");
     }
 
+    public static boolean modifyCookie(Map<String, List<String>> headers, String key, String value) {
+        List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+        if (CookieTransformer.isKeyPresentInCookie(cookieList, key)) {
+            CookieTransformer.modifyCookie(cookieList, key, value);
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean deleteCookie(Map<String, List<String>> headers, String key, String value) {
+        List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+        if (CookieTransformer.isKeyPresentInCookie(cookieList, key)) {
+            CookieTransformer.deleteCookie(cookieList, key, value);
+            return true;
+        }
+        return false;
+    }
+
     public static ExecutorSingleOperationResp modifyHeader(RawApi rawApi, String key, String value) {
         Map<String, List<String>> headers = rawApi.fetchReqHeaders();
+        boolean modified = false;
+        modified = modifyCookie(headers, key, value);
+
         if (!headers.containsKey(key)) {
-            return new ExecutorSingleOperationResp(true, "header key not present " + key);
+            if (!modified) {
+                return new ExecutorSingleOperationResp(true, "header key not present " + key);
+            } else {
+                rawApi.modifyReqHeaders(headers);
+                return new ExecutorSingleOperationResp(true, "");
+            }
         }
         List<String> valList = Collections.singletonList(value);
         headers.put(key, valList);
@@ -93,6 +124,11 @@ public class Operations {
             return new ExecutorSingleOperationResp(true, "body param not present " + key);
         }
         rawApi.modifyReqPayload(payload);
+        return new ExecutorSingleOperationResp(true, "");
+    }
+
+    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key, Object value) {
+        rawApi.getRequest().setBody(key.toString());
         return new ExecutorSingleOperationResp(true, "");
     }
 

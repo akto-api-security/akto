@@ -1,0 +1,62 @@
+id: MUST_CONTAIN_RESPONSE_HEADERS
+info:
+  name: Must contain response headers
+  description: "The response does not contain some HTTP security headers."
+  details: >
+            "The endpoint seems to be missing some HTTP security headers which provide yet another layer of 
+            security by helping to mitigate attacks and security vulnerabilities.<br>"
+            "<b>Background:</b> Whenever a browser requests a page from a web server, the server responds with 
+            the content along with HTTP response headers. Some of these headers contain content meta data such 
+            as the Content-Encoding, Cache-Control, status codes, etc. Along with these are also HTTP security 
+            headers that tell your browser how to behave when handling your website's content. For example, 
+            by using the Strict-Transport-Security you can force the browser to communicate solely over HTTPS."
+  impact: "This information can be used to facilitate more sophisticated attacks on your application."
+  category:
+    name: MHH
+    shortName: MHH
+    displayName: Misconfigured HTTP Headers (MHH)
+  subCategory: MUST_CONTAIN_RESPONSE_HEADERS
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://web.dev/security-headers/"
+    - "https://www.keycdn.com/blog/http-security-headers"
+    - "https://www.invicti.com/white-papers/whitepaper-http-security-headers"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    for_one:
+      key:
+        not_contains_either:
+          - Cache-Control
+          - Clear-Site-Data
+          - Content-Security-Policy
+          - Cross-Origin-Embedder-Policy
+          - Cross-Origin-Opener-Policy
+          - Cross-Origin-Resource-Policy
+          - Permissions-Policy
+          - Pragma
+          - Referrer-Policy
+          - Strict-Transport-Security
+          - X-Content-Type-Options
+          - X-Frame-Options
+          - X-Permitted-Cross-Domain-Policies

@@ -87,7 +87,7 @@ public class ExportSampleDataAction extends UserAction {
         }
 
         Map<String, String> result = generateBurpRequestFromSampleData(sampleData);
-        burpRequest = result.get("request");
+        burpRequest = result.get("request_path");
         return SUCCESS.toUpperCase();
     }
 
@@ -100,9 +100,8 @@ public class ExportSampleDataAction extends UserAction {
             originalHttpRequest.buildFromApiSampleMessage(sampleData);
         }
 
-        StringBuilder builder = new StringBuilder("");
-
         String url = originalHttpRequest.getFullUrlWithParams();
+        String path = originalHttpRequest.getPath();
 
         if (!url.startsWith("http")) {
             String host = originalHttpRequest.findHostFromHeader();
@@ -113,6 +112,21 @@ public class ExportSampleDataAction extends UserAction {
                 System.out.println(e.getMessage());
             }
         }
+
+        StringBuilder builderWithUrl = buildRequest(originalHttpRequest, url);
+        StringBuilder builderWithPath = buildRequest(originalHttpRequest, path);
+
+        Map<String, String> result = new HashMap<>();
+        result.put("request", builderWithUrl.toString());
+        result.put("url", url);
+        result.put("type", originalHttpRequest.getType());
+        result.put("request_path", builderWithPath.toString());
+
+        return result;
+    }
+
+    private StringBuilder buildRequest(OriginalHttpRequest originalHttpRequest, String url) {
+        StringBuilder builder = new StringBuilder("");
 
         // METHOD and PATH
         builder.append(originalHttpRequest.getMethod()).append(" ")
@@ -127,13 +141,7 @@ public class ExportSampleDataAction extends UserAction {
 
         // BODY
         builder.append(originalHttpRequest.getBody());
-
-        Map<String, String> result = new HashMap<>();
-        result.put("request", builder.toString());
-        result.put("url", url);
-        result.put("type", originalHttpRequest.getType());
-
-        return result;
+        return builder;
     }
 
     private String generateBurpResponseFromSampleData(String sampleData, String httpType) {

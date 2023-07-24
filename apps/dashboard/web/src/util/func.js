@@ -756,5 +756,15 @@ export default {
           } else {
             return arr[0] || ""
           }
+    },
+    
+    getRunResultSeverity(runResult, subCategoryMap) {
+        let testSubType = subCategoryMap[runResult.testSubType]
+        if (!testSubType) {
+            return "HIGH"
+        } else {
+            let a = testSubType.superCategory["severity"]["_name"]
+            return a
+        }
     }
 }

@@ -10,15 +10,21 @@
             <div class="items-container">
                 <div class="field-container">
                     <span class="field-name">{{ field1.span_text }}</span>
-                    <v-select 
-                        class="dropdown-menu" 
-                        v-if="field1.items && field1.items.length > 0"
-                        :items="field1.items"
-                        attach
-                        append-icon="$fas_angle-down"
-                        @change="showApiEndpoints"
-                        v-model="newCollection.name"
-                    />
+                    <v-menu offset-y v-if="field1.items && field1.items.length > 0">
+                        <template v-slot:activator="{ on, attrs }">
+                            <div class="filter-button" v-bind="attrs" v-on="on" primary :ripple="false">
+                                <span class="mx-3 my-auto">{{ newCollection.name || field1.span_text }}</span>
+                                <v-icon>$fas_angle-down</v-icon>
+                            </div>
+                        </template>
+                        <filter-list 
+                            :title="field1.span_text" 
+                            :items="field1.items"
+                            @clickedItem="(collection) => showApiEndpoints(collection.item)" hideOperators hideListTitle selectExactlyOne 
+                        />
+                    </v-menu>
+
+
                     <div v-else>
                         <v-text-field
                             v-model="modelTestName"
@@ -29,20 +35,23 @@
                 </div>
                 <div class="field-container">
                     <span class="field-name">{{ field2.span_text }}</span>
-                    <v-select
-                        class="dropdown-menu" 
-                        :items="field2.items"
-                        attach
-                        v-model="modelTestCategory"
-                        append-icon="$fas_angle-down"
-                        @change="saveInfo"
-                    />
+                    <v-menu offset-y v-if="field2.items && field2.items.length > 0">
+                        <template v-slot:activator="{ on, attrs }">
+                            <div class="filter-button" v-bind="attrs" v-on="on" primary>
+                                <span class="mx-3 my-auto">{{ (newCollection && newCollection.url) ? newCollection.url.url : field2.span_text }}</span>
+                                <v-icon>$fas_angle-down</v-icon>
+                            </div>
+                        </template>
+                        <filter-list 
+                            :title="field2.span_text" 
+                            :items="field2.items"
+                            @clickedItem="(urlDetails) => saveInfo(urlDetails)" hideOperators hideListTitle selectExactlyOne 
+                        />
+                    </v-menu>
+                    
                 </div>
 
                 <div class="button-container">
-                    <v-btn class="save-cancel-button light-btn" color="var(--white)" @click="$emit('closeDialog')">
-                        Cancel
-                    </v-btn>
                     <v-btn class="save-cancel-button" primary dark depressed color="var(--themeColor)" @click="emitFunc(currentParam)">
                         Save
                     </v-btn>
@@ -54,13 +63,15 @@
 
 <script>
 import obj from '@/util/obj'
-import ACard from '../shared/components/ACard.vue'
+import ACard from '../shared/components/ACard'
 import testApi from "../views/testing/components/test_roles/api"
+import FilterList from "../shared/components/FilterList"
 
 export default {
     name: 'SelectorModel',
     components:{
         ACard,
+        FilterList
     },
     props:{
         showDialog:obj.boolR,
@@ -81,18 +92,17 @@ export default {
                 name:'your_test_name',
                 category: "BOLA"
             },
-            newCollection:{
-                name: 0,
-                url: {},
-            },
+            newCollection: {},
         }
     },
     methods:{
-        saveInfo(){
-            this.newCollection.url = this.newTest.category
+        saveInfo(urlDetails){
+            this.newCollection.url = urlDetails.item.value
         },
-        showApiEndpoints(){
-            testApi.fetchCollectionWiseApiEndpoints(this.newCollection.name).then((resp)=>{
+        async showApiEndpoints(collectionDetails){
+            this.newCollection.name = collectionDetails.title
+            this.newCollection.id = collectionDetails.value
+            await testApi.fetchCollectionWiseApiEndpoints(this.newCollection.id).then((resp)=>{
                 this.field2.items=this.getApiEndpoints(resp.listOfEndpointsInCollection)
             })
         },
@@ -101,11 +111,10 @@ export default {
         },
         mapCollectionIdToName() {
             let collections = this.$store.state.collections.apiCollections
-            this.newCollection.name = collections[0].id
-            return [...new Set(collections.map(collection => {return { text: collection.displayName, value: collection.id}}))]
+            return [...new Set(collections.map(collection => {return { title: collection.displayName, value: collection.id}}))]
         },
         getApiEndpoints(arr){
-            return [...new Set(arr.map(urlObj => {return { text: urlObj.url, value: {"method":urlObj.method, "url": urlObj.url}}}))]
+            return [...new Set(arr.map(urlObj => {return { title: urlObj.method + " " + urlObj.url, value: {"method":urlObj.method, "url": urlObj.url}}}))]
         },
         emitFunc(param){
             if(param !== 'save'){
@@ -178,13 +187,15 @@ export default {
                 }
             }else{
                 this.field1 = {
-                    span_text: 'Collection',
+                    span_text: 'Select collection',
                     items: this.mapCollectionIdToName(),
                 }
                 this.field2 = {
                     span_text: 'API',
-                    items: this.showApiEndpoints(),
+                    items: [],
                 }
+
+                console.log(this.field1, this.field2)
             }
         },
         customTest(newVal){
@@ -198,6 +209,31 @@ export default {
 }
 </script>
 <style scoped>
+    .field-container {
+        display: flex;
+        gap: 10%
+    }
+    .filter-button {
+        box-sizing: border-box;
+
+        width: 70%;
+        height: 40px;
+        color: var(--themeColorDark) !important;
+        font-size: 12px;
+
+        background: var(--white);
+        border: 1px solid var(--hexColor22);
+
+        display: flex;
+
+        border-radius: 4px;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        justify-content: space-between;
+
+    }
+
     .dialog-card >>> .acard-title{
         font-size: 18px !important;
     }
@@ -266,11 +302,10 @@ export default {
 </style>
 <style lang="scss" scoped>
     .dialog-card{
-        min-height: 350px;
         overflow-y: hidden;
     }
     .items-container{
-        padding: 12px 24px;
+        padding: 24px;
         display: flex;
         flex-direction: column;
         gap: 24px;
@@ -279,6 +314,8 @@ export default {
         font-size: 14px;
         color: var(--themeColorDark);
         font-weight: 500;
+        width: 30%;
+        margin: auto 0;
     }
     .form-field-text , .dropdown-menu{
         padding: 10px 14px;
@@ -291,13 +328,6 @@ export default {
         display: flex;
         gap: 20px;
         margin-top: 16px;
-        .save-cancel-button{
-            width: 210px !important;
-            box-shadow: none !important;
-            padding: 10px 18px !important;
-            font-size: 16px !important;
-            border-radius: 8px !important;
-            font-weight: 500;
-        }
+        flex-direction: row-reverse;
     }
 </style>

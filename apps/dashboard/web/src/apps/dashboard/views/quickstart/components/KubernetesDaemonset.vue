@@ -330,6 +330,7 @@ export default {
                 `            "Resource": [`,
                 `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/get-akto-setup-details.zip", `,
                 `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/create-mirror-session.zip", `,
+                `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/configure_security_groups.zip", `,
                 `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/mirroring-collections-split.zip"`,
                 `            ]`,
                 `        }, `,

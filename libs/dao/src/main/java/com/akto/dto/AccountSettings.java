@@ -52,6 +52,8 @@ public class AccountSettings {
 
     private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
+    public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
+    private int globalRateLimit;
 
     public AccountSettings() {
     }
@@ -61,6 +63,14 @@ public class AccountSettings {
         this.privateCidrList = privateCidrList;
         this.redactPayload = redactPayload;
         this.setupType = setupType;
+    }
+
+    public int getGlobalRateLimit() {
+        return globalRateLimit;
+    }
+
+    public void setGlobalRateLimit(int globalRateLimit) {
+        this.globalRateLimit = globalRateLimit;
     }
 
     public enum SetupType {

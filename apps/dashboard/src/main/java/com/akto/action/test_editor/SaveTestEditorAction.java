@@ -2,28 +2,35 @@ package com.akto.action.test_editor;
 
 import com.akto.DaoInit;
 import com.akto.action.UserAction;
-import com.akto.action.testing.StartTestAction;
+import com.akto.action.testing_issues.IssuesAction;
+import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
-import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.store.TestingUtil;
+import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
@@ -45,8 +52,11 @@ public class SaveTestEditorAction extends UserAction {
     private String testingRunHexId;
     private BasicDBObject apiInfoKey;
     private TestingRunResult testingRunResult;
-    private GlobalEnums.TestCategory testCategory;
-    private String testId;
+    private String originalTestId;
+    private String finalTestId;
+    private List<SampleData> sampleDataList;
+    private TestingRunIssues testingRunIssues;
+    private Map<String, BasicDBObject> subCategoryMap;
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -62,47 +72,71 @@ public class SaveTestEditorAction extends UserAction {
     public String saveTestEditorFile() {
         TestConfig testConfig;
         try {
-            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-
+            ObjectMapper mapper = new ObjectMapper(YAMLFactory.builder()
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .build());
+            mapper.findAndRegisterModules();
             Map<String, Object> config = mapper.readValue(content, Map.class);
-            String originalIDFromContent = (String) config.get("id");
-            if (!testId.equals(originalIDFromContent)) {
-                YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, testId));
-                if (yamlTemplate != null && yamlTemplate.getSource() == YamlTemplateSource.CUSTOM) {//custom template with same name exists
-                    addActionError("Cannot save template as template with same id exists, specify a different test id");
-                    return ERROR.toUpperCase();
-                }
-            }
-            config.replace("id", testId);
-
             Object info = config.get("info");
-            String testName; 
-            if (info != null) {
-                Map<String, Object> infoMap = (Map<String, Object>) info;
-                Object category = infoMap.get("category");
-                testName = infoMap.get("name").toString();
-                infoMap.replace("subCategory", testId);
-                Bson filters = Filters.and(
-                    Filters.eq("info.name", testName),
-                    Filters.ne("source", "CUSTOM")
-                );
-                YamlTemplate template = YamlTemplateDao.instance.findOne(filters);
-                if (template != null) {
-                    addActionError("Cannot save template, specify a differnet test name under info tab");
-                    return ERROR.toUpperCase();
-                }
-                if (category != null) {
-                    Map<String, Object> categoryMap = (Map<String, Object>) category;
-                    categoryMap.replace("name", testCategory.getName());
-                    categoryMap.replace("displayName", testCategory.getDisplayName());
-                    categoryMap.replace("shortName", testCategory.getShortName());
-                }
+            if (info == null) {
+                addActionError("Error in template: info key absent");
+                return ERROR.toUpperCase();
             }
+
+            Map<String, Object> infoMap = (Map<String, Object>) info;
+
+            finalTestId = config.getOrDefault("id", "").toString();            
+            String finalTestName = infoMap.getOrDefault("name", "").toString();
+            
+            int epoch = Context.now();
+
+            if (finalTestId.length()==0) {
+                finalTestId = "CUSTOM_"+epoch;
+            }
+
+            if (finalTestName.length()==0) {
+                finalTestName="Custom " + epoch;
+            }
+
+            YamlTemplate templateWithSameName = YamlTemplateDao.instance.findOne(Filters.eq("info.name", finalTestName));
+
+            if (finalTestId.equals(originalTestId)) {
+                YamlTemplate origYamlTemplate = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, originalTestId));
+                if (origYamlTemplate != null && origYamlTemplate.getSource() == YamlTemplateSource.CUSTOM) {
+
+                    if (templateWithSameName != null && !templateWithSameName.getId().equals(originalTestId)) {
+                        finalTestName += " Custom " + epoch;
+                    }
+
+                    // update the content in the original template
+                } else {
+                    finalTestId = finalTestId + "_CUSTOM_" + epoch;
+
+                    if (templateWithSameName != null) {
+                        finalTestName = finalTestName + " Custom " + epoch;
+                    }
+
+                    // insert new template
+                }
+            } else {
+                YamlTemplate templateWithSameId = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, finalTestId));
+                if (templateWithSameId != null) {
+                    finalTestId = finalTestId + "_CUSTOM_" + epoch;
+                }
+
+                if (templateWithSameName != null) {
+                    finalTestName = finalTestName + " Custom " + epoch;
+                }
+
+                // insert new template
+            }
+
+            config.replace("id", finalTestId);
+            infoMap.put("name", finalTestName);
+            
             this.content = mapper.writeValueAsString(config);
             testConfig = TestConfigYamlParser.parseTemplate(content);
-//            testConfig.setId(testId);
-//            Category category = new Category(testCategory.getName(), testCategory.getDisplayName(), testCategory.getShortName());
-//            testConfig.getInfo().setCategory(category);
         } catch (Exception e) {
             e.printStackTrace();
             addActionError(e.getMessage());
@@ -116,7 +150,7 @@ public class SaveTestEditorAction extends UserAction {
         String author = getSUser().getLogin();
 
 
-        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));
+        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));        
         if (template == null || template.getSource() == YamlTemplateSource.CUSTOM) {
             YamlTemplateDao.instance.updateOne(
                     Filters.eq("_id", id),
@@ -137,6 +171,7 @@ public class SaveTestEditorAction extends UserAction {
     }
 
     public String runTestForGivenTemplate() {
+        TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
         try {
             testConfig = TestConfigYamlParser.parseTemplate(content);
@@ -156,48 +191,44 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        String id = testConfig.getId();
-        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));
-        if (template == null) {
-            addActionError("template does not exists");
+        if (sampleDataList == null || sampleDataList.isEmpty()) {
+            addActionError("sampleDataList is empty");
             return ERROR.toUpperCase();
         }
 
-//        int createdAt = Context.now();
-//        int updatedAt = Context.now();
-//        String author = getSUser().getLogin();
-//
-//
-//        //todo: @shivam modify this part when yaml template is bootstrapped via script in RuntimeInitializer
-//        YamlTemplateSource source = templateSource == null? YamlTemplateSource.AKTO_TEMPLATES : YamlTemplateSource.valueOf(templateSource);
-//        if (template == null || template.getSource() == YamlTemplateSource.CUSTOM || source == YamlTemplateSource.AKTO_TEMPLATES) {
-//            YamlTemplateDao.instance.updateOne(
-//                    Filters.eq("_id", id),
-//                    Updates.combine(
-//                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-//                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-//                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-//                            Updates.set(YamlTemplate.CONTENT, content),
-//                            Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-//                            Updates.set(YamlTemplate.SOURCE, source)
-//                    )
-//            );
-//        }
+        try {
+            GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+        } catch (Exception e) {
+            addActionError("invalid severity, please choose from " + Arrays.toString(GlobalEnums.Severity.values()));
+            return ERROR.toUpperCase();
+        }
 
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
-        StartTestAction testAction = new StartTestAction();
-        testAction.setTriggeredBy("test_editor");
-        testAction.setSession(getSession());
-        testAction.setRecurringDaily(false);
-        testAction.setApiInfoKeyList(Collections.singletonList(infoKey));//default id
-        testAction.setType(TestingEndpoints.Type.CUSTOM);
-        List<String> idList = new ArrayList<>();
-        idList.add(id);
-        testAction.setSelectedTests(idList);
-        testAction.startTest();
-        this.setTestingRunHexId(testAction.getTestingRunHexId());
+
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
+        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleDataMap, null, null);
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
+        if (testingRunResult == null) {
+            testingRunResult = new TestingRunResult(
+                    new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(0),
+                    Collections.singletonList("failed to execute test"),
+                    0, false, TestResult.Confidence.HIGH, null)),
+                    false,null,0,Context.now(),
+                    Context.now(), new ObjectId()
+            );
+        }
+        testingRunResult.setId(new ObjectId());
+        if (testingRunResult.isVulnerable()) {
+            TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
+            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null);
+        }
+        BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
+        subCategoryMap = new HashMap<>();
+        subCategoryMap.put(testConfig.getId(), infoObj);
         return SUCCESS.toUpperCase();
     }
 
@@ -258,19 +289,43 @@ public class SaveTestEditorAction extends UserAction {
         this.testingRunResult = testingRunResult;
     }
 
-    public GlobalEnums.TestCategory getTestCategory() {
-        return testCategory;
+    public String getOriginalTestId() {
+        return originalTestId;
     }
 
-    public void setTestCategory(GlobalEnums.TestCategory testCategory) {
-        this.testCategory = testCategory;
+    public void setOriginalTestId(String originalTestId) {
+        this.originalTestId = originalTestId;
     }
 
-    public String getTestId() {
-        return testId;
+    public String getFinalTestId() {
+        return finalTestId;
     }
 
-    public void setTestId(String testId) {
-        this.testId = testId;
+    public void setFinalTestId(String finalTestId) {
+        this.finalTestId = finalTestId;
+    }
+
+    public List<SampleData> getSampleDataList() {
+        return sampleDataList;
+    }
+
+    public void setSampleDataList(List<SampleData> sampleDataList) {
+        this.sampleDataList = sampleDataList;
+    }
+
+    public TestingRunIssues getTestingRunIssues() {
+        return testingRunIssues;
+    }
+
+    public void setTestingRunIssues(TestingRunIssues testingRunIssues) {
+        this.testingRunIssues = testingRunIssues;
+    }
+
+    public Map<String, BasicDBObject> getSubCategoryMap() {
+        return subCategoryMap;
+    }
+
+    public void setSubCategoryMap(Map<String, BasicDBObject> subCategoryMap) {
+        this.subCategoryMap = subCategoryMap;
     }
 }

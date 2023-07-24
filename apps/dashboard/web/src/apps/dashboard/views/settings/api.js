@@ -154,6 +154,16 @@ export default {
         })
     },
 
+    updateGlobalRateLimit(globalRateLimit) {
+        return request({
+            url: '/api/updateGlobalRateLimit',
+            method: 'post',
+            data: {
+                globalRateLimit
+            }
+        })
+    },
+
     fetchAdminSettings() {
         return request({
             url: '/api/fetchAdminSettings',
@@ -260,6 +270,14 @@ export default {
             data: {
                 regex
             }
+        })
+    },
+
+    resetAllCustomAuthTypes() {
+        return request({
+            url: '/api/resetAllCustomAuthTypes',
+            method: 'post',
+            data: {}
         })
     }
 

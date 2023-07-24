@@ -44,21 +44,21 @@ export default {
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests}
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}
         }).then((resp) => {
             return resp
         })        
@@ -73,20 +73,38 @@ export default {
             return resp
         })        
     },
-    addTestTemplate(content,testId, testCategory) {
+    addTestTemplate(content,originalTestId) {
         return request({
             url: '/api/saveTestEditorFile',
             method: 'post',
-            data:{content, testId, testCategory}
+            data:{content, originalTestId}
         }).then((resp) => {
             return resp
         })
     },
-    runTestForTemplate(content, apiInfoKey) {
+    runTestForTemplate(content, apiInfoKey, sampleDataList) {
         return request({
             url: '/api/runTestForGivenTemplate',
             method: 'post',
-            data:{content, apiInfoKey}
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    runTestForTemplateAnonymous(content, apiInfoKey, sampleDataList) {
+        return request({
+            url: '/tools/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    setCustomSampleApi(sampleRequestString, sampleResponseString) {
+        return request({
+            url: '/tools/createSampleDataJson',
+            method: 'post',
+            data:{sampleRequestString, sampleResponseString}
         }).then((resp) => {
             return resp
         })

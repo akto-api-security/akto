@@ -19,6 +19,8 @@ public class RateLimitFilter implements Filter {
         ConcurrentHashMap<String, RateLimitCache.IpInfo> val ;
         if (path.equals("/auth/login")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SIGN_IN);
+        } else if (path.startsWith("/tools/")) {
+            val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.ANONYMOUS_LOGIN);
         } else {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SEND_EMAIL);
         }
@@ -47,8 +49,15 @@ public class RateLimitFilter implements Filter {
     }
 
     private Bucket newBucket(String path) {
-        Refill refill = Refill.intervally(10, Duration.ofHours(1));
-        Bandwidth limit = Bandwidth.classic(10, refill);
+        Refill refill;
+        Bandwidth limit;
+        if (path.startsWith("/tools/")) {
+            refill = Refill.intervally(1000, Duration.ofHours(1));
+            limit = Bandwidth.classic(1000, refill);
+        } else {
+            refill = Refill.intervally(10, Duration.ofHours(1));
+            limit = Bandwidth.classic(10, refill);
+        }
 
         return Bucket.builder().addLimit(limit).build();
     }
@@ -58,7 +67,6 @@ public class RateLimitFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) request;
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
-
         String requestURI = httpServletRequest.getRequestURI();
         String ip = httpServletRequest.getRemoteAddr();
 
