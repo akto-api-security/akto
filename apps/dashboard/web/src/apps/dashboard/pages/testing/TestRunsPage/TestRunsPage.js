@@ -80,8 +80,8 @@ const sortOptions = [
 ];
 
 const resourceName = {
-  singular: 'Test run',
-  plural: 'Test runs',
+  singular: 'test run',
+  plural: 'test runs',
 };
 
 let filters = [

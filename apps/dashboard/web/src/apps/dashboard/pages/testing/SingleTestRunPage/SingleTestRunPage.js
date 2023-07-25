@@ -62,8 +62,8 @@ const sortOptions = [
 ];
 
 const resourceName = {
-  singular: 'Test run result',
-  plural: 'Test run results',
+  singular: 'test run result',
+  plural: 'test run results',
 };
 
 function disambiguateLabel(key, value) {

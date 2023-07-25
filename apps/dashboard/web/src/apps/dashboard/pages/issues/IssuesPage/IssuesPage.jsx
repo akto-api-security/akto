@@ -124,8 +124,8 @@ let appliedFilters = [
 ]
 
 const resourceName = {
-    singular: 'Issue',
-    plural: 'Issues',
+    singular: 'issue',
+    plural: 'issues',
 };
 
 async function getNextUrl(issueId){
