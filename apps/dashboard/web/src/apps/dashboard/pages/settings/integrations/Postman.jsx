@@ -4,6 +4,7 @@ import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import Dropdown from '../../../components/layouts/Dropdown';
+import Store from '../../../store';
 
 function Postman() {
     
@@ -40,6 +41,14 @@ function Postman() {
       }
     }
     
+    const setToastConfig = Store(state => state.setToastConfig)
+    const setToast = (isActive, isError, message) => {
+        setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+        })
+    }
     
     useEffect(() => {
         fetchPostmanCred()
@@ -47,11 +56,12 @@ function Postman() {
     }, [postmanKey]);
     
     const seeWork = () => {
-        console.log("see Working")
+        window.open("https://docs.akto.io/traffic-connections/postman")
     }
 
     async function saveCollection(){
         await settingFunctions.addOrUpdatePostmanCred(postmanKey,selected)
+        setToast(true,false,"Collection Saved")
     }
     const PostmanCard = (
         <LegacyCard title="Integrate Postman" 
@@ -71,7 +81,7 @@ function Postman() {
 
     let cardContent = "Seamlessly enhance your web application security with Postman integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "Postman" cardContent={cardContent} component={PostmanCard} /> 
+        <IntegrationsLayout title= "Postman" cardContent={cardContent} component={PostmanCard} docsUrl="https://docs.akto.io/traffic-connections/postman"/> 
     )
 }
 

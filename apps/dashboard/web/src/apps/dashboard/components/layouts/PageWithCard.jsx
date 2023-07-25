@@ -9,7 +9,7 @@ function PageWithCard(props) {
     <Page
       backAction={{ content: props.content, onAction: () => navigate(props.backUrl) }}
       title={props.title}
-      primaryAction={{content: props.primaryActionContent}}
+      primaryAction={props.docsAction}
       divider
     >
       <LegacyCard title={props.cardTitle} sectioned>

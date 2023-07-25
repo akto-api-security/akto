@@ -1,35 +1,5 @@
 import func from "@/util/func";
 
-function convertHighlightPathToMap(highlightPaths){
-
-    let highlightPathMap = { request: {}, response: {} }
-    for (const x of highlightPaths) {
-        if (x["responseCode"] === -1) {
-            let keys = []
-            if (x["header"]) {
-                keys.push("requestHeaders#" + x["param"])
-            } else {
-                keys.push("requestPayload#" + x["param"])
-                keys.push("queryParams#" + x["param"])
-            }
-
-            keys.forEach((key) => {
-                key = key.toLowerCase()
-                highlightPathMap.request[key] = x["highlightValue"]
-            })
-        } else {
-            let key = ""
-            if (x["header"]) {
-                key = "responseHeaders#" + x["param"]
-            } else {
-                key = "responsePayload#" + x["param"];
-            }
-            key = key.toLowerCase();
-            highlightPathMap.response[key] = x["highlightValue"]
-        }
-    }
-    return highlightPathMap;
-}
 
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
@@ -65,7 +35,7 @@ const transform = {
                 x["highlightValue"] = val
                 return x
             })
-            paths.push({message:c, highlightPathMap:convertHighlightPathToMap(highlightPaths)})
+            paths.push({message:c, highlightPaths:highlightPaths}); 
         }
         return paths;
     }
