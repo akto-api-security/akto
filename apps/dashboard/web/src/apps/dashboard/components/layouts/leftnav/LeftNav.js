@@ -111,6 +111,12 @@ export default function LeftNav(){
                       onClick: ()=>{
                         navigate('/dashboard/testing')
                       }
+                    },
+                    {
+                      label: 'Test roles',
+                      onClick: ()=>{
+                        navigate('/dashboard/testing/roles')
+                      }
                     }
                   ],
                   key: '4',

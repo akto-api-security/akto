@@ -27,6 +27,8 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
+import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 
 const router = createBrowserRouter([
   {
@@ -49,6 +51,14 @@ const router = createBrowserRouter([
             path: ":hexId/result/:hexId2",
             element: <TestRunResultPage />
           },
+          {
+            path:"roles",
+            element: <TestRolesPage/>
+          },
+          {
+            path:"roles/settings",
+            element:<TestRoleSettings/>
+          }
         ]
       },
       {

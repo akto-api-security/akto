@@ -90,8 +90,8 @@ const appliedFilters = [
 ]
 
 const resourceName = {
-    singular: 'Endpoint with sensitive data',
-    plural: 'Endpoints with sensitive data',
+    singular: 'endpoint with sensitive data',
+    plural: 'endpoints with sensitive data',
   };
 
 let promotedBulkActions = (selectedResources) => {

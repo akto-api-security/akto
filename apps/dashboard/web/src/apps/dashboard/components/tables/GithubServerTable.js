@@ -19,7 +19,7 @@ function GithubServerTable(props) {
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
   const [selected, setSelected] = useState(0);
-  const [sortSelected, setSortSelected] = useState(props.sortOptions.length!=0 ? [props.sortOptions[0].value] : []);
+  const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length>0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
@@ -183,7 +183,7 @@ function GithubServerTable(props) {
           sortOptions={props.sortOptions}
           sortSelected={sortSelected}
           queryValue={queryValue}
-          queryPlaceholder={`Searching in ${total} test run${total==1 ? '':'s'}`}
+          queryPlaceholder={`Searching in ${total} ${total==1 ? props.resourceName.singular:props.resourceName.plural}`}
           onQueryChange={handleFiltersQueryChange}
           onQueryClear={handleFiltersQueryClear}
           {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}

@@ -111,11 +111,12 @@ const func = {
     }, {})
   },
   findInObjectValue(obj, query, keysToIgnore = []) {
+    if(query=="") return true;
     let flattenedObject = this.flattenObject(obj);
     let ret = false;
     Object.keys(flattenedObject).forEach((key) => {
       ret |= !keysToIgnore.some(ignore => key.toLowerCase().includes(ignore.toLowerCase())) &&
-        flattenedObject[key].toString().toLowerCase().includes(query);
+        flattenedObject[key]?.toString().toLowerCase().includes(query);
     })
     return ret;
   },
@@ -238,6 +239,9 @@ const func = {
     return result
   },
   prepareFilters: (data, filters) => {
+    if(!data || !filters){
+      return []
+    }
     let localFilters = filters;
     localFilters.forEach((filter, index) => {
       localFilters[index].availableChoices = new Set()

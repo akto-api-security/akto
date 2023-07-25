@@ -53,9 +53,9 @@ function GithubSimpleTable(props) {
         tempData = tempData.filter((value) => {
           return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order']);
         })
-        let dataSortKey = props.sortOptions.filter(value => {
+        let dataSortKey = props?.sortOptions?.filter(value => {
           return (value.value.startsWith(sortKey))
-        })[0].sortKey;
+        })[0]?.sortKey;
 
         tempData = func.sortFunc(tempData, dataSortKey, sortOrder)
         return {value:tempData,total:tempData.length}
