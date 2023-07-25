@@ -130,7 +130,7 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
-        //todo add apiCollection id in fetchEndpoints
+
         Set<Integer> apiCollectionIds = extractApiCollectionIds(apiInfoKeyList);
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);

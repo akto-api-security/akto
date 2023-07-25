@@ -15,7 +15,6 @@ import java.util.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-//todo fetchSample message method handle
 public class TestSampleMessageStore extends MongoBasedTest {
 
     @Test
