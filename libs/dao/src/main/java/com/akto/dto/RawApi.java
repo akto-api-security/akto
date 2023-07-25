@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.RequestTemplate;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 public class RawApi {
@@ -32,6 +33,10 @@ public class RawApi {
         OriginalHttpRequest req = this.getRequest();
         String reqBody = req.getBody();
         BasicDBObject payload;
+
+        if (reqBody != null && reqBody.startsWith("[")) {
+            reqBody = "{\"json\": "+reqBody+"}";
+        }
         try {
              payload = BasicDBObject.parse(reqBody);
         } catch (Exception e) {
@@ -42,7 +47,18 @@ public class RawApi {
 
     public void modifyReqPayload(BasicDBObject payload) {
         OriginalHttpRequest req = this.getRequest();
-        req.setBody(payload.toJson());
+
+        String payloadStr = payload.toJson();
+
+        if (payload.size() == 1 && payload.containsKey("json")) {
+            Object jsonValue = payload.get("json");
+            if (jsonValue instanceof BasicDBList) {
+                payloadStr = payload.get("json").toString();
+            }
+        }
+
+
+        req.setBody(payloadStr);
         this.setRequest(req);
     }
 
