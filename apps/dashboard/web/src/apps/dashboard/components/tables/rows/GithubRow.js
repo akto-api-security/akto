@@ -26,7 +26,7 @@ function GithubRow(props) {
         [],
     );
     async function nextPage(data){
-        navigate(data?.nextUrl, {state:{data:data}}) || (props.getNextUrl && navigate(await props.getNextUrl(data.id), {state:{data:data}}));
+        navigate(data?.nextUrl) || (props.getNextUrl && navigate(await props.getNextUrl(data.id)));
     }
 
     const [rowClickable, setRowClickable] = useState(props.rowClickable || false)
