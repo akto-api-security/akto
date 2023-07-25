@@ -2,7 +2,8 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.User;
 import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
@@ -74,7 +75,7 @@ public class AdminSettingsAction extends UserAction {
     public String toggleRedactFeature() {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
-        boolean isAdmin = RBACDao.instance.isAdmin(user.getId());
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
         if (!isAdmin) return ERROR.toUpperCase();
 
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -131,7 +132,7 @@ public class AdminSettingsAction extends UserAction {
 
 
     private Map<String, String> filterHeaderValueMap;
-    
+
     public String addFilterHeaderValueMap() {
         Bson update;
         if (this.filterHeaderValueMap == null) {
@@ -161,7 +162,7 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public String deleteApiCollectionNameMapper() {
-        
+
         String hashStr = regex.hashCode()+"";
 
         Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr);
@@ -200,7 +201,7 @@ public class AdminSettingsAction extends UserAction {
     public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
         this.filterHeaderValueMap = filterHeaderValueMap;
     }
-    
+
     public void setRegex(String regex) {
         this.regex = regex;
     }
@@ -208,7 +209,7 @@ public class AdminSettingsAction extends UserAction {
     public void setNewName(String newName) {
         this.newName = newName;
     }
-    
+
     public int getGlobalRateLimit() {
         return globalRateLimit;
     }

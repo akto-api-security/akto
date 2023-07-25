@@ -119,7 +119,7 @@ public class HarAction extends UserAction {
         try {
             HAR har = new HAR();
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            List<String> messages = har.getMessages(harString, apiCollectionId);
+            List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);

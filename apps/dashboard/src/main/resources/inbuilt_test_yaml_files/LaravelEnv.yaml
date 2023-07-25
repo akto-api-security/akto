@@ -1,0 +1,69 @@
+id: LARAVEL_ENV
+info:
+  name: Laravel - Sensitive Information Disclosure
+  description: "A Laravel .env file was discovered, which stores sensitive information like database credentials and tokens. It should not be publicly accessible."
+  details: >
+              "The Laravel - Sensitive Information Disclosure vulnerability identifies the presence of a Laravel .env file, which stores sensitive data such as database credentials, API keys, and configuration settings. If publicly accessible, this file exposes critical information and can lead to unauthorized access, data breaches, and compromise of the application's security. It is essential to secure the .env file to protect sensitive information and maintain the integrity of the Laravel application."
+  impact: "Publicly exposing the Laravel .env file exposes sensitive information like database credentials and API keys, leading to potential unauthorized access, data breaches, and compromise of the application's security."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: LARAVEL_ENV
+  severity: HIGH
+  references:
+    - https://laravel.com/docs/master/configuration#environment-configuration
+    - https://stackoverflow.com/questions/38331397/how-to-protect-env-file-in-laravel
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.env
+    - ${urlVar}/.env.bak
+    - ${urlVar}/.env.dev
+    - ${urlVar}/.env.dev.local
+    - ${urlVar}/.env.development.local
+    - ${urlVar}/.env.prod
+    - ${urlVar}/.env.prod.local
+    - ${urlVar}/.env.production
+    - ${urlVar}/.env.production.local
+    - ${urlVar}/.env.local
+    - ${urlVar}/.env.example
+    - ${urlVar}/.env.stage
+    - ${urlVar}/.env.live
+    - ${urlVar}/.env.backup
+    - ${urlVar}/.env.save
+    - ${urlVar}/.env.old
+    - ${urlVar}/.env.www
+    - ${urlVar}/.env_1
+    - ${urlVar}/.env_sample
+    - ${urlVar}/.env.{{DN}}
+    - ${urlVar}/.env.{{SD}}
+    - ${urlVar}/api/.env
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - 'APP_NAME'
+      - 'APP_ENV'
+      - 'APP_KEY'
+      - 'APP_DEBUG'
+      - 'APP_URL'
+      - 'DB_HOST'
+      - 'DB_PASSWORD'
+      - 'DB_DATABASE'
+

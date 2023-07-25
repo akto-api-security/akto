@@ -1,0 +1,51 @@
+id: XSS_VIA_APPENDING_TO_QUERY_PARAMS
+info:
+  name: "XSS by appending to query parameters"
+  description: "Testing vulnerability by appending malicious scripts into query parameters to bypass security measures and execute unauthorized code." 
+  details: >
+            "Security test that aims to identify vulnerabilities in web applications. By appending malicious scripts into query parameters, attackers can bypass security measures and execute unauthorized code on the victim's browser."
+            "This test helps developers uncover and address potential XSS (Cross-Site Scripting) vulnerabilities, ensuring robust protection against malicious attacks."
+  impact: "An XSS vulnerability can have significant impacts, including the potential for data theft, unauthorized access, session hijacking, defacement of web pages, and the injection of malicious content."
+  category:
+    name: XSS
+    shortName: XXS
+    displayName: Cross-site scripting (XSS)
+  subCategory: XSS_VIA_APPENDING_TO_QUERY_PARAMS
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-community/attacks/xss/"
+    - "https://hackerone.com/reports/840759"
+api_selection_filters:
+  method:
+    contains_either:
+      - "GET"
+
+  response_payload:
+    contains_either:
+      - <!doctype html>
+
+  query_param:
+    for_one:
+      key:
+        regex: .*
+        extract: query_param_key
+      value:
+        extract: query_param_val
+
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          query_param_key: ${query_param_val}%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E
+
+validate:
+  response_payload:
+    contains_either: "<script>alert(document.domain)</script>"
+  response_payload:
+    contains_either: <!doctype html>
