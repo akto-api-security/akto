@@ -7,6 +7,7 @@ import {
     ResourceItem,
     Text,
     Badge,
+    Button,
   } from '@shopify/polaris';
 import {useState} from 'react';
 import '../settings.css'
@@ -170,10 +171,14 @@ function Integrations() {
             />
         )
     }
+
+  const redirectDocs = () => {
+    window.open("https://docs.akto.io/readme")
+  }  
   return (
     <Page
       title="Integrations"
-      primaryAction={{content: 'See Docs'}}
+      primaryAction={<Button primary onClick={redirectDocs}>See Docs</Button>}
       divider
     >
         <LegacyCard>

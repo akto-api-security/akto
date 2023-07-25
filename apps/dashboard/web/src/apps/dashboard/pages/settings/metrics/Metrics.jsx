@@ -107,7 +107,7 @@ function Metrics() {
             element.value && element.value.length > 0 ? 
             <LegacyCard.Section key={element.key}>
                 <GraphMetric data={element.value}  type='spline' color='#6200EA' areaFillHex="true" height="330"
-                    title={nameMap.get(element.key).descriptionName} subtitle = {nameMap.get(element.key).description}
+                    title={nameMap.get(element.key)?.descriptionName} subtitle = {nameMap.get(element.key)?.description}
                     defaultChartOptions={defaultChartOptions}
                     background-color="#000000"
                     text="true"
@@ -116,8 +116,8 @@ function Metrics() {
             </LegacyCard.Section>
                 :
                 <LegacyCard.Section key={element.key}>
-                    <EmptyState heading={nameMap.get(element.key).descriptionName} footerContent="No Graph Data exist !">
-                        <p>{nameMap.get(element.key).description}</p>
+                    <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
+                        <p>{nameMap.get(element.key)?.description}</p>
                     </EmptyState>
                 </LegacyCard.Section>
         ))
