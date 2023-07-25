@@ -111,14 +111,6 @@ public class TestExecutor {
         );
     }
 
-    private Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
-        Set<Integer> ret = new HashSet<>();
-        for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-            ret.add(apiInfoKey.getApiCollectionId());
-        }
-
-        return ret;
-    }
 
     public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         int accountId = Context.accountId.get();
@@ -130,12 +122,8 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
-
-        Set<Integer> apiCollectionIds = extractApiCollectionIds(apiInfoKeyList);
-
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        sampleMessageStore.fetchSampleMessages(apiCollectionIds);
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         List<AuthParam> authParams = authMechanism.getAuthParams();

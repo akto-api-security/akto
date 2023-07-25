@@ -9,6 +9,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -31,8 +32,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -85,6 +85,15 @@ public class Main {
                 }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
+    }
+
+    private static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        Set<Integer> ret = new HashSet<>();
+        for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            ret.add(apiInfoKey.getApiCollectionId());
+        }
+
+        return ret;
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -142,9 +151,8 @@ public class Main {
                             accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
 
                     SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+                    sampleMessageStore.fetchSampleMessages(extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
                     AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-
-
                     TestExecutor testExecutor = new TestExecutor();
                     long timestamp = testingRun.getId().getTimestamp();
                     long seconds = Context.now() - timestamp;
