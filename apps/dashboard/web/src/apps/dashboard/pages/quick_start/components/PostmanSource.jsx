@@ -9,7 +9,7 @@ function PostmanSource() {
     }
 
     return (
-        <div style={{marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
+        <div style={{marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
             <Text variant='bodyMd'>
                 Use postman to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>

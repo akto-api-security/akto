@@ -115,6 +115,7 @@ function NewConnection() {
         tasksCompleted === 2 ?
         <div className='connector-container'>
             <DropdownSearch optionsList={dropdownList} value={connectors.label} avatarIcon={connectors.icon} setSelected={(item)=> setConnector(item)}/>
+            <br/>
             {connectors.component}
             <br/> 
         </div>

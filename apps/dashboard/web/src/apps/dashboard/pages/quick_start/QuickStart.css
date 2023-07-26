@@ -23,10 +23,14 @@
 .card-popover .Polaris-Button{
     padding: 8px !important;
 }
-.Polaris-PositionedOverlay {
-    left: unset !important;
-    right: 0px;
-    top: 40px !important;
-    width: 27.5vw !important;
-    position: fixed !important;
+.right-card .Polaris-Box {
+    position: fixed;
+    right: 0;
+    top: 57px;
+    width: 27vw;
+}
+.settings {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 10px;
 }

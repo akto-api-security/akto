@@ -1,9 +1,11 @@
 import React from 'react'
 import quickStartFunc from '../tranform';
-import { Badge, Page, Text } from '@shopify/polaris';
+import { Badge, Button, Card, Page, Text } from '@shopify/polaris';
+import {CancelMinor} from "@shopify/polaris-icons"
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
 import { useState } from 'react';
+import QuickStartStore from '../quickStartStore';
 
 function UpdateConnections(props) {
 
@@ -12,8 +14,17 @@ function UpdateConnections(props) {
     const obj = quickStartFunc.getConnectionsObject(myConnections,allConnections)
     const [newCol, setNewCol] = useState(0)
 
-    const onButtonClick = () => {
+    const currentCardObj = QuickStartStore(state => state.currentConnector)
+    const setCurrentCardObj = QuickStartStore(state => state.setCurrentConnector)
+
+    const closeAction = () => {
+        setCurrentCardObj(null)
+        setNewCol(0)
+    }
+
+    const onButtonClick = (cardObj) => {
         setNewCol(2)
+        setCurrentCardObj(cardObj)
     }
 
     return (
@@ -34,6 +45,21 @@ function UpdateConnections(props) {
                 items={obj.moreConnections} buttonText="Connect" onButtonClick={onButtonClick}     
                 changedColumns={newCol}
             />
+
+            {
+                currentCardObj ? 
+                <div className="right-card">
+                    <Card>
+                        <div className='settings'>
+                            <Text variant="headingMd" as="h6">Setup guide </Text>
+                            <Button plain icon={CancelMinor} onClick={closeAction} />
+                        </div>
+                        <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
+                        {currentCardObj.component}
+                    </Card>
+                </div>
+                : null
+            }
 
         </Page>
     )

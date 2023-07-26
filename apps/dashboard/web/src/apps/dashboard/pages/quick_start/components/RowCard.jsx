@@ -1,11 +1,14 @@
 import { Avatar, Button, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris';
-import "../QuickStart.css"
 
 function RowCard(props) {
 
     const {cardObj, onButtonClick, buttonText} = props ;
     const goToDocs = () => {
         window.open(cardObj.docsUrl)
+    }
+
+    const handleAction = () => {
+        onButtonClick(cardObj)
     }
 
     return (
@@ -18,7 +21,7 @@ function RowCard(props) {
                 </VerticalStack>
 
                 <HorizontalGrid columns={4} gap="1">
-                    <Button onClick={onButtonClick}>{buttonText}</Button>
+                    <Button onClick={handleAction}>{buttonText}</Button>
                     <Button plain onClick={goToDocs}>See Docs</Button>
                 </HorizontalGrid>
             </VerticalStack>
