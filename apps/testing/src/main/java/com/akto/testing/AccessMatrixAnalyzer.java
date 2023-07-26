@@ -19,6 +19,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.BFLATest;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.util.Constants;
@@ -72,17 +73,16 @@ public class AccessMatrixAnalyzer {
     }
 
     public void run() {
-        Context.accountId.set(1_000_000);
-
         Bson pendingTasks = Filters.lt(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now());
         for(AccessMatrixTaskInfo task: AccessMatrixTaskInfosDao.instance.findAll(pendingTasks)) {
             loggerMaker.infoAndAddToDb("Running task: " + task.toString(),LogDb.TESTING);
 
             List<ApiInfoKey> endpoints = getEndpointsToAnalyze(task);
             loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
-
+            SampleMessageStore sampleMessageStore = SampleMessageStore.create();
             CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);
-            Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(tempTestingEndpoints);
+            sampleMessageStore.buildSingleTypeInfoMap(tempTestingEndpoints);
+            Map<String, SingleTypeInfo> singleTypeInfoMap = sampleMessageStore.getSingleTypeInfos();
         
 
             List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
@@ -90,26 +90,25 @@ public class AccessMatrixAnalyzer {
             loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
 
-            Set<Integer> apiCollectionIds = TestExecutor.extractApiCollectionIds(apiInfoKeyList);
+            Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
+            sampleMessageStore.fetchSampleMessages(apiCollectionIds);
+            Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
+            List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
 
-            Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages(apiCollectionIds);
-            List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-
-            
-            AuthMechanism authMechanism = TestExecutor.createAuthMechanism();
-            TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
+            AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+            AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+            TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"");
 
             BFLATest bflaTest = new BFLATest();
 
             if(endpoints!=null && !endpoints.isEmpty()){
                 for(ApiInfoKey endpoint: endpoints){
-                    List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(endpoint, sampleMessages);
+                    List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(endpoint);
                     if (messages!=null){
 
                         for (RawApi rawApi: messages) {
                             bflaTest.updateAllowedRoles(rawApi, endpoint, testingUtil);
                         }
-
                     }
                 }
             }

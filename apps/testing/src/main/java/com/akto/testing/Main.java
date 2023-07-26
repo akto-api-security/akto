@@ -88,7 +88,7 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
     }
 
-    private static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+    public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         Set<Integer> ret = new HashSet<>();
         for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             ret.add(apiInfoKey.getApiCollectionId());
