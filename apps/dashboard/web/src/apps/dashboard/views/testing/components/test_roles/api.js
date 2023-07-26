@@ -28,6 +28,47 @@ export default {
             return resp
         })        
     },
+    fetchAccessMatrixUrlToRoles(){
+        return request({
+            url: '/api/fetchAccessMatrixUrlToRoles',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    createMultipleAccessMatrixTasks(roleName){
+        return request({
+            url: '/api/createMultipleAccessMatrixTasks',
+            method: 'post',
+            data: {roleName}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    analyzeApiSamples(apiCollectionIds, headerNames){
+        return request({
+            url: '/api/analyzeApiSamples',
+            method: 'post',
+            data: {apiCollectionIds, headerNames}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    addAuthToRole(roleName, apiCond, authParamData) {
+        return request({
+            url: '/api/addAuthToRole',
+            method: 'post',
+            data: {roleName, apiCond, authParamData}
+        })
+    },
+    deleteAuthFromRole(roleName, index) {
+        return request({
+            url: '/api/deleteAuthFromRole',
+            method: 'post',
+            data: {roleName, index}
+        })
+    },    
     fetchCollectionWiseApiEndpoints (apiCollectionId) {
         return request({
             url: '/api/fetchCollectionWiseApiEndpoints',

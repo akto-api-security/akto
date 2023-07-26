@@ -1,13 +1,17 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-
+import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -110,4 +114,63 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         return countMap;
     }
+
+    public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = 
+            new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, "$apiCollectionId")
+            .append(ApiInfoKey.URL, "$url")
+            .append(ApiInfoKey.METHOD, "$method");
+
+        pipeline.add(Aggregates.match(Filters.eq(ApiInfoKey.API_COLLECTION_ID, apiCollectionId)));
+
+        int recentEpoch = Context.now() - deltaPeriodValue;
+
+        Bson projections = Projections.fields(
+            Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD),
+            Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch})),
+            Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))
+        );
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"), Accumulators.sum("changesCount", 1)));
+        pipeline.add(Aggregates.skip(skip));
+        pipeline.add(Aggregates.limit(limit));
+        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            endpoints.add(endpointsCursor.next());
+        }
+
+        return endpoints;
+    }
+
+    public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
+        Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
+    }
+
+    public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
+            return fetchEndpointsInCollection(apiCollectionId, skip, limit, deltaPeriodValue);
+        } else {
+            List<SingleTypeInfo> allUrlsInCollection = fetchHostSTI(apiCollectionId, skip);
+
+            List<BasicDBObject> endpoints = new ArrayList<>();
+            for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
+                BasicDBObject groupId = new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, singleTypeInfo.getApiCollectionId())
+                    .append(ApiInfoKey.URL, singleTypeInfo.getUrl())
+                    .append(ApiInfoKey.METHOD, singleTypeInfo.getMethod());
+                endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append(Constants.ID, groupId));
+            }
+
+            return endpoints;
+        }
+    }    
 }
