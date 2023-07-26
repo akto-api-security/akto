@@ -119,14 +119,13 @@ public class Main {
         setupRateLimitWatcher();
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
-//todo: shivam handle scheduler in
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
-                Context.accountId.set(1_000_000);
-                AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                matrixAnalyzer.run();
+                AccountTask.instance.executeTask(account -> {
+                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                    matrixAnalyzer.run();
+                },"matrix-analyser-task");
             }
         }, 0, 1, TimeUnit.MINUTES);
 
@@ -135,8 +134,6 @@ public class Main {
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
-
-        TestExecutor testExecutor = new TestExecutor();
 
         while (true) {
             AccountTask.instance.executeTask(account -> {

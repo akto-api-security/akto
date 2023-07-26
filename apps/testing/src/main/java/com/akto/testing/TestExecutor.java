@@ -31,6 +31,7 @@ import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -54,8 +55,6 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-    private static final Gson gson = new Gson();
-
     public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
