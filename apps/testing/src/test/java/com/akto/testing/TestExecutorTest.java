@@ -61,6 +61,9 @@ public class TestExecutorTest extends MongoBasedTest {
         data.setId(key);
         SampleDataDao.instance.insertOne(data);
         SampleMessageStore messageStore = SampleMessageStore.create();
+        Set<Integer> apiCollectionSet = new HashSet<>();
+        apiCollectionSet.add(0);
+        messageStore.fetchSampleMessages(apiCollectionSet);
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
         TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "");
 

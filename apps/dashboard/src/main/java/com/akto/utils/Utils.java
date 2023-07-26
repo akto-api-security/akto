@@ -325,18 +325,18 @@ public class Utils {
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
                 info.setPolicy(new AktoPolicyNew(false));
+                info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
+            responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             info.getHttpCallParser().syncFunction(responses, true, false);
             info.getPolicy().main(responses, true, false);
-
-            responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
-                RuntimeListener.resourceAnalyser.analyse(responseParams);
+                info.getResourceAnalyser().analyse(responseParams);
             }
-            RuntimeListener.resourceAnalyser.syncWithDb();
+            info.getResourceAnalyser().syncWithDb();
         }
     }
 
