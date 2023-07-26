@@ -1,0 +1,32 @@
+.items-list .Polaris-ResourceList{
+    border: none !important;
+}
+.items-list .Polaris-ResourceItem__ListItem{
+   border: none !important;
+}
+.connector-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    align-items: center;
+}
+.connector-item .Polaris-Text--root{
+    display: flex;
+    gap: 8px;
+}
+.connector-container{
+    margin-top: 16px;
+}
+.connector-container .Polaris-Connected{
+    width: 300px;
+}
+.card-popover .Polaris-Button{
+    padding: 8px !important;
+}
+.Polaris-PositionedOverlay {
+    left: unset !important;
+    right: 0px;
+    top: 40px !important;
+    width: 27.5vw !important;
+    position: fixed !important;
+}
