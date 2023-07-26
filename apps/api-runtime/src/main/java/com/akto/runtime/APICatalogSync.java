@@ -707,6 +707,8 @@ public class APICatalogSync {
 
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
+            String newTemplateUrl = urlTemplate.getTemplateString();
+            if (!APICatalog.isTemplateUrl(newTemplateUrl)) continue;
 
             boolean isFirst = true;
             for (String matchedURL: matchStaticURLs) {
@@ -726,7 +728,6 @@ public class APICatalogSync {
 
                 if (isFirst) {
 
-                    String newTemplateUrl = urlTemplate.getTemplateString();
                     for (int i = 0; i < urlTemplate.getTypes().length; i++) {
                         SuperType superType = urlTemplate.getTypes()[i];
                         if (superType == null) continue;
@@ -1262,7 +1263,8 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
-            allParams = SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
+            allParams = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForHostHeader(0, false), Projections.exclude(SingleTypeInfo._VALUES));
+            allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
