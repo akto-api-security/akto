@@ -118,5 +118,9 @@ export default {
     
 .details-container
     flex: 1 1 80%
+    margin: 12px 10px 12px 0px
+    border: 1px solid var(--themeColorDark13)
+    border-radius: 4px
+    box-shadow: none !important
 
 </style>
