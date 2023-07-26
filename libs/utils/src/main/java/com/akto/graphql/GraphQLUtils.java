@@ -1,8 +1,13 @@
 package com.akto.graphql;
 
 import com.akto.dto.HttpResponseParams;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import graphql.language.*;
 import graphql.parser.Parser;
+import graphql.util.TraversalControl;
+import graphql.util.TraverserContext;
+import graphql.util.TreeTransformerUtil;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
 import org.mortbay.util.ajax.JSON;
@@ -11,6 +16,8 @@ import java.util.*;
 
 public class GraphQLUtils {//Singleton class
     Parser parser = new Parser();
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final Gson gson = new Gson();
     LanguageTraversal traversal = new LanguageTraversal();
     public static final String __ARGS = "__args";
     public static final String QUERY = "query";
@@ -121,6 +128,51 @@ public class GraphQLUtils {//Singleton class
         return responseParamsList;
     }
 
+    public String deleteGraphqlField(String payload, String field) {
+        return editGraphqlField(payload, field, "", "DELETE");
+    }
+
+    public String addGraphqlField(String payload, String field, String value) {
+        return editGraphqlField(payload, field, value, "ADD");
+    }
+
+    public String modifyGraphqlField(String payload, String field, String value) {
+        return editGraphqlField(payload, field, value, "MODIFY");
+    }
+
+    private String editGraphqlField(String payload, String field, String value, String type) {
+        String tempVariable = "__tempDummyVariableToReplace";
+        Object[] payloadList = (Object []) JSON.parse(payload);
+        for (Object operationObj: payloadList) {
+            Map<String, Object> operation = (Map) operationObj;
+            String query = (String) operation.get("query");
+            Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
+
+                @Override
+                public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                    String nodeName = node.getName();
+                    if (nodeName != null && nodeName.equalsIgnoreCase(field)) {
+                        switch (type) {
+                            case "MODIFY":
+                            case "DELETE":
+                                return TreeTransformerUtil.changeNode(context, parser.parseValue(tempVariable));
+                            case "ADD":
+                                return TreeTransformerUtil.insertAfter(context, parser.parseValue(tempVariable));
+                            default:
+                                return super.visitField(node, context);
+                        }
+                    } else {
+                        return super.visitField(node, context);
+                    }
+                }
+            });
+            String modifiedQuery = AstPrinter.printAst(result);
+            modifiedQuery = modifiedQuery.replace(tempVariable, value);
+            operation.replace("query", modifiedQuery);
+        }
+        return gson.toJson(payloadList);
+    }
+
     private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
         List<OperationDefinition> operationDefinitions = parseGraphQLRequest(mapOfRequestPayload);
 
@@ -178,5 +230,4 @@ public class GraphQLUtils {//Singleton class
         }
         return result;
     }
-
 }
