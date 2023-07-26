@@ -92,7 +92,6 @@ public class AccessMatrixAnalyzer {
 
             Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
-            Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
             List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
 
             AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
