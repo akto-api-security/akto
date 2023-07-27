@@ -27,6 +27,8 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
+import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 
@@ -124,6 +126,18 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/settings/integrations/akto_gpt",
         element: <AktoGPT />,
+      },
+      {
+        path: "/dashboard/settings/integrations/webhooks",
+        element: <Webhooks />,
+      },
+      {
+        path: "/dashboard/settings/integrations/webhooks/:webhookId",
+        element: <Webhook />,
+      },
+      {
+        path: "/dashboard/settings/integrations/webhooks/create_custom_webhook",
+        element: <Webhook />,
       },
       {
         path: "/dashboard/settings/health_logs",
