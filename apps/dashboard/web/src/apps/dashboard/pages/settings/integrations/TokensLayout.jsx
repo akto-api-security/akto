@@ -22,7 +22,7 @@ function TokensLayout(props) {
   }
 
   const seeWork = () => {
-    console.log("see Working")
+    window.open(props.docsUrl)
   }
 
   const generateNewToken = async() => {
@@ -63,7 +63,7 @@ function TokensLayout(props) {
     </LegacyCard>
   )
   return (
-    <IntegrationsLayout title= {props.title} cardContent={props.cardContent} component={BurpSuiteCard} /> 
+    <IntegrationsLayout title= {props.title} cardContent={props.cardContent} component={BurpSuiteCard} docsUrl={props.docsUrl}/> 
   )
 }
 

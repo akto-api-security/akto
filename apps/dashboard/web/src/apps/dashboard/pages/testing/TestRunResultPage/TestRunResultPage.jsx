@@ -106,6 +106,13 @@ function TestRunResultPage(props) {
   const location = useLocation();
   const locationState = location.state;
   const [infoState, setInfoState] = useState(moreInfoSections)
+  const [fullDescription, setFullDescription] = useState(false);
+  
+  function getDescriptionText(fullDescription){
+    let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
+    return fullDescription ? str : str[0] + " "
+  }
+
   useEffect(() => {
     let testRunResult = selectedTestRunResult;
     async function fetchData() {
@@ -199,7 +206,10 @@ function TestRunResultPage(props) {
     components = {[
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
-        {parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found")}
+        {
+          getDescriptionText(fullDescription) 
+        }
+        <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
     selectedTestRunResult.testResults &&
@@ -208,7 +218,7 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.filter((result) => {
         return result.message
       }).map((result) => {
-        return {message:result.message, highlightPathMap:{}}
+        return {message:result.message, highlightPaths:[]}
       })}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}

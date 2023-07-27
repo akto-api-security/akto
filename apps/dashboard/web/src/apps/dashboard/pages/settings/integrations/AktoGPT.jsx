@@ -15,6 +15,15 @@ function AktoGPT() {
     const [displayItems , setDisplayItems] = useState(apiCollections)
     const [sortOrder, setSortOrder] = useState(true)
 
+    const setToastConfig = Store(state => state.setToastConfig)
+    const setToast = (isActive, isError, message) => {
+        setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+        })
+    }
+
     async function fetchSelectedCollections(){
         let arr = await settingFunctions.fetchGptCollections() 
         setSelectedItems(arr)
@@ -38,10 +47,12 @@ function AktoGPT() {
 
     const discardAction = () =>{
         setSelectedItems(clonedItems)
+        setToast(true,true,"Changes Discarded.")
     }
 
     const saveAction = async() =>{
         await settingFunctions.updateGptCollections(selectedItems,apiCollections)
+        setToast(true,false,"Collections updated successfully")
     }
 
     function compareItems (){
@@ -124,7 +135,7 @@ function AktoGPT() {
     let cardContent = "Seamlessly enhance your web application security with AktoGPT integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
 
   return (
-    <IntegrationsLayout title="AktoGPT" cardContent={cardContent} component={component} />
+    <IntegrationsLayout title="AktoGPT" cardContent={cardContent} component={component} docsUrl="https://docs.akto.io/aktogpt"/>
   )
 }
 

@@ -52,8 +52,8 @@ const sortOptions = [
   ];
 
 const resourceName = {
-    singular: 'Sensitive data type',
-    plural: 'Sensitive data types',
+    singular: 'sensitive data type',
+    plural: 'sensitive data types',
   };
 
 function AllSensitiveData(){
