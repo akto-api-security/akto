@@ -86,5 +86,13 @@ export default {
         }).then((resp) => {
             return resp
         })        
-    }
+    },
+    async fetchTestRoles() {
+        const resp = await request({
+            url: '/api/fetchTestRoles',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
 }

@@ -29,6 +29,8 @@ import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
+import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
+import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 
 const router = createBrowserRouter([
   {
@@ -51,6 +53,14 @@ const router = createBrowserRouter([
             path: ":hexId/result/:hexId2",
             element: <TestRunResultPage />
           },
+          {
+            path:"roles",
+            element: <TestRolesPage/>
+          },
+          {
+            path:"roles/settings",
+            element:<TestRoleSettings/>
+          }
         ]
       },
       {

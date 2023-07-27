@@ -27,8 +27,7 @@ function highlightPaths(highlightPathMap, ref){
         let mainKey = path[path.length - 1];
         let matches = ref.getModel().findMatches(mainKey, false, false, false, null, true);
         matches.forEach((match) => {
-          ref
-            .createDecorationsCollection([
+          ref.createDecorationsCollection([
               {
                 range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
                 options: {
@@ -36,6 +35,7 @@ function highlightPaths(highlightPathMap, ref){
                 },
               }
             ])
+          ref.revealLineInCenter(match.range.startLineNumber);
         })
       }
     })
