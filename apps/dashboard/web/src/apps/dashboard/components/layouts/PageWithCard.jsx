@@ -1,4 +1,4 @@
-import { LegacyCard, Page } from '@shopify/polaris'
+import { Button, LegacyCard, Page } from '@shopify/polaris'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -10,6 +10,7 @@ function PageWithCard(props) {
       backAction={{ content: props.content, onAction: () => navigate(props.backUrl) }}
       title={props.title}
       primaryAction={props.docsAction}
+      secondaryActions={props?.secondaryAction}
       divider
     >
       <LegacyCard title={props.cardTitle} sectioned>

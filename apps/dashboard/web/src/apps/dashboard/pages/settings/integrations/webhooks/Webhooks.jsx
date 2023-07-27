@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react"
-import settingRequests from "../api"
-import IntegrationsLayout from "./IntegrationsLayout"
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
+import settingRequests from "../../api"
+import IntegrationsLayout from "../IntegrationsLayout"
+import SpinnerCentered from "../../../../components/progress/SpinnerCentered"
+import GithubSimpleTable from "../../../../components/tables/GithubSimpleTable"
 import func from "@/util/func"
+import { Button } from "@shopify/polaris"
+import { useNavigate } from "react-router-dom"
+import WebhooksStore from "./webhooksStore"
+import Store from "../../../../store"
 
 function Webhooks() {
+    const navigate = useNavigate()
+
     const [isLoading, setIsLoading] = useState()
-    const [customWebhooks, setCustomWebhooks] = useState([])
+    const setToastConfig = Store(state => state.setToastConfig)
+    const customWebhooks = WebhooksStore(state => state.customWebhooks)
+    const setCustomWebhooks = WebhooksStore(state => state.setCustomWebhooks)
 
     async function fetchCustomWebhooks() {
         setIsLoading(true)
@@ -24,7 +32,8 @@ function Webhooks() {
             const mapCustomWebhooks = filterCustomWebhooks.map(customWebhook => ({
                 ...customWebhook,
                 createTime: func.prettifyEpoch(customWebhook.createTime),
-                lastSentTimestamp: func.prettifyEpoch(customWebhook.createTime)
+                lastSentTimestamp: func.prettifyEpoch(customWebhook.createTime),
+                nextUrl: `${customWebhook.id}`
             }))
             
             setCustomWebhooks(mapCustomWebhooks)
@@ -39,10 +48,9 @@ function Webhooks() {
     const webhooksCardContent = "Webhooks integration"
 
     const resourceName = {
-        singular: 'Sensitive data type',
-        plural: 'Sensitive data types',
+        singular: 'Webhook',
+        plural: 'Webhhooks',
     };
-    
     
     const headers = [
         {
@@ -76,12 +84,20 @@ function Webhooks() {
         { label: 'Name', value: 'webhookName desc', directionLabel: 'Z-A', sortKey: 'webhookName' },
       ];
     
+    async function handleWebhookStatusChange(id, status) {
+        const webhookStatusChangeResponse = await settingRequests.changeStatus(id, status)
+        if (webhookStatusChangeResponse) {
+            setToastConfig({ isActive: true, isError: false, message: `Webhook ${status === "ACTIVE" ? "activated" : "deactivated"}` })
+            fetchCustomWebhooks()
+        }
+    }
     
     const getActions = (item) => {
+        console.log(item)
         return [{
             items: [{
-                content: 'Edit',
-                onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),
+                content: item.activeStatus === "ACTIVE" ? 'Deactivate' : 'Activate',
+                onAction: () => handleWebhookStatusChange(item.id, item.activeStatus === "ACTIVE" ? "INACTIVE": "ACTIVE"),
             }]
         }]
     }
@@ -102,7 +118,6 @@ function Webhooks() {
                             headers={headers}
                             hasRowActions={true}
                             getActions={getActions}
-                            rowClickable={true}
                          />
                     </div>
             }
@@ -110,11 +125,18 @@ function Webhooks() {
 
     )
 
+    const createCustomWebhook =  (
+        <Button onClick={() => navigate('create_custom_webhook')}>
+            Create Custom Webhook
+        </Button>
+    )
+
     return (
         <IntegrationsLayout
             title="Webhooks"
             cardContent={webhooksCardContent}
             component={WebhooksCard}
+            secondaryAction={createCustomWebhook}
         />
     )
 }

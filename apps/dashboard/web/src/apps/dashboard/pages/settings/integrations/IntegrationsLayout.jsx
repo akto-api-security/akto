@@ -17,6 +17,7 @@ function IntegrationsLayout(props) {
         cardTitle="About the Integration"
         cardContent={props.cardContent}
         component={props.component}
+        secondaryAction={props?.secondaryAction}
     />
   )
 }
