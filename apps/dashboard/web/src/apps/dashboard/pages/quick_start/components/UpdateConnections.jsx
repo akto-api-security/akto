@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import quickStartFunc from '../tranform';
 import { Badge, Button, Card, Page, Text } from '@shopify/polaris';
 import {CancelMinor} from "@shopify/polaris-icons"
@@ -26,6 +26,10 @@ function UpdateConnections(props) {
         setNewCol(2)
         setCurrentCardObj(cardObj)
     }
+
+    useEffect(()=>{
+        setCurrentCardObj(null)
+    },[])
 
     return (
         <Page divider title='Quick start' fullWidth>

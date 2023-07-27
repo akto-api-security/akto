@@ -1,5 +1,6 @@
 import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
+import BurpSource from "./components/BurpSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -37,7 +38,8 @@ const burpObj = {
     text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",   
     badge: "Recommended",
     docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
-    key: "BURP"
+    key: "BURP",
+    component : <BurpSource/>
 }
 
 const dockerObj = {

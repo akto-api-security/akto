@@ -34,3 +34,19 @@
     justify-content: space-between;
     padding-bottom: 10px;
 }
+
+.card-items{
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.card-items .Polaris-HorizontalStack{
+    align-items: flex-start !important;
+}
+
+.right-card .Polaris-Text--bodySm{
+    display: flex;
+    align-items: center;
+}
