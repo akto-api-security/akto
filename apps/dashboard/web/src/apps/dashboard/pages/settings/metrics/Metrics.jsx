@@ -17,6 +17,8 @@ function Metrics() {
     const [orderedResult, setOrderedResult] = useState([])
     const [startTime, setStartTime] = useState(Math.floor(Date.now() / 1000))
     const [endTime, setEndTime] = useState(Math.floor(Date.now() / 1000))
+    const [hostsActive, setHostsActive] = useState(false)
+    const [currentHost, setCurrentHost] = useState(null)
 
     const initialItems = [
         { label: "All", value: "ALL" },
@@ -37,8 +39,7 @@ function Metrics() {
         
 
     const getGraphData = async(startTime,endTime) =>{
-        let host = null
-        const metricData = await settingFunctions.fetchGraphData(groupBy,startTime,endTime,names,host)
+        const metricData = await settingFunctions.fetchGraphData(groupBy,startTime,endTime,names,currentHost)
         let result = {}
         for (const [key, countMap] of Object.entries(metricData)) {
             let val = func.convertTrafficMetricsToTrend(countMap)
@@ -71,9 +72,15 @@ function Metrics() {
 
     function changeItems(){
         setMenuItems(hosts)
+        setHostsActive(true)
     }
     const handleChange = (val) =>{
-        setGroupBy(val)
+        if(hostsActive){
+            setGroupBy("IP")
+            setCurrentHost(val)
+        }else{
+            setGroupBy(val)
+        }
         setMenuItems(initialItems)
     }
 
