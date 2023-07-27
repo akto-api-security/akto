@@ -67,4 +67,11 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
     public String getInitStackType() {
         return instance.findOne(AccountSettingsDao.generateFilter()).getInitStackType();
     }
+
+    public void updateLastTelemetryUpdateSentTs(String dbName, int ts) {
+        instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.TELEMETRY_UPDATE_SENT_TS_MAP + "." + dbName, ts)
+        );
+    }
 }

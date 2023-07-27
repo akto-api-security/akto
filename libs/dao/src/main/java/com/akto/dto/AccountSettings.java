@@ -54,6 +54,12 @@ public class AccountSettings {
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
+    public static final String ENABLE_TELEMETRY = "enableTelemetry";
+    private boolean enableTelemetry;
+
+    private Map<String, Integer> telemetryUpdateSentTsMap;
+    public static final String TELEMETRY_UPDATE_SENT_TS_MAP = "telemetryUpdateSentTsMap";
+
 
     public AccountSettings() {
     }
@@ -231,5 +237,21 @@ public class AccountSettings {
 
     public void setApiCollectionNameMapper(Map<String,CollectionReplaceDetails> apiCollectionNameMapper) {
         this.apiCollectionNameMapper = apiCollectionNameMapper;
+    }
+
+    public boolean isEnableTelemetry() {
+        return enableTelemetry;
+    }
+
+    public void setEnableTelemetry(boolean enableTelemetry) {
+        this.enableTelemetry = enableTelemetry;
+    }
+
+    public Map<String, Integer> getTelemetryUpdateSentTsMap() {
+        return telemetryUpdateSentTsMap;
+    }
+
+    public void setTelemetryUpdateSentTsMap(Map<String, Integer> telemetryUpdateSentTsMap) {
+        this.telemetryUpdateSentTsMap = telemetryUpdateSentTsMap;
     }
 }
