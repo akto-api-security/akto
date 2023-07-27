@@ -437,6 +437,90 @@ async copyRequest(type, completeData) {
     }
   }
   return {copyString, snackBarMessage};
+},
+
+deepComparison(item1, item2) {
+  
+  const areArrays = Array.isArray(item1) && Array.isArray(item2)
+  const areObjects = func.isObject(item1) && func.isObject(item2)
+  
+    if (areObjects) {
+    return func.deepObjectComparison(item1, item2);
+  } else if (areArrays) {
+    return func.deepArrayComparison(item1, item2);
+  } else {
+    return item1 === item2;
+  }
+},
+
+deepArrayComparison(arr1, arr2) {
+  if (arr1.length !== arr2.length) {
+    return false;
+  }
+
+  for (let i = 0; i < arr1.length; i++) {
+    const element1 = arr1[i];
+    const element2 = arr2[i];
+
+    const areArrays = Array.isArray(element1) && Array.isArray(element2)
+    const areObjects = func.isObject(element1) && func.isObject(element2)
+
+    if (areArrays) {
+      if (!func.deepArrayComparison(element1, element2)) {
+        return false;
+      }
+    } else if (areObjects) {
+      if (!func.deepObjectComparison(element1, element2)) {
+        return false;
+      }
+    } else if (element1 !== element2) {
+      return false;
+    }
+  }
+
+  return true;
+},
+
+deepObjectComparison(obj1, obj2) {
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) {
+    return false;
+  }
+
+  for (const key of keys1) {
+    const val1 = obj1[key];
+    const val2 = obj2[key];
+
+    const areArrays = Array.isArray(val1) && Array.isArray(val2);
+    const areObjects = func.isObject(val1) && func.isObject(val2);
+
+    if (areArrays) {
+      if (!func.deepArrayComparison(val1, val2)) {
+        return false;
+      }
+    } else if (areObjects) {
+      if (!func.deepObjectComparison(val1, val2)) {
+        return false;
+      }
+    } else if (val1 !== val2) {
+      return false;
+    }
+  }
+
+  return true;
+},
+
+isObject(obj) {
+  return obj !== null && typeof obj === 'object';
+},
+
+toMethodUrlString({method,url}){
+  return method + " " + url;
+},
+toMethodUrlObject(str){
+  return {method:str.split(" ")[0], url:str.split(" ")[1]}
 }
 
 }

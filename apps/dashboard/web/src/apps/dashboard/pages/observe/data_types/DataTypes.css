@@ -1,14 +1,4 @@
-.control-frame-padding .Polaris-Frame__Main {
-    padding: 0 !important;
-}
-
 .footer-save{
     display: flex;
     justify-content: end;
-}
-
-.Polaris-Frame-ContextualSaveBar__Contents{
-    max-width: 100% !important;
-    margin: 0 !important;
-    margin-right: 2rem !important;
 }

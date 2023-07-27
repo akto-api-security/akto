@@ -1,18 +1,25 @@
 import { Autocomplete, Icon, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
-
-function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected, value }) {
+import func from "@/util/func";
+function DropdownSearch({ itemName, disabled, label, placeholder, optionsList, setSelected, preSelected, value, allowMultiple }) {
 
     const deselectedOptions = optionsList
-    const [selectedOptions, setSelectedOptions] = useState([]);
-    const [inputValue, setInputValue] = useState(value);
+    const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
+    const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
 
 
     useEffect(() => {
-        setOptions(deselectedOptions)
+        setOptions((prev) => {
+            if(func.deepComparison(prev,deselectedOptions)){
+                return prev;
+            }
+            setInputValue(value ? value : undefined);
+            setSelectedOptions(preSelected ? preSelected : []);
+            return deselectedOptions;
+        })
     }, [deselectedOptions])
 
     const updateText = useCallback(
@@ -40,6 +47,10 @@ function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected
         [deselectedOptions, loading],
     );
 
+    const handleFocusEvent = () => {
+        updateText('');
+    }
+
     const updateSelection = useCallback(
         (selected) => {
             const selectedText = selected.map((selectedItem) => {
@@ -51,9 +62,11 @@ function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected
                 });
                 return matchedOption && matchedOption.label;
             });
-            setSelectedOptions(selected);
-            setInputValue(selectedText[0] || '');
-            setSelected(selected[0])
+            setSelectedOptions([...selected]);
+            setInputValue(allowMultiple ? 
+                `${selected.length} ${itemName ? itemName : "item"}${selected.length==1 ? "" : "s"} selected` : 
+                (selectedText[0] || ''));
+            setSelected(allowMultiple ? selected : selected[0])
         },
         [options],
     );
@@ -68,6 +81,7 @@ function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected
             suffix={<Icon source={ChevronDownMinor} color="base" />}
             placeholder={placeholder}
             autoComplete="off"
+            onFocus={handleFocusEvent}
         />
     );
 
@@ -82,6 +96,7 @@ function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected
 
     return (
             <Autocomplete
+                {...(allowMultiple ? {allowMultiple:true} : {} )}
                 options={options}
                 selected={selectedOptions}
                 onSelect={updateSelection}
