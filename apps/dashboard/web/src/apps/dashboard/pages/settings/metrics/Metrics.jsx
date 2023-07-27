@@ -80,8 +80,10 @@ function Metrics() {
             setCurrentHost(val)
         }else{
             setGroupBy(val)
+            setCurrentHost(null)
         }
         setMenuItems(initialItems)
+        setHostsActive(false)
     }
 
     const defaultChartOptions = {
