@@ -39,6 +39,14 @@ const api = {
             data: {workspace_id, allowReplay, api_key}
         })
     },
+
+    fetchLBs(){
+        return request({
+            url: '/api/fetchLoadBalancers',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default api
