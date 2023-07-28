@@ -135,7 +135,7 @@ function TagDetails() {
                 });
             } else {
                 tagsApi.saveTagConfig(name, currState.operator, keyConditionFromUsers, false, currState.active).then((res) => {
-                    func.setToast(true, false, "Auth type updated successfully");
+                    func.setToast(true, false, "Tag config updated successfully");
                     setChange(false);
                     let item = res.tagConfig;
                     navigate(null, {
@@ -145,7 +145,7 @@ function TagDetails() {
                         }
                     })
                 }).catch((err) => {
-                    func.setToast(true, true, "Unable to add auth type");
+                    func.setToast(true, true, "Unable to add Tag config");
                 });
             }
         }
