@@ -76,30 +76,33 @@ const SampleApi = () => {
         let testId = selectedTest.value
         let selectedUrl = vulnerableRequestsObj?.[testId]
         setSelectedCollectionId(null)
+        setCopyCollectionId(null)
         setSelectedApiEndpoint(null)
+        setCopySelectedApiEndpoint(null)
         setTestResult(null)
         if(!selectedUrl){
             selectedUrl = defaultRequest
         }
         setTimeout(()=> {
             setSelectedCollectionId(selectedUrl.apiCollectionId)
-            let obj = {
-                method: selectedUrl.method._name,
-                url: selectedUrl.url
-            }
-            setSelectedApiEndpoint(obj)
+            setCopyCollectionId(selectedUrl.apiCollectionId)
+            setSelectedApiEndpoint(func.toMethodUrlString({method:selectedUrl.method._name, url:selectedUrl.url}))
         },0)
+        setTimeout(() => {
+            setCopySelectedApiEndpoint(func.toMethodUrlString({method:selectedUrl.method._name, url:selectedUrl.url}))
+        }, 300)
         
     },[selectedTest])
 
     useEffect(() => {
         fetchApiEndpoints(copyCollectionId)
+        setCopySelectedApiEndpoint(null);
         setTestResult(null)
     }, [copyCollectionId])
 
     useEffect(() => {
         if (selectedCollectionId && selectedApiEndpoint) {
-            fetchSampleData(selectedCollectionId, selectedApiEndpoint.url, selectedApiEndpoint.method)
+            fetchSampleData(selectedCollectionId, func.toMethodUrlObject(selectedApiEndpoint).url, func.toMethodUrlObject(selectedApiEndpoint).method)
         }else{
             editorInstance?.setValue("")
         }
@@ -135,13 +138,11 @@ const SampleApi = () => {
     }
 
     const apiEndpointsOptions = apiEndpoints.map(apiEndpoint => {
+        let str = func.toMethodUrlString(apiEndpoint);
         return {
-            id: apiEndpoint.method + " " + apiEndpoint.url,
-            label: apiEndpoint.method + " " + apiEndpoint.url,
-            value: {
-                method: apiEndpoint.method,
-                url: apiEndpoint.url
-            }
+            id: str,
+            label: str,
+            value: str
         }
     })
 
@@ -231,7 +232,8 @@ const SampleApi = () => {
                         placeholder="Select API collection"
                         optionsList={allCollectionsOptions}
                         setSelected={setCopyCollectionId}
-                        value={mapCollectionIdToName?.[selectedCollectionId]}
+                        value={mapCollectionIdToName?.[copyCollectionId]}
+                        preSelected={[copyCollectionId]}
                     />
 
                     <br />
@@ -242,7 +244,8 @@ const SampleApi = () => {
                         placeholder="Select API endpoint"
                         optionsList={apiEndpointsOptions}
                         setSelected={setCopySelectedApiEndpoint}
-                        value={selectedApiEndpoint?.url}
+                        value={copySelectedApiEndpoint==null ? "No endpoints selected" : copySelectedApiEndpoint}
+                        preSelected={[copySelectedApiEndpoint]}
                     />
 
                 </Modal.Section>

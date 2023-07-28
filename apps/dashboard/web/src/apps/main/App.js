@@ -27,11 +27,14 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
+import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
+import Tags from "../dashboard/pages/settings/tags/Tags";
 
 const router = createBrowserRouter([
   {
@@ -93,6 +96,10 @@ const router = createBrowserRouter([
       {
         path:"issues",
         element:<IssuesPage/>
+      },
+      {
+        path: "quick-start",
+        element: <QuickStart/>
       }
     ]
   },
@@ -145,17 +152,22 @@ const router = createBrowserRouter([
         element: <Webhook />,
       },
       {
-        path: "/dashboard/settings/health_logs",
+        path: "/dashboard/settings/health-logs",
         element: <HealthLogs />,
+      },
+      {
+        path: "/dashboard/settings/auth-types",
+        element:<AuthTypes/>
+      },
+      {
+        path: "/dashboard/settings/tags",
+        element: <Tags/>
       }
   ]
   },
   {
     path: "/dashboard/test-editor/:testId",
     element: <TestEditor />
-  },
-  {
-
   },
 {
   path: "/login",

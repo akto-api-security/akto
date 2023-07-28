@@ -78,14 +78,13 @@ export default {
             }
         })
     },
-    fetchCollectionWiseApiEndpoints (apiCollectionId) {
-        return request({
+    async fetchCollectionWiseApiEndpoints (apiCollectionId) {
+        const resp = await request({
             url: '/api/fetchCollectionWiseApiEndpoints',
             method: 'post',
-            data: {apiCollectionId}
-        }).then((resp) => {
-            return resp
-        })        
+            data: { apiCollectionId }
+        })
+        return resp        
     },
     async fetchTestRoles() {
         const resp = await request({
@@ -120,6 +119,21 @@ export default {
             data: {}
         }).then((resp) => {
             return resp
+        })},
+    async addTestRoles (roleName, andConditions, orConditions) {
+        const resp = await request({
+            url: '/api/addTestRoles',
+            method: 'post',
+            data: { roleName, andConditions, orConditions }
         })
+        return resp        
+    },
+    async updateTestRoles (roleName, andConditions, orConditions) {
+        const resp = await request({
+            url: '/api/updateTestRoles',
+            method: 'post',
+            data: { roleName, andConditions, orConditions }
+        })
+        return resp        
     },
 }

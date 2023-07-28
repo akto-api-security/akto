@@ -2,6 +2,9 @@ import { useEffect, useState } from "react"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import api from "../api"
+import { Button } from "@shopify/polaris"
+import { useNavigate } from "react-router-dom"
+import func from "@/util/func"
 
 const headers = [
     {
@@ -9,6 +12,17 @@ const headers = [
         value:"name",
         itemOrder:1
     },
+    {
+        text:"Last updated",
+        value:"timestamp",
+        itemCell: 2
+    },
+    {
+        text:"Created by",
+        value:"createdBy",
+        itemCell: 2
+    },
+
 ]
 
 const resourceName = {
@@ -20,6 +34,28 @@ function TestRolesPage(){
 
     const [testRoles, setTestRoles] = useState([]);
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate()
+
+    const handleRedirect = () => {
+        navigate("settings")
+    }
+
+    const getActions = (item) => {
+        return [{
+            items: [{
+                content: 'Edit',
+                onAction: () => navigate("settings", {state: {name: item.name ,endpoints: item.endpointLogicalGroup.testingEndpoints}}),
+            },
+            {
+                content: 'Access matrix',
+                onAction: () => console.log("access matrix")
+            },
+            {
+                content: 'Validate',
+                onAction: () => console.log("validate")
+            }]
+        }]
+    }
 
     useEffect(() => {
         setLoading(true);
@@ -27,8 +63,8 @@ function TestRolesPage(){
         async function fetchData(){
             await api.fetchTestRoles().then((res) => {
                 setTestRoles(res.testRoles.map((testRole) => {
+                    testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
                     testRole.id=testRole.name;
-                    testRole.nextUrl="settings"
                     return testRole;
                 }));
             })
@@ -40,6 +76,7 @@ function TestRolesPage(){
     return (
         <PageWithMultipleCards
         title={"Test roles"}
+        primaryAction = {<Button primary onClick={handleRedirect}>Create new test role</Button>}
         components={[
             <GithubSimpleTable
             key="table"
@@ -47,6 +84,8 @@ function TestRolesPage(){
             resourceName={resourceName} 
             headers={headers}
             loading={loading}
+            getActions={getActions}
+            hasRowActions={true}
             />
         ]}
         />
