@@ -32,6 +32,8 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
+import Tags from "../dashboard/pages/settings/tags/Tags";
 
 const router = createBrowserRouter([
   {
@@ -147,6 +149,14 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/settings/health_logs",
         element: <HealthLogs />,
+      },
+      {
+        path: "/dashboard/settings/auth-types",
+        element:<AuthTypes/>
+      },
+      {
+        path: "/dashboard/settings/tags",
+        element: <Tags/>
       }
   ]
   },

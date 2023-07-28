@@ -5,6 +5,7 @@ import {
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
+import { isValidElement } from 'react';
 
 const func = {
   toDateStr(date, needYear) {
@@ -441,15 +442,23 @@ async copyRequest(type, completeData) {
 
 deepComparison(item1, item2) {
   
-  const areArrays = Array.isArray(item1) && Array.isArray(item2)
-  const areObjects = func.isObject(item1) && func.isObject(item2)
-  
-    if (areObjects) {
-    return func.deepObjectComparison(item1, item2);
-  } else if (areArrays) {
-    return func.deepArrayComparison(item1, item2);
-  } else {
-    return item1 === item2;
+  try {
+    const areArrays = Array.isArray(item1) && Array.isArray(item2)
+    const areObjects = func.isObject(item1) && func.isObject(item2)
+    const isReactObject = isValidElement(item1) || isValidElement(item2)
+
+    if (isReactObject) {
+      return false;
+    }
+    else if (areObjects) {
+      return func.deepObjectComparison(item1, item2);
+    } else if (areArrays) {
+      return func.deepArrayComparison(item1, item2);
+    } else {
+      return item1 === item2;
+    }
+  } catch (ex) {
+    return false;
   }
 },
 
@@ -464,8 +473,12 @@ deepArrayComparison(arr1, arr2) {
 
     const areArrays = Array.isArray(element1) && Array.isArray(element2)
     const areObjects = func.isObject(element1) && func.isObject(element2)
+    const isReactObject = isValidElement(element1) || isValidElement(element2)
 
-    if (areArrays) {
+  if(isReactObject){
+    return false;
+  }
+  else if (areArrays) {
       if (!func.deepArrayComparison(element1, element2)) {
         return false;
       }
@@ -495,8 +508,12 @@ deepObjectComparison(obj1, obj2) {
 
     const areArrays = Array.isArray(val1) && Array.isArray(val2);
     const areObjects = func.isObject(val1) && func.isObject(val2);
+    const isReactObject = isValidElement(val1) || isValidElement(val2)
 
-    if (areArrays) {
+  if(isReactObject){
+    return false;
+  }
+  else if (areArrays) {
       if (!func.deepArrayComparison(val1, val2)) {
         return false;
       }
