@@ -147,7 +147,7 @@ const router = createBrowserRouter([
         element: <Webhook />,
       },
       {
-        path: "/dashboard/settings/health_logs",
+        path: "/dashboard/settings/health-logs",
         element: <HealthLogs />,
       },
       {

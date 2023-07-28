@@ -56,7 +56,7 @@ const SettingsLeftNav = () => {
                         label: 'Health & Logs',
                         icon: ReportMinor,
                         selected: page === "health-logs",
-                        onClick: () => navigate("/dashboard/settings/health_logs")
+                        onClick: () => navigate("/dashboard/settings/health-logs")
                     },
                     {
                         label: 'Metrics',
