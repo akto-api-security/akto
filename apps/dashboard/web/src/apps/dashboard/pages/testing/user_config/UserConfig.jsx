@@ -1,15 +1,16 @@
-import { Button, Card, Collapsible, Icon, LegacyCard, LegacyStack, Link, Page, TextContainer, TextField } from "@shopify/polaris"
+import { Button, Card, Collapsible, Divider, Icon, LegacyCard, LegacyStack, Link, Page, TextContainer, TextField } from "@shopify/polaris"
 import { ChevronRightMinor } from '@shopify/polaris-icons';
 import { useCallback, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import { useEffect } from "react";
+import HardCoded from "./HardCoded";
 
 function UserConfig() {
 
-    const [open, setOpen] = useState(true);
+    const [hardcodedOpen, setHardcodedOpen] = useState(true);
 
-    const handleToggle = useCallback(() => setOpen((open) => !open), []);
+    const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
 
     async function fetchAuthMechanismData() {
         const authMechanismDataResponse = await api.fetchAuthMechanismData()
@@ -58,36 +59,51 @@ function UserConfig() {
                 </LegacyCard.Section>
             </LegacyCard> */}
 
-            <LegacyCard title="Choose Auth Token Configuration"></LegacyCard>
             <LegacyCard sectioned title="Choose auth token configuration">
+                <Divider />
                 <LegacyCard.Section>
-                <LegacyStack vertical>
-                    <Button
-                        onClick={handleToggle}
-                        ariaExpanded={open}
-                        icon={ChevronRightMinor}
-                        ariaControls="basic-collapsible"
-                    >
-                        Inject hard-coded attacker auth token
-                    </Button>
-                    <Collapsible
-                        open={open}
-                        id="basic-collapsible"
-                        transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
-                        expandOnPrint
-                    >
-                        <TextContainer>
-                            <p>
-                                Your mailing list lets you contact customers or visitors who
-                                have shown an interest in your store. Reach out to them with
-                                exclusive offers or updates about your products.
-                            </p>
-                            <Link url="#">Test link</Link>
-                        </TextContainer>
-                    </Collapsible>
-                </LegacyStack>
+                    <LegacyStack vertical>
+                        <Button
+                            onClick={handleToggle}
+                            ariaExpanded={open}
+                            icon={ChevronRightMinor}
+                            ariaControls="hardcoded"
+                        >
+                            Hard coded
+                        </Button>
+                        <Collapsible
+                            open={open}
+                            id="hardcoded"
+                            transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
+                            expandOnPrint
+                        >
+                            <HardCoded />
+                        </Collapsible>
+                    </LegacyStack>
                 </LegacyCard.Section>
-             
+
+
+                <LegacyCard.Section>
+                    <LegacyStack vertical>
+                        <Button
+                            onClick={handleToggle}
+                            ariaExpanded={open}
+                            icon={ChevronRightMinor}
+                            ariaControls="automated"
+                        >
+                            Automated
+                        </Button>
+                        <Collapsible
+                            open={false}
+                            id="automated"
+                            transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
+                            expandOnPrint
+                        >
+                            <HardCoded />
+                        </Collapsible>
+                    </LegacyStack>
+                </LegacyCard.Section>
+
             </LegacyCard>
         </Page>
     )

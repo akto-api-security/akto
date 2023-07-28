@@ -1,6 +1,5 @@
-import { Button, Card, Collapsible, Icon, LegacyCard, Link, Page, TextContainer, TextField } from "@shopify/polaris"
-import { CircleTickMajor } from '@shopify/polaris-icons';
-import { useCallback, useState } from "react";
+import { Button, Card, Collapsible, Icon, LegacyCard, Link, Page, Text, TextContainer, TextField } from "@shopify/polaris"
+import { useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import { useEffect } from "react";
@@ -16,10 +15,9 @@ function HardCoded() {
 
     async function fetchAuthMechanismData() {
         const authMechanismDataResponse = await api.fetchAuthMechanismData()
-        if (authMechanismDataResponse 
-            && authMechanismDataResponse.authMechanism 
-            && authMechanismDataResponse.authMechanism.type === "HARDCODED") 
-        {
+        if (authMechanismDataResponse
+            && authMechanismDataResponse.authMechanism
+            && authMechanismDataResponse.authMechanism.type === "HARDCODED") {
             const authParam = authMechanismDataResponse.authMechanism.authParams[0]
             setUserConfig({
                 authHeaderKey: authParam.key,
@@ -59,30 +57,23 @@ function HardCoded() {
     }
 
     return (
-        <Page
-            title="User config"
-            primaryAction={{ content: 'Stop all tests', onAction: handleStopAlltests }}
-            divider
-            fullWidth
-        >
-            <LegacyCard title="Inject hard-coded attacker auth token">
-                <LegacyCard.Section>
-                    <TextField
-                        label="Auth header key"
-                        value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />
-                    <br />
-                    <TextField label="Auth header value" value={userConfig.authHeaderValue} placeholder='' onChange={(authHeaderValue) => updateUserConfig("authHeaderValue", authHeaderValue)} />
-                    <br />
-                    <Button
-                        primary
-                        disabled={!hasChanges}
-                        onClick={handleSave}
-                    >
-                        Save changes
-                    </Button>
-                </LegacyCard.Section>
-            </LegacyCard>
-        </Page>
+        <div>
+            <Text variant="headingMd">Inject hard-coded attacker auth token</Text>
+            <br />
+            <TextField
+                label="Auth header key"
+                value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />
+            <br />
+            <TextField label="Auth header value" value={userConfig.authHeaderValue} placeholder='' onChange={(authHeaderValue) => updateUserConfig("authHeaderValue", authHeaderValue)} />
+            <br />
+            <Button
+                primary
+                disabled={!hasChanges}
+                onClick={handleSave}
+            >
+                Save changes
+            </Button>
+        </div>                   
     )
 }
 
