@@ -54,6 +54,20 @@ function ConditionsPicker(props) {
         }
     ]
 
+    const getOption = (field) => {
+        const option = items.filter((item) => {
+            return item.value == field.type
+        })[0]
+        return option;
+    }
+    const getConditions = (field) => {
+        const option = getOption(field)
+        if (option.operators) {
+            return option.operators
+        }
+        return orAndConditions;
+    }
+
     const handleConditionSelected = (val) =>{
         let obj = {
             predicates: textFields,
@@ -75,7 +89,7 @@ function ConditionsPicker(props) {
 
     const prefixLeft= (index) =>(
         <ButtonGroup>
-            {index > 0 ? (<Dropdown menuItems={orAndConditions} initial={condition} selected={handleConditionSelected}/>) : null}
+            {index > 0 ? (<Dropdown menuItems={getConditions(textFields[index])} initial={condition} selected={handleConditionSelected}/>) : null}
             <TextField value={param} />
             <Dropdown menuItems={items} initial={textFields[index].type} selected={(val) => handleRegexSelected(val,index)}/>
         </ButtonGroup>
