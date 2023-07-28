@@ -1,0 +1,48 @@
+id: DOCKER_COMPOSE_CONFIG
+info:
+  name: docker-compose.yml exposure
+  description: "Attacker can get unauthorized access of Docker Compose configuration files."
+  details: >
+              "Docker Compose.yml Exposure refers to the vulnerability where Docker Compose configuration files, such as docker-compose.yml and related variants, are exposed due to misconfiguration. Unauthorized access to these files can reveal sensitive information about the containerized application, including its services, configurations, and version details. Attackers can exploit this exposure to identify weaknesses, manipulate container settings, and potentially compromise the security of the application's environment. Promptly addressing this vulnerability is essential to prevent unauthorized access, protect sensitive data, and maintain the overall security of the containerized application."
+  impact: "Exposing Docker Compose configuration files allows attackers to gain insights into the application's containerized structure, services, and configurations. This information can be exploited to identify weaknesses, manipulate container settings, and potentially compromise the application's security."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: DOCKER_COMPOSE_CONFIG
+  severity: MEDIUM
+  references:
+    - https://beaglesecurity.com/blog/vulnerability/docker-compose-yml-exposure.html
+    - https://secapps.com/vulndb/docker-compose-exposure
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/docker-compose.yml
+    - ${urlVar}/docker-compose.prod.yml
+    - ${urlVar}/docker-compose.production.yml
+    - ${urlVar}/docker-compose.staging.yml
+    - ${urlVar}/docker-compose.dev.yml
+    - ${urlVar}/docker-compose-dev.yml
+    - ${urlVar}/docker-compose.override.yml
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      - follow_redirect: true
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'version'
+      - 'services'

@@ -1,0 +1,40 @@
+id: APACHE_CONFIG
+info:
+  name: Apache Config file disclosure
+  description: "Attackers can get access to the Apache configuration files."
+  details: >
+              "Apache Config File Disclosure refers to the vulnerability where Apache configuration files are exposed due to misconfiguration. This exposes sensitive information about the server's setup and security measures. Attackers can exploit this vulnerability to gain insights into the server's configuration, potentially identifying weaknesses and planning targeted attacks. Promptly addressing this issue is important to prevent unauthorized access and protect the server from potential security risks."
+  impact: "Attackers can exploit the exposed configuration files to gain insights into the server's configuration, potentially identifying vulnerabilities and planning targeted attacks. The impact may vary depending on the specific information disclosed in the files."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: AIRFLOW_CONFIGURATION_EXPOSURE
+  severity: LOW
+  references:
+    - https://www.apachelounge.com/viewtopic.php?t=8762
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/apache.conf
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    or:
+      - contains_all:
+        - "<Directory"
+        - "</Directory"
+      - contains_all:
+        - "<VirtualHost"
+        - "</VirtualHost"

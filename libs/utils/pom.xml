@@ -17,6 +17,11 @@
     <dependencies>
         <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
+            <groupId>com.mixpanel</groupId>
+            <artifactId>mixpanel-java</artifactId>
+            <version>1.4.4</version>
+        </dependency>
+        <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.13.1</version>

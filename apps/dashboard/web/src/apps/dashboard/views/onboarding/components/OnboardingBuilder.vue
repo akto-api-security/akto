@@ -52,7 +52,6 @@ import NextButton from '@/apps/dashboard/views/onboarding/components/NextButton'
 import SetConfig from '@/apps/dashboard/views/onboarding/components/SetConfig'
 import {mapState} from 'vuex'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
-import marketplaceApi from "../../marketplace/api"
 
 export default {
     name: "OnboardingBuilder",
@@ -108,27 +107,13 @@ export default {
                 },
             ],
             loading: false,
-            timer: null
         }
     },
     methods: {
         next() {
             if (this.currentStep === 3) {
-                let foundTests = false;
                 this.$store.commit("onboarding/UPDATE_RUN_TEST_LOADING",true)
-                this.timer = setInterval(async () => {
-                    if (foundTests) {
-                        this.$store.dispatch("onboarding/runTestOnboarding")
-                        clearInterval(this.timer)
-                    } else {
-                        marketplaceApi.searchTestResults("").then((resp) => {
-                            // we wait for atleast 100 tests to be downloaded before we run tests.
-                            if (resp.searchResults && resp.searchResults.length > 50) {
-                                foundTests = true;
-                            }
-                        })
-                    }
-                }, 1000)
+                this.$store.dispatch("onboarding/runTestOnboarding")
             } else if (this.currentStep === 4) {
                 this.$router.push('/dashboard/testing/' + this.testingRunHexId + '/results')
             }

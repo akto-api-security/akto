@@ -52,7 +52,7 @@ public class SendgridEmail {
 
         Email fromEmail = new Email();
         fromEmail.setName("Ankita");
-        fromEmail.setEmail("ankita@akto.io");
+        fromEmail.setEmail("ankita.gupta@akto.io");
         mail.setFrom(fromEmail);
 
         //mail.setSubject("Welcome to Akto");
@@ -77,6 +77,7 @@ public class SendgridEmail {
         personalization.addDynamicTemplateData("inviteeName",inviteeName);
         personalization.addDynamicTemplateData("orgName",extractOrgName(inviteFrom));
         personalization.addDynamicTemplateData("aktoUrl",invitiationUrl);
+        System.out.println("Invitation url: "+invitiationUrl);
         return mail;
     }
 

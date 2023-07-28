@@ -1,0 +1,43 @@
+id: CONFIG_RUBY
+info:
+  name: Config Ruby File Disclosure
+  description: ""
+  details: >
+              "Config Ruby File Disclosure refers to the vulnerability where Ruby configuration files, such as config.rb, .chef/config.rb, and assets/config.rb, are exposed due to misconfiguration. Unauthorized access to these files can reveal sensitive information about the application's configuration, including directory paths for images and CSS. Attackers can leverage this information to gain insights into the application's structure, potentially enabling further attacks such as path traversal or unauthorized file access. Promptly addressing this vulnerability is essential to prevent unauthorized access and protect the security and integrity of the application."
+  impact: "Enables attackers to gain insights into the application's structure, potentially leading to path traversal or unauthorized file access."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: CONFIG_RUBY
+  severity: MEDIUM
+  references:
+    - https://www.broadcom.com/support/security-center/attacksignatures/detail?asid=31405
+    - https://www.acunetix.com/vulnerabilities/web/ruby-on-rails-database-configuration-file/
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/config.rb
+    - ${urlVar}/.chef/config.rb
+    - ${urlVar}/assets/config.rb
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'images_dir'
+      - 'css_dir'

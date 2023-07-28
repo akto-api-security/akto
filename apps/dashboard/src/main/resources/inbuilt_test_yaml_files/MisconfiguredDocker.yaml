@@ -1,0 +1,37 @@
+id: MISCONFIGURED_DOCKER
+info:
+  name: Docker Container - Misconfiguration Exposure
+  description: "A Docker container misconfiguration was discovered."
+  details: >
+              "This vulnerability identifies misconfigured Docker containers by scanning the "/images/json" endpoint. Misconfigurations can include exposed parent IDs, container information, and labels. Such misconfigurations can lead to unauthorized access, data leaks, and potential compromise of the Docker environment."
+  impact: "Misconfigured Docker containers can lead to unauthorized access, data leaks, and compromise of the Docker environment, posing significant security risks to applications and sensitive data."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: MISCONFIGURED_DOCKER
+  severity: HIGH
+  references:
+    - https://madhuakula.com/content/attacking-and-auditing-docker-containers-using-opensource/attacking-docker-containers/misconfiguration.html
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/images/json
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'ParentId'
+      - 'Container'
+      - 'Labels'

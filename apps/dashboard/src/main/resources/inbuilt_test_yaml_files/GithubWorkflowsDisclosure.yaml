@@ -1,0 +1,68 @@
+id: GITHUB_WORKFLOW_DISCLOSURE
+info:
+  name: Github Workflow Disclosure
+  description: "Searches for the presence of GitHub workflow files on provided URLs." 
+  details: >
+              "GitHub Workflow Disclosure refers to the vulnerability where the presence of GitHub workflow files is checked on provided URLs. These workflow files, located in the .github/workflows directory, define automation tasks and may contain sensitive information or misconfigurations. Identifying and addressing this vulnerability is crucial to prevent unauthorized access, protect secrets, and ensure the integrity of workflows and automation processes."
+  impact: "Exposing GitHub workflow files can reveal sensitive information, including secrets, API tokens, and configurations. Attackers can exploit this information to gain unauthorized access, manipulate workflows, escalate privileges, or perform unauthorized actions."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GITHUB_WORKFLOW_DISCLOSURE
+  severity: MEDIUM
+  references:
+    - https://github.com/detectify/ugly-duckling/blob/master/modules/crowdsourced/github-workflows-disclosure.json
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.github/workflows/ci.yml
+    - ${urlVar}/.github/workflows/ci.yaml
+    - ${urlVar}/.github/workflows/CI.yml
+    - ${urlVar}/.github/workflows/main.yml
+    - ${urlVar}/.github/workflows/main.yaml
+    - ${urlVar}/.github/workflows/build.yml
+    - ${urlVar}/.github/workflows/build.yaml
+    - ${urlVar}/.github/workflows/test.yml
+    - ${urlVar}/.github/workflows/test.yaml
+    - ${urlVar}/.github/workflows/tests.yml
+    - ${urlVar}/.github/workflows/tests.yaml
+    - ${urlVar}/.github/workflows/release.yml
+    - ${urlVar}/.github/workflows/publish.yml
+    - ${urlVar}/.github/workflows/deploy.yml
+    - ${urlVar}/.github/workflows/push.yml
+    - ${urlVar}/.github/workflows/lint.yml
+    - ${urlVar}/.github/workflows/coverage.yml
+    - ${urlVar}/.github/workflows/release.yaml
+    - ${urlVar}/.github/workflows/pr.yml
+    - ${urlVar}/.github/workflows/automerge.yml
+    - ${urlVar}/.github/workflows/docker.yml
+    - ${urlVar}/.github/workflows/ci-generated.yml
+    - ${urlVar}/.github/workflows/ci-push.yml
+    - ${urlVar}/.github/workflows/ci-daily.yml
+    - ${urlVar}/.github/workflows/ci-issues.yml
+    - ${urlVar}/.github/workflows/smoosh-status.yml
+    - ${urlVar}/.github/workflows/snyk.yml
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - "on"
+      - "jobs"
+      - "steps"
+      - "uses"
