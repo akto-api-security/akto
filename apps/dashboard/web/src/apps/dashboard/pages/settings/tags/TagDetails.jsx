@@ -128,7 +128,8 @@ function TagDetails() {
                         state: {
                             name: item?.name, active: item?.active,
                             keyConditions: item?.keyConditions
-                        }
+                        },
+                            replace:true
                     })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to add tag config");
@@ -142,7 +143,8 @@ function TagDetails() {
                         state: {
                             name: item?.name, active: item?.active,
                             keyConditions: item?.keyConditions
-                        }
+                        },
+                            replace:true
                     })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to add Tag config");

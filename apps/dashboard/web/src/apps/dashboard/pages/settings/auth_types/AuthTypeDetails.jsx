@@ -128,7 +128,8 @@ function AuthTypeDetails() {
                     setChange(false);
                     let item = res.customAuthType;
                     navigate(null, { state: { name: item?.name, active: item?.active,
-                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys }})
+                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys },
+                        replace:true})
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to add auth type");
                 });
@@ -138,7 +139,8 @@ function AuthTypeDetails() {
                     setChange(false);
                     let item = res.customAuthType; 
                     navigate(null, { state: { name: item?.name, active: item?.active,
-                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys }})
+                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys },
+                        replace:true})
                     }).catch((err) => {
                     func.setToast(true, true, "Unable to add auth type");
                 });

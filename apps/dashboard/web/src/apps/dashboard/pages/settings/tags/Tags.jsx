@@ -53,10 +53,8 @@ function Tags(){
         setLoading(true);
         async function fetchData() {
             await tagsApi.fetchTagConfigs().then((res) => {
-                console.log(res);
                 let usersMap = res.tagConfigs.usersMap;
                 setTags(res.tagConfigs.tagConfigs.map((tag) => {
-                    console.log(tag);
                     tag.id = tag.name
                     tag.updatedTimestamp = func.prettifyEpoch(tag.timestamp);
                     tag.createdBy = usersMap[tag.creatorId]

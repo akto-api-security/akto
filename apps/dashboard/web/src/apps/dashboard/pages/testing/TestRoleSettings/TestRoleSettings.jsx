@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import { LegacyCard, HorizontalGrid, TextField } from '@shopify/polaris'
-import ContextualLayout from '../../../components/layouts/ContextualLayout';
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
 import api from '../api';
 import transform from '../transform';
-import Store from '../../../store';
+import DetailsPage from '../../../components/DetailsPage';
 
 const selectOptions = [
     {
@@ -51,14 +49,6 @@ function TestRoleSettings() {
         setRoleName(initialItems.name ? initialItems.name : "");
         setConditions(transform.createConditions(initialItems.endpoints));
     }
-    const setToastConfig = Store(state => state.setToastConfig)
-    const setToast = (isActive, isError, message) => {
-        setToastConfig({
-            isActive: isActive,
-            isError: isError,
-            message: message
-        })
-    }
     useEffect(() => {
         resetFunc()
     }, [])
@@ -79,29 +69,28 @@ function TestRoleSettings() {
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
         if (!(andConditions || orConditions) || roleName.length == 0) {
-            setToast(true, true, "Please select valid values for a test role")
+            func.setToast(true, true, "Please select valid values for a test role")
         } else {
             if (isNew) {
                 api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
-                    setToast(true, false, "Test role added")
+                    func.setToast(true, false, "Test role added")
                     setChange(false);
-                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } } })
+                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } }, 
+                        replace:true })
                 }).catch((err) => {
-                    setToast(true, true, "Unable to add test role")
+                    func.setToast(true, true, "Unable to add test role")
                 })
             } else {
                 api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
-                    setToast(true, false, "Test role updated")
+                    func.setToast(true, false, "Test role updated")
                     setChange(false);
-                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } } })
+                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } },
+                        replace:true })
                 }).catch((err) => {
-                    setToast(true, true, "Unable to update test role")
+                    func.setToast(true, true, "Unable to update test role")
                 })
             }
         }
-    }
-    const navigateBack = () => {
-        navigate("/dashboard/testing/roles")
     }
 
     const handleChange = (val) => {
@@ -140,20 +129,13 @@ function TestRoleSettings() {
 
     let components = [descriptionCard, conditionsCard]
 
-    const pageMarkup = (
-        <PageWithMultipleCards title={pageTitle}
-            backAction={{ onAction: navigateBack }}
-            divider
-            components={components}
-        />
-    )
-
     return (
-        <ContextualLayout
-            saveAction={saveAction}
-            discardAction={resetFunc}
-            isDisabled={compareFunc}
-            pageMarkup={pageMarkup}
+        <DetailsPage
+        pageTitle={pageTitle}
+        saveAction={saveAction}
+        discardAction={resetFunc}
+        isDisabled={compareFunc}
+        components={components}
         />
     )
 }
