@@ -13,7 +13,6 @@ import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
-import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
@@ -30,10 +29,6 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.rate_limit.ApiRateLimit;
-import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
-import com.akto.dto.testing.rate_limit.RateLimitHandler;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
@@ -42,12 +37,12 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
-import com.akto.util.JSONUtils;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
-import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
@@ -60,31 +55,19 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.attribute.FileTime;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.checkerframework.checker.units.qual.C;
-import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 import javax.servlet.ServletContextListener;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -92,6 +75,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -133,7 +117,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void setUpPiiCleanerScheduler(){
-        Set<Integer> whiteListCollectionSet = new HashSet<>();
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -141,6 +124,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
+                            Set<Integer> whiteListCollectionSet = new HashSet<>();
                             executePiiCleaner(whiteListCollectionSet);
                         } catch (Exception e) {
                         }
@@ -163,12 +147,6 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
-                            executeTestSourcesFetch();
-                            editTestSourceConfig();
-                        } catch (Exception e) {
-                        }
-
-                        try {
                             executePIISourceFetch();
                         } catch (Exception e) {
                         }
@@ -176,65 +154,6 @@ public class InitializerListener implements ServletContextListener {
                 }, "pii-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
-    }
-
-    public static void editTestSourceConfig() throws IOException{
-        List<TestSourceConfig> detailsTest = TestSourceConfigsDao.instance.findAll(new BasicDBObject()) ;
-        for(TestSourceConfig tsc : detailsTest){
-            String filePath = tsc.getId() ;
-            filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
-            if(downloadFileCheck(filePath)){
-                try {
-                    FileUtils.copyURLToFile(new URL(filePath), new File(filePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                    continue;
-                }
-            }
-
-            Yaml yaml = new Yaml();
-            InputStream inputStream = java.nio.file.Files.newInputStream(new File(filePath).toPath());
-            try {
-                Map<String, Map<String,Object>> data = yaml.load(inputStream);
-                if (data == null) data = new HashMap<>();
-
-                Map<String ,Object> currObj = new HashMap<>() ;
-                if(data != null){
-                    currObj = data.get("info");
-                }
-                if(currObj != null){
-                    String description = (String) currObj.get("name");
-                    if(description != null){
-                        tsc.setDescription(description);
-                    }
-
-                    String severity = (String) currObj.get("severity");
-                    Severity castedSeverity = Severity.LOW ;
-                    if(severity != null && severity.toLowerCase() != "unknown"){
-                        castedSeverity = Severity.valueOf(severity.toUpperCase()) ;
-                        tsc.setSeverity(castedSeverity);
-                    }
-
-                    String stringTags = (String) currObj.get("tags") ;
-                    List<String> tags = new ArrayList<>();
-                    if(stringTags != null){
-                        tags = Arrays.asList(stringTags.split(","));
-                        tsc.setTags(tags);
-                    }
-
-                    TestSourceConfigsDao.instance.updateOne(Filters.eq("_id", tsc.getId()),
-                            Updates.combine(Updates.set("description", description),
-                                    Updates.set("severity", castedSeverity), Updates.set("tags", tags)));
-                }
-            } catch (Exception e) {
-                // TODO: handle exception
-            }
-            finally{
-                if(inputStream!=null){
-                    inputStream.close();
-                }
-            }
-        }
     }
 
     static TestCategory findTestCategory(String path, Map<String, TestCategory> shortNameToTestCategory) {
@@ -245,82 +164,6 @@ public class InitializerListener implements ServletContextListener {
     static String findTestSubcategory(String path) {
         String parentPath = path.substring(0, path.lastIndexOf("/"));
         return parentPath.substring(parentPath.lastIndexOf("/") + 1);
-    }
-
-    public static void executeTestSourcesFetch() {
-        try {
-            TestCategory[] testCategories = TestCategory.values();
-            Map<String, TestCategory> shortNameToTestCategory = new HashMap<>();
-            for (TestCategory tc : testCategories) {
-                String sn = tc.getShortName().replaceAll("-", "").replaceAll("_", "")
-                        .replaceAll(" ", "").toLowerCase();
-                shortNameToTestCategory.put(sn, tc);
-            }
-
-            String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/tests-library/git/trees/master?recursive=1";
-            String tempFilename = "temp_testingSourcesRepoTree.json";
-            String fileContent = "";
-            if(downloadFileCheck(tempFilename)) {
-                try {
-                    FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
-                } catch (Exception e) {
-                    logger.error("api github error " + tempFilename, e);
-                }
-            }
-
-            try {
-                fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
-            } catch (Exception e) {
-                logger.error("temp file does not exist, using local file " + tempFilename, e);
-                fileContent = convertStreamToString(InitializerListener.class.getResourceAsStream("/testingSourcesRepoTree.json"));
-            }
-
-            BasicDBObject fileList = BasicDBObject.parse(fileContent);
-            BasicDBList files = (BasicDBList) (fileList.get("tree"));
-
-            BasicDBObject systemTestsQuery = new BasicDBObject(TestSourceConfig.CREATOR, TestSourceConfig.DEFAULT);
-            List<TestSourceConfig> currConfigs = TestSourceConfigsDao.instance.findAll(systemTestsQuery);
-            Map<String, TestSourceConfig> currConfigsMap = new HashMap<>();
-            for (TestSourceConfig tsc : currConfigs) {
-
-                if (tsc.getCategory() == null || tsc.getCategory().equals(TestCategory.UC)) {
-                    Bson deleteQ = Filters.eq("_id", tsc.getId());
-                    TestSourceConfigsDao.instance.getMCollection().deleteOne(deleteQ);
-                } else {
-                    currConfigsMap.put(tsc.getId(), tsc);
-                }
-            }
-
-            if (files == null) return;
-            for (Object fileObj : files) {
-                BasicDBObject fileDetails = (BasicDBObject) fileObj;
-                String filePath = fileDetails.getString("path");
-                if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
-                    if(filePath.contains("business-logic")){
-                        continue;
-                    }
-                    String categoryFolder = filePath.split("/")[0];
-                    filePath = "https://github.com/akto-api-security/tests-library/blob/master/" + filePath;
-                    if (!currConfigsMap.containsKey(filePath)) {
-                        TestCategory testCategory = findTestCategory(categoryFolder, shortNameToTestCategory);
-                        String subcategory = findTestSubcategory(filePath);
-                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", TestSourceConfig.DEFAULT, Context.now(), new ArrayList<>());
-                        TestSourceConfigsDao.instance.insertOne(testSourceConfig);
-                    }
-                    currConfigsMap.remove(filePath);
-                }
-            }
-
-            for (String toBeDeleted : currConfigsMap.keySet()) {
-                TestSourceConfigsDao.instance.getMCollection().deleteOne(new BasicDBObject("_id", toBeDeleted));
-            }
-
-
-        } catch (Exception e1) {
-            logger.error("executeTestSourcesFetch error " , e1);
-        }
-
-
     }
 
     static void executePiiCleaner(Set<Integer> whiteListCollectionSet) {
@@ -1099,6 +942,14 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        if(isSaas){
+                            try {
+                                Auth0.getInstance();
+                                loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
+                            }
+                        }
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1111,7 +962,6 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
-
     }
 
     public static void insertPiiSources(){
@@ -1177,7 +1027,7 @@ public class InitializerListener implements ServletContextListener {
 
             insertPiiSources();
 
-            setUpPiiCleanerScheduler();
+//            setUpPiiCleanerScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();

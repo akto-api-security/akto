@@ -343,25 +343,29 @@ public class Main {
 
     public static void initializeRuntime(){
         AccountTask.instance.executeTask(t -> {
-            SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
-            SingleTypeInfo.init();
-            createIndices();
-            insertRuntimeFilters();
-            try {
-                AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
-            }
-
-            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
-            if (apiCollection == null) {
-                Set<String> urls = new HashSet<>();
-                for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
-                    urls.add(singleTypeInfo.getUrl());
-                }
-                ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0));
-            }
+            initializeRuntimeHelper();
         }, "initialize-runtime-task");
+    }
+
+    public static void initializeRuntimeHelper() {
+        SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
+        SingleTypeInfo.init();
+        createIndices();
+        insertRuntimeFilters();
+        try {
+            AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
+        if (apiCollection == null) {
+            Set<String> urls = new HashSet<>();
+            for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
+                urls.add(singleTypeInfo.getUrl());
+            }
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0));
+        }
     }
 
 

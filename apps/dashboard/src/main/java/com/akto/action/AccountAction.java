@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -8,20 +7,13 @@ import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.Main;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
-import com.akto.runtime.Main;
-import com.amazonaws.services.lambda.model.*;
-import com.amazonaws.util.EC2MetadataUtils;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import com.opensymphony.xwork2.Action;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.RefreshPreferences;
@@ -29,8 +21,11 @@ import com.amazonaws.services.autoscaling.model.StartInstanceRefreshRequest;
 import com.amazonaws.services.autoscaling.model.StartInstanceRefreshResult;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.amazonaws.services.lambda.model.*;
+import com.amazonaws.util.EC2MetadataUtils;
+import com.mongodb.BasicDBObject;
+import com.opensymphony.xwork2.Action;
+
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static com.akto.dao.MCollection.ID;
 import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
@@ -48,7 +42,6 @@ public class AccountAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
-    private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     
     @Override
@@ -114,7 +107,7 @@ public class AccountAction extends UserAction {
     public void asgInstanceRefresh(StartInstanceRefreshRequest refreshRequest, String stack, String asg){
         String autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(stack, asg);
         refreshRequest.setAutoScalingGroupName(autoScalingGroup);
-        StartInstanceRefreshResult result = asc.startInstanceRefresh(refreshRequest);
+        StartInstanceRefreshResult result = AwsStack.getInstance().getAsc().startInstanceRefresh(refreshRequest);
         loggerMaker.infoAndAddToDb(String.format("instance refresh called on %s with result %s", asg, result.toString()), LogDb.DASHBOARD);
     }
 
@@ -237,6 +230,14 @@ public class AccountAction extends UserAction {
         return user;
     }
 
+    public static void addUserToExistingAccount(String email, int accountId){
+        Account account = AccountsDao.instance.findOne(eq("_id", accountId));
+        UsersDao.addNewAccount(email, account);
+        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+        //RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER, accountId));
+        Context.accountId.set(accountId);
+    }
+
     private static void intializeCollectionsForTheAccount(int newAccountId) {
         executorService.schedule(new Runnable() {
             public void run() {
@@ -251,15 +252,10 @@ public class AccountAction extends UserAction {
                 Main.createIndices();
                 Main.insertRuntimeFilters();
                 RuntimeListener.initialiseDemoCollections();
+                RuntimeListener.addSampleData();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
                 InitializerListener.saveTestEditorYaml();
-                try {
-                    InitializerListener.executeTestSourcesFetch();
-                    InitializerListener.editTestSourceConfig();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {

@@ -3,7 +3,7 @@ package com.akto.dto.type;
 public class URLMethods {
 
     public enum Method {
-        GET, POST, PUT, DELETE, HEAD, OPTIONS, TRACE, PATCH, OTHER;
+        GET, POST, PUT, DELETE, HEAD, OPTIONS, TRACE, PATCH, OTHER, TRACK;
 
         private static final Method[] valuesArray = values();
 
