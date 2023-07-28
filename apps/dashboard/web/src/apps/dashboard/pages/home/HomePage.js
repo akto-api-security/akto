@@ -8,17 +8,19 @@ import homeFunctions from "./module";
 
 function HomePage() {
   const setAllCollections = Store(state => state.setAllCollections)
-
+  const setUsername = Store(state => state.setUsername);
   const fetchAllCollections = async () => {
     let apiCollections = await homeFunctions.getAllCollections()
     setAllCollections(apiCollections)
   }
   useEffect(() => {
     fetchAllCollections()
+    setUsername(window.USER_NAME)
   }, [])
 
   const toastConfig = Store(state => state.toastConfig)
   const setToastConfig = Store(state => state.setToastConfig)
+  const leftNavCollapsed = Store(state => state.leftNavCollapsed)
 
   const disableToast = () => {
     setToastConfig({
@@ -41,7 +43,7 @@ function HomePage() {
   };
 
   return (
-    <Frame navigation={<LeftNav />} topBar={<Header />} logo={logo} >
+    <Frame navigation={leftNavCollapsed? undefined:<LeftNav />} topBar={<Header />} logo={logo} >
      <Box paddingBlockEnd={"20"}>
       <Outlet />
      </Box>
