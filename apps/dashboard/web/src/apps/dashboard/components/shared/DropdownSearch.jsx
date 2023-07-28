@@ -1,8 +1,8 @@
-import { Autocomplete, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Icon, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
-function DropdownSearch({ itemName, disabled, label, placeholder, optionsList, setSelected, preSelected, value, allowMultiple }) {
+function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName}) {
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -63,10 +63,21 @@ function DropdownSearch({ itemName, disabled, label, placeholder, optionsList, s
                 return matchedOption && matchedOption.label;
             });
             setSelectedOptions([...selected]);
-            setInputValue(allowMultiple ? 
-                `${selected.length} ${itemName ? itemName : "item"}${selected.length==1 ? "" : "s"} selected` : 
-                (selectedText[0] || ''));
-            setSelected(allowMultiple ? selected : selected[0])
+
+            if (avatarIcon) {
+                setInputValue(selected[0])
+            } else if (allowMultiple) {
+                setInputValue(`${selected.length} ${itemName ? itemName : "item"}${selected.length == 1 ? "" : "s"} selected`)
+            }
+            else {
+                setInputValue(selectedText[0] || '');
+            }
+
+            if (allowMultiple) {
+                setSelected(selected);
+            } else {
+                setSelected(selected[0])
+            }
         },
         [options],
     );
@@ -77,7 +88,12 @@ function DropdownSearch({ itemName, disabled, label, placeholder, optionsList, s
             onChange={updateText}
             label={label}
             value={inputValue}
-            prefix={<Icon source={SearchMinor} color="base" />}
+            prefix={
+                <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
+                    <Icon source={SearchMinor} color="base" />
+                    {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="extraSmall" name={avatarIcon} source={avatarIcon}/> : null}
+                </div>
+            }
             suffix={<Icon source={ChevronDownMinor} color="base" />}
             placeholder={placeholder}
             autoComplete="off"

@@ -9,3 +9,7 @@
     color: #d77f0c !important;
     font-weight: 600 !important;
 }
+
+.Polaris-DropZone{
+    min-height: 0 !important;
+}
