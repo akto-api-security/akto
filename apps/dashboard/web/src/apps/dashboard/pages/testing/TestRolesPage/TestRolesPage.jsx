@@ -21,8 +21,7 @@ const headers = [
         text:"Created by",
         value:"createdBy",
         itemCell: 2
-    },
-
+    }
 ]
 
 const resourceName = {
@@ -37,14 +36,14 @@ function TestRolesPage(){
     const navigate = useNavigate()
 
     const handleRedirect = () => {
-        navigate("settings")
+        navigate("details")
     }
 
     const getActions = (item) => {
         return [{
             items: [{
                 content: 'Edit',
-                onAction: () => navigate("settings", {state: {name: item.name ,endpoints: item.endpointLogicalGroup.testingEndpoints}}),
+                onAction: () => navigate("details", {state: {name: item.name ,endpoints: item.endpointLogicalGroup.testingEndpoints}}),
             },
             {
                 content: 'Access matrix',
@@ -67,10 +66,10 @@ function TestRolesPage(){
                     testRole.id=testRole.name;
                     return testRole;
                 }));
+                setLoading(false);
             })
         }
         fetchData();
-        setLoading(false);
     }, [])
 
     return (

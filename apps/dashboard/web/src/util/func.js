@@ -6,8 +6,16 @@ import {
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
+import Store from '../apps/dashboard/store';
 
 const func = {
+  setToast (isActive, isError, message) {
+    Store.getState().setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+      })
+  },
   toDateStr(date, needYear) {
     let strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let d = date.getDate();
