@@ -95,4 +95,31 @@ export default {
         })
         return resp
     },
+    stopAllTests() {
+        return request({
+            url: '/api/stopAllTests',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+    addAuthMechanism(type, requestData, authParamData) {
+        return request({
+            url: '/api/addAuthMechanism',
+            method: 'post',
+            data: {type, requestData, authParamData}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+    fetchAuthMechanismData() {
+        return request({
+            url: '/api/fetchAuthMechanismData',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }

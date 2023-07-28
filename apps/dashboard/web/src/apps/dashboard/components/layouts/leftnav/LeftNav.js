@@ -117,6 +117,12 @@ export default function LeftNav(){
                       onClick: ()=>{
                         navigate('/dashboard/testing/roles')
                       }
+                    },
+                    {
+                      label: 'User config',
+                      onClick: ()=>{
+                        navigate('/dashboard/testing/user_config')
+                      }
                     }
                   ],
                   key: '4',
