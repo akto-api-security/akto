@@ -40,6 +40,11 @@ function ConditionsPicker(props) {
 
     const handleAddTextField = () => {
         const updatedFields = [...textFields, { type: items[0].value, value: '', }];
+        let obj = {
+            predicates: updatedFields,
+            operator: condition,
+        }
+        fetchChanges(obj)
         setTextFields(updatedFields);
     };
 
