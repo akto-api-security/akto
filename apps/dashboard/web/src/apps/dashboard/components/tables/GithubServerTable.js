@@ -36,7 +36,6 @@ function GithubServerTable(props) {
     })
     async function fetchData(){
       let tempData = await props.fetchData(sortKey, sortOrder=='asc' ? -1 : 1, page*pageLimit, pageLimit, filters, filterOperators, queryValue);
-      // TODO: check state updates.
       setData([...tempData.value])
       setTotal(tempData.total)
     }
@@ -155,12 +154,12 @@ function GithubServerTable(props) {
       <GithubRow 
         key={data.id}
         id={data.id}
-        data={data} 
+        dataObj={data} 
         index={index} 
         getActions={props.getActions} 
         selectedResources={selectedResources}
         headers={props.headers}
-        rowClickable={props.rowClickable}
+        isRowClickable={props.rowClickable}
         hasRowActions={props.hasRowActions || false}
         page={props.page || 0}
         getNextUrl={props?.getNextUrl}
