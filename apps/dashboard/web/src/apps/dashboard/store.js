@@ -11,6 +11,7 @@ let store = (set)=>({
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
     username: window.USER_NAME,
+    setUsername: (username) => set({username: username}),
     toastConfig: {
         isActive: false,
         isError: false,

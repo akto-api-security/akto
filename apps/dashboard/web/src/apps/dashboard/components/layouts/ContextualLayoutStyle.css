@@ -1,0 +1,9 @@
+.control-frame-padding .Polaris-Frame__Main {
+    padding: 0 !important;
+}
+
+.Polaris-Frame-ContextualSaveBar__Contents{
+    max-width: 100% !important;
+    margin: 0 !important;
+    margin-right: 2rem !important;
+}

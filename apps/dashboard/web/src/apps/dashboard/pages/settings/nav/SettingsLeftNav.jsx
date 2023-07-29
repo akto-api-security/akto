@@ -1,5 +1,13 @@
 import { Navigation } from "@shopify/polaris"
-import { HomeMinor } from "@shopify/polaris-icons"
+import { RichTextMinor, 
+    ProductsMinor, 
+    LockMinor, 
+    ReportMinor, 
+    AnalyticsLineMinor, 
+    AppsMinor,
+    CustomersMinor,
+    DiamondAlertMinor,
+    MarketingMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 
@@ -16,45 +24,57 @@ const SettingsLeftNav = () => {
                 items={[
                     {
                         label: 'About',
-                        icon: HomeMinor,
+                        icon: RichTextMinor,
                         selected: page === "about",
                         onClick: () => navigate("/dashboard/settings/about")
                     },
                     {
                         label: 'Users',
-                        icon: HomeMinor,
+                        icon: CustomersMinor,
                         selected: page === "users",
                         onClick: () => navigate("/dashboard/settings/users")
                     },
                     {
                         label: 'Alerts',
-                        icon: HomeMinor,
+                        icon: DiamondAlertMinor,
                         selected: page === "alerts",
-                        onClick: () => navigate("/dashboard/settings/alerts")
+                        onClick: () => navigate("/dashboard/settings")
                     },
                     {
                         label: 'CI/CD',
-                        icon: HomeMinor,
+                        icon: MarketingMinor,
                         selected: page === "cicd",
-                        onClick: () => navigate("/dashboard/settings/cicd")
+                        onClick: () => navigate("/dashboard/settings")
                     },
                     {
                         label: 'Integrations',
-                        icon: HomeMinor,
+                        icon: AppsMinor,
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
                     {
                         label: 'Health & Logs',
-                        icon: HomeMinor,
+                        icon: ReportMinor,
                         selected: page === "health-logs",
-                        onClick: () => navigate("/dashboard/settings/health_logs")
+                        onClick: () => navigate("/dashboard/settings/health-logs")
                     },
                     {
                         label: 'Metrics',
-                        icon: HomeMinor,
+                        icon: AnalyticsLineMinor,
                         selected: page === "metrics",
                         onClick: () => navigate("/dashboard/settings/metrics")
+                    },
+                    {
+                        label: 'Auth types',
+                        icon: LockMinor,
+                        selected: page === "auth-types",
+                        onClick: () => navigate("/dashboard/settings/auth-types")
+                    },
+                    {
+                        label: 'Tags',
+                        icon: ProductsMinor,
+                        selected: page === "tags",
+                        onClick: () => navigate("/dashboard/settings/tags")
                     },
                 ]}
             />

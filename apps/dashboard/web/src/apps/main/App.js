@@ -33,6 +33,10 @@ import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import AwsSource from "../dashboard/pages/quick_start/components/AwsSource";
+import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
+import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
+import Tags from "../dashboard/pages/settings/tags/Tags";
+import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 
 const router = createBrowserRouter([
   {
@@ -60,7 +64,7 @@ const router = createBrowserRouter([
             element: <TestRolesPage/>
           },
           {
-            path:"roles/settings",
+            path:"roles/details",
             element:<TestRoleSettings/>
           }
         ]
@@ -106,52 +110,68 @@ const router = createBrowserRouter([
     element: <Settings />,
     children: [
       {
-        path: "/dashboard/settings/users",
+        path: "users",
         element: <Users />
       },
       {
-        path: "/dashboard/settings/integrations",
+        path: "integrations",
         element: <Integrations />,
       },
       {
-        path: "/dashboard/settings/about",
+        path: "about",
         element: <About />,
       },
       {
-        path: "/dashboard/settings/metrics",
+        path: "metrics",
         element: <Metrics />,
       },
       {
-        path: "/dashboard/settings/integrations/burp",
+        path: "integrations/burp",
         element: <BurpSuite />,
       },
       {
-        path: "/dashboard/settings/integrations/postman",
+        path: "integrations/postman",
         element: <Postman />,
       },
       {
-        path: "/dashboard/settings/integrations/akto_apis",
+        path: "integrations/akto_apis",
         element: <ApiTokens />,
       },
       {
-        path: "/dashboard/settings/integrations/akto_gpt",
+        path: "integrations/akto_gpt",
         element: <AktoGPT />,
       },
       {
-        path: "/dashboard/settings/integrations/webhooks",
+        path: "integrations/webhooks",
         element: <Webhooks />,
       },
       {
-        path: "/dashboard/settings/integrations/webhooks/:webhookId",
+        path: "integrations/webhooks/:webhookId",
         element: <Webhook />,
       },
       {
-        path: "/dashboard/settings/integrations/webhooks/create_custom_webhook",
+        path: "integrations/webhooks/create_custom_webhook",
         element: <Webhook />,
       },
       {
-        path: "/dashboard/settings/health_logs",
+        path: "health-logs",
         element: <HealthLogs />,
+      },
+      {
+        path: "auth-types",
+        element:<AuthTypes/>
+      },
+      {
+        path: "auth-types/details",
+        element: <AuthTypeDetails/>
+      },
+      {
+        path: "tags",
+        element: <Tags/>
+      },
+      {
+        path: "tags/details",
+        element: <TagDetails/>
       }
   ]
   },

@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
-import { Button, Frame, LegacyCard, ContextualSaveBar, HorizontalGrid, TextField, Box, VerticalStack } from '@shopify/polaris'
+import { Button, LegacyCard, HorizontalGrid, TextField, VerticalStack } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
 import { useLocation, useNavigate } from 'react-router-dom'
 import func from './transform'
 import api from '../api'
+import ContextualLayout from '../../../components/layouts/ContextualLayout'
 
 function DataTypes() {
 
   const location = useLocation();
-  const mapData =  (location.state && location.state.resp) ? location.state.resp :location.state && location.state.dataObj ? location.state.dataObj : {}
+  const mapDataCopy =  (location.state && location.state.resp) ? location.state.resp :location.state && location.state.dataObj ? location.state.dataObj : {}
+  const mapData = JSON.parse(JSON.stringify(mapDataCopy));
   const typename = mapData.name ? mapData.name : ''
   const dataType = location.state?.type || "Custom"
 
@@ -259,39 +261,13 @@ function DataTypes() {
     />
   )
 
-
-  const logo = {
-    width: 124,
-    contextualSaveBarSource:'/public/logo.svg',
-    url: '#',
-    accessibilityLabel: 'Akto Icon',
-  };
-
-
-  const contextualMarkup = (
-    <ContextualSaveBar
-          message="Unsaved changes"
-          saveAction={{
-            onAction: () => saveAction(),
-            loading: false,
-            disabled: compareFunc(),
-            content: "Save"
-          }}
-          discardAction={{
-            onAction: () => resetFunc(),
-            content: "Discard",
-            disabled: compareFunc(),
-          }}
-      />
-  )
-
   return (
-    <div className='control-frame-padding'>
-      <Frame logo={logo}>
-        {contextualMarkup}
-        {pageMarkup}
-      </Frame>
-    </div>
+    <ContextualLayout
+      saveAction={saveAction}
+      discardAction={resetFunc}
+      isDisabled={compareFunc}
+      pageMarkup={pageMarkup}
+    />
   )
 }
 
