@@ -105,7 +105,7 @@ function AuthTypes() {
 
     return (
         <PageWithMultipleCards
-            types={"Auth types"}
+            title={"Auth types"}
             primaryAction={<Button primary onClick={handleRedirect}>Create new auth type</Button>}
             secondaryActions={<ResetModal />}
             components={[

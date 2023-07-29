@@ -68,7 +68,7 @@ function Tags(){
 
     return (
         <PageWithMultipleCards
-        types={"Tags"}
+        title={"Tags"}
         primaryAction={<Button primary onClick={handleRedirect}>Create new tags</Button>}
         components={[
             <GithubSimpleTable

@@ -93,7 +93,7 @@ function TestRoleSettings() {
         }
     }
 
-    const handleChange = (val) => {
+    const handleTextChange = (val) => {
         setRoleName(val);
         if (val == initialItems.name) {
             setChange(false);
@@ -108,7 +108,7 @@ function TestRoleSettings() {
                 <HorizontalGrid gap="4" columns={2}>
                     <TextField
                         label="Name" value={roleName}
-                        placeholder='New test role name' onChange={isNew ? handleChange : () => { }}
+                        placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
                     />
                 </HorizontalGrid>
             </LegacyCard.Section>

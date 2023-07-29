@@ -12,15 +12,30 @@ function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected
 
 
     useEffect(() => {
+        if(value!=undefined){
+            setInputValue((prev) => {
+                if(prev == value){
+                    return prev;
+                }
+                return value;
+            });
+        }
+        if(preSelected!=undefined){
+            setSelectedOptions((prev) => {
+                if(func.deepComparison(prev,preSelected)){
+                    return prev;
+                }
+                return [...preSelected];
+            });
+
+        }
         setOptions((prev) => {
             if(func.deepComparison(prev,deselectedOptions)){
                 return prev;
             }
-            setInputValue(value ? value : undefined);
-            setSelectedOptions(preSelected ? preSelected : []);
             return deselectedOptions;
         })
-    }, [deselectedOptions])
+    }, [deselectedOptions, value, preSelected])
 
     const updateText = useCallback(
         (value) => {
