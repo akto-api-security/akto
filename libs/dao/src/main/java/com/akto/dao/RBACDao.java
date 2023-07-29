@@ -9,10 +9,16 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     public boolean isAdmin(int userId, int accountId) {
         RBAC rbac = RBACDao.instance.findOne(
-                Filters.and(
-                        Filters.eq(RBAC.USER_ID, userId),
-                        Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN),
-                        Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                Filters.or(Filters.and(
+                                Filters.eq(RBAC.USER_ID, userId),
+                                Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN),
+                                Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                        ),
+                        Filters.and(
+                                Filters.eq(RBAC.USER_ID, userId),
+                                Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN),
+                                Filters.exists(RBAC.ACCOUNT_ID, false)
+                                )
                 )
         );
         return rbac != null;
