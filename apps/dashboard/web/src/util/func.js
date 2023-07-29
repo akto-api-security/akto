@@ -16,6 +16,15 @@ const func = {
           message: message
       })
   },
+  validateName(name) {
+    const regex = /^[a-z0-9_]+$/i;
+    if (name.length == 0) {
+       return "Name cannot be blank";
+    } else if (!name.match(regex)) {
+      return "Only alphanumeric and underscore characters allowed in name" ;
+    }
+    return true;
+  },
   toDateStr(date, needYear) {
     let strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let d = date.getDate();

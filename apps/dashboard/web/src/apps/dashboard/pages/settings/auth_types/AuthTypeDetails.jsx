@@ -1,13 +1,12 @@
 import { LegacyCard, HorizontalGrid, TextField } from "@shopify/polaris";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
-import ContextualLayout from "../../../components/layouts/ContextualLayout";
 import authTypesApi from "./api";
 import ConditionsPicker from "../../../components/ConditionsPicker";
 import Dropdown from "../../../components/layouts/Dropdown";
 import transform from "./transform";
 import func from "@/util/func";
+import DetailsPage from "../../../components/DetailsPage";
 
 const selectOptions = [
     {
@@ -38,9 +37,9 @@ function AuthTypeDetails() {
     const location = useLocation();
     const navigate = useNavigate()
     const isNew = location?.state != undefined && Object.keys(location?.state).length > 0 ? false : true
-    const pageTitle = isNew ? "Add test role" : "Configure test role"
+    const pageTitle = isNew ? "Add auth type" : "Configure auth type"
     const initialState = isNew ? { name: "", active:undefined, headerConditions: [], payloadConditions: [] } : 
-        transform.fillInitialState(location.state, selectOptions[0]) ;
+        transform.fillInitialState(location.state, selectOptions[0]);
     const [currState, setCurrentState] = useState({});
     const [change, setChange] = useState(false)
     const resetFunc = () => {
@@ -61,21 +60,10 @@ function AuthTypeDetails() {
         }
     }, [currState])
 
-    const navigateBack = () => {
-        navigate("/dashboard/settings/auth-types")
-    }
-
-    const handleChange = (val, key) => {
-        let obj = {}
-        obj[key]=val;
+    const handleChange = (obj) => {
         setCurrentState((prev) => {
             return { ...prev, ...obj };
         })
-        if (val == initialState[key]) {
-            setChange(false);
-        } else {
-            setChange(true);
-        }
     }
 
     const descriptionCard = (
@@ -84,11 +72,11 @@ function AuthTypeDetails() {
                 <HorizontalGrid gap="4" columns={2}>
                     <TextField
                         label="Name" value={currState.name}
-                        placeholder='New auth type name' onChange={(val) => {isNew ? handleChange(val, "name") : {}}}
+                        placeholder='New auth type name' onChange={(val) => { isNew ? handleChange({ name: val }) : {} }}
                     />
                     {isNew ? null :
                     <Dropdown menuItems={activeItems} placeHolder={"Auth type active status"}
-                    selected={(val) => {handleChange(val, "active")}} initial={initialState.active} label= "Active" /> } 
+                    selected={(val) => { handleChange({ active: val }) }} initial={initialState.active} label= "Active" /> } 
                 </HorizontalGrid>
             </LegacyCard.Section>
         </LegacyCard>
@@ -102,7 +90,7 @@ function AuthTypeDetails() {
               initialItems={currState.headerConditions || []} 
               items={selectOptions} 
               conditionOp={"AND"}
-              fetchChanges={(val) => {handleChange(val.predicates, "headerConditions")}}
+              fetchChanges={(val) => { handleChange({ headerConditions: val.predicates }) }}
               setChange={setChange}
             />
             <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -116,7 +104,7 @@ function AuthTypeDetails() {
               initialItems={currState.payloadConditions || []} 
               items={selectOptions} 
               conditionOp={"AND"}
-              fetchChanges={(val) => {handleChange(val.predicates, "payloadConditions")}}
+              fetchChanges={(val) => { handleChange({ payloadConditions: val.predicates }) }}
               setChange={setChange}
             />
         </LegacyCard>
@@ -124,38 +112,35 @@ function AuthTypeDetails() {
 
     let components = [descriptionCard, conditionsCard]
 
-    const pageMarkup = (
-        <PageWithMultipleCards title={pageTitle}
-            backAction={{ onAction: navigateBack }}
-            divider
-            components={components}
-        />
-    )
-
     const saveAction = async () => {
         let headerKeys = transform.convertPredicateToArray(currState.headerConditions);
         let payloadKeys = transform.convertPredicateToArray(currState.payloadConditions);
-        let active = currState.active;
-        if( (!headerKeys || headerKeys.length==0 ) && (!payloadKeys || payloadKeys.length==0 )){
-            func.setToast(true, true, "Invalid header and payload keys");
+        let name = currState.name
+        let isValidOrError = func.validateName(name);
+        if( (!headerKeys || headerKeys.length==0 ) && (!payloadKeys || payloadKeys.length==0 ) ){
+            func.setToast(true, true, "Invalid header or payload keys");
+        } else if (isValidOrError!==true){
+            func.setToast(true, true, isValidOrError);
         } else {
             if(isNew){
-                authTypesApi.addCustomAuthType(currState.name, headerKeys, payloadKeys, true).then((res) => {
+                authTypesApi.addCustomAuthType(name, headerKeys, payloadKeys, true).then((res) => {
                     func.setToast(true, false, "Auth type added successfully");
                     setChange(false);
                     let item = res.customAuthType;
                     navigate(null, { state: { name: item?.name, active: item?.active,
-                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys }})
+                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys },
+                        replace:true})
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to add auth type");
                 });
             } else {
-                authTypesApi.updateCustomAuthType(currState.name, headerKeys, payloadKeys, active).then((res) => {
+                authTypesApi.updateCustomAuthType(name, headerKeys, payloadKeys, currState.active).then((res) => {
                     func.setToast(true, false, "Auth type updated successfully");
                     setChange(false);
                     let item = res.customAuthType; 
                     navigate(null, { state: { name: item?.name, active: item?.active,
-                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys }})
+                        headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys },
+                        replace:true})
                     }).catch((err) => {
                     func.setToast(true, true, "Unable to add auth type");
                 });
@@ -168,12 +153,13 @@ function AuthTypeDetails() {
     }
 
     return (
-    <ContextualLayout
+        <DetailsPage
+        pageTitle={pageTitle}
         saveAction={saveAction}
         discardAction={resetFunc}
         isDisabled={compareFunc}
-        pageMarkup={pageMarkup}
-    />
+        components={components}
+        />
     )
 }
 

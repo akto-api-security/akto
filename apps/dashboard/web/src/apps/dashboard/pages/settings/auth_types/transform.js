@@ -7,7 +7,9 @@ const transform = {
         })
     },
     convertPredicateToArray: (conditions) => {
-        return conditions.map((condition) => {
+        return conditions.filter((condition) => {
+            return condition.value!=undefined && condition.value.length>0;
+        }).map((condition) => {
             return condition.value;
         })
     },

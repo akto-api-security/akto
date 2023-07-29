@@ -1,6 +1,6 @@
 import request from "@/util/request"
 
-const TagsApi = {
+const tagsApi = {
     fetchTagConfigs() {
         return request({
             url: '/api/fetchTagConfigs',
@@ -8,16 +8,16 @@ const TagsApi = {
             data: { }
         })
     },
-    saveTagConfig(id,name, keyOperator, keyConditionFromUsers, createNew,active) {
+    saveTagConfig(name, keyOperator, keyConditionFromUsers, createNew,active) {
         return request({
             url: '/api/saveTagConfig',
             method: 'post',
             data: {
-                id,name,keyOperator,keyConditionFromUsers, createNew, active
+                name,keyOperator,keyConditionFromUsers, createNew, active
              }
 
         })
     },
 }
 
-export default TagsApi
+export default tagsApi

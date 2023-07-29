@@ -40,6 +40,11 @@ function ConditionsPicker(props) {
 
     const handleAddTextField = () => {
         const updatedFields = [...textFields, { type: items[0].value, value: '', }];
+        let obj = {
+            predicates: updatedFields,
+            operator: condition,
+        }
+        fetchChanges(obj)
         setTextFields(updatedFields);
     };
 
@@ -111,7 +116,7 @@ function ConditionsPicker(props) {
         <LegacyCard.Section title={title}>
             {textFieldsComponent}
             <br/>
-            <Button onClick={handleAddTextField}>Add Condition</Button>
+            <Button onClick={handleAddTextField}>Add condition</Button>
         </LegacyCard.Section>
     )
 }
