@@ -1,0 +1,210 @@
+.start-node {
+    background: var(--white);
+    border: 1px solid var(--themeColorDark);
+    border-radius: 3px;
+    color: var(--themeColorDark);
+    font-size: 12px;
+    padding: 10px;
+    text-align: center;
+    width: 200px;
+}
+
+.start-node:hover {
+    box-shadow: 0px 0px 3px 3px var(--themeColorDark12);
+}
+
+.red-boundary {
+    border: 1px solid var(--redMetric) !important;
+}
+
+.red-boundary:hover {
+    box-shadow: 0px 0px 3px 3px #f443363d;
+}
+
+.green-boundary {
+    border: 1px solid var(--themeColor) !important;
+}
+
+.green-boundary:hover {
+    box-shadow: 0px 0px 3px 3px var(--themeColor9) !important;
+}
+
+.MuiInput-input {
+    color: var(--themeColorDark) !important;
+    font-size: 12px !important;
+}
+
+.MuiFormControl-root {
+    margin: 0px !important;
+}
+
+.MuiIconButton-root {
+    padding-top: 8px !important;
+}
+
+.MuiButton-root {
+    background-color: var(--themeColor) !important;
+    margin: 0 12px 12px 0 !important;
+}
+
+.MuiDialog-paperScrollPaper {
+    min-width: 850px;
+}
+
+.variable-name {
+    position: absolute;
+    top: -8px;
+    left: 0px;
+    font-size: 10px !important;
+    color: var(--themeColor) !important;
+}
+
+.autocomplete-options {
+    font-size: 12px !important;
+    color: var(--themeColorDark) !important;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.autocomplete-options:hover {
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-all;
+}
+
+.GET {
+    color: var(--hexColor14) !important;
+}
+
+.POST {
+    color: var(--hexColor11) !important;
+}
+
+.PUT {
+    color: var(--hexColor36) !important;
+}
+
+.DELETE {
+    color: var(--hexColor37) !important;
+}
+
+.PATCH {
+    color: var(--hexColor13) !important;
+}
+
+.HEAD {
+    color: var(--hexColor18) !important;
+}
+
+.OPTIONS {
+    color: #0d5aa7 !important;
+}
+
+[method="GET"] {
+    color: var(--hexColor14) !important;
+}
+
+[method="POST"] {
+    color: var(--hexColor11) !important;
+}
+
+[method="PUT"] {
+    color: var(--hexColor36) !important;
+}
+
+[method="DELETE"] {
+    color: var(--hexColor37) !important;
+}
+
+[method="PATCH"] {
+    color: var(--hexColor13) !important;
+}
+
+[method="HEAD"] {
+    color: var(--hexColor18) !important;
+}
+
+[method="OPTIONS"] {
+    color: #0d5aa7 !important;
+}
+
+.react-flow__attribution a {
+    display: none;
+}
+
+  
+.react-flow__edge-path:hover {
+    stroke-width: 2px;
+    filter: drop-shadow(3px 5px 2px var(--themeColorDark12));
+    cursor: pointer;
+}
+
+.primary-btn {
+    color: var(--themeColor);
+    font-size: 12px;
+}
+  
+.MuiPaper-root {
+    color: var(--themeColorDark) !important
+}
+
+.request-editor {
+    font-size: 12px !important;
+    font-family: monospace !important;
+    color: var(--themeColorDark) !important;
+    letter-spacing: unset !important;
+    line-height: 23px !important;
+    word-wrap: break-word !important;
+}
+
+.workflow-button {
+    color: var(--themeColor) !important;
+    font-weight: 600 !important;
+}
+
+.request-editor-matched {
+    color:  darkblue !important;
+    font-weight: 600 !important;
+}
+
+.request-editor-variable {
+    color: var(--themeColor) !important;
+    font-weight: 600 !important;
+}
+
+.request-title {
+    padding-top: 12px;
+    font-size: 13px;
+    color: var(--themeColorDark);
+    font-family: 'Poppins';
+    font-weight: 500;
+}
+
+.results-node {
+    margin-top: 24px;
+    margin-bottom: 24px;
+    margin-left: 8px;
+    margin-right: 8px;
+    background: rgba(71,70,106,.03);
+    padding: 0px;
+    text-align: center;
+    line-height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    overflow: hidden
+}
+
+.results-node:hover {
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-all;
+}
+
+.result-node-vulnerable {
+    color: red
+}
+
+.results-node-selected {
+    font-weight: bold;
+}
