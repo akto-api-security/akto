@@ -64,8 +64,8 @@ function SampleData(props) {
         if(!instance){
             createInstance();
         } else {
-            instance.setValue(props?.data?.firstLine + "\n\n" + JSON.stringify(props?.data?.json, null, 2))
-            highlightPaths(props?.data?.highlightPaths, instance);
+          instance.setValue((props?.data?.firstLine!=undefined ? props?.data?.firstLine + "\n\n" : "") + JSON.stringify(props?.data?.json, null, 2))
+          highlightPaths(props?.data?.highlightPaths, instance);
         }
         
     }, [props.data])

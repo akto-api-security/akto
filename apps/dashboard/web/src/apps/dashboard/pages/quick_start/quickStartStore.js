@@ -6,6 +6,11 @@ let quickStartStore = (set)=>({
     setCurrentConnector:(currentConnector)=>{
         set({currentConnector: currentConnector})
     },
+
+    active: null,
+    setActive:(active)=>{
+        set({active: active})
+    },
 })
 
 quickStartStore = devtools(quickStartStore)

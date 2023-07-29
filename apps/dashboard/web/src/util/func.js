@@ -437,7 +437,12 @@ async copyRequest(type, completeData) {
     }
   }
   return {copyString, snackBarMessage};
-}
+},
+convertPolicyLines: function(policyLines){
+  const jsonString = policyLines.join("\n");
+  const formattedJson = JSON.parse(jsonString);
+  return formattedJson
+},
 
 }
 
