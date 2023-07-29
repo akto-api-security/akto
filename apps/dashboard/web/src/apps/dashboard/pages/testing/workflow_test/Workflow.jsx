@@ -19,6 +19,7 @@ import ScheduleBox from './ScheduleBox.jsx';
 import Menu from '@mui/material/Menu';
 import { saveAs } from 'file-saver'
 import "./start-node.css"
+import func from "@/util/func"
 
 const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInstance);
 
@@ -154,20 +155,12 @@ const Workflow = ({apiCollectionId, defaultOpenResult}) => {
   const onSave = () => {
     if (originalState.id) {
       editWorkflowTest(originalState.id, nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap).then((resp) => {
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-              show: true,
-              text: "Workflow saved",
-              color: 'green'
-          })
+        func.setToast(true, false, "Workflow saved");
       })
     } else {
       createWorkflowTest(nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap, "DRAFT", apiCollectionId).then(resp => {
         setOriginalState(resp.workflowTests[0])
-        window._AKTO.$emit('SHOW_SNACKBAR', {
-            show: true,
-            text: "Workflow saved",
-            color: 'green'
-        })
+        func.setToast(true, false, "Workflow saved");
       })
     }
   }
@@ -225,11 +218,7 @@ const Workflow = ({apiCollectionId, defaultOpenResult}) => {
       setTestRunning(true)
 
       runWorkflowTest(originalState.id).then((resp) => {
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-              show: true,
-              text: "Running test",
-              color: 'green'
-          })
+        func.setToast(true, false, "Running test");
       })
 
       setWorkflowTestingRun(null)
@@ -238,11 +227,7 @@ const Workflow = ({apiCollectionId, defaultOpenResult}) => {
       let interval = setInterval(() => {
         fetchResult().then((result) => {
           if (result) {
-              window._AKTO.$emit('SHOW_SNACKBAR', {
-                  show: true,
-                  text: "Test completed",
-                  color: 'green'
-              })
+            func.setToast(true, false, "Test completed");
             setTestRunning(false)
             clearInterval(interval)
           }
@@ -272,20 +257,12 @@ const Workflow = ({apiCollectionId, defaultOpenResult}) => {
           });
           const fileName = "workflow_"+workflowId+".json";
           saveAs(blob, fileName);
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-              show: true,
-              text: fileName + " downloaded !",
-              color: 'green'
-          })
+          func.setToast(true, false, fileName + " downloaded !");
       })
   }
 
   const saveWorkflowEmitSnackbar = () => {
-      window._AKTO.$emit('SHOW_SNACKBAR', {
-          show: true,
-          text: "Please save the workflow first",
-          color: 'red'
-      })
+    func.setToast(true, true, "Please save the workflow first");
   }
 
     React.useEffect(() => {

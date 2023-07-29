@@ -1,8 +1,7 @@
 import axios from 'axios'
-import { useLocation } from 'react-router-dom';
-// import store from "@/apps/main/store/module";
-// import router from "@/apps/main/router";
 import Store from "../apps/dashboard/store";
+import func from "./func"
+import { history } from './history';
 
 // create axios
 const service = axios.create({
@@ -10,12 +9,6 @@ const service = axios.create({
   timeout: 60000, // timeout,
   headers: { 'Access-Control-Allow-Origin': '*' }
 })
-
-// custom hook to get the current pathname in React
-const usePathname = () => {
-  const location = useLocation();
-  return location.pathname;
-}
 
 const err = async (error) => {
   const { status, data } = error.response
@@ -26,8 +19,25 @@ const err = async (error) => {
     message = actionErrors[0]
   }
 
-
   switch (status) {
+    case 400:
+      func.setToast(true, true, 'Bad Request ' + data.message);
+      break;
+    case 422:
+      func.setToast(true, true, message);
+      break;
+    case 401:
+      if (history.location.pathname !== "/login") {
+        history.navigate("/login")
+      }
+      func.setToast(true, true, "Please login again");
+      break
+    case 423:
+      func.setToast(true, true, "Please confirm your email first");
+      break
+    case 429:
+      func.setToast(true, true, "Too many requests!! Please try after 1 hour");
+      break
     case 403:
       const originalRequest = error.config;
       if (originalRequest._retry) {
@@ -39,13 +49,10 @@ const err = async (error) => {
         method: 'get',
       })
       return service(originalRequest)
-    case 422:
-      Store.getState().setToastConfig({
-        isActive: true,
-        isError: true,
-        message: message
-      })
+    case 500:
+      func.setToast(true, true, "Server Error");
       break
+
     default:
       break;
   }
