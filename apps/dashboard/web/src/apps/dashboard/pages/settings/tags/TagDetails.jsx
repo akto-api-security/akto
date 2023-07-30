@@ -131,9 +131,7 @@ function TagDetails() {
                         },
                             replace:true
                     })
-                }).catch((err) => {
-                    func.setToast(true, true, "Unable to add tag config");
-                });
+                })
             } else {
                 tagsApi.saveTagConfig(name, currState.operator, keyConditionFromUsers, false, currState.active).then((res) => {
                     func.setToast(true, false, "Tag config updated successfully");
@@ -146,9 +144,7 @@ function TagDetails() {
                         },
                             replace:true
                     })
-                }).catch((err) => {
-                    func.setToast(true, true, "Unable to add Tag config");
-                });
+                })
             }
         }
     }

@@ -139,6 +139,9 @@ const func = {
     return ret;
   },
   getSeverityStatus(countIssues) {
+    if(countIssues==null){
+      return [];
+    }
     return Object.keys(countIssues).filter((key) => {
       return (countIssues[key] > 0)
     })
@@ -560,7 +563,14 @@ toMethodUrlString({method,url}){
 },
 toMethodUrlObject(str){
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
-}
+},
+dayStart(epochMs) {
+  let date = new Date(epochMs)
+  date.setHours(0)
+  date.setMinutes(0)
+  date.setSeconds(0)
+  return date
+},
 
 }
 

@@ -21,6 +21,7 @@ import { useState, useEffect } from 'react';
 import TestingStore from "../testingStore";
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
+import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
 
 let headers = [
   {
@@ -116,12 +117,16 @@ function SingleTestRunPage() {
   const subCategoryMap = TestingStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(true);
+  const [workflowTest, setWorkflowTest ] = useState(false);
 
 useEffect(()=>{
     const hexId = params.hexId;
     async function fetchData() {
       if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.id != hexId){
-        await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries }) => {
+        await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
+          if(testingRun.testIdConfig == 1){
+            setWorkflowTest(workflowTest);
+          }
           let selectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
             setSelectedTestRun(selectedTestRun);
           })
@@ -150,6 +155,35 @@ const promotedBulkActions = (selectedDataHexIds) => {
     },
   },
 ]};
+
+  const ResultTable = (
+    <GithubSimpleTable
+      key="table"
+      data={testRunResults}
+      sortOptions={sortOptions}
+      resourceName={resourceName}
+      filters={filters}
+      disambiguateLabel={disambiguateLabel}
+      headers={headers}
+      selectable={true}
+      promotedBulkActions={promotedBulkActions}
+      loading={loading}
+      rowClickable={true}
+    />
+  )
+
+  const workflowTestBuilder = (
+    <WorkflowTestBuilder
+      key="workflow-test"
+      endpointsList={[]}
+      apiCollectionId={0}
+      originalStateFromDb={workflowTest}
+      defaultOpenResult={true}
+      class={"white-background"}
+    />
+  )
+
+  const components = [!workflowTest ? ResultTable : workflowTestBuilder];
 
   return (
     <PageWithMultipleCards
@@ -186,22 +220,8 @@ const promotedBulkActions = (selectedDataHexIds) => {
           </VerticalStack>
     }
     backAction = {{onAction:navigateBack}}
-    primaryAction={<Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button>}
-    components = {[
-      <GithubSimpleTable 
-      key="table"
-      data={testRunResults} 
-      sortOptions={sortOptions} 
-      resourceName={resourceName} 
-      filters={filters} 
-      disambiguateLabel={disambiguateLabel} 
-      headers={headers}
-      selectable = {true}
-      promotedBulkActions = {promotedBulkActions}
-      loading={loading}
-      rowClickable={true}
-    />
-    ]}
+    primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
+    components = {components}
     />
   );
 }

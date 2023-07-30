@@ -5,6 +5,10 @@ import { useState, useCallback, useEffect } from "react";
 import { Modal, Button } from "@shopify/polaris";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import func from "@/util/func";
+import {
+    CustomersMinor,
+    ClockMinor
+  } from '@shopify/polaris-icons';
 
 function ResetModal() {
     const [resetModalActive, setResetModalActive] = useState(false);
@@ -52,12 +56,14 @@ function AuthTypes() {
         {
             text: "Last updated",
             value: "updatedTimestamp",
-            itemCell: 2
+            itemOrder: 3,
+            icon:ClockMinor
         },
         {
             text: "Created by",
             value: "createdBy",
-            itemCell: 2
+            itemOrder: 3,
+            icon:CustomersMinor
         }
     ]
 

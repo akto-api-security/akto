@@ -154,12 +154,12 @@ function GithubServerTable(props) {
       <GithubRow 
         key={data.id}
         id={data.id}
-        data={data} 
+        dataObj={data} 
         index={index} 
         getActions={props.getActions} 
         selectedResources={selectedResources}
         headers={props.headers}
-        rowClickable={props.rowClickable}
+        isRowClickable={props.rowClickable}
         hasRowActions={props.hasRowActions || false}
         page={props.page || 0}
         getNextUrl={props?.getNextUrl}
