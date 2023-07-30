@@ -47,6 +47,20 @@ const api = {
             data: {}
         })
     },
+    saveLBs(selectedLBs){
+        return request({
+            url: 'api/saveLoadBalancers',
+            method: 'post',
+            data: {selectedLBs}
+        })
+    },
+    fetchStackCreationStatus(){
+        return request({
+            url: 'api/checkStackCreationProgress',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default api

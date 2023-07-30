@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import api from '../api'
 import quickStartFunc from '../tranform'
-import { Avatar, Banner, Button, HorizontalStack, LegacyCard, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Avatar, Banner, Box, Button, HorizontalStack, LegacyCard, ProgressBar, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import {ClipboardMinor} from "@shopify/polaris-icons"
 import func from '@/util/func'
 import SampleData from '../../../components/shared/SampleData'
 import { useNavigate } from 'react-router-dom'
 import QuickStartStore from '../quickStartStore'
 import Store from '../../../store'
+import DropdownSearch from '../../../components/shared/DropdownSearch'
+import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 
 function AwsSource() {
-
-    const [hasRequiredAccess, setHasRequiredAccess] = useState(false)
+    const [hasRequiredAccess, setHasRequiredAccess] = useState(true)
     const [selectedLBs, setSelectedLBs] = useState([])
-    const [existingSelectedLBs, setExistingSelectedLBs] = useState([])
-    const [initialLBCount, setInitialLBCount] = useState(0)
+    const [preSelectedLBs, setPreSelectedLBs] = useState([])
     const [aktoDashboardRoleName, setAktoDashboardRoleName] = useState(null)
     const [availableLBs, setAvailableLBs] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [statusText, setStatusText] = useState('')
+    const [progressBar, setProgressBar] = useState({show: false, value: 0, max_deployment_time_in_ms: 8 * 60 * 1000})
 
     const [policyLines, setPolicyLines] = useState(quickStartFunc.getPolicyLines())
     const active = QuickStartStore(state => state.active)
@@ -32,7 +35,60 @@ function AwsSource() {
         })
     }
 
+    const renderProgressBar = (creationTimeInMs) => {
+      const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
+      progressBarCopy.show = true;
+      const currTimeInMs = Date.now();
+      const maxDeploymentTimeInMs = progressBarCopy.max_deployment_time_in_ms;
+      let progressPercent = ((currTimeInMs - creationTimeInMs) * 100) / maxDeploymentTimeInMs
+      if (progressPercent > 90) {
+          progressPercent = 90;
+      }
+      // to add more else if blocks to handle cases where deployment is stuck
+      progressBarCopy.value = Math.round(progressPercent);
+      setProgressBar(progressBarCopy)
+    }
+
+    const removeProgressBarAndStatuschecks = (intervalId) => {
+      const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
+      progressBarCopy.show = false;
+      progressBarCopy.value = 0;
+      setProgressBar(progressBarCopy)
+      clearInterval(intervalId);
+    }
+
+    const handleStackState = (stackState, intervalId) => {
+      switch (stackState.status) {
+        case 'CREATE_IN_PROGRESS':
+          renderProgressBar(stackState.creationTime);
+          setStatusText('We are setting up mirroring for you! Grab a cup of coffee, sit back and relax while we work our magic!')
+          break;
+        case 'CREATE_COMPLETE':
+          removeProgressBarAndStatuschecks(intervalId);
+          setStatusText('Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.')
+          break;
+        case 'DOES_NOT_EXISTS':
+          removeProgressBarAndStatuschecks(intervalId);
+          setStatusText('Mirroring is not set up currently, choose 1 or more LBs to enable mirroring.')
+          break;
+        default:
+          removeProgressBarAndStatuschecks(intervalId);
+          setStatusText('Something went wrong while setting up mirroring, please write to us at support@akto.io')
+      }      
+    }
+
+    const checkStackState = () => {
+      let intervalId = null;
+      intervalId = setInterval(async () => {
+        await api.fetchStackCreationStatus().then((resp) => {  
+            handleStackState(resp.stackState, intervalId)
+          }
+        )
+      }, 5000)
+    }
+
     const fetchLBs = async() => {
+      setLoading(true)
       if(!isLocalDeploy){
         await api.fetchLBs().then((resp)=> {
           if (!resp.dashboardHasNecessaryRole) {
@@ -49,20 +105,11 @@ function AwsSource() {
           }
           setHasRequiredAccess(resp.dashboardHasNecessaryRole)
           setSelectedLBs(resp.selectedLBs);
-          for(let i=0; i<resp.availableLBs.length; i++){
-              let lb = resp.availableLBs[i];
-              let alreadySelected = false;
-              for(let j=0; j< resp.selectedLBs.length; j++){
-                  if(resp.selectedLBs[j].resourceName === lb.resourceName){
-                      alreadySelected = true;
-                  }
-              }
-              lb['alreadySelected'] = alreadySelected;
-          }
+          setPreSelectedLBs(resp.selectLBs)
           setAvailableLBs(resp.availableLBs);
-          setExistingSelectedLBs(resp.selectedLBs);
-          setInitialLBCount(resp.selectedLBs.length);
           setAktoDashboardRoleName(resp.aktoDashboardRoleName); 
+          setLoading(false)
+          checkStackState()
         })
       }
     }
@@ -106,11 +153,40 @@ function AwsSource() {
       },
     ]
 
+    const idToNameMap = availableLBs.reduce((result, obj) => {
+      result[obj.resourceId] = obj.resourceName;
+      return result;
+    }, {});
+
+    const handleSelectedLBs = (selectLBs) => {
+      let tempArr = quickStartFunc.getLBListFromValues(selectLBs, idToNameMap)
+      setSelectedLBs(tempArr)
+    }
+
     const copyRequest = () => {
       let jsonString  = JSON.stringify(formattedJson, null, 2)
       navigator.clipboard.writeText(jsonString)
       setToast(true, false, "Policy copied to clipboard.")
     }
+
+    const saveFunc = async() => {
+      setLoading(true)
+      await api.saveLBs(selectedLBs).then((resp) => {
+        setLoading(false)
+        setAvailableLBs(resp.availableLBs)
+        setSelectedLBs(resp.selectedLBs)
+        setPreSelectedLBs(resp.selectLBs)
+        if (resp.isFirstSetup) {
+            checkStackState()
+            window.mixpanel.track("mirroring_stack_creation_initialized");
+        } else {
+            window.mixpanel.track("loadbalancers_updated");
+        }
+    })
+    }
+
+    const lbList = quickStartFunc.convertLbList(availableLBs)
+    const preSelected = quickStartFunc.getValuesArr(selectedLBs)
 
     const noAccessComponent = (
       <VerticalStack gap="1">
@@ -151,9 +227,32 @@ function AwsSource() {
       component: localDeployComponent,
       title: "Local_Depoy"
     }
+
+    const selectLBComponent = (
+      loading ? 
+      <SpinnerCentered />
+      :
+        <VerticalStack gap="2">
+          <DropdownSearch itemName="load balancer" optionsList={lbList} placeholder="Select LBs to activate mirroring." 
+            allowMultiple disabled={availableLBs.length === 0} preSelected={preSelected} value={`${selectedLBs.length} Load balancers selected`}
+            setSelected={handleSelectedLBs}
+            />
+
+          <Box>
+            <Button onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </Button>
+          </Box>
+          <Text variant="bodyMd" as="h3">{statusText}</Text>
+          {progressBar.show ? <ProgressBar progress={progressBar.value} size='medium' /> : null }
+        </VerticalStack>
+    )
+
+    const selectedLBObj = {
+      component: selectLBComponent,
+      title: "Selected LB"
+    }
      
 
-    const displayObj = isLocalDeploy ? localDeployObj : hasRequiredAccess ? null : noAccessObject
+    const displayObj = isLocalDeploy ? localDeployObj : hasRequiredAccess ? selectedLBObj : noAccessObject
     const headerTitle = (
       <HorizontalStack gap="3">
         <Avatar customer size="medium" name="AWS Logo" source="/public/aws.svg"/>

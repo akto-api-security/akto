@@ -419,6 +419,34 @@ const quickStartFunc = {
 
     getPolicyLines: function(){
         return quick_start_policy_lines;
+    },
+
+    convertLbList: function(lbList){
+        const arr = lbList.map((item) => {
+            return{
+                label: item.resourceName,
+                value: item.resourceId,
+            }
+        })
+        return arr
+    },
+
+    getValuesArr: function(lbList){
+        let arr = []
+        lbList.forEach((element) => {
+            arr.push(element.resourceId)
+        })
+        return arr
+    },
+
+    getLBListFromValues: function(valuesArr,mapNameToId){
+        const arr = valuesArr.map((element) => {
+            return{
+                resourceId: element,
+                resourceName: mapNameToId[element]
+            }
+        })
+        return arr
     }
 }
 
