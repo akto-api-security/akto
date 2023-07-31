@@ -1,7 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import {
-    Box
-    } from '@shopify/polaris';
 import { editor, Range } from "monaco-editor/esm/vs/editor/editor.api"
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -42,6 +39,13 @@ function highlightPaths(highlightPathMap, ref){
 }
 
 function SampleData(props) {
+
+    const {showDiff, data, minHeight} = props;
+
+    if(minHeight==undefined){
+      minHeight="300px";
+    }
+
     const ref = useRef("");
     const [instance, setInstance] = useState(null);
 
@@ -54,27 +58,44 @@ function SampleData(props) {
             colorDecorations: true,
             scrollBeyondLastLine: false,
             readOnly: true,
+            enableSplitViewResizing: false,
+		        renderSideBySide: false
         }
-        let instance = editor.create(ref.current, options) 
+        let instance = "";
+        if(showDiff){
+          instance = editor.createDiffEditor(ref.current, options)
+        } else {
+          instance = editor.create(ref.current, options) 
+        }
         setInstance(instance)
+    }
+
+    function showData(data){
+      if (showDiff) {
+        let ogModel = editor.createModel(data?.original, "json")
+        let model = editor.createModel(data?.message, "json")
+        instance.setModel({
+          original: ogModel,
+          modified: model
+        })
+      } else {
+        instance.setValue(data?.message)
+        highlightPaths(data?.highlightPaths, instance);
+      }
     }
 
     useEffect(() => {
 
-        if(!instance){
-            createInstance();
-        } else {
-            instance.setValue(props?.data?.firstLine + "\n\n" + JSON.stringify(props?.data?.json, null, 2))
-            highlightPaths(props?.data?.highlightPaths, instance);
-        }
+      if (!instance) {
+        createInstance();
+      } else {
+        showData(data);
+      }
         
-    }, [props.data])
+    }, [instance, data])
 
     return (
-        <Box 
-        ref={ref}
-        minHeight={props.minHeight || '300px' }
-        />
+      <div ref={ref} style={{height:minHeight}} className='editor'/>
     )
 }
 

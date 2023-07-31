@@ -13,3 +13,8 @@
 .Polaris-DropZone{
     min-height: 0 !important;
 }
+
+.editor > .monaco-editor {
+    --vscode-diffEditor-insertedTextBackground:"";
+    --vscode-diffEditor-removedTextBackground:"";
+}

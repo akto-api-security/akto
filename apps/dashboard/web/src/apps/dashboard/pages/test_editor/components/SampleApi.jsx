@@ -1,6 +1,6 @@
-import { Box, Button, Divider, LegacyTabs, Modal} from "@shopify/polaris"
+import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, VerticalStack} from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
-import { UpdateInventoryMajor } from "@shopify/polaris-icons"
+import { UpdateInventoryMajor, ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
 
@@ -29,6 +29,7 @@ import func from "@/util/func";
 import TestEditorStore from "../testEditorStore"
 import "../TestEditor.css"
 import { useNavigate } from "react-router-dom";
+import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 
 const SampleApi = () => {
 
@@ -45,6 +46,7 @@ const SampleApi = () => {
     const [sampleDataList, setSampleDataList] = useState(null)
     const [loading, setLoading] = useState(false)
     const [testResult,setTestResult] = useState(null)
+    const [showTestResult, setShowTestResult] = useState(false);
 
     const currentContent = TestEditorStore(state => state.currentContent)
     const selectedTest = TestEditorStore(state => state.selectedTest)
@@ -108,6 +110,14 @@ const SampleApi = () => {
         }
         setTestResult(null)
     }, [selectedApiEndpoint])
+
+    useEffect(()=> {
+        if(testResult){
+            setShowTestResult(true);
+        } else {
+            setShowTestResult(false);
+        }
+    }, [testResult])
 
 
     const handleTabChange = (selectedTabIndex) => {
@@ -189,13 +199,51 @@ const SampleApi = () => {
     }
 
     const showResults = () => {
-        let hexId = testResult?.testingRunResult?.hexId
-        navigate( "/dashboard/testing/editor/result/" + hexId , {state: {testingRunResult : testResult?.testingRunResult , runIssues : testResult?.testingRunIssues, testId:selectedTest.value}})
+        setShowTestResult(!showTestResult);
     }
-    
+
+    function getColor(){
+        if(testResult){
+            if(testResult.testingRunResult.vulnerable){
+                let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
+                status = status.toUpperCase();
+                switch(status){
+                    case "HIGH" : return "bg-critical";
+                    case "MEDIUM": return "bg-caution";
+                    case "LOW": return "bg-info";
+                    default:
+                        return "bg";
+                }
+            } else {
+                return "bg-success"
+            }
+        } else {
+            return "bg";
+        }
+    }
+
+    function getResultDescription() {
+        if (testResult) {
+            if(testResult.testingRunResult.vulnerable){
+                let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
+                return func.toSentenceCase(status) + " vulnerability found";
+            } else {
+                return "No vulnerability found"
+            }
+        } else {
+            return "Run test to see Results"
+        }
+    }
+
     const resultComponent = (
-        testResult ? <Button icon={UpdateInventoryMajor} plain onClick={showResults}>Show Results</Button>
-        : <span>Run test to see Results</span>
+        <Box background={getColor()} width="100%" padding={"2"}>
+            <Button removeUnderline monochrome plain 
+            onClick={testResult ? showResults : () => {}}
+            icon={testResult ? ChevronUpMinor : undefined}>
+                {getResultDescription()}
+            </Button>
+        </Box>
+
     )
 
     return (
@@ -208,9 +256,22 @@ const SampleApi = () => {
 
             <Divider />
             <Box ref={jsonEditorRef} minHeight="75vh"/>
-            <div className="show-results">
-                {resultComponent}
-            </div>
+            {resultComponent}
+            <Modal
+                open={showTestResult}
+                onClose={() => setShowTestResult(!showTestResult)}
+                title="Results"
+                large
+            >
+                <Frame >
+                <TestRunResultPage
+                    testingRunResult={testResult?.testingRunResult}
+                    runIssues={testResult?.testingRunIssues}
+                    testId={selectedTest.value}
+                    source="editor"
+                />
+                </Frame>
+            </Modal>
             <Modal
                 open={selectApiActive}
                 onClose={toggleSelectApiActive}
