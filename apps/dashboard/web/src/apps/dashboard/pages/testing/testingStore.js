@@ -12,6 +12,8 @@ let testingStore = (set)=>({
     setSubCategoryMap: (subCategoryMap) => set({subCategoryMap: subCategoryMap}),
     subCategoryFromSourceConfigMap: {},
     setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({subCategoryFromSourceConfigMap: subCategoryFromSourceConfigMap}),
+    authMechanism: null,
+    setAuthMechanism: (authMechanism) => set({authMechanism: authMechanism}),
 })
 
 testingStore = devtools(testingStore)
