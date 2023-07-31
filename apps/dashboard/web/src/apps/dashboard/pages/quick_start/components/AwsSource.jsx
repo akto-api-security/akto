@@ -1,18 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import api from '../api'
 import quickStartFunc from '../tranform'
-import { Avatar, Banner, Box, Button, HorizontalStack, LegacyCard, ProgressBar, Text, Tooltip, VerticalStack } from '@shopify/polaris'
-import {ClipboardMinor} from "@shopify/polaris-icons"
+import { Box, Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
 import func from '@/util/func'
-import SampleData from '../../../components/shared/SampleData'
-import { useNavigate } from 'react-router-dom'
-import QuickStartStore from '../quickStartStore'
 import Store from '../../../store'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import BannerComponent from './shared/BannerComponent'
+import NoAccessComponent from './shared/NoAccessComponent'
 
 function AwsSource() {
-    const [hasRequiredAccess, setHasRequiredAccess] = useState(true)
+    const [hasRequiredAccess, setHasRequiredAccess] = useState(false)
     const [selectedLBs, setSelectedLBs] = useState([])
     const [preSelectedLBs, setPreSelectedLBs] = useState([])
     const [aktoDashboardRoleName, setAktoDashboardRoleName] = useState(null)
@@ -21,10 +19,10 @@ function AwsSource() {
     const [statusText, setStatusText] = useState('')
     const [progressBar, setProgressBar] = useState({show: false, value: 0, max_deployment_time_in_ms: 8 * 60 * 1000})
 
-    const [policyLines, setPolicyLines] = useState(quickStartFunc.getPolicyLines())
-    const active = QuickStartStore(state => state.active)
-    const navigate = useNavigate()
+    const [policyLines, setPolicyLines] = useState(quickStartFunc.getPolicyLines("AWS"))
     const isLocalDeploy = Store(state => state.isLocalDeploy)
+    // const isLocalDeploy = false
+    const DeploymentMethod = "AWS_TRAFFIC_MIRRORING"
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -35,26 +33,13 @@ function AwsSource() {
         })
     }
 
-    const renderProgressBar = (creationTimeInMs) => {
-      const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
-      progressBarCopy.show = true;
-      const currTimeInMs = Date.now();
-      const maxDeploymentTimeInMs = progressBarCopy.max_deployment_time_in_ms;
-      let progressPercent = ((currTimeInMs - creationTimeInMs) * 100) / maxDeploymentTimeInMs
-      if (progressPercent > 90) {
-          progressPercent = 90;
-      }
-      // to add more else if blocks to handle cases where deployment is stuck
-      progressBarCopy.value = Math.round(progressPercent);
-      setProgressBar(progressBarCopy)
+    const renderProgressBar = (createTime) => {
+      setProgressBar(quickStartFunc.renderProgressBar(createTime))
     }
 
     const removeProgressBarAndStatuschecks = (intervalId) => {
-      const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
-      progressBarCopy.show = false;
-      progressBarCopy.value = 0;
-      setProgressBar(progressBarCopy)
-      clearInterval(intervalId);
+      clearInterval(intervalId)
+      setProgressBar(quickStartFunc.removeProgressBarAndStatuschecks(progressBar))
     }
 
     const handleStackState = (stackState, intervalId) => {
@@ -65,11 +50,15 @@ function AwsSource() {
           break;
         case 'CREATE_COMPLETE':
           removeProgressBarAndStatuschecks(intervalId);
-          setStatusText('Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.')
+          setStatusText('Akto is tirelessly processing mirrored traffic to protect your APIs.')
           break;
         case 'DOES_NOT_EXISTS':
           removeProgressBarAndStatuschecks(intervalId);
           setStatusText('Mirroring is not set up currently, choose 1 or more LBs to enable mirroring.')
+          break;
+        case 'TEMP_DISABLE':
+          removeProgressBarAndStatuschecks(intervalId)
+          setStatusText('Current deployment is in progress, please refresh this page in sometime.')
           break;
         default:
           removeProgressBarAndStatuschecks(intervalId);
@@ -80,7 +69,7 @@ function AwsSource() {
     const checkStackState = () => {
       let intervalId = null;
       intervalId = setInterval(async () => {
-        await api.fetchStackCreationStatus().then((resp) => {  
+        await api.fetchStackCreationStatus({deploymentMethod: DeploymentMethod}).then((resp) => {  
             handleStackState(resp.stackState, intervalId)
           }
         )
@@ -90,10 +79,10 @@ function AwsSource() {
     const fetchLBs = async() => {
       setLoading(true)
       if(!isLocalDeploy){
-        await api.fetchLBs().then((resp)=> {
+        await api.fetchLBs({deploymentMethod: DeploymentMethod}).then((resp)=> {
           if (!resp.dashboardHasNecessaryRole) {
             let policyLinesCopy = policyLines
-            for (let i = 0; i < policyLinesCopy.length; i++) {
+            for (let i = 0; i < policyLines.length; i++) {
               let line = policyLinesCopy[i];
               line = line.replaceAll('AWS_REGION', resp.awsRegion);
               line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
@@ -116,17 +105,9 @@ function AwsSource() {
 
     useEffect(()=> {
       fetchLBs()
-      if(!isLocalDeploy && !hasRequiredAccess && active === "update"){
-        navigate("/dashboard/quick-start/aws-setup")
-      }else{
-        navigate("/dashboard/quick-start")
-      }
     },[])
 
     const docsUrl = "https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy"
-    const openLink = (url)=> {
-      window.open(url)
-    }
 
     const urlAws = "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + aktoDashboardRoleName  + "$createPolicy?step=edit"
     const formattedJson = func.convertPolicyLines(policyLines)
@@ -134,24 +115,7 @@ function AwsSource() {
       json: formattedJson,
     }
 
-    const steps = [
-      {
-        text: "Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking ",
-        textComponent: <a target='_blank' href={urlAws}>here</a>, 
-      },
-      {
-        text: "We will create an inline policy, navigate to JSON tab and paste the copied JSON here."
-      },
-      {
-        text: "Click on 'Review policy'."
-      },
-      {
-        text: "Now lets name the policy as 'AktoDashboardPolicy'."
-      },
-      {
-        text: "Finally create the policy by clicking on 'Create policy'."
-      },
-    ]
+    const steps = quickStartFunc.getDesiredSteps(urlAws)
 
     const idToNameMap = availableLBs.reduce((result, obj) => {
       result[obj.resourceId] = obj.resourceName;
@@ -182,49 +146,22 @@ function AwsSource() {
         } else {
             window.mixpanel.track("loadbalancers_updated");
         }
-    })
+      })
     }
 
     const lbList = quickStartFunc.convertLbList(availableLBs)
     const preSelected = quickStartFunc.getValuesArr(selectedLBs)
+    const noAccessText = "Your dashboard's instance needs relevant access to setup traffic mirroring, please do the following steps:"
 
-    const noAccessComponent = (
-      <VerticalStack gap="1">
-          {steps.map((element,index) => (
-              <VerticalStack gap="1" key={index}>
-                  <HorizontalStack gap="1" wrap={false} key={element.text}>
-                      <span>{index + 1}.</span>
-                      <span>{element.text}</span>
-                      <span>{element.textComponent}</span>
-                  </HorizontalStack>
-                  <HorizontalStack gap="3">
-                      <div/>
-                      {/* <SampleData data={dataObj} /> */}
-                      {element?.component}
-                  </HorizontalStack>
-              </VerticalStack>
-          ))}
-          <span>6. Click <Button plain onClick={() => navigate(0)}>here</Button> to refresh.</span>
-      </VerticalStack>
-    )
     const noAccessObject= {
-      text: "Your dashboard's instance needs relevant access to setup traffic mirroring, pleasedo the following steps:",
-      component: noAccessComponent,
+      text: noAccessText,
+      component: <NoAccessComponent dataObj={dataObj} onClickFunc={() => copyRequest()} steps={steps} title="Policy JSON" toolTipContent="Copy JSON"/>,
       title: "NoAccess"
     }
     
-    const localDeployComponent = (
-      <div>
-        <Banner title='Set Up Mirroring' status='warning'>
-          <span>To setup traffic mirroring from AWS deploy in AWS:</span>
-          <br/>
-          <Button plain onClick={() => openLink(docsUrl)}>Go to docs</Button>
-        </Banner>
-      </div>
-    )
     const localDeployObj = {
       text: "Use AWS packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs.",
-      component: localDeployComponent,
+      component: <BannerComponent title="Set up Mirroring" docsUrl={docsUrl} content="To setup traffic mirroring from AWS deploy in AWS:"/>,
       title: "Local_Depoy"
     }
 
@@ -253,51 +190,12 @@ function AwsSource() {
      
 
     const displayObj = isLocalDeploy ? localDeployObj : hasRequiredAccess ? selectedLBObj : noAccessObject
-    const headerTitle = (
-      <HorizontalStack gap="3">
-        <Avatar customer size="medium" name="AWS Logo" source="/public/aws.svg"/>
-        <Text variant='headingMd' as='h5'>
-          AWS Setup guide
-        </Text>
-      </HorizontalStack>
-    )
+    
     return (
-      active === 'update' && displayObj.title === 'NoAccess' ?
-        <div style={{marginTop: '2vw', padding: '0 4vw'}}>
-          <LegacyCard title={headerTitle}>
-            <LegacyCard.Section>
-              <Text>{displayObj.text}</Text>
-              <br/>
-              {displayObj.component}
-            </LegacyCard.Section>
-            <LegacyCard.Section>
-              <div className='copyRequest'>
-                <Text>Policy JSON</Text>
-                <Tooltip dismissOnMouseOut preferredPosition='above' content="Copy JSON">
-                <Button icon={ClipboardMinor} plain onClick={()=> copyRequest()} />
-                </Tooltip>
-              </div>
-              <SampleData data={dataObj} />
-            </LegacyCard.Section>
-          </LegacyCard>
-        </div>
-      :
-        <div className='card-items'>
-          <Text>{displayObj?.text}</Text>
-          {displayObj?.component}
-          {displayObj.title === "NoAccess" ?
-          <VerticalStack gap="1">  
-            <div className='copyRequest'>
-              <Text>Policy JSON</Text>
-              <Tooltip dismissOnMouseOut preferredPosition='above' content="Copy JSON">
-                <Button icon={ClipboardMinor} plain  />
-              </Tooltip>
-            </div>
-            <SampleData data={dataObj} />
-          </VerticalStack>
-           : null }
-        </div>
-       
+      <div className='card-items'>
+        <Text>{displayObj?.text}</Text>
+        {displayObj?.component}
+      </div>
     )
 }
 

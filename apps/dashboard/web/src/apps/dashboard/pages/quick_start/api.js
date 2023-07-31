@@ -40,11 +40,11 @@ const api = {
         })
     },
 
-    fetchLBs(){
+    fetchLBs(data){
         return request({
             url: '/api/fetchLoadBalancers',
             method: 'post',
-            data: {}
+            data: data,
         })
     },
     saveLBs(selectedLBs){
@@ -54,13 +54,20 @@ const api = {
             data: {selectedLBs}
         })
     },
-    fetchStackCreationStatus(){
+    fetchStackCreationStatus(data){
         return request({
             url: 'api/checkStackCreationProgress',
             method: 'post',
-            data: {}
+            data: data,
         })
     },
+    createRuntimeStack(deploymentMethod) {
+        return request({
+            url: '/api/createRuntimeStack',
+            method: 'post',
+            data: {deploymentMethod}
+        })
+    }
 }
 
 export default api

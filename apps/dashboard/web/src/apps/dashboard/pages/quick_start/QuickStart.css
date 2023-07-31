@@ -24,9 +24,9 @@
     padding: 8px !important;
 }
 .right-card .Polaris-Box {
-    position: fixed;
+    position: absolute;
     right: 0;
-    top: 57px;
+    top: 1px;
     width: 27vw;
 }
 .settings {
