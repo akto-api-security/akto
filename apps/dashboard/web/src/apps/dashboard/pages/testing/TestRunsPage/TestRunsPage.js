@@ -227,6 +227,7 @@ useEffect(()=>{
         getActions = {getActions}
         hasRowActions={true}
         loading={loading}
+        getStatus={func.getTestResultStatus}
       />
     ]}
     />

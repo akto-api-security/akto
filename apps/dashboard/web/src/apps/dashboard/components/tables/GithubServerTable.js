@@ -23,7 +23,7 @@ function GithubServerTable(props) {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
-  const pageLimit = 20;
+  const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => {map[e.sortKey || e.value] = 'OR'; return map}, {})
@@ -157,6 +157,7 @@ function GithubServerTable(props) {
         dataObj={data} 
         index={index} 
         getActions={props.getActions} 
+        getStatus={props.getStatus}
         selectedResources={selectedResources}
         headers={props.headers}
         isRowClickable={props.rowClickable}
