@@ -87,11 +87,11 @@ const transform = {
           delete testingRunResultSummary.countIssues['LOW']
       }
       obj['id'] = data.hexId;
-      obj['testingRunResultSummaryHexId'] = testingRunResultSummary.hexId;
+      obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(data.state)
       obj['icon'] = func.getTestingRunIcon(data.state);
       obj['name'] = data.name || "Test"
-      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
+      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
       obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
       obj['scheduleTimestamp'] = data.scheduleTimestamp
@@ -108,7 +108,7 @@ const transform = {
       let testRuns = []
       testingRuns.forEach((data)=>{
         let obj={};
-        let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']];
+        let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']] || {};
         obj = transform.prepareTestRun(data, testingRunResultSummary)
         testRuns.push(obj);
     })

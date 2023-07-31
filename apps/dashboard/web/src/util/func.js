@@ -6,8 +6,25 @@ import {
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
+import Store from '../apps/dashboard/store';
 
 const func = {
+  setToast (isActive, isError, message) {
+    Store.getState().setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+      })
+  },
+  validateName(name) {
+    const regex = /^[a-z0-9_]+$/i;
+    if (name.length == 0) {
+       return "Name cannot be blank";
+    } else if (!name.match(regex)) {
+      return "Only alphanumeric and underscore characters allowed in name" ;
+    }
+    return true;
+  },
   toDateStr(date, needYear) {
     let strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let d = date.getDate();
@@ -122,6 +139,9 @@ const func = {
     return ret;
   },
   getSeverityStatus(countIssues) {
+    if(countIssues==null){
+      return [];
+    }
     return Object.keys(countIssues).filter((key) => {
       return (countIssues[key] > 0)
     })
@@ -619,6 +639,13 @@ convertSensitiveTags(subTypeList) {
   })
 
   return result
+},
+dayStart(epochMs) {
+  let date = new Date(epochMs)
+  date.setHours(0)
+  date.setMinutes(0)
+  date.setSeconds(0)
+  return date
 }
 
 }

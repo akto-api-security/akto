@@ -2,11 +2,16 @@ import { Frame, Toast, Box } from "@shopify/polaris"
 import Header from "../../components/layouts/header/Headers"
 import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
-import { useNavigate, Outlet } from "react-router-dom";
+import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useEffect } from "react";
 import homeFunctions from "./module";
+import {history} from "@/util/history"
 
 function HomePage() {
+
+  history.location = useLocation();
+  history.navigate = useNavigate();
+
   const setAllCollections = Store(state => state.setAllCollections)
   const setUsername = Store(state => state.setUsername);
   const fetchAllCollections = async () => {

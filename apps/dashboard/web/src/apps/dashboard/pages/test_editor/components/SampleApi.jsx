@@ -178,7 +178,7 @@ const SampleApi = () => {
     const runTest = async()=>{
         setLoading(true)
         const apiKeyInfo = {
-            ...selectedApiEndpoint,
+            ...func.toMethodUrlObject(selectedApiEndpoint),
             apiCollectionId: selectedCollectionId
         }
 
