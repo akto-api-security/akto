@@ -15,7 +15,7 @@ function GithubCell(props){
             return header.itemOrder==0
         }).map((header) => {
             return (
-                <div style={{ marginBottom: "auto" }} key={header.value}>
+                <div style={{ marginBottom: "auto" }} key={header.value} className='rowIconClass'>
                     <Box padding="05">
                         <Icon source={props.data[header.value]} color="primary" />
                     </Box>
@@ -42,7 +42,7 @@ function GithubCell(props){
                 }).map((header) => {
                     return props?.data?.[header?.value]
                     ?.map((item) =>
-                    <Badge key={item} status={func.getStatus(item)}>
+                    <Badge key={item} status={props.getStatus(item)}>
                         {item}
                     </Badge>
                 )}) 

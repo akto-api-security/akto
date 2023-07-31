@@ -49,6 +49,7 @@ function GithubRow(props) {
                         <GithubCell
                             headers={props.headers}
                             data={data}
+                            getStatus={props.getStatus}
                         />
                     </Link>
                 </div>

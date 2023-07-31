@@ -307,6 +307,7 @@ function IssuesPage(){
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
                     rowClickable={true}
+                    getStatus={func.getTestResultStatus}
                 />
             ]}
         />
