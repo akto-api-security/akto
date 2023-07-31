@@ -3,7 +3,7 @@ import React from 'react'
 import SampleData from '../../../../components/shared/SampleData'
 import { ClipboardMinor } from "@shopify/polaris-icons"
 
-function JsonComponent({dataObj, onClickFunc, title, toolTipContent, contentValue, language}) {
+function JsonComponent({dataObj, onClickFunc, title, toolTipContent, contentValue, language, minHeight}) {
   return (
     <VerticalStack gap="1">  
         <div className='copyRequest'>
@@ -12,7 +12,7 @@ function JsonComponent({dataObj, onClickFunc, title, toolTipContent, contentValu
                 <Button icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
             </Tooltip>
         </div>
-        <SampleData data={dataObj} contentValue={contentValue} language={language}/>
+        <SampleData data={dataObj} contentValue={contentValue} language={language} minHeight={minHeight}/>
     </VerticalStack>
   )
 }

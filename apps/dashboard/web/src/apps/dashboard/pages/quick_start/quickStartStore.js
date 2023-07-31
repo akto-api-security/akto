@@ -11,6 +11,11 @@ let quickStartStore = (set)=>({
     setActive:(active)=>{
         set({active: active})
     },
+
+    yamlContent: null,
+    setYamlContent:(yamlContent)=>{
+        set({yamlContent: yamlContent})
+    },  
 })
 
 quickStartStore = devtools(quickStartStore)

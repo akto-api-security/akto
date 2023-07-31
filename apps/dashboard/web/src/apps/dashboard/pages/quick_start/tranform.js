@@ -3,6 +3,7 @@ import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
+import Kubernetes from "./components/Kubernetes"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -96,6 +97,8 @@ const kubernetesObj = {
     label: 'Kubernetes Daemonset',
     text: 'You can deploy Akto in Kubernetes and collect traffic through a daemonset on your Kubernetes configuration.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kubernetes',
+    key: "KUBERNETES",
+    component: <Kubernetes />
 }
 
 const nginxObj = {
@@ -618,6 +621,40 @@ const yaml_fargate =[
     `"AKTO_MONGO_IP": "<AKTO_MONGO_CONN>"`   
 ]
 
+const yaml_kubernetes = [
+    `apiVersion: apps/v1`,
+    `kind: DaemonSet`,
+    `metadata:`,
+    `  name: akto-k8s`,
+    `  namespace: {NAMESPACE}`,
+    `  labels:`,
+    `    app: {APP_NAME}`,
+    `spec:`,
+    `  selector:`,
+    `    matchLabels:`,
+    `      app: {APP_NAME}`,
+    `  template:`,
+    `    metadata:`,
+    `      labels:`,
+    `        app: {APP_NAME}`,
+    `    spec:`,
+    `      hostNetwork: true`,
+    `      containers:`,
+    `      - name: mirror-api-logging`,
+    `        image: aktosecurity/mirror-api-logging:k8s_agent`,
+    `        env: `,
+    `          - name: AKTO_TRAFFIC_BATCH_TIME_SECS`,
+    `            value: "10"`,
+    `          - name: AKTO_TRAFFIC_BATCH_SIZE`,
+    `            value: "100"`,
+    `          - name: AKTO_INFRA_MIRRORING_MODE`,
+    `            value: "gcp"`,
+    `          - name: AKTO_KAFKA_BROKER_MAL`,
+    `            value: "<AKTO_NLB_IP>:9092"`,
+    `          - name: AKTO_MONGO_CONN`,
+    `            value: "<AKTO_MONGO_CONN>"`,
+]
+
 const quickStartFunc = {
     getConnectorsList: function (){
         const connectorsList = [mirroringObj, gcpObj, burpObj, postmanObj,
@@ -669,6 +706,9 @@ const quickStartFunc = {
             case "FARGATE":
                 return quick_start_policy_lines_kubernetes
 
+            case "KUBERNETES":
+                return quick_start_policy_lines_kubernetes
+
             default:
                 return []
         }
@@ -678,6 +718,9 @@ const quickStartFunc = {
         switch(key){
             case "FARGATE":
                 return yaml_fargate
+
+            case "KUBERNETES":
+                return yaml_kubernetes
 
             default :
                 return []
