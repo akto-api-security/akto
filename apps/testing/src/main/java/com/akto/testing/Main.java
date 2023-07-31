@@ -139,7 +139,9 @@ public class Main {
             AccountTask.instance.executeTask(account -> {
                 int delta = Context.now() - 20*60;
 
-                Bson filter1 = Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED);
+                Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
+                );
                 Bson filter2 = Filters.and(
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                         Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
