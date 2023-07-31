@@ -6,6 +6,16 @@ let quickStartStore = (set)=>({
     setCurrentConnector:(currentConnector)=>{
         set({currentConnector: currentConnector})
     },
+
+    active: null,
+    setActive:(active)=>{
+        set({active: active})
+    },
+
+    yamlContent: null,
+    setYamlContent:(yamlContent)=>{
+        set({yamlContent: yamlContent})
+    },  
 })
 
 quickStartStore = devtools(quickStartStore)

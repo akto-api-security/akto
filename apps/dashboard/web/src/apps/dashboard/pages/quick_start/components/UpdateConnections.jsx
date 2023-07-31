@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import quickStartFunc from '../tranform';
-import { Badge, Button, Card, Page, Text } from '@shopify/polaris';
+import { Badge, Button, Card, HorizontalStack, Page, Text } from '@shopify/polaris';
 import {CancelMinor} from "@shopify/polaris-icons"
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
@@ -58,7 +58,10 @@ function UpdateConnections(props) {
                             <Text variant="headingMd" as="h6">Setup guide </Text>
                             <Button plain icon={CancelMinor} onClick={closeAction} />
                         </div>
-                        <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
+                        <HorizontalStack gap="1">
+                            <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
+                            {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
+                        </HorizontalStack>
                         {currentCardObj.component}
                     </Card>
                 </div>

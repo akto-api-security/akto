@@ -8,7 +8,7 @@ import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
 import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
 import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
-// import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
+import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
 import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
 import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
 import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
@@ -18,6 +18,7 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
+import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import "./style.css";
 
 function highlightPaths(highlightPathMap, ref){
@@ -45,9 +46,12 @@ function SampleData(props) {
     const ref = useRef("");
     const [instance, setInstance] = useState(null);
 
+    const editorContent = props.contentValue ? props.contentValue : (props?.data?.firstLine!=undefined ? props?.data?.firstLine + "\n\n" : "") + JSON.stringify(props?.data?.json, null, 2)
+    const editorLanguage = props.language ? props.language : "json"
+
     function createInstance(){
         const options = {
-            language: "json",
+            language: editorLanguage,
             minimap: { enabled: false },
             wordWrap: true,
             automaticLayout: true,
@@ -60,20 +64,19 @@ function SampleData(props) {
     }
 
     useEffect(() => {
-
-        if(!instance){
+      if(!instance){
             createInstance();
         } else {
-            instance.setValue(props?.data?.firstLine + "\n\n" + JSON.stringify(props?.data?.json, null, 2))
-            highlightPaths(props?.data?.highlightPaths, instance);
+          instance.setValue(editorContent)
+          highlightPaths(props?.data?.highlightPaths, instance);
         }
         
-    }, [props.data])
+    }, [instance])
 
     return (
         <Box 
-        ref={ref}
-        minHeight={props.minHeight || '300px' }
+          ref={ref}
+          minHeight={props.minHeight || '300px' }
         />
     )
 }

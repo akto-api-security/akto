@@ -34,6 +34,7 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import AwsSource from "../dashboard/pages/quick_start/components/AwsSource";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
@@ -106,7 +107,11 @@ const router = createBrowserRouter([
       },
       {
         path: "quick-start",
-        element: <QuickStart/>
+        element: <QuickStart/>,
+      },
+      {
+        path: "quick-start/aws-setup",
+        element: <AwsSource />
       }
     ]
   },

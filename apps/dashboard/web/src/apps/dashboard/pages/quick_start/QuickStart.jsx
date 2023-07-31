@@ -3,17 +3,20 @@ import NewConnection from './components/NewConnection'
 import api from './api'
 import UpdateConnections from './components/UpdateConnections'
 import SpinnerCentered from "../../components/progress/SpinnerCentered"
+import QuickStartStore from './quickStartStore'
 
 
 function QuickStart() {
 
     const [myConnections, setMyConnections] = useState([])
     const [loading, setLoading] = useState(false)
+    const setActive = QuickStartStore(state => state.setActive)
 
     const fetchConnections = async () => {
         setLoading(true)
         await api.fetchQuickStartPageState().then((resp)=> {
             setMyConnections(resp.configuredItems)
+            resp.configuredItems.length > 0 ? setActive("update") : setActive("new")
             setLoading(false)
         })
     }

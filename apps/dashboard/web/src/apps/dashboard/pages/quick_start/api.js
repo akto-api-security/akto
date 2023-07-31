@@ -39,6 +39,35 @@ const api = {
             data: {workspace_id, allowReplay, api_key}
         })
     },
+
+    fetchLBs(data){
+        return request({
+            url: '/api/fetchLoadBalancers',
+            method: 'post',
+            data: data,
+        })
+    },
+    saveLBs(selectedLBs){
+        return request({
+            url: 'api/saveLoadBalancers',
+            method: 'post',
+            data: {selectedLBs}
+        })
+    },
+    fetchStackCreationStatus(data){
+        return request({
+            url: 'api/checkStackCreationProgress',
+            method: 'post',
+            data: data,
+        })
+    },
+    createRuntimeStack(deploymentMethod) {
+        return request({
+            url: '/api/createRuntimeStack',
+            method: 'post',
+            data: {deploymentMethod}
+        })
+    }
 }
 
 export default api
