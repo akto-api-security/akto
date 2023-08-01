@@ -1,4 +1,5 @@
-import { Button, Card, Collapsible, Icon, LegacyCard, Link, Page, Text, TextContainer, TextField } from "@shopify/polaris"
+import { Button, Card, Collapsible, FormLayout, HorizontalGrid, HorizontalStack, Icon, LegacyCard, Link, Page, Text, TextContainer, TextField, Tooltip } from "@shopify/polaris"
+import { InfoMinor } from "@shopify/polaris-icons"
 import { useState } from "react";
 import api from "../api"
 import Store from "../../../store";
@@ -51,11 +52,29 @@ function HardCoded() {
         <div>
             <Text variant="headingMd">Inject hard-coded attacker auth token</Text>
             <br />
-            <TextField
-                label="Auth header key"
-                value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />
-            <br />
-            <TextField label="Auth header value" value={userConfig.authHeaderValue} placeholder='' onChange={(authHeaderValue) => updateUserConfig("authHeaderValue", authHeaderValue)} />
+            <FormLayout>
+                <FormLayout.Group>
+                <TextField
+                    label={(
+                        <HorizontalStack gap="2">
+                            <Text>Auth header key</Text>
+                            <Tooltip content="Hello" dismissOnMouseOut width="wide" preferredPosition="below">
+                                <Icon source={InfoMinor} color="base" />
+                            </Tooltip>
+                        </HorizontalStack>
+                    )}
+                    value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />   
+                <TextField label={(
+                        <HorizontalStack gap="2">
+                            <Text>Auth header value</Text>
+                            <Tooltip content="Hello" dismissOnMouseOut width="wide" preferredPosition="below">
+                                <Icon source={InfoMinor} color="base" />
+                            </Tooltip>
+                        </HorizontalStack>
+                    )}
+                    value={userConfig.authHeaderValue} placeholder='' onChange={(authHeaderValue) => updateUserConfig("authHeaderValue", authHeaderValue)} />`
+                </FormLayout.Group>
+            </FormLayout>
             <br />
             <Button
                 primary

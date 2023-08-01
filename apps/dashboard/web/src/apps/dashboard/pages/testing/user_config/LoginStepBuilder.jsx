@@ -6,23 +6,39 @@ import TestingStore from '../testingStore';
 import Store from '../../../store';
 import LoginForm from './LoginForm';
 import OtpVerification from './OtpVerification';
+import api from '../api';
+import { v4 as uuidv4 } from 'uuid';
+import AuthParams from './AuthParams';
 
 function LoginStepBuilder() {
-    
 
-    const [steps, setSteps] = useState([{
+    const initialStepState = {
         id: "step1",
         content: "Step 1",
-        headers: "",
-        method: "",
+        body: '{"email": "abc@mail.com"}',
+        headers: '{"content-type": "application/json"}',
+        method: "POST",
         otpRefUuid: "",
         queryParams: "",
-        regex: "",
+        regex: "(\d+){1,6}",
         type: "LOGIN_FORM",
-        url: "",
+        url: "https://xyz.com",
         testResponse: ""
     }
+
+    const [steps, setSteps] = useState([{
+        ...initialStepState,
+        id: "step1",
+        content: "Step 1",
+    }
     ])
+
+    const [authParams, setAuthParams] = useState([{
+        key: "",
+        value: "",
+        where: "HEADER",
+        showHeader: true
+    }])
 
     const setToastConfig = Store(state => state.setToastConfig)
     const authMechanism = TestingStore(state => state.authMechanism)
@@ -32,14 +48,14 @@ function LoginStepBuilder() {
 
     useEffect(() => {
         setIsLoading(true)
-        if (authMechanism && authMechanism.type === "LOGIN_REQUEST") {
-            //add handle data from api logic - id, content, testResponse
-            setSteps([
-                {
-                    id: 'step1',
-                    content: 'Step 1',
-                },
-            ])
+        if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
+            setSteps(authMechanism.requestData.map((step, index) => ({
+                ...step,
+                id: `step${index + 1}`,
+                content: `Step ${index + 1}`,
+                testResponse: ''
+            })))
+            setAuthParams(authMechanism.authParams)
         }
         setSelectedStep(0)
         setIsLoading(false)
@@ -49,6 +65,11 @@ function LoginStepBuilder() {
         { label: "Call API", value: "LOGIN_FORM" },
         { label: "Receive OTP", value: "OTP_VERIFICATION" },
     ]
+
+    const stepsTabs = steps.map(step => ({
+        id: step.id,
+        content: step.content
+    }))
 
     function getStepDropdownLabel() {
         const type = stepOptions.find(stepOption => stepOption.value === steps[selectedStep].type)
@@ -61,34 +82,35 @@ function LoginStepBuilder() {
     }
 
     function handleStepTypeChange(type) {
-        setSteps(prev => prev.map((step, index) => index === selectedStep ? {
+        if (type === "LOGIN_FORM") {
+            setSteps(prev => prev.map((step, index) => index === selectedStep ? {
+                ...initialStepState,
                 id: step.id,
                 content: step.content,
-                headers: "",
-                method: "",
-                otpRefUuid: "",
-                queryParams: "",
-                regex: "",
                 type: type,
-                url: "",
-                testResponse: ""
             }
             : step))
+        } else {
+            setSteps(prev => prev.map((step, index) => index === selectedStep ? {
+                ...initialStepState,
+                id: step.id,
+                content: step.content,
+                type: type,
+                otpRefUuid: uuidv4()
+            }
+            : step))
+        }
+       
     }
 
     function handleAddStep () {
         setSteps(prev => {
             setSelectedStep(prev.length)
             return [...prev, {
+                ...initialStepState,
                 id: `step${prev.length + 1}`,
                 content: `Step ${prev.length + 1}`,
-                headers: "",
-                method: "",
-                otpRefUuid: "",
-                queryParams: "",
-                regex: "",
-                type: type,
-                url: ""
+                type: "LOGIN_FORM",
             }]
         })
         setToastConfig({ isActive: true, isError: false, message: "Step added!" })
@@ -98,12 +120,23 @@ function LoginStepBuilder() {
         if (steps.length > 1) {
             setSteps(prev => {
                 setSelectedStep(prev.length - 2)
-                return prev.filter((step, index) => index !== selectedStep)
+                const prevFiltered = prev.filter((step, index) => index !== selectedStep)
+                const prevIndexFixed = [...prevFiltered]
+                for(let i = 0; i < prevIndexFixed.length; i++) {
+                    prevIndexFixed[i].id = `step${i + 1}`
+                    prevIndexFixed[i].content = `Step ${i + 1}`
+                }
+                return prevIndexFixed
             })
             setToastConfig({ isActive: true, isError: false, message: "Step removed!" })
         } else {
             setToastConfig({ isActive: true, isError: true, message: "Atleast 1 step required!" })
         }
+    }
+
+    async function handleSave() {
+        await api.addAuthMechanism('LOGIN_REQUEST', [ ...steps ] , authParams)
+        setToastConfig({ isActive: true, isError: false, message: "Login flow saved successfully!" })
     }
 
     return (
@@ -116,7 +149,7 @@ function LoginStepBuilder() {
                 <div>
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
-                            <Tabs tabs={steps} selected={selectedStep} onSelect={handleStepChange}></Tabs>
+                            <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
                             <Button primary onClick={handleAddStep}>Add step</Button>
                         </div>
 
@@ -144,8 +177,10 @@ function LoginStepBuilder() {
 
                     </LegacyCard>
 
+                    <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
+
                     <br />
-                    <Button primary>Save changes</Button>
+                    <Button primary onClick={handleSave}>Save changes</Button>
 
                 </div>
             }

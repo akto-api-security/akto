@@ -21,7 +21,6 @@ function UserConfig() {
     async function fetchAuthMechanismData() {
         setIsLoading(true)
         const authMechanismDataResponse = await api.fetchAuthMechanismData()
-        console.log(authMechanismDataResponse)
         if (authMechanismDataResponse && authMechanismDataResponse.authMechanism) {
             const authMechanism = authMechanismDataResponse.authMechanism
             setAuthMechanism(authMechanism)
