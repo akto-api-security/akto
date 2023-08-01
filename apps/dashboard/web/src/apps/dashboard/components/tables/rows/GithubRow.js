@@ -13,30 +13,45 @@ import {
     HorizontalDotsMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useCallback} from 'react';
+import { useState, useCallback, useEffect} from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
+import func from "@/util/func"
 
 function GithubRow(props) {
+
+    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions } = props;
+
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
-    const [data, setData] = useState(props.data);
-    const togglePopoverActive = (index) =>useCallback(
+    const [data, setData] = useState(dataObj);
+
+    const togglePopoverActive = (index) => useCallback(
         () => setPopoverActive(index),
         [],
     );
     async function nextPage(data){
-        navigate(data?.nextUrl) || (props.getNextUrl && navigate(await props.getNextUrl(data.id)));
+        navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id)));
     }
 
-    const [rowClickable, setRowClickable] = useState(props.rowClickable || false)
+    const [rowClickable, setRowClickable] = useState(isRowClickable || false)
+
+    useEffect(() => {
+        setData((prev) => {
+            if(func.deepComparison(prev,dataObj))
+            {
+                return prev;
+            }
+            return {...dataObj};
+        })
+    }, [dataObj])
 
     return (
         <IndexTable.Row
             id={data.id}
             key={data.id}
-            selected={props.selectedResources.includes(data.id)}
-            position={props.index}
+            selected={selectedResources.includes(data.id)}
+            position={index}
         >
             <IndexTable.Cell>
                 <div className='linkClass'>
@@ -47,13 +62,14 @@ function GithubRow(props) {
                         onClick={() => (nextPage(data))}
                     >
                         <GithubCell
-                            headers={props.headers}
+                            headers={headers}
                             data={data}
+                            getStatus={props.getStatus}
                         />
                     </Link>
                 </div>
             </IndexTable.Cell>
-            {props?.headers?.filter((header) => {
+            {headers?.filter((header) => {
                 return header.itemCell == 2
             }).filter((header) => {
                 return data[header.value] != undefined
@@ -74,7 +90,7 @@ function GithubRow(props) {
                 )
             })
             }
-            {props.hasRowActions &&
+            {hasRowActions &&
                 <IndexTable.Cell >
                     <HorizontalStack align='end'>
                         {
@@ -86,7 +102,7 @@ function GithubRow(props) {
                             >
                                 <ActionList
                                     actionRole="menuitem"
-                                    sections={props.getActions(data)}
+                                    sections={getActions(data)}
                                 />
                             </Popover>
                         }

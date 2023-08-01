@@ -84,7 +84,7 @@ function TestRolesConditionsPicker(props) {
         <LegacyCard.Section title={title}>
             {textFieldsComponent}
             <br/>
-            <Button onClick={handleAddTextField}>Add Condition</Button>
+            <Button onClick={handleAddTextField}>Add condition</Button>
         </LegacyCard.Section>
     )
 

@@ -133,7 +133,7 @@ const TestEditorFileExplorer = () => {
     }
 
     return (
-        <div className="editor-navbar" style={{'maxHeight': '90vh', 'overflowY' : 'scroll'}}>
+        <div className="editor-navbar" style={{'overflowY' : 'scroll'}}>
             <Navigation location="/">
                 <TextField  
                     prefix={<Icon source={SearchMinor} />} 

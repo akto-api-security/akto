@@ -95,6 +95,8 @@ function MoreInformationComponent(props) {
 
 function TestRunResultPage(props) {
 
+  let {testingRunResult, runIssues} = props;
+
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
   const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
@@ -103,8 +105,6 @@ function TestRunResultPage(props) {
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
-  const location = useLocation();
-  const locationState = location.state;
   const [infoState, setInfoState] = useState(moreInfoSections)
   const [fullDescription, setFullDescription] = useState(false);
   
@@ -113,45 +113,46 @@ function TestRunResultPage(props) {
     return fullDescription ? str : str[0] + " "
   }
 
+  async function setData(testingRunResult, runIssues) {
+    if (testingRunResult) {
+      let testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
+      setSelectedTestRunResult(testRunResult)
+    } else {
+      setSelectedTestRunResult({})
+    }
+    if (runIssues) {
+      setIssueDetails(...[runIssues]);
+      setInfoState(await transform.fillMoreInformation(runIssues, subCategoryMap, moreInfoSections))
+    } else {
+      setIssueDetails(...[{}]);
+    }
+  }
+
   useEffect(() => {
-    let testRunResult = selectedTestRunResult;
     async function fetchData() {
-      if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0 ) {
-      if(locationState){
-        testRunResult = transform.prepareTestRunResult(hexId, locationState.testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
-        setSelectedTestRunResult(testRunResult)
-        if (locationState.runIssues) {
-          setIssueDetails(...[locationState.runIssues]);
-          setInfoState(await transform.fillMoreInformation(locationState.runIssues, subCategoryMap, moreInfoSections))
-        } else {
-          setIssueDetails(...[{}]);
-        }
-      } else {
-        await api.fetchTestRunResultDetails(hexId2).then(({ testingRunResult }) => {
-          testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
-          setSelectedTestRunResult(testRunResult)
-        })
-        
-        await api.fetchIssueFromTestRunResultDetails(hexId2).then(async (resp) => {
-          if (resp.runIssues) {
-            setIssueDetails(...[resp.runIssues]);
-            setInfoState(await transform.fillMoreInformation(resp.runIssues, subCategoryMap, moreInfoSections))
-          } else {
-            setIssueDetails(...[{}]);
+      if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
+        if (hexId2 != undefined) {
+          if (testingRunResult == undefined) {
+            let res = await api.fetchTestRunResultDetails(hexId2)
+            testingRunResult = res.testingRunResult;
           }
-        })
+          if (runIssues == undefined) {
+            let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
+            runIssues = res.runIssues;
+          }
+        }
+        setData(testingRunResult, runIssues);
+      } else {
+        transform.setTestMetadata();
       }
     }
-    }
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap])
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
   const navigate = useNavigate();
   function navigateBack() {
     if (hexId == "issues") {
       navigate("/dashboard/issues")
-    } else if(hexId=="editor"){
-      navigate("/dashboard/test-editor/"+location.state.testId)
     } else {
       navigate("/dashboard/testing/" + hexId)
     }
@@ -175,7 +176,7 @@ function TestRunResultPage(props) {
               selectedTestRunResult?.severity &&
               selectedTestRunResult.severity
                 .map((item) =>
-                  <Badge key={item} status={func.getStatus(item)}>
+                  <Badge key={item} status={func.getTestResultStatus(item)}>
                     <Text fontWeight="regular">
                     {item}
                     </Text></Badge>
@@ -200,9 +201,9 @@ function TestRunResultPage(props) {
           </HorizontalStack>
         </VerticalStack>
     }
-    backAction = {{onAction:navigateBack}}
-    primaryAction = {hexId=="editor" ? "" : <Button primary>Create issue</Button>}
-    secondaryActions = {hexId=="editor" ? "" : <Button disclosure>Dismiss alert</Button>}
+    backAction = {props.source == "editor" ? undefined : {onAction:navigateBack}}
+    primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
+    secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {[
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
@@ -214,12 +215,11 @@ function TestRunResultPage(props) {
     ,
     selectedTestRunResult.testResults &&
     <SampleDataList
-      key={hexId2}
-      sampleData={selectedTestRunResult?.testResults.filter((result) => {
-        return result.message
-      }).map((result) => {
-        return {message:result.message, highlightPaths:[]}
+      key={"sampleData"}
+      sampleData={selectedTestRunResult?.testResults.map((result) => {
+        return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
       })}
+      showDiff={true}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
     />,

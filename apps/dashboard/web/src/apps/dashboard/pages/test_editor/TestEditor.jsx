@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Button, Card, Frame, Icon, Text, Toast, Divider } from "@shopify/polaris"
+import { Badge, Button, Frame, Text } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -9,7 +9,6 @@ import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
 import SpinnerCentered from "../../components/progress/SpinnerCentered"
 
-import Store from "../../store"
 import TestEditorStore from "./testEditorStore"
 
 import testEditorRequests from "./api"
@@ -19,8 +18,6 @@ import convertFunc from "./transform"
 const TestEditor = () => {
     const navigate = useNavigate()
 
-    const toastConfig = Store(state => state.toastConfig)
-    const setToastConfig = Store(state => state.setToastConfig)
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
@@ -28,17 +25,6 @@ const TestEditor = () => {
 
     const [loading, setLoading] = useState(true)
 
-    const disableToast = () => {
-        setToastConfig({
-            isActive: false,
-            isError: false,
-            message: ""
-        })
-    }
-
-    const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={1500} />
-    ) : null;
 
     const handleExit = () => {
         navigate("/dashboard/testing")
@@ -73,8 +59,9 @@ const TestEditor = () => {
     }, [])
 
     return (
-        <Frame>
-            <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto", alignItems: "center", gap: "5px", height: "10vh", padding: "10px", background: "#ffffff" }}>
+
+        <Frame topBar={
+            <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto", alignItems: "center", gap: "5px", height: "7vh", padding: "10px", background: "#ffffff" }}>
                 <Button icon={ExitMajor} plain onClick={handleExit} />
                 <Text variant="headingLg">
                     Test Editor
@@ -88,22 +75,18 @@ const TestEditor = () => {
                     </Button>
                 </div>
             </div>
-
-            <Divider />
-
+        }
+        navigation={ loading ? <SpinnerCentered />: <TestEditorFileExplorer /> }
+        >
             {loading ?
                 <SpinnerCentered />
-                : <div style={{ display: "grid", gridTemplateColumns: "max-content auto" }}>
-                    <TestEditorFileExplorer />
-
-                    <div style={{ display: "grid", gridTemplateColumns: "50% 50%" }}>
+                : 
+                    <div style={{ "paddingLeft":"6vh", display: "grid", gridTemplateColumns: "50% 50%" }}>
                         <YamlEditor fetchAllTests={fetchAllTests} />
                         <SampleApi />
                     </div>
-                </div>
             }
 
-            {toastMarkup}
         </Frame>
     )
 }

@@ -224,6 +224,7 @@ const handleRedirect = () => {
                 promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
                 calenderFilter={true}
+                getStatus={func.getTestResultStatus}
             />
         ]}
         />

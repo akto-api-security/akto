@@ -24,9 +24,9 @@
     padding: 8px !important;
 }
 .right-card .Polaris-Box {
-    position: fixed;
+    position: absolute;
     right: 0;
-    top: 57px;
+    top: 1px;
     width: 27vw;
 }
 .settings {
@@ -49,4 +49,18 @@
 .right-card .Polaris-Text--bodySm{
     display: flex;
     align-items: center;
+}
+
+.card-items .Polaris-Box{
+    position: unset !important;
+    width: unset !important;
+}
+
+.copyRequest {
+    display: flex;
+    margin: 0 8px 0 16px;
+    justify-content: space-between;
+    border: 1px solid #dde0e4;
+    padding: 4px;
+    border-radius: 4px;
 }

@@ -57,7 +57,7 @@ function ConditionComponent(props) {
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
     const [apiEndpoints, setApiEndpoints] = useState({})
 
-    const handleChange = (value) => {
+    const handleTextChange = (value) => {
         setConditions((prev) => {
             prev[index].value = value;
             return [...prev];
@@ -89,7 +89,7 @@ function ConditionComponent(props) {
         return orAndConditions;
     }
 
-    const handleRegexSelected = (type) => {
+    const handleTypeSelected = (type) => {
         setConditions((prev) => {
             if(getOption(type).type == "MAP"){
                 if(getOption(prev[index].type).type==undefined){
@@ -144,7 +144,7 @@ function ConditionComponent(props) {
                 <TextField value={param}/>
             </div>
             <div style={{ flexGrow: "1" }}>
-                <Dropdown menuItems={selectOptions} initial={field.type} selected={(type) => handleRegexSelected(type)} />
+                <Dropdown menuItems={selectOptions} initial={field.type} selected={(type) => handleTypeSelected(type)} />
             </div>
         </div>
     )
@@ -190,7 +190,7 @@ function ConditionComponent(props) {
                         collectionComponent(condition) :
                         <TextField
                             value={condition.value}
-                            onChange={(newValue) => handleChange(newValue)}
+                            onChange={(newValue) => handleTextChange(newValue)}
                         />
                 }
             </div>

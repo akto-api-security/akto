@@ -1,8 +1,7 @@
 import axios from 'axios'
-import { useLocation } from 'react-router-dom';
-// import store from "@/apps/main/store/module";
-// import router from "@/apps/main/router";
-import Store from "../apps/dashboard/store";
+import PersistStore from '../apps/main/PersistStore';
+import func from "./func"
+import { history } from './history';
 
 // create axios
 const service = axios.create({
@@ -10,12 +9,6 @@ const service = axios.create({
   timeout: 60000, // timeout,
   headers: { 'Access-Control-Allow-Origin': '*' }
 })
-
-// custom hook to get the current pathname in React
-const usePathname = () => {
-  const location = useLocation();
-  return location.pathname;
-}
 
 const err = async (error) => {
   const { status, data } = error.response
@@ -26,8 +19,25 @@ const err = async (error) => {
     message = actionErrors[0]
   }
 
-
   switch (status) {
+    case 400:
+      func.setToast(true, true, 'Bad Request ' + data.message);
+      break;
+    case 422:
+      func.setToast(true, true, message);
+      break;
+    case 401:
+      if (history.location.pathname !== "/login") {
+        history.navigate("/login")
+      }
+      func.setToast(true, true, "Please login again");
+      break
+    case 423:
+      func.setToast(true, true, "Please confirm your email first");
+      break
+    case 429:
+      func.setToast(true, true, "Too many requests!! Please try after 1 hour");
+      break
     case 403:
       const originalRequest = error.config;
       if (originalRequest._retry) {
@@ -39,13 +49,10 @@ const err = async (error) => {
         method: 'get',
       })
       return service(originalRequest)
-    case 422:
-      Store.getState().setToastConfig({
-        isActive: true,
-        isError: true,
-        message: message
-      })
+    case 500:
+      func.setToast(true, true, "Server Error");
       break
+
     default:
       break;
   }
@@ -57,9 +64,7 @@ const err = async (error) => {
 service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
-  //   config.headers["access-token"] = store.getters["auth/getAccessToken"]
-  config.headers["access-token"] = Store.getState().accessToken
-  // config.headers["access-token"] = localStorage.getItem("access_token")
+  config.headers["access-token"] = PersistStore.getState().accessToken
 
 
   if (window.ACTIVE_ACCOUNT) {
@@ -73,20 +78,14 @@ service.interceptors.request.use((config) => {
 // For every response that is sent to the vue app, look for access token in header and set it if not null
 service.interceptors.response.use((response) => {
   if (response.headers["access-token"] != null) {
-    // store.commit('auth/SET_ACCESS_TOKEN',response.headers["access-token"])
-    // localStorage.setItem("access_token", response.headers["access-token"])
-    Store.getState().storeAccessToken(response.headers["access-token"])
-
+    PersistStore.getState().storeAccessToken(response.headers["access-token"])
   }
 
   if (['put', 'post', 'delete', 'patch'].includes(response.method) && response.data.meta) {
-    // window._AKTO.$emit('SHOW_SNACKBAR', {
-    //   text: response.data.meta.message,
-    //   color: 'success'
-    // })
+    func.setToast(true, false, response.data.meta.message )
   }
   if (response.data.error !== undefined) {
-    // window._AKTO.$emit('API_FAILED', response.data.error)
+    func.setToast(true, true, response.data.error )
   } else {
     if (window.mixpanel && window.mixpanel.track && response.config && response.config.url) {
       raiseMixpanelEvent(response.config.url);

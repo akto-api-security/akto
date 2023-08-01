@@ -1,6 +1,7 @@
 import { Autocomplete, Box, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {CircleRightMajor, ChevronDownMinor} from "@shopify/polaris-icons"
+import func from "@/util/func"
 
 function Dropdown(props) {
     const deselectedOptions = useMemo(() => props.menuItems,[props.menuItems],);
@@ -23,9 +24,19 @@ function Dropdown(props) {
     const getLabel  = (id) => {
         props.menuItems.forEach(element => {
             if(element.value === id){
-                setInputValue(element.label)
+                setInputValue((prev) => {
+                    if(prev == element.label){
+                        return prev
+                    }
+                    return element.label;
+                })
                 let arr = [id]
-                setSelectedOptions(arr)
+                setSelectedOptions((prev) => {
+                    if(func.deepComparison(prev, arr)){
+                        return arr;
+                    }
+                    return arr;
+                })
             }
         });
     }
@@ -33,7 +44,7 @@ function Dropdown(props) {
     useEffect(()=>{
         getLabel(props.initial)
         setOptions(deselectedOptions)
-    },[deselectedOptions])
+    },[deselectedOptions, props.initial])
 
     const textField = (
         <Autocomplete.TextField

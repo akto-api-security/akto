@@ -75,11 +75,16 @@ export default function LeftNav(){
                     selected: leftNavSelected === 'inventory',
                     subNavigationItems:[
                       {
+                        label: 'API Collections',
+                        onClick: ()=>{
+                          navigate('/dashboard/observe/inventory')
+                        },
+                      },
+                      {
                         label: 'Sensitive data',
                         onClick: ()=>{
                           navigate('/dashboard/observe/sensitive')
                         },
-                        
                       }
                     ],
                     key: '3',
