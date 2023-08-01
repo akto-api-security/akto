@@ -169,6 +169,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       promotedBulkActions={promotedBulkActions}
       loading={loading}
       rowClickable={true}
+      getStatus={func.getTestResultStatus}
     />
   )
 
@@ -203,7 +204,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
                 selectedTestRun?.severity && 
                 selectedTestRun.severity
                 .map((item) =>
-                <Badge key={item} status={func.getStatus(item)}>
+                <Badge key={item} status={func.getTestResultStatus(item)}>
                   <Text fontWeight="regular">
                     {item}
                   </Text>

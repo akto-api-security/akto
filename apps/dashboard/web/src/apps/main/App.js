@@ -3,6 +3,8 @@ import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
 import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
+import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
+import ApiEndpoints from  "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
@@ -32,6 +34,7 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import AwsSource from "../dashboard/pages/quick_start/components/AwsSource";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
@@ -77,6 +80,14 @@ const router = createBrowserRouter([
             element: <AllSensitiveData/>
           },
           {
+            path: "inventory",
+            element: <ApiCollections/>
+          },
+          {
+            path: "inventory/:apiCollectionId",
+            element: <ApiEndpoints/>
+          },
+          {
             path: "data-types",
             element: <DataTypes/>
           },
@@ -96,7 +107,11 @@ const router = createBrowserRouter([
       },
       {
         path: "quick-start",
-        element: <QuickStart/>
+        element: <QuickStart/>,
+      },
+      {
+        path: "quick-start/aws-setup",
+        element: <AwsSource />
       }
     ]
   },

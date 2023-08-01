@@ -16,6 +16,7 @@ import TestingStore from "../testingStore";
 import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
+import func from "@/util/func"
 
 /*
   {
@@ -227,6 +228,7 @@ useEffect(()=>{
         getActions = {getActions}
         hasRowActions={true}
         loading={loading}
+        getStatus={func.getTestResultStatus}
       />
     ]}
     />

@@ -56,7 +56,7 @@ const resourceName = {
     plural: 'sensitive data types',
   };
 
-function AllSensitiveData(){
+function AllSensitiveData() {
 
     const [data, setData] = useState([])
     const [mapData, setMapData] = useState({})
@@ -152,7 +152,7 @@ function AllSensitiveData(){
                 headers={headers}
                 hasRowActions={true}
                 getActions={getActions}
-                
+                getStatus={func.getTestResultStatus}
                 />
             ]}
         />

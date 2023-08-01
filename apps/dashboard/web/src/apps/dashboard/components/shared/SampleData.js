@@ -5,7 +5,7 @@ import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
 import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
 import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
-// import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
+import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
 import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
 import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
 import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
@@ -15,6 +15,7 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
+import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import "./style.css";
 
 function highlightPaths(highlightPathMap, ref){
@@ -49,9 +50,11 @@ function SampleData(props) {
     const ref = useRef("");
     const [instance, setInstance] = useState(null);
 
+    const editorLanguage = props.language ? props.language : "json"
+
     function createInstance(){
         const options = {
-            language: "json",
+            language: editorLanguage,
             minimap: { enabled: false },
             wordWrap: true,
             automaticLayout: true,

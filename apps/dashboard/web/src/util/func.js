@@ -164,7 +164,7 @@ const func = {
       return countIssues[key] + " " + key
     })
   },
-  getStatus(item) {
+  getTestResultStatus(item) {
     let localItem = item.toUpperCase();
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
@@ -473,6 +473,11 @@ async copyRequest(type, completeData) {
   }
   return {copyString, snackBarMessage};
 },
+convertPolicyLines: function(policyLines){
+  const jsonString = policyLines.join("\n");
+  const formattedJson = JSON.parse(jsonString);
+  return formattedJson
+},
 
 deepComparison(item1, item2) {
   
@@ -573,13 +578,94 @@ toMethodUrlString({method,url}){
 toMethodUrlObject(str){
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
 },
+isSubTypeSensitive(x) {
+  return x.savedAsSensitive || x.sensitive
+},
+parameterizeUrl(x) {
+  let re = /INTEGER|STRING|UUID/gi;
+  let newStr = x.replace(re, (match) => { 
+      return "{param_" + match + "}";
+  });
+  return newStr
+},
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName, iconFunc) {
+  let ret = {}
+  let apiInfoMap = {}
+
+  if (!listEndpoints) {
+      return []
+  }
+
+  if (apiInfoList) {
+      apiInfoList.forEach(x => {
+          apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
+      })
+  }
+
+  listEndpoints.forEach(x => {
+      let key = x.apiCollectionId + "-" + x.url + "-" + x.method
+      if (!ret[key]) {
+          let access_type = null
+          if (apiInfoMap[key]) {
+              let access_types = apiInfoMap[key]["apiAccessTypes"]
+              if (!access_types || access_types.length == 0) {
+                  access_type = null
+              } else if (access_types.indexOf("PUBLIC") !== -1) {
+                  access_type = "Public"
+              } else {
+                  access_type = "Private"
+              }
+          }
+
+          let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+
+          ret[key] = {
+              id: x.method+ " " + x.url,
+              shadow: x.shadow ? x.shadow : false,
+              sensitive: x.sensitive,
+              tags: x.tags,
+              endpoint: x.url,
+              parameterisedEndpoint: this.parameterizeUrl(x.url),
+              open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
+              access_type: access_type || "None",
+              method: x.method,
+              color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
+              apiCollectionId: x.apiCollectionId,
+              last_seen: apiInfoMap[key] ? ("Seen " + this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
+              detectedTs: x.startTs,
+              changesCount: x.changesCount,
+              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
+              added: "Discovered " + this.prettifyEpoch(x.startTs),
+              violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
+              apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
+              auth_type: (authType || "").toLowerCase(),
+              sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              method_icon: iconFunc ? iconFunc(x.method) : null
+          }
+
+      }
+  })
+  
+  return Object.values(ret) 
+},
+
+convertSensitiveTags(subTypeList) {
+  let result = new Set()
+  if (!subTypeList || subTypeList.size === 0) return result
+
+  subTypeList.forEach((x) => {
+      result.add(x.name)
+  })
+
+  return result
+},
 dayStart(epochMs) {
   let date = new Date(epochMs)
   date.setHours(0)
   date.setMinutes(0)
   date.setSeconds(0)
   return date
-},
+}
 
 }
 
