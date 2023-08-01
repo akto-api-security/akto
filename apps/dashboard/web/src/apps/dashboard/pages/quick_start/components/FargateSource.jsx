@@ -37,7 +37,7 @@ function FargateSource() {
                 <a href='dashboard/observe/inventory'>here</a>
             </HorizontalStack>
 
-            <JsonComponent title="Variables" toolTipContent="Copy your variables" onClickFunc={()=> copyYaml()} contentValue={yamlContent} language="yaml" minHeight="50px"/>
+            <JsonComponent title="Variables" toolTipContent="Copy your variables" onClickFunc={()=> copyYaml()} dataString={yamlContent} language="yaml" minHeight="50px"/>
         </VerticalStack>
     )
 

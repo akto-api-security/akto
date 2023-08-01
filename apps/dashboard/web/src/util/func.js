@@ -287,7 +287,17 @@ const func = {
   timeNow: () => {
     return parseInt(new Date().getTime() / 1000)
   },
+  convertKeysToLowercase: function (obj){
+    return Object.keys(obj).reduce((acc, k) => {
+      acc[k.toLowerCase()] = obj[k];
+      return acc;
+    }, {});
+  },
   requestJson: function (message, highlightPaths) {
+
+    if(message==undefined){
+      return {}
+    }
     let result = {}
     let requestHeaders = {}
 
@@ -316,7 +326,7 @@ const func = {
     }
 
     try {
-      requestHeaders = JSON.parse(requestHeadersString)
+      requestHeaders = func.convertKeysToLowercase(JSON.parse(requestHeadersString))
     } catch (e) {
       // eat it
     }
@@ -350,6 +360,10 @@ const func = {
     return result
   },
   responseJson: function (message, highlightPaths) {
+
+    if(message==undefined){
+      return {}
+    }
     let result = {}
 
     let responseHeadersString = "{}"
@@ -364,7 +378,7 @@ const func = {
 
     let responseHeaders = {};
     try {
-      responseHeaders = JSON.parse(responseHeadersString)
+      responseHeaders = func.convertKeysToLowercase(JSON.parse(responseHeadersString))
     } catch (e) {
       // eat it
     }
@@ -461,7 +475,7 @@ async copyRequest(type, completeData) {
 },
 convertPolicyLines: function(policyLines){
   const jsonString = policyLines.join("\n");
-  const formattedJson = JSON.parse(jsonString);
+  const formattedJson = JSON.stringify(JSON.parse(jsonString), null, 2);
   return formattedJson
 },
 

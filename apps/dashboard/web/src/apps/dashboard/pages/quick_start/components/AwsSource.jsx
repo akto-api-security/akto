@@ -111,9 +111,6 @@ function AwsSource() {
 
     const urlAws = "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + aktoDashboardRoleName  + "$createPolicy?step=edit"
     const formattedJson = func.convertPolicyLines(policyLines)
-    const dataObj = {
-      json: formattedJson,
-    }
 
     const steps = quickStartFunc.getDesiredSteps(urlAws)
 
@@ -155,7 +152,7 @@ function AwsSource() {
 
     const noAccessObject= {
       text: noAccessText,
-      component: <NoAccessComponent dataObj={dataObj} onClickFunc={() => copyRequest()} steps={steps} title="Policy JSON" toolTipContent="Copy JSON"/>,
+      component: <NoAccessComponent dataString={formattedJson} onClickFunc={() => copyRequest()} steps={steps} title="Policy JSON" toolTipContent="Copy JSON"/>,
       title: "NoAccess"
     }
     

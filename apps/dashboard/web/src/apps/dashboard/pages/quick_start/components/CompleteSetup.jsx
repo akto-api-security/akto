@@ -113,13 +113,15 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         fetchLBs()
     },[])
 
+    useEffect(() => {
+        const yamlContent = yaml.join('\n')
+        setYamlContent(yamlContent)
+    }, [yaml])
+
     const urlFargate = "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + aktoDashboardRoleName  + "$createPolicy?step=edit";
 
     const steps = quickStartFunc.getDesiredSteps(urlFargate)
     const formattedJson = func.convertPolicyLines(policyLines)
-    const dataObj = {
-        json: formattedJson
-    }
 
     const copyRequest = () => {
         let jsonString  = JSON.stringify(formattedJson, null, 2)
@@ -147,8 +149,6 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     }
 
     const isButtonActive = buttonActive()
-    const yamlContent = yaml.join('\n')
-    setYamlContent(yamlContent)
 
     const accessComponent = (
         loading ? 
@@ -173,14 +173,24 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
 
     const noAccessObject = {
         text: noAccessText,
-        component: <NoAccessComponent  dataObj={dataObj} onClickFunc={() => copyRequest()} steps={steps} title="Policy JSON" toolTipContent="Copy JSON"/>
+        component: <NoAccessComponent  dataString={formattedJson} onClickFunc={() => copyRequest()} steps={steps} title="Policy JSON" toolTipContent="Copy JSON"/>
     }
 
     const accessObj = {
         component: accessComponent
     }
 
-    const displayObj = isLocalDeploy ? localDeployObj : hasRequiredAccess ? accessObj : noAccessObject
+    const displayFunc = () => {
+        if (isLocalDeploy) {
+            return localDeployObj
+        }
+        if (hasRequiredAccess) {
+            return accessObj
+        }
+        return noAccessObject
+    }
+
+    const displayObj = displayFunc();
 
     return (
         <div className='card-items'>

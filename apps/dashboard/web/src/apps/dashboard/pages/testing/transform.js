@@ -5,6 +5,7 @@ import {
   Text,
   HorizontalStack, Badge, Link, List
   } from '@shopify/polaris';
+  import TestingStore from "./testingStore";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -295,6 +296,20 @@ createConditions(data){
             transform.fillConditions(conditions, testingEndpoint.orConditions.predicates, 'OR')
         }
         return conditions;
+},
+setTestMetadata () {
+  api.fetchAllSubCategories().then((resp) => {
+    let subCategoryMap = {}
+    resp.subCategories.forEach((x) => {
+      subCategoryMap[x.name] = x
+    })
+    let subCategoryFromSourceConfigMap = {}
+    resp.testSourceConfigs.forEach((x) => {
+      subCategoryFromSourceConfigMap[x.id] = x
+    })
+    TestingStore.getState().setSubCategoryMap(subCategoryMap)
+    TestingStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
+})
 }
 
 }
