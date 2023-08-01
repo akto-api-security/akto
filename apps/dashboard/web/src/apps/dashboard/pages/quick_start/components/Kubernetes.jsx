@@ -41,7 +41,7 @@ function Kubernetes() {
 
         <VerticalStack gap="1">
           <span>1. Create a file akto-daemonset-deploy.yaml with the following config:</span>
-          <JsonComponent title="Yaml Template" toolTipContent="Copy the yaml template" onClickFunc={()=> copyYaml()} contentValue={yamlContent} language="yaml" />
+          <JsonComponent title="Yaml Template" toolTipContent="Copy the yaml template" onClickFunc={()=> copyYaml()} dataString={yamlContent} language="yaml" />
         </VerticalStack>
 
         <VerticalStack gap="1">
@@ -54,7 +54,7 @@ function Kubernetes() {
 
         <VerticalStack gap="1">
           <span>3. Run the following command with appropriate namespace:</span>
-          <JsonComponent title="Command" toolTipContent="Copy the command" onClickFunc={()=> copyText()} contentValue="kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>" language="text/plain" minHeight="50px"/>
+          <JsonComponent title="Command" toolTipContent="Copy the command" onClickFunc={()=> copyText()} dataString="kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>" language="text/plain" minHeight="50px"/>
         </VerticalStack>
 
         <HorizontalStack gap="1">

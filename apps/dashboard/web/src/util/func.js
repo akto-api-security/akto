@@ -475,7 +475,7 @@ async copyRequest(type, completeData) {
 },
 convertPolicyLines: function(policyLines){
   const jsonString = policyLines.join("\n");
-  const formattedJson = JSON.parse(jsonString);
+  const formattedJson = JSON.stringify(JSON.parse(jsonString), null, 2);
   return formattedJson
 },
 

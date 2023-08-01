@@ -3,6 +3,7 @@ import {NotificationMajor, CircleChevronRightMinor,CircleChevronLeftMinor} from 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
+import PersistStore from '../../../../main/PersistStore';
 import './Headers.css'
 import api from '../../../../signup/api';
 import func from '../../../../../util/func';
@@ -17,7 +18,7 @@ export default function Header() {
     const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
     const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
     const username = Store((state) => state.username)
-    const storeAccessToken = Store(state => state.storeAccessToken)
+    const storeAccessToken = PersistStore(state => state.storeAccessToken)
 
     const handleLeftNavCollapse = () => {
         if (!leftNavCollapsed) {

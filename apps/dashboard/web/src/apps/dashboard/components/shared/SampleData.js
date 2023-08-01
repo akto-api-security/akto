@@ -41,16 +41,18 @@ function highlightPaths(highlightPathMap, ref){
 
 function SampleData(props) {
 
-    const {showDiff, data, minHeight} = props;
+    let {showDiff, data, minHeight, editorLanguage} = props;
 
     if(minHeight==undefined){
       minHeight="300px";
     }
 
+    if(editorLanguage==undefined){
+      editorLanguage='json'
+    }
+
     const ref = useRef("");
     const [instance, setInstance] = useState(null);
-
-    const editorLanguage = props.language ? props.language : "json"
 
     function createInstance(){
         const options = {

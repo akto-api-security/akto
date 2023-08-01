@@ -1,5 +1,5 @@
 import {create} from "zustand"
-import {devtools, persist, createJSONStorage} from "zustand/middleware"
+import {devtools} from "zustand/middleware"
 
 let store = (set)=>({
     leftNavSelected: '',
@@ -8,8 +8,6 @@ let store = (set)=>({
     toggleLeftNavCollapsed: () => {
         set(state => ({ leftNavCollapsed: !state.leftNavCollapsed }))
     },
-    accessToken: null,
-    storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
     username: window.USER_NAME,
     setUsername: (username) => set({username: username}),
     toastConfig: {
@@ -35,8 +33,6 @@ let store = (set)=>({
 })
 
 store = devtools(store)
-store = persist(store,{storage: createJSONStorage(() => sessionStorage)})
-
 const Store = create(store)
 
 export default Store

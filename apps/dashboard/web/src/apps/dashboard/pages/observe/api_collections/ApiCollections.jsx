@@ -1,7 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, Modal, TextContainer, TextField } from "@shopify/polaris"
 import api from "../api"
-import { useEffect,useState, useCallback } from "react"
+import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
@@ -105,7 +105,7 @@ function ApiCollections() {
         fetchData()    
     }, [])
 
-    const createCollectionModalActivator = (<Button secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>)
+    const createCollectionModalActivatorRef = useRef();
 
     return(
         <PageWithMultipleCards
@@ -116,12 +116,12 @@ function ApiCollections() {
             }
         </Text>
             }
-            
+            primaryAction={<Button secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             components={[
                
                 (<Modal
                     key="modal"
-                    activator={createCollectionModalActivator}
+                    activator={createCollectionModalActivatorRef}
                     open={active}
                     onClose={() => setActive(false)}
                     title="New collection"

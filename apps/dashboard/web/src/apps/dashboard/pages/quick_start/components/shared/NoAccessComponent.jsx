@@ -3,7 +3,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import JsonComponent from './JsonComponent'
 
-function NoAccessComponent({steps , dataObj, onClickFunc, toolTipContent, title}) {
+function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, title}) {
     const navigate = useNavigate(0)
     const noAccessComponent = (
         <VerticalStack gap="1">
@@ -27,7 +27,7 @@ function NoAccessComponent({steps , dataObj, onClickFunc, toolTipContent, title}
     return (
         <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
             {noAccessComponent}
-            <JsonComponent dataObj={dataObj} onClickFunc={onClickFunc} title={title} toolTipContent={toolTipContent}/>
+            <JsonComponent dataString={dataString} onClickFunc={onClickFunc} title={title} toolTipContent={toolTipContent}/>
         </div>
     )
 }
