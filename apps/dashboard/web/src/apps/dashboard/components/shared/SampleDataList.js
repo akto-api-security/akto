@@ -138,10 +138,10 @@ function SampleDataList(props) {
                         <HorizontalStack padding="2" align='space-between'>
                           {func.toSentenceCase(type)}
                             <Popover
+                              zIndexOverride={"600"}
                               active={popoverActive[type]}
-                            activator={<Button icon={ClipboardMinor} plain onClick={() => setPopoverActive({ [type]: !popoverActive[type] })} />}
+                              activator={<Button icon={ClipboardMinor} plain onClick={() => setPopoverActive({ [type]: !popoverActive[type] })} />}
                               onClose={() => setPopoverActive(false)}
-
                             >
                               <ActionList
                                 actionRole="menuitem"
