@@ -17,6 +17,7 @@ import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import "./style.css";
+import func from "@/util/func"
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -43,6 +44,10 @@ function SampleData(props) {
 
     let {showDiff, data, minHeight, editorLanguage} = props;
 
+    const ref = useRef(null);
+    const [instance, setInstance] = useState(undefined);
+    const [editorData, setEditorData] = useState(data);
+
     if(minHeight==undefined){
       minHeight="300px";
     }
@@ -51,8 +56,26 @@ function SampleData(props) {
       editorLanguage='json'
     }
 
-    const ref = useRef("");
-    const [instance, setInstance] = useState(null);
+    useEffect(() => {
+      if (instance===undefined) {
+        createInstance();
+      }
+    }, [])
+
+    useEffect(() => {
+      setEditorData((prev) => {
+        if(func.deepComparison(prev, data)){
+          return prev;
+        }
+          return data;
+      })
+    }, [data])
+
+    useEffect(() => {
+      if(instance!==undefined){
+        showData(editorData);
+      }
+    }, [instance, editorData])
 
     function createInstance(){
         const options = {
@@ -88,16 +111,6 @@ function SampleData(props) {
         highlightPaths(data?.highlightPaths, instance);
       }
     }
-
-    useEffect(() => {
-
-      if (!instance) {
-        createInstance();
-      } else {
-        showData(data);
-      }
-        
-    }, [instance, data])
 
     return (
       <div ref={ref} style={{height:minHeight}} className='editor'/>
