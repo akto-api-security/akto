@@ -578,6 +578,13 @@ toMethodUrlString({method,url}){
 toMethodUrlObject(str){
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
 },
+validateMethod(methodName) {
+  let m = methodName.toUpperCase()
+  let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+  let idx = allowedMethods.indexOf(m);
+  if (idx === -1) return null
+  return allowedMethods[idx]
+},
 isSubTypeSensitive(x) {
   return x.savedAsSensitive || x.sensitive
 },
