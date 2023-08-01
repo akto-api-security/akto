@@ -794,7 +794,7 @@
             </result>
         </action>
 
-        <action name="tools/convertSampleDataToCurl" class="com.akto.action.ExportSampleDataAction" method="generateCurl">
+        <action name="api/convertSampleDataToCurl" class="com.akto.action.ExportSampleDataAction" method="generateCurl">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
@@ -1413,7 +1413,7 @@
             </result>
         </action>
 
-        <action name="tools/convertSamleDataToBurpRequest" class="com.akto.action.ExportSampleDataAction" method="generateBurpRequest">
+        <action name="api/convertSamleDataToBurpRequest" class="com.akto.action.ExportSampleDataAction" method="generateBurpRequest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
