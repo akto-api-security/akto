@@ -39,6 +39,7 @@ import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
+import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 
 const router = createBrowserRouter([
   {
@@ -109,10 +110,6 @@ const router = createBrowserRouter([
         path: "quick-start",
         element: <QuickStart/>,
       },
-      {
-        path: "quick-start/aws-setup",
-        element: <AwsSource />
-      }
     ]
   },
   {
@@ -188,6 +185,10 @@ const router = createBrowserRouter([
   {
     path: "/dashboard/test-editor/:testId",
     element: <TestEditor />
+  },
+  {
+    path: "/dashboard/onboarding",
+    element: <Onboarding />
   },
 {
   path: "/login",
