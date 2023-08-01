@@ -4,12 +4,11 @@ import {devtools} from "zustand/middleware"
 let store = (set)=>({
     leftNavSelected: '',
     setLeftNavSelected: (selected) =>  set({ leftNavSelected: selected }), 
-    leftNavCollapsed: true,
+    leftNavCollapsed: false,
     toggleLeftNavCollapsed: () => {
         set(state => ({ leftNavCollapsed: !state.leftNavCollapsed }))
     },
     username: window.USER_NAME,
-    setUsername: (username) => set({username: username}),
     toastConfig: {
         isActive: false,
         isError: false,
@@ -28,7 +27,6 @@ let store = (set)=>({
     setAllCollections:(allCollections)=>{
         set({allCollections: allCollections})
     },
-
     isLocalDeploy: window.DASHBOARD_MODE === "LOCAL_DEPLOY"
 })
 

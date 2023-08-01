@@ -39,160 +39,167 @@ import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
+import Dashboard from "../dashboard/pages/Dashboard";
 
 const router = createBrowserRouter([
   {
     path: "/dashboard",
-    element: <HomePage />,
+    element: <Dashboard/>,
     children: [
       {
-        path: "testing",
-        element: <PageTesting />,
-        children:[
-          {
-            path: "",
-            element: <TestRunsPage />
-          },
-          {
-            path: ":hexId",
-            element: <SingleTestRunPage />
-          },
-          {
-            path: ":hexId/result/:hexId2",
-            element: <TestRunResultPage />
-          },
-          {
-            path:"roles",
-            element: <TestRolesPage/>
-          },
-          {
-            path:"roles/details",
-            element:<TestRoleSettings/>
-          }
-        ]
-      },
-      {
-        path: "observe",
-        element: <PageObserve/>,
+        path: "",
+        element: <HomePage />,
         children: [
           {
-            path: "sensitive",
-            element: <AllSensitiveData/>
+            path: "testing",
+            element: <PageTesting />,
+            children:[
+              {
+                path: "",
+                element: <TestRunsPage />
+              },
+              {
+                path: ":hexId",
+                element: <SingleTestRunPage />
+              },
+              {
+                path: ":hexId/result/:hexId2",
+                element: <TestRunResultPage />
+              },
+              {
+                path:"roles",
+                element: <TestRolesPage/>
+              },
+              {
+                path:"roles/details",
+                element:<TestRoleSettings/>
+              }
+            ]
           },
           {
-            path: "inventory",
-            element: <ApiCollections/>
+            path: "observe",
+            element: <PageObserve/>,
+            children: [
+              {
+                path: "sensitive",
+                element: <AllSensitiveData/>
+              },
+              {
+                path: "inventory",
+                element: <ApiCollections/>
+              },
+              {
+                path: "inventory/:apiCollectionId",
+                element: <ApiEndpoints/>
+              },
+              {
+                path: "data-types",
+                element: <DataTypes/>
+              },
+              {
+                path: "sensitive/:subType",
+                element: <SensitiveDataExposure/>
+              },
+              {
+                path: "sensitive/:subType/:apiCollectionId/:urlAndMethod",
+                element: <SingleRequest/>
+              }
+            ]
           },
           {
-            path: "inventory/:apiCollectionId",
-            element: <ApiEndpoints/>
+            path:"issues",
+            element:<IssuesPage/>
           },
           {
-            path: "data-types",
-            element: <DataTypes/>
+            path: "quick-start",
+            element: <QuickStart/>,
           },
           {
-            path: "sensitive/:subType",
-            element: <SensitiveDataExposure/>
-          },
-          {
-            path: "sensitive/:subType/:apiCollectionId/:urlAndMethod",
-            element: <SingleRequest/>
+            path: "quick-start/aws-setup",
+            element: <AwsSource />
           }
         ]
       },
       {
-        path:"issues",
-        element:<IssuesPage/>
+        path: "settings",
+        element: <Settings />,
+        children: [
+          {
+            path: "users",
+            element: <Users />
+          },
+          {
+            path: "integrations",
+            element: <Integrations />,
+          },
+          {
+            path: "about",
+            element: <About />,
+          },
+          {
+            path: "metrics",
+            element: <Metrics />,
+          },
+          {
+            path: "integrations/burp",
+            element: <BurpSuite />,
+          },
+          {
+            path: "integrations/postman",
+            element: <Postman />,
+          },
+          {
+            path: "integrations/akto_apis",
+            element: <ApiTokens />,
+          },
+          {
+            path: "integrations/akto_gpt",
+            element: <AktoGPT />,
+          },
+          {
+            path: "integrations/webhooks",
+            element: <Webhooks />,
+          },
+          {
+            path: "integrations/webhooks/:webhookId",
+            element: <Webhook />,
+          },
+          {
+            path: "integrations/webhooks/create_custom_webhook",
+            element: <Webhook />,
+          },
+          {
+            path: "health-logs",
+            element: <HealthLogs />,
+          },
+          {
+            path: "auth-types",
+            element:<AuthTypes/>
+          },
+          {
+            path: "auth-types/details",
+            element: <AuthTypeDetails/>
+          },
+          {
+            path: "tags",
+            element: <Tags/>
+          },
+          {
+            path: "tags/details",
+            element: <TagDetails/>
+          }
+        ]
       },
       {
-        path: "quick-start",
-        element: <QuickStart/>,
+        path: "test-editor/:testId",
+        element: <TestEditor />
       },
-      {
-        path: "quick-start/aws-setup",
-        element: <AwsSource />
-      }
     ]
-  },
-  {
-    path: "/dashboard/settings",
-    element: <Settings />,
-    children: [
-      {
-        path: "users",
-        element: <Users />
-      },
-      {
-        path: "integrations",
-        element: <Integrations />,
-      },
-      {
-        path: "about",
-        element: <About />,
-      },
-      {
-        path: "metrics",
-        element: <Metrics />,
-      },
-      {
-        path: "integrations/burp",
-        element: <BurpSuite />,
-      },
-      {
-        path: "integrations/postman",
-        element: <Postman />,
-      },
-      {
-        path: "integrations/akto_apis",
-        element: <ApiTokens />,
-      },
-      {
-        path: "integrations/akto_gpt",
-        element: <AktoGPT />,
-      },
-      {
-        path: "integrations/webhooks",
-        element: <Webhooks />,
-      },
-      {
-        path: "integrations/webhooks/:webhookId",
-        element: <Webhook />,
-      },
-      {
-        path: "integrations/webhooks/create_custom_webhook",
-        element: <Webhook />,
-      },
-      {
-        path: "health-logs",
-        element: <HealthLogs />,
-      },
-      {
-        path: "auth-types",
-        element:<AuthTypes/>
-      },
-      {
-        path: "auth-types/details",
-        element: <AuthTypeDetails/>
-      },
-      {
-        path: "tags",
-        element: <Tags/>
-      },
-      {
-        path: "tags/details",
-        element: <TagDetails/>
-      }
-  ]
-  },
-  {
-    path: "/dashboard/test-editor/:testId",
-    element: <TestEditor />
   },
 {
   path: "/login",
     element: <SignUp />,
-  },
+},
 {
   path: "/",
     element: <Navigate to="/login" />,

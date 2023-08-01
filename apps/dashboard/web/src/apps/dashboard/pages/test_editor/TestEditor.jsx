@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Button, Frame, Text, Toast, HorizontalGrid, Box, Divider } from "@shopify/polaris"
+import { Badge, Button, Frame, Text } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -9,7 +9,6 @@ import YamlEditor from "./components/YamlEditor"
 import SampleApi from "./components/SampleApi"
 import SpinnerCentered from "../../components/progress/SpinnerCentered"
 
-import Store from "../../store"
 import TestEditorStore from "./testEditorStore"
 
 import testEditorRequests from "./api"
@@ -19,8 +18,6 @@ import convertFunc from "./transform"
 const TestEditor = () => {
     const navigate = useNavigate()
 
-    const toastConfig = Store(state => state.toastConfig)
-    const setToastConfig = Store(state => state.setToastConfig)
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
@@ -28,17 +25,6 @@ const TestEditor = () => {
 
     const [loading, setLoading] = useState(true)
 
-    const disableToast = () => {
-        setToastConfig({
-            isActive: false,
-            isError: false,
-            message: ""
-        })
-    }
-
-    const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={1500} />
-    ) : null;
 
     const handleExit = () => {
         navigate("/dashboard/testing")
@@ -101,7 +87,6 @@ const TestEditor = () => {
                     </div>
             }
 
-            {toastMarkup}
         </Frame>
     )
 }
