@@ -6,6 +6,11 @@ let onboardingStore = (set)=>({
     setSelectedCollection:(selectedCollection)=>{
         set({selectedCollection: selectedCollection})
     },
+
+    selectedTestSuite: null,
+    setSelectedTestSuite:(selectedTestSuite)=>{
+        set({selectedTestSuite: selectedTestSuite})
+    },
 })
 
 onboardingStore = devtools(onboardingStore)

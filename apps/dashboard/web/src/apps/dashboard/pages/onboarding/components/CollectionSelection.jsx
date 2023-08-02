@@ -3,12 +3,10 @@ import Store from "../../../store"
 import homeRequests from '../../home/api'
 import OnboardingStore from '../OnboardingStore'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
-import { Box, Button, HorizontalStack, Icon, LegacyCard } from '@shopify/polaris'
-import { ArrowRightMinor } from "@shopify/polaris-icons"
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from '../../../../../util/func'
 
-function CollectionSelection({nextClicked}) {
+function CollectionSelection() {
     const apiCollections = Store(state => state.allCollections)
     const setCollections = Store(state => state.setAllCollections)
     const setSelectedCollection = OnboardingStore(state => state.setSelectedCollection)
@@ -58,11 +56,6 @@ function CollectionSelection({nextClicked}) {
         getCollections()
     },[])
 
-    const next = () => {
-        if(collection){
-            nextClicked()
-        }
-    }
     const allCollectionsOptions = dummyCollections.map(collection => {
         return {
             label: collection.displayName,
@@ -72,26 +65,13 @@ function CollectionSelection({nextClicked}) {
 
     return (
         loading ? <SpinnerCentered /> :
-        <LegacyCard.Section>
-            <DropdownSearch label="Select collection"
-                        placeholder="Select API collection"
-                        optionsList={allCollectionsOptions}
-                        setSelected={setSelectedCollection}
-                        value={mapCollectionIdToName?.[collection]}
-                        preSelected={[collection]}
-            />
-
-            <br/>
-
-            <Button onClick={()=> next()} primary fullWidth>
-                <HorizontalStack gap="1">
-                    Select Tests
-                    <Box>
-                        <Icon source={ArrowRightMinor} />
-                    </Box>
-                </HorizontalStack>
-            </Button>
-        </LegacyCard.Section>
+        <DropdownSearch label="Select collection"
+                    placeholder="Select API collection"
+                    optionsList={allCollectionsOptions}
+                    setSelected={setSelectedCollection}
+                    value={mapCollectionIdToName?.[collection]}
+                    preSelected={[collection]}
+        />
     )
 }
 

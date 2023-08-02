@@ -1,8 +1,8 @@
-import { Button, LegacyCard, Text, VerticalStack} from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Icon, LegacyCard, Text, VerticalStack} from '@shopify/polaris'
 import React from 'react'
 import StepperComponent from '../../../components/shared/StepperComponent'
 
-function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboarding}) {
+function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboarding, next}) {
 
     const titleComponent = (
         <VerticalStack gap="1">
@@ -18,7 +18,19 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
                 <StepperComponent currentStep={currentStep} totalSteps={3} stepperClicked={(index) => requestStepChange(index)}/>
             </div>
             <LegacyCard title={titleComponent}>
-                {stepObj?.component}
+                <LegacyCard.Section>
+                    <VerticalStack gap="3">
+                        {stepObj?.component}
+                        <Button onClick={()=> next()} primary fullWidth size='large'>
+                            <HorizontalStack gap="1">
+                                {stepObj.buttonText}
+                                <Box>
+                                    <Icon source={stepObj.icon} />
+                                </Box>
+                            </HorizontalStack>
+                        </Button>
+                    </VerticalStack>
+                </LegacyCard.Section>
             </LegacyCard>
 
             <Button plain onClick={() => skipOnboarding()} fullWidth>I'm a ninja!! I dont need onboarding.</Button>

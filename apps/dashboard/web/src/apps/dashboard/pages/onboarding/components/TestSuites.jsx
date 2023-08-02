@@ -1,11 +1,19 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import api from '../api'
+import SuitesCard from './SuitesCard'
+import GridRows from '../../../components/shared/GridRows'
+import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 
 function TestSuites() {
 
+    const [testSuites, setTestSuites] = useState([])
+    const [loading, setLoading] = useState(false)
+
     const fetchTestSuites = async() => {
+        setLoading(true)
         await api.fetchTestSuites().then((resp) => {
-            console.log(resp)
+            setLoading(false)
+            setTestSuites(resp.testSuites)
         })
     }
 
@@ -14,7 +22,8 @@ function TestSuites() {
     },[])
 
     return (
-        <div>TestSuites</div>
+        loading ? <SpinnerCentered /> :
+        <GridRows columns={2} items={testSuites} CardComponent={SuitesCard} />
     )
 }
 
