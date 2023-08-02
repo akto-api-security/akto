@@ -13,7 +13,6 @@ function Slack() {
 
     async function fetchWebhooks() {
         let arr = await settingFunctions.getTokenList("SLACK")
-        console.log(arr)
         setSlackWebhooks(arr)
     }
 
@@ -30,15 +29,15 @@ function Slack() {
         
     }
 
-    const seeWork = () => {
-        window.open(props.docsUrl)
-    }
-
     const handleAddSlackWebhook = async () => {
         const response = await settingRequests.addSlackWebhook(slackWebhookUrl)
         if (response) {
-            func.setToast(true, false, "Slack webhook added successfully!")
-            fetchWebhooks()
+            if (response.error) {
+                func.setToast(true, true, response.error)
+            } else {
+                func.setToast(true, false, "Slack webhook added successfully!")
+                fetchWebhooks()
+            }
         }
     }
 
