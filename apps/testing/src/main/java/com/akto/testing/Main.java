@@ -18,12 +18,9 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.store.AuthMechanismStore;
-import com.akto.store.SampleMessageStore;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -114,7 +111,9 @@ public class Main {
             AccountTask.instance.executeTask(account -> {
                 int delta = Context.now() - 20*60;
 
-                Bson filter1 = Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED);
+                Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
+                );
                 Bson filter2 = Filters.and(
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                         Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
@@ -134,18 +133,8 @@ public class Main {
                     return;
                 }
 
-                loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString(), LogDb.TESTING);
 
                 try {
-                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
-                    boolean runStatusCodeAnalyser = accountSettings == null ||
-                            accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
-
-                    SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-                    AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-
-
-                    TestExecutor testExecutor = new TestExecutor();
                     long timestamp = testingRun.getId().getTimestamp();
                     long seconds = Context.now() - timestamp;
                     loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
@@ -158,17 +147,12 @@ public class Main {
                             loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
                         }
                     }
-                    if (runStatusCodeAnalyser) {
-                        StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore, testingRun.getTestingRunConfig());
-                    }
-
                     ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
-                    loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
-
-                    testExecutor.init(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+                    TestExecutor testExecutor = new TestExecutor();
+                    testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
                 }
                 Bson completedUpdate = Updates.combine(
                         Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
