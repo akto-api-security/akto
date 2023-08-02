@@ -31,7 +31,7 @@ function GithubRow(props) {
         [],
     );
     async function nextPage(data){
-        navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id)));
+        navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), {replace:true}));
     }
 
     const [rowClickable, setRowClickable] = useState(isRowClickable || false)

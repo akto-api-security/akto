@@ -100,9 +100,6 @@ function DataTypes() {
     setChange(true)
   }
 
-  const navigateBack = () =>{
-    navigate("/dashboard/observe/sensitive")
-  }
 
   const handleValue = (selected) =>{
     setStatus(selected)
@@ -255,7 +252,6 @@ function DataTypes() {
 
   const pageMarkup = (
     <PageWithMultipleCards title = {pageTitle}
-        backAction= {{onAction:navigateBack}}
         divider
         components={components}
     />

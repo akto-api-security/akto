@@ -72,7 +72,7 @@ function SampleData(props) {
     }, [data])
 
     useEffect(() => {
-      if(instance!==undefined){
+      if(instance!==undefined && editorData!==undefined){
         showData(editorData);
       }
     }, [instance, editorData])
@@ -96,8 +96,9 @@ function SampleData(props) {
           instance = editor.create(ref.current, options) 
         }
         setInstance(instance)
-    }
 
+    }
+    
     function showData(data){
       if (showDiff) {
         let ogModel = editor.createModel(data?.original, "json")

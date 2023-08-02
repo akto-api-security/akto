@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextContainer, TextField } from "@shopify/polaris"
+import { Text, Button, Modal, TextField } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
@@ -54,7 +54,8 @@ function convertToCollectionData(c) {
         ...c,
         endpoints: c["urlsCount"] || 0,
         detected: func.prettifyEpoch(c.startTs),
-        icon: CircleTickMinor    
+        icon: CircleTickMinor,
+        nextUrl: "/dashboard/observe/inventory/"+ c.id
     }    
 }
 
@@ -70,16 +71,6 @@ function ApiCollections() {
     
     
     const navigate = useNavigate()
-
-
-    const getActions = (item) => {
-        return [{
-            items: [{
-                content: 'View',
-                onAction: () => navigate("/dashboard/observe/inventory/"+item.id, {state: {id: item.id}}),
-            }]
-        }]
-    }
 
     const showCreateNewCollectionPopup = () => {
         setActive(true)
@@ -117,6 +108,7 @@ function ApiCollections() {
         </Text>
             }
             primaryAction={<Button secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            isFirstPage={true}
             components={[
                
                 (<Modal
@@ -152,9 +144,6 @@ function ApiCollections() {
                 filters={[]}
                 disambiguateLabel={()=>{}} 
                 headers={headers}
-                hasRowActions={true}
-                getActions={getActions}
-                
                 />)
             ]}
         />

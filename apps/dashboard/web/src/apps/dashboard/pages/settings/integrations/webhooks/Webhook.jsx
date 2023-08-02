@@ -273,7 +273,6 @@ function Webhook() {
                 title={webhookId ?
                     customWebhookFindId ? customWebhookFindId.webhookName : ''
                     : "Create custom webhook"}
-                backAction={{ onAction: () => navigate(-1) }}
                 divider
                 components={components}
             />
