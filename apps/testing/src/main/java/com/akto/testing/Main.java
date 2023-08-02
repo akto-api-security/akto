@@ -161,17 +161,8 @@ public class Main {
                     return;
                 }
 
-                loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString(), LogDb.TESTING);
 
                 try {
-                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
-                    boolean runStatusCodeAnalyser = accountSettings == null ||
-                            accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
-
-                    SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-                    sampleMessageStore.fetchSampleMessages(extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
-                    AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-                    TestExecutor testExecutor = new TestExecutor();
                     long timestamp = testingRun.getId().getTimestamp();
                     long seconds = Context.now() - timestamp;
                     loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
@@ -184,17 +175,12 @@ public class Main {
                             loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
                         }
                     }
-                    if (runStatusCodeAnalyser) {
-                        StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore, testingRun.getTestingRunConfig());
-                    }
-
                     ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
-                    loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
-
-                    testExecutor.init(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+                    TestExecutor testExecutor = new TestExecutor();
+                    testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
                 }
                 Bson completedUpdate = Updates.combine(
                         Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),

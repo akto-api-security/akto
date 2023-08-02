@@ -1,6 +1,5 @@
 package com.akto.testing;
 
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -22,7 +21,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.rules.TestPlugin;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -55,9 +53,9 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-    public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
+    public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
+            apiWiseInit(testingRun, summaryId);
         } else {
             workflowInit(testingRun, summaryId);
         }
@@ -105,11 +103,15 @@ public class TestExecutor {
     }
 
 
-    public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+
+        SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
+        AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
@@ -118,8 +120,6 @@ public class TestExecutor {
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-
-        List<AuthParam> authParams = authMechanism.getAuthParams();
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
 
