@@ -16,6 +16,15 @@ const func = {
           message: message
       })
   },
+  formatJsonForEditor(data){
+    let res = "";
+    try{
+      res = JSON.stringify(JSON.parse(data), null, 2)
+    } catch {
+      res = data;
+    }
+    return res
+  },
   validateName(name) {
     const regex = /^[a-z0-9_]+$/i;
     if (name.length == 0) {

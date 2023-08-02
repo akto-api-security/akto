@@ -96,22 +96,8 @@ function SampleData(props) {
           instance = editor.create(ref.current, options) 
         }
         setInstance(instance)
-        return instance
+
     }
-
-    useEffect(() => {
-        let EditorInstance = null
-
-        if(!instance){
-            EditorInstance = createInstance();
-        } else {
-            EditorInstance = instance
-        }
-
-        EditorInstance.setValue(props?.data?.firstLine + "\n\n" + JSON.stringify(props?.data?.json, null, 2))
-        highlightPaths(props?.data?.highlightPaths, EditorInstance);
-        
-    }, [props.data])
     
     function showData(data){
       if (showDiff) {

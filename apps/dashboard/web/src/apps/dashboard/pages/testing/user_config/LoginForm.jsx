@@ -1,13 +1,13 @@
-import { TextField, Text, Button, Divider, LegacyCard, LegacyTabs, Tabs } from "@shopify/polaris"
-import { useEffect, useState } from "react"
+import { TextField, Text, Button, LegacyCard, LegacyTabs } from "@shopify/polaris"
+import { useState } from "react"
 import SampleData from "../../../components/shared/SampleData"
 import api from "../api";
-import Store from "../../../store";
+import func from "@/util/func"
 
 function LoginForm({ step, setSteps }) {
 
-    const setToastConfig = Store(state => state.setToastConfig)
     const [ selectedApiResponseTab, setSelectedApiResponseTab] = useState(0)
+    const [testDisable, setTestDisable] = useState(false)
 
     function updateForm(field, value) {
         setSteps(prev => prev.map((s) => s.id === step.id ? {
@@ -28,14 +28,16 @@ function LoginForm({ step, setSteps }) {
     ];
 
     async function handleLoginFlowTest() {
+        setTestDisable(true)
+        func.setToast(true,  false,  "Running login flow")
         const response = await api.triggerSingleStep('LOGIN_REQUEST', step.id, [{ ...step }])
         if (response) {
-            setToastConfig({ isActive: true, isError: false, message: "Login flow ran successfully!"})
+            func.setToast(true,  false,  "Login flow ran successfully!")
             const testResponse = JSON.parse(response.responses[0])
 
             let responseBody
             try {
-                responseBody = JSON.parse(testResponse.body)
+                responseBody = func.formatJsonForEditor(testResponse.body)
             } catch {
                 responseBody = testResponse.body
             }
@@ -43,13 +45,14 @@ function LoginForm({ step, setSteps }) {
             setSteps(prev => prev.map((s) => s.id === step.id ? {
                 ...s,
                 testResponse: {
-                    headers: { firstLine: "", json: JSON.parse(testResponse.headers) },
-                    body: { firstLine: "", json: responseBody }
+                    headers: { message: func.formatJsonForEditor(testResponse.headers) },
+                    body: {  message: responseBody }
                 }
             }
             : s))
             setSelectedApiResponseTab(0)
         }
+        setTestDisable(false);
     }   
 
     return (
@@ -75,7 +78,7 @@ function LoginForm({ step, setSteps }) {
                 <LegacyCard subdued>
                     <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px", alignItems: "center", padding: "20px" }}>
                         <Text variant="headingMd">Test Response</Text>
-                        <Button onClick={handleLoginFlowTest}>Test</Button>
+                        <Button onClick={handleLoginFlowTest} disabled={testDisable}>Test</Button>
                     </div>
                     {step.testResponse ?
                         <div>

@@ -58,7 +58,7 @@ function HardCoded() {
                     label={(
                         <HorizontalStack gap="2">
                             <Text>Auth header key</Text>
-                            <Tooltip content="Hello" dismissOnMouseOut width="wide" preferredPosition="below">
+                            <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
                                 <Icon source={InfoMinor} color="base" />
                             </Tooltip>
                         </HorizontalStack>
@@ -67,7 +67,7 @@ function HardCoded() {
                 <TextField label={(
                         <HorizontalStack gap="2">
                             <Text>Auth header value</Text>
-                            <Tooltip content="Hello" dismissOnMouseOut width="wide" preferredPosition="below">
+                            <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
                                 <Icon source={InfoMinor} color="base" />
                             </Tooltip>
                         </HorizontalStack>
