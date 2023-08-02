@@ -16,6 +16,15 @@ const func = {
           message: message
       })
   },
+  formatJsonForEditor(data){
+    let res = "";
+    try{
+      res = JSON.stringify(JSON.parse(data), null, 2)
+    } catch {
+      res = data;
+    }
+    return res
+  },
   validateName(name) {
     const regex = /^[a-z0-9_]+$/i;
     if (name.length == 0) {
@@ -577,6 +586,13 @@ toMethodUrlString({method,url}){
 },
 toMethodUrlObject(str){
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
+},
+validateMethod(methodName) {
+  let m = methodName.toUpperCase()
+  let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+  let idx = allowedMethods.indexOf(m);
+  if (idx === -1) return null
+  return allowedMethods[idx]
 },
 isSubTypeSensitive(x) {
   return x.savedAsSensitive || x.sensitive

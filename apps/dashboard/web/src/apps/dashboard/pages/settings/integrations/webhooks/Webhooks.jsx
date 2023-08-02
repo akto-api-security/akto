@@ -93,7 +93,6 @@ function Webhooks() {
     }
     
     const getActions = (item) => {
-        console.log(item)
         return [{
             items: [{
                 content: item.activeStatus === "ACTIVE" ? 'Deactivate' : 'Activate',

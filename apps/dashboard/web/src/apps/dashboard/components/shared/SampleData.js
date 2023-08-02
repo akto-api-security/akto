@@ -96,8 +96,9 @@ function SampleData(props) {
           instance = editor.create(ref.current, options) 
         }
         setInstance(instance)
-    }
 
+    }
+    
     function showData(data){
       if (showDiff) {
         let ogModel = editor.createModel(data?.original, "json")
