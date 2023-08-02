@@ -181,6 +181,20 @@ const settingRequests = {
             data: {id}
         })
     },
+    addSlackWebhook(webhookUrl) {
+        return request({
+            url: '/api/addSlackWebhook',
+            method: 'post',
+            data: {webhookUrl}
+        })
+    },
+    deleteSlackWebhook(apiTokenId) {
+        return request({
+            url: '/api/deleteSlackWebhook',
+            method: 'post',
+            data: {apiTokenId}
+        })
+    },
 }
 
 export default settingRequests

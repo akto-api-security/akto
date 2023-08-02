@@ -82,6 +82,7 @@ function TestRolesPage(){
         <PageWithMultipleCards
         title={"Test roles"}
         primaryAction = {<Button primary onClick={handleRedirect}>Create new test role</Button>}
+        isFirstPage={true}
         components={[
             <GithubSimpleTable
             key="table"

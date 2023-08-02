@@ -34,6 +34,7 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AwsSource from "../dashboard/pages/quick_start/components/AwsSource";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
@@ -41,6 +42,7 @@ import Tags from "../dashboard/pages/settings/tags/Tags";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
+import Slack from "../dashboard/pages/settings/integrations/Slack";
 
 const router = createBrowserRouter([
   {
@@ -74,6 +76,10 @@ const router = createBrowserRouter([
               {
                 path:"roles/details",
                 element:<TestRoleSettings/>
+              },
+              {
+                path:"user_config",
+                element:<UserConfig/>
               }
             ]
           },
@@ -156,6 +162,10 @@ const router = createBrowserRouter([
           {
             path: "integrations/akto_gpt",
             element: <AktoGPT />,
+          },
+          {
+            path: "integrations/slack",
+            element: <Slack />,
           },
           {
             path: "integrations/webhooks",

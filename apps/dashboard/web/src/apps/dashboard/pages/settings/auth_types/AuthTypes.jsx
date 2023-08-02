@@ -114,6 +114,7 @@ function AuthTypes() {
             title={"Auth types"}
             primaryAction={<Button primary onClick={handleRedirect}>Create new auth type</Button>}
             secondaryActions={<ResetModal />}
+            isFirstPage={true}
             components={[
                 <GithubSimpleTable
                     key="table"

@@ -15,7 +15,6 @@ import {
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
-import { useNavigate } from "react-router-dom";
 import { useParams } from 'react-router';
 import { useState, useEffect } from 'react';
 import TestingStore from "../testingStore";
@@ -141,11 +140,6 @@ useEffect(()=>{
     fetchData();
 }, [selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
 
-const navigate = useNavigate();
-function navigateBack(){
-  navigate("/dashboard/testing/")
-}
-
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
   {
@@ -168,7 +162,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
       selectable={true}
       promotedBulkActions={promotedBulkActions}
       loading={loading}
-      rowClickable={true}
       getStatus={func.getTestResultStatus}
     />
   )
@@ -220,7 +213,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
             </Text>
           </VerticalStack>
     }
-    backAction = {{onAction:navigateBack}}
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
     components = {components}
     />

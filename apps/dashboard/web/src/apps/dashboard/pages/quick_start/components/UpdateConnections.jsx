@@ -1,10 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import quickStartFunc from '../tranform';
 import { Badge, Button, Card, HorizontalStack, Page, Text } from '@shopify/polaris';
 import {CancelMinor} from "@shopify/polaris-icons"
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
-import { useState } from 'react';
 import QuickStartStore from '../quickStartStore';
 
 function UpdateConnections(props) {
