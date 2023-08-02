@@ -214,7 +214,7 @@ Resources:
               aws-cfn-bootstrap-latest.tar.gz
             - >-
               curl -fsSL
-              'https://raw.githubusercontent.com/akto-api-security/infra/feature/segregation_2/cf-deploy-akto'
+              'https://raw.githubusercontent.com/akto-api-security/infra/feature/quick-setup/cf-deploy-akto'
               > cf-deploy-akto
             - sudo chmod 700 cf-deploy-akto
             - ./cf-deploy-akto < <(echo 'test')
@@ -237,7 +237,7 @@ Resources:
               ~/akto/infra/docker-context-analyser.env
             - >-
               curl -fsSL
-              'https://raw.githubusercontent.com/akto-api-security/infra/feature/segregation_2/cf-deploy-akto-start'
+              'https://raw.githubusercontent.com/akto-api-security/infra/feature/quick-setup/cf-deploy-akto-start'
               > cf-deploy-akto-start
             - sudo chmod 700 cf-deploy-akto-start
             - ./cf-deploy-akto-start < <(echo 'test')
@@ -358,7 +358,7 @@ Resources:
               aws-cfn-bootstrap-latest.tar.gz
             - >-
               curl -fsSL
-              'https://raw.githubusercontent.com/akto-api-security/infra/feature/segregation_2/cf-deploy-akto'
+              'https://raw.githubusercontent.com/akto-api-security/infra/feature/quick-setup/cf-deploy-akto'
               > cf-deploy-akto
             - sudo chmod 700 cf-deploy-akto
             - ./cf-deploy-akto < <(echo 'test')
@@ -369,7 +369,7 @@ Resources:
             - sudo echo AKTO_KAFKA_IP=$AKTO_KAFKA_IP >> ~/akto/infra/.env
             - >-
               curl -fsSL
-              'https://raw.githubusercontent.com/akto-api-security/infra/feature/segregation_2/cf-deploy-akto-start'
+              'https://raw.githubusercontent.com/akto-api-security/infra/feature/quick-setup/cf-deploy-akto-start'
               > cf-deploy-akto-start
             - sudo chmod 700 cf-deploy-akto-start
             - ./cf-deploy-akto-start < <(echo 'test')
