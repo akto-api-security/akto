@@ -2,6 +2,7 @@ import React from 'react'
 import { Avatar, Button, ButtonGroup, Frame, TopBar } from "@shopify/polaris"
 import {ClipboardMinor} from "@shopify/polaris-icons"
 import "./Onboarding.css"
+import OnboardingBuilder from './components/OnboardingBuilder'
 
 function Onboarding() {
 
@@ -36,6 +37,7 @@ function Onboarding() {
     return (
       <div className='onboarding'>
         <Frame logo={logo} topBar={topBar}>
+          <OnboardingBuilder/>
         </Frame>
       </div>
     )

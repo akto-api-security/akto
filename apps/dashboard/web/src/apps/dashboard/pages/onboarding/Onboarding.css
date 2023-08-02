@@ -6,3 +6,23 @@
 .onboarding .Polaris-Avatar--sizeExtraSmall {
     height: 20px !important;
 }
+
+.main-card-onboarding {
+    margin: auto;
+    width: 45vw;
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    gap: 2vw;
+}
+
+.titleContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2vw;
+    padding-bottom: 0;
+}
+.Polaris-Text--subdued {
+    color: #47466a !important;
+}

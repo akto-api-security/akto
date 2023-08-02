@@ -13,3 +13,13 @@
 .Polaris-DropZone{
     min-height: 0 !important;
 }
+
+.stepper-box {
+    height: 6px;
+    border-radius: 4px;
+    background: #dadae1;
+}
+
+.active {
+    background: #47466a !important;
+}
