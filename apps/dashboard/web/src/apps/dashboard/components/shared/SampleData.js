@@ -72,7 +72,7 @@ function SampleData(props) {
     }, [data])
 
     useEffect(() => {
-      if(instance!==undefined){
+      if(instance!==undefined && editorData!==undefined){
         showData(editorData);
       }
     }, [instance, editorData])

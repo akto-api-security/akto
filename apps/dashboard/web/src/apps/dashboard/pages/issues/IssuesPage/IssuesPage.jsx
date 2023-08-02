@@ -291,6 +291,7 @@ function IssuesPage(){
     return (
         <PageWithMultipleCards
             title="Issues"
+            isFirstPage={true}
             components = {[
                 <GithubServerTable
                     key={key}
