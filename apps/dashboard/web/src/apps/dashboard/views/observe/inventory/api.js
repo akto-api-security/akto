@@ -205,7 +205,7 @@ export default {
     },
     convertSampleDataToCurl(sampleData) {
         return request({
-            url: '/tools/convertSampleDataToCurl',
+            url: '/api/convertSampleDataToCurl',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {
@@ -214,7 +214,7 @@ export default {
     },
     convertSampleDataToBurpRequest(sampleData) {
         return request({
-            url: '/tools/convertSamleDataToBurpRequest',
+            url: '/api/convertSamleDataToBurpRequest',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {
