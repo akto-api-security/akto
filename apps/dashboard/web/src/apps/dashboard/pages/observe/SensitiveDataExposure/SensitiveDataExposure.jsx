@@ -192,9 +192,6 @@ function SensitiveDataExposure() {
     }
 
 const navigate = useNavigate();
-function navigateBack(){
-  navigate("/dashboard/observe/sensitive")
-}
 
 const handleRedirect = () => {
     navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
@@ -207,7 +204,6 @@ const handleRedirect = () => {
             {`Endpoints with ${subType}` }
           </Text>
         }
-        backAction = {{onAction:navigateBack}}
         primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
         components = {[
             <GithubServerTable

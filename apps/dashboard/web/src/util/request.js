@@ -84,10 +84,10 @@ service.interceptors.response.use((response) => {
   if (['put', 'post', 'delete', 'patch'].includes(response.method) && response.data.meta) {
     func.setToast(true, false, response.data.meta.message )
   }
-  if (response.data.error !== undefined) {
+  if (response.data.error) {
     func.setToast(true, true, response.data.error )
   } else {
-    if (window.mixpanel && window.mixpanel.track && response.config && response.config.url) {
+    if ( window?.mixpanel?.track && response?.config?.url) {
       raiseMixpanelEvent(response.config.url);
     }
   }

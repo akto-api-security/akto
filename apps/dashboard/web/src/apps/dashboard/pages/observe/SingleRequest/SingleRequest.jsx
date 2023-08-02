@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import { Button, Text, Box, Popover, ActionList, VerticalStack, HorizontalStack, Icon } from "@shopify/polaris"
 import api from "../api";
 import { useEffect, useState } from "react";
@@ -59,11 +59,6 @@ function SingleRequest(){
         fetchData();
     },[])
 
-    const navigate = useNavigate();
-    function navigateBack() {
-        navigate("/dashboard/observe/sensitive/" + subType)
-    }
-
     return (
         <PageWithMultipleCards
             title={
@@ -94,7 +89,6 @@ function SingleRequest(){
               </VerticalStack>
                 
             }
-            backAction = {{onAction:navigateBack}}
             secondaryActions = {
                 <Popover
                 active={popoverActive}

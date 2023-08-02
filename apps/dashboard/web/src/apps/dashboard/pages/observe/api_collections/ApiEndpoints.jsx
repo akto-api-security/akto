@@ -1,7 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextContainer, Icon } from "@shopify/polaris"
+import { Text } from "@shopify/polaris"
 import api from "../api"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useParams} from "react-router-dom"
@@ -13,7 +13,6 @@ import {
     HintMajor
   } from '@shopify/polaris-icons';
 
-import { useNavigate } from "react-router-dom"
 import "./api_inventory.css"
 
 const headers = [
@@ -181,9 +180,8 @@ function ApiEndpoints() {
             }
         </Text>
             }
-            
             components={[
-                <div className="apiEndpointsTable">
+                <div className="apiEndpointsTable" key="table">
                     <GithubSimpleTable
                         key="table"
                         pageLimit={50}
@@ -194,9 +192,6 @@ function ApiEndpoints() {
                         disambiguateLabel={()=>{}} 
                         headers={headers}
                         getStatus={() => {return "warning"}}
-                    // hasRowActions={true}
-                    // getActions={getActions}
-                    
                     />
                 </div>
             ]}

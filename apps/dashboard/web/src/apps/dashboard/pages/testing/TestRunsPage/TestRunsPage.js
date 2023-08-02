@@ -216,6 +216,7 @@ useEffect(()=>{
          </Text>
     }
     primaryAction={<Button primary>New test run</Button>}
+    isFirstPage={true}
     components={[
       <GithubSimpleTable 
         key="table"

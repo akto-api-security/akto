@@ -28,7 +28,7 @@ function SampleDataList(props) {
 
     const {showDiff, sampleData, heading} = props;
 
-    const [sampleJsonData, setSampleJsonData] = useState({request:"",response:""});
+    const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [page, setPage] = useState(0);
     const [popoverActive, setPopoverActive] = useState({});
 

@@ -76,6 +76,7 @@ function Tags(){
         <PageWithMultipleCards
         title={"Tags"}
         primaryAction={<Button primary onClick={handleRedirect}>Create new tags</Button>}
+        isFirstPage={true}
         components={[
             <GithubSimpleTable
                 key="table"

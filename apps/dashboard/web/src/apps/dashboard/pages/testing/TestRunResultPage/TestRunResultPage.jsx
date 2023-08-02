@@ -15,7 +15,7 @@ import {
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import func from "@/util/func"
 import parse from 'html-react-parser';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -149,15 +149,6 @@ function TestRunResultPage(props) {
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
-  const navigate = useNavigate();
-  function navigateBack() {
-    if (hexId == "issues") {
-      navigate("/dashboard/issues")
-    } else {
-      navigate("/dashboard/testing/" + hexId)
-    }
-  }
-
   return (
     <PageWithMultipleCards
     title = {
@@ -201,7 +192,7 @@ function TestRunResultPage(props) {
           </HorizontalStack>
         </VerticalStack>
     }
-    backAction = {props.source == "editor" ? undefined : {onAction:navigateBack}}
+    isFirstPage = {props.source == "editor" ? true : false}
     primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
     secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {[
