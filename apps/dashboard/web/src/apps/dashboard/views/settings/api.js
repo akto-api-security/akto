@@ -142,6 +142,16 @@ export default {
         });
     },
 
+    toggleTelemetry(enableTelemetry) {
+        return request({
+            url: '/api/toggleTelemetry',
+            method: 'post',
+            data: {
+                enableTelemetry
+            }
+        });
+    },
+
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',

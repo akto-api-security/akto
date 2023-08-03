@@ -47,6 +47,7 @@ import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicyNew;
+import com.akto.telemetry.Cron;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.JSONUtils;
@@ -102,6 +103,7 @@ public class InitializerListener implements ServletContextListener {
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService telemetryExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
 
@@ -1301,6 +1303,14 @@ public class InitializerListener implements ServletContextListener {
             readAndSaveBurpPluginVersion();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+
+        if(DashboardMode.isOnPremDeployment()) {
+            telemetryExecutorService.scheduleAtFixedRate(() -> {
+                Cron cron = new Cron();
+                cron.init();
+            }, 0, 1, TimeUnit.MINUTES);
+            loggerMaker.infoAndAddToDb("Registered telemetry cron", LogDb.DASHBOARD);
         }
     }
 

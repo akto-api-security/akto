@@ -94,6 +94,16 @@
             </div>
         </div>
 
+        <div class="toggle-redact-feature">
+            <div class="entry-text">Enable telemetry</div>
+            <div class="entry-value">
+                <v-switch
+                    color="var(--themeColor)"
+                    v-model="enableTelemetry"
+                />
+            </div>
+        </div>
+
 
       </div>
       <div>
@@ -230,7 +240,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs', 'filterHeaderValueMap', 'apiCollectionNameMapper']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs', 'filterHeaderValueMap', 'apiCollectionNameMapper', 'telemetryEnabled']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -274,6 +284,14 @@ import {mapState} from 'vuex'
                 },
                 set(v) {
                     this.$store.dispatch('team/updateEnableNewMerge', v)
+                }
+            },
+            enableTelemetry:{
+                get(){
+                    return this.telemetryEnabled
+                },
+                set(v){
+                    this.$store.dispatch('team/updateTelemetry', v)
                 }
             },
             nonNullAuth() {

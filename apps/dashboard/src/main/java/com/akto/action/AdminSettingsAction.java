@@ -29,6 +29,8 @@ public class AdminSettingsAction extends UserAction {
     public AccountSettings.SetupType setupType;
     public Boolean newMergingEnabled;
 
+    public Boolean enableTelemetry;
+
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
@@ -54,6 +56,15 @@ public class AdminSettingsAction extends UserAction {
                 new UpdateOptions().upsert(true)
         );
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleTelemetry() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENABLE_TELEMETRY, this.enableTelemetry),
+                new UpdateOptions().upsert(true)
+        );
         return SUCCESS.toUpperCase();
     }
 
@@ -215,5 +226,14 @@ public class AdminSettingsAction extends UserAction {
 
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
+    }
+
+
+    public Boolean getEnableTelemetry() {
+        return enableTelemetry;
+    }
+
+    public void setEnableTelemetry(Boolean enableTelemetry) {
+        this.enableTelemetry = enableTelemetry;
     }
 }

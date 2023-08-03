@@ -18,6 +18,7 @@ const team = {
         dashboardVersion: null,
         apiRuntimeVersion: null,
         urlRegexMatchingEnabled: null,
+        telemetryEnabled: null,
         setupType: null,
         lastLoginTs: null,
         privateCidrList: null,
@@ -34,6 +35,7 @@ const team = {
         getDashboardVersion: (state) => state.dashboardVersion,
         getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
         getUrlRegexMatchingEnabled: (state) => state.urlRegexMatchingEnabled,
+        getTelemetryEnabled: (state) => state.telemetryEnabled,
         getSetupType: (state) => state.setupType,
         getLastLoginTs: (state) => state.lastLoginTs,
         getPrivateCidrList: (state) => state.privateCidrList,
@@ -61,6 +63,7 @@ const team = {
                 state.redactPayload = false
                 state.apiRuntimeVersion = "-"
                 state.urlRegexMatchingEnabled = false
+                state.telemetryEnabled = false
                 state.dashboardVersion = "-"
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
@@ -71,6 +74,7 @@ const team = {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
                 state.urlRegexMatchingEnabled = resp.accountSettings.urlRegexMatchingEnabled
+                state.telemetryEnabled = resp.accountSettings.enableTelemetry ? resp.accountSettings.enableTelemetry : false
                 state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "-"
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
@@ -135,6 +139,12 @@ const team = {
                 state.urlRegexMatchingEnabled = v
             }))
         },
+        updateTelemetry({commit,dispatch, state}, v){
+            api.toggleTelemetry(v).then((resp => {
+                state.telemetryEnabled = v;
+            }))
+        }
+        ,
         updateSetupType({commit, dispatch, state}, v) {
             api.updateSetupType(v).then((resp => {
                 state.setupType = v
