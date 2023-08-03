@@ -10,7 +10,7 @@ function SuitesCard({cardObj}) {
 
     return (
         <div onClick={() => setSelectedTest(cardObj._name)} className={"suite-card " + (selectedTest === cardObj._name ? "active-card" : '')}>
-            <Card>
+            <Card background="bg-subdued">
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between">
                         <Text variant="headingXl" as='h4' color='subdued'>{cardObj?.name}</Text>

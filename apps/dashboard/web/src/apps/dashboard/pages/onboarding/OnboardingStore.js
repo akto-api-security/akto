@@ -11,6 +11,16 @@ let onboardingStore = (set)=>({
     setSelectedTestSuite:(selectedTestSuite)=>{
         set({selectedTestSuite: selectedTestSuite})
     },
+
+    authObject: null,
+    setAuthObject:(authObject)=>{
+        set({authObject: authObject})
+    },
+
+    testingRunHexId: null,
+    setTestingRunHexId:(testingRunHexId)=>{
+        set({testingRunHexId: testingRunHexId})
+    },
 })
 
 onboardingStore = devtools(onboardingStore)

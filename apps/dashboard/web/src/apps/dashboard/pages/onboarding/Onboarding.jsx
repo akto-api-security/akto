@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Avatar, Button, ButtonGroup, Frame, TopBar } from "@shopify/polaris"
 import {ClipboardMinor} from "@shopify/polaris-icons"
 import "./Onboarding.css"
 import OnboardingBuilder from './components/OnboardingBuilder'
+import transform from "../testing/transform"
 
 function Onboarding() {
 
@@ -25,6 +26,10 @@ function Onboarding() {
     const topBar = (
       <TopBar secondaryMenu={topbarButtons} />
     )
+
+    useEffect(()=> {
+      transform.setTestMetadata()
+    },[])
 
     const logo = {
       width: 124,

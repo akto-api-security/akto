@@ -8,6 +8,24 @@ const api = {
             data: {}
         })
     },
+
+    runTestOnboarding(authParamData,collectionId,testSuite) {
+        return request({
+            url: '/api/runTestOnboarding',
+            method: 'post',
+            data: {
+                authParamData, collectionId, testSuite
+            }
+        })
+    },
+
+    skipOnboarding() {
+        return request({
+            url: '/api/skipOnboarding',
+            method: 'post',
+            data: {}
+        })
+    }
 }
 
 export default api

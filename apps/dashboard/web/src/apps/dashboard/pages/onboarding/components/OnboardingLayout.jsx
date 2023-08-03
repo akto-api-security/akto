@@ -11,11 +11,11 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
     )
 
     return (
-        <div className='main-card-onboarding'>
+        <div className={"main-card-onboarding " + (currentStep === 4 ? 'shrink': '')}>
             <div className='titleContainer'>
                 <Text variant="heading3xl" color='subdued' as='h2'>{stepObj.title}</Text>
                 <Text variant="headingXl" color='subdued' as='h5'>{stepObj.subtitle}</Text>
-                <StepperComponent currentStep={currentStep} totalSteps={3} stepperClicked={(index) => requestStepChange(index)}/>
+                {currentStep < 4 ? <StepperComponent currentStep={currentStep} totalSteps={3} stepperClicked={(index) => requestStepChange(index)}/> : null}
             </div>
             <LegacyCard title={titleComponent}>
                 <LegacyCard.Section>

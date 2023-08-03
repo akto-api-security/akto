@@ -7,6 +7,10 @@ import {ArrowRightMinor, PlayMajor} from "@shopify/polaris-icons"
 import Store from '../../../store'
 import TestSuites from './TestSuites'
 import func from '../../../../../util/func'
+import SetConfig from './SetConfig'
+import ResultsSummary from './ResultsSummary'
+import { useNavigate } from "react-router-dom"
+import api from '../api'
 
 function OnboardingBuilder() {
 
@@ -14,6 +18,10 @@ function OnboardingBuilder() {
     const [currentStep, setCurrentStep] = useState(1)
     const apiCollections = Store(state => state.allCollections)
     const selectedTestSuite = OnboardingStore(state => state.selectedTestSuite)
+    const authObj = OnboardingStore(state => state.authObject)
+    const hexId = OnboardingStore(state => state.testingRunHexId)
+
+    const navigate = useNavigate()
 
     const canNext = () => {
         if(currentStep === 1){
@@ -21,13 +29,20 @@ function OnboardingBuilder() {
         }else if(currentStep === 2){
             return selectedTestSuite ? true : false
         }else{
-            return false
+            return authObj.key.length > 0 && authObj.value.length > 0
         }
     }
 
     const next = () => {
-        if(currentStep < 3 && canNext())
+        if(canNext()){
+            if(currentStep === 3){
+                func.setToast(true,false, "Test runs scheduled !")
+            }else if(currentStep === 4){
+                const url = "/dashboard/testing/" + hexId
+                navigate(url)
+            }
             setCurrentStep(currentStep + 1)
+        }
         else{
             func.setToast(true, false, componentsArr[currentStep - 1].toast)
         }
@@ -58,17 +73,24 @@ function OnboardingBuilder() {
             buttonText: "Run tests",
             cardTitle: "Attacker Token",
             icon: PlayMajor,
-            toast: "Please fill the above fields."
+            toast: "Please fill the above fields.",
+            component: <SetConfig />
         },
         {
             title: "Test results",
             subtitle: "Here are the results for the tests you recently ran",
             buttonText: "See all issues",
+            component: <ResultsSummary />,
+            icon: ArrowRightMinor,
         },
     ]
 
-    const skipOnboarding = () => {
-        console.log("skipOnboarding")
+    const skipOnboarding = async() => {
+        setLoading(true)
+        await api.skipOnboarding().then((resp)=>{
+            setLoading(false)
+            navigate("/dashboard/quick-start")
+        })
     }
 
 

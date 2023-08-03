@@ -21,18 +21,31 @@
     flex-direction: column;
     gap: 10px;
     padding: 2vw;
-    padding-bottom: 0;
-}
+    padding-bottom: 0;}
 .Polaris-Text--subdued {
     color: #47466a !important;
 }
 
 .suite-card{
-    /* border: 1px solid #dde0e4; */
     border-radius: 8px;
     cursor: pointer;
 }
 
 .active-card {
     border: 2.5px solid #47466a !important;
+}
+
+.shrink .Polaris-LegacyCard{
+    width: 38vw !important;
+    margin: auto;
+}
+.shrink .titleContainer{
+    margin: auto;
+}
+
+.header-active{
+    padding: 2px 12px;
+    border: 1px solid;
+    border-radius: 8px;
+    background: #47466a26;
 }

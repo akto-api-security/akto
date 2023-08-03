@@ -681,7 +681,18 @@ dayStart(epochMs) {
   date.setMinutes(0)
   date.setSeconds(0)
   return date
-}
+},
+convertToRelativePath(url) {
+  if (!url) return url
+  if (!url.startsWith("http")) return url
+  try {
+      var url = new URL(url)
+      return url.pathname
+  }catch(e) {
+      console.log(e);
+  }
+  return url
+},
 
 }
 
