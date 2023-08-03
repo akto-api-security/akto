@@ -26,25 +26,26 @@ import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.LoginFlowEnums;
+import com.google.gson.Gson;
+import com.google.api.client.json.Json;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import org.mortbay.util.ajax.JSON;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     public static long acceptableSizeInBytes = 5_000_000;
+    private static final Gson gson = new Gson();
     
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -95,13 +96,22 @@ public class TestExecutor {
         );
     }
 
-    private Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+    public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         Set<Integer> ret = new HashSet<>();
         for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             ret.add(apiInfoKey.getApiCollectionId());
         }
 
         return ret;
+    }
+
+    public static AuthMechanism createAuthMechanism(){
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+
+        authMechanism.setAuthParams(authParams);
+        return authMechanism;
     }
 
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
@@ -121,13 +131,10 @@ public class TestExecutor {
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages(apiCollectionIds);
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-
-        List<AuthParam> authParams = authMechanism.getAuthParams();
+        AuthMechanism authMechanism = createAuthMechanism();
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
 
-        authMechanism.setAuthParams(authParams);
 
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
@@ -581,8 +588,9 @@ public class TestExecutor {
         String message = messages.get(0);
 
         RawApi rawApi = RawApi.buildFromMessage(message);
-
         int startTime = Context.now();
+
+        filterGraphQlPayload(rawApi, apiInfoKey);
 
         FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
         FilterNode validatorNode = testConfig.getValidation().getNode();
@@ -625,6 +633,78 @@ public class TestExecutor {
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
                 endTime, testRunResultSummaryId
         );
+    }
+
+    public void filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
+
+        String url = apiInfoKey.getUrl();
+        if (!url.toLowerCase().contains("graphql") || (!url.toLowerCase().contains("query") && !url.toLowerCase().contains("mutation"))) {
+            return;
+        }
+
+        String queryName;
+
+        try {
+            String []split;
+            if(url.contains("query")) {
+                split = apiInfoKey.getUrl().split("query/");
+            } else{
+                split = apiInfoKey.getUrl().split("mutation/");
+            }
+            if (split.length < 2) {
+                return;
+            }
+            String queryStr = split[1];
+
+            String []querySplit = queryStr.split("/");
+            if (querySplit.length < 2) {
+                return;
+            }
+            queryName = querySplit[0];
+        } catch (Exception e) {
+            return;
+        }
+
+        ObjectMapper m = new ObjectMapper();
+        String updatedBody, updatedRespBody;
+        try {
+            Object obj = JSON.parse(rawApi.getRequest().getBody());
+            List<Object> objList = Arrays.asList((Object[])obj);
+
+            Object respObj = JSON.parse(rawApi.getResponse().getBody());
+            List<Object> respObjList = Arrays.asList((Object[])respObj);
+
+            if (objList.size() != respObjList.size()) {
+                return;
+            }
+            int index = 0;
+
+            List<Object> updatedObjList = new ArrayList<>();
+            for (int i = 0; i < objList.size(); i++) {
+                Map<String,Object> mapValues = m.convertValue(objList.get(i), Map.class);
+                if (mapValues.get("operationName").toString().equalsIgnoreCase(queryName)) {
+                    updatedObjList.add(objList.get(i));
+                    index = i;
+                    break;
+                }
+            }
+            updatedBody = gson.toJson(updatedObjList);
+
+            List<Object> updatedRespObjList = new ArrayList<>();
+            updatedRespObjList.add(respObjList.get(index));
+            updatedRespBody = gson.toJson(updatedRespObjList);
+
+            Map<String, Object> json = gson.fromJson(rawApi.getOriginalMessage(), Map.class);
+            json.put("requestPayload", updatedBody);
+            json.put("responsePayload", updatedRespBody);
+            rawApi.setOriginalMessage(gson.toJson(json));
+
+            rawApi.getRequest().setBody(updatedBody);
+            rawApi.getResponse().setBody(updatedRespBody);
+
+        } catch (Exception e) {
+            return;
+        }
     }
 
     public TestingRunResult runTestNuclei(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil,
