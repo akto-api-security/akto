@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text } from "@shopify/polaris"
+import { Tooltip, Text, HorizontalStack } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -14,13 +14,53 @@ import {
   } from '@shopify/polaris-icons';
 
 import "./api_inventory.css"
+import ApiDetails from "./ApiDetails"
+
+const StyledEndpoint = (data) => {
+    const {method, url } = func.toMethodUrlObject(data)
+    const arr = url.split("/")
+    let colored = []
+    arr.forEach((item, index) => {
+        if(item.startsWith("{param")){
+            colored.push(index);
+        }
+    })
+
+    function getMethodColor(method){
+        switch(method){
+            case "GET" : return "success";
+            case "POST": return "critical"
+            default: return "";
+        }
+    }
+    return (
+            <Tooltip hoverDelay={800} content={data} width='wide' preferredPosition='mostSpace'>
+               <HorizontalStack gap={"1"} wrap={false}>
+               <Text as="span" variant="headingMd" color={getMethodColor(method)}>
+                    {method}
+                </Text>
+                {/* <div style={{ marginBottom: "auto" }} className='rowIconClass'>
+                    <Box padding="05">
+                        <Icon source={iconFunc(method)}/>
+                    </Box>
+                </div> */}
+                <div className="styled-endpoint">
+                    {
+                        arr?.map((item, index) => {
+                            return (
+                                <Text key={index} as="span" variant="headingMd" color={colored.includes(index) ? "critical" : ""}>
+                                    {item + "/"}
+                                </Text>
+                            )
+                        })
+                    }
+                </div>
+               </HorizontalStack>
+            </Tooltip>
+    )
+}
 
 const headers = [
-    {
-        text: "MethodIcon",
-        value: "method_icon",
-        itemOrder: 0
-    },
     {
         text: "Method",
         value: "method",
@@ -30,7 +70,8 @@ const headers = [
         text: "Endpoint",
         value: "parameterisedEndpoint",
         itemOrder: 1,
-        showFilter:true
+        showFilter:true,
+        component: StyledEndpoint
     },
     {
         text: 'Tags',
@@ -82,8 +123,8 @@ const headers = [
 const sortOptions = [
     { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
     { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
-    { label: 'Endpoint', value: 'parameterisedEndpoint asc', directionLabel: 'A-Z', sortKey: 'parameterisedEndpoint' },
-    { label: 'Endpoint', value: 'parameterisedEndpoint desc', directionLabel: 'Z-A', sortKey: 'parameterisedEndpoint' },
+    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint' },
+    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint' },
     { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type' },
     { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
     { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
@@ -120,7 +161,7 @@ const iconFunc = (methodName) => {
             return "<svg width='70' height='20' viewBox='0 0 70 20' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M13.56 5.66V14H12.192V10.352H8.268V14H6.9V5.66H8.268V9.236H12.192V5.66H13.56ZM16.7289 6.764V9.212H19.6089V10.328H16.7289V12.884H19.9689V14H15.3609V5.648H19.9689V6.764H16.7289ZM26.6819 12.296H23.1899L22.5899 14H21.1619L24.1499 5.648H25.7339L28.7219 14H27.2819L26.6819 12.296ZM26.2979 11.18L24.9419 7.304L23.5739 11.18H26.2979ZM32.7451 5.66C33.6331 5.66 34.4091 5.832 35.0731 6.176C35.7451 6.512 36.2611 7 36.6211 7.64C36.9891 8.272 37.1731 9.012 37.1731 9.86C37.1731 10.708 36.9891 11.444 36.6211 12.068C36.2611 12.692 35.7451 13.172 35.0731 13.508C34.4091 13.836 33.6331 14 32.7451 14H30.0211V5.66H32.7451ZM32.7451 12.884C33.7211 12.884 34.4691 12.62 34.9891 12.092C35.5091 11.564 35.7691 10.82 35.7691 9.86C35.7691 8.892 35.5091 8.136 34.9891 7.592C34.4691 7.048 33.7211 6.776 32.7451 6.776H31.3891V12.884H32.7451Z' fill='rgb(0, 127, 49)'/></svg>"
 
         default:
-            break;
+            return "";
     }
     
 }
@@ -137,6 +178,8 @@ function ApiEndpoints() {
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
+    const [showDetails, setShowDetails] = useState(false);
+    const [apiDetail, setApiDetail] = useState({})
     
     useEffect(() => {
         async function fetchData() {
@@ -171,6 +214,22 @@ function ApiEndpoints() {
         fetchData()    
     }, [])
 
+    function handleRowClick(data){
+        const sameRow = func.deepComparison(apiDetail, data);
+        setShowDetails((prev) => {
+            if(prev && !sameRow){
+                return prev;
+            }
+            return !prev;
+        })
+        setApiDetail((prev) => {
+            if(sameRow){
+                return prev;
+            }
+            return {...data}
+        })
+    }
+
     return(
         <PageWithMultipleCards
         title={
@@ -192,8 +251,17 @@ function ApiEndpoints() {
                         disambiguateLabel={()=>{}} 
                         headers={headers}
                         getStatus={() => {return "warning"}}
+                        onRowClick={handleRowClick}
                     />
-                </div>
+                </div>, 
+                <ApiDetails 
+                    key="details" 
+                    showDetails={showDetails} 
+                    setShowDetails={setShowDetails} 
+                    apiDetail={apiDetail}
+                    headers={headers}
+                    getStatus={() => {return "warning"}}
+                />
             ]}
         />
     )

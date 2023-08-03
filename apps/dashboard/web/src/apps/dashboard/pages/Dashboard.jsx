@@ -4,6 +4,7 @@ import Store from "../store";
 import homeFunctions from "./home/module";
 import { useEffect } from "react";
 import { Frame, Toast } from "@shopify/polaris";
+import "./dashboard.css"
 
 function Dashboard() {
 
@@ -35,10 +36,12 @@ function Dashboard() {
     ) : null;
 
     return (
+        <div className="dashboard">
         <Frame>
             <Outlet />
             {toastMarkup}
         </Frame>
+        </div>
     )
 }
 

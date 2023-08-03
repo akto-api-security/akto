@@ -585,6 +585,11 @@ toMethodUrlString({method,url}){
   return method + " " + url;
 },
 toMethodUrlObject(str){
+
+  if(!str){
+    return {method:"", url:""}  
+  }
+
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
 },
 validateMethod(methodName) {
@@ -597,6 +602,24 @@ validateMethod(methodName) {
 isSubTypeSensitive(x) {
   return x.savedAsSensitive || x.sensitive
 },
+prepareValuesTooltip(x) {
+  let result = "";
+  let values = x["values"]
+  if (!values) return "No values recorded"
+  let elements = values["elements"] ? values["elements"] : []
+  let count = 0;
+  for (let elem of elements) {
+      if (count > 50) return result
+      if (count !== 0) {
+          result +=  ", "
+      }
+      result += elem
+      count += 1
+  }
+
+  return (count == 0 ? "No values recorded" : result)
+},
+
 parameterizeUrl(x) {
   let re = /INTEGER|STRING|UUID/gi;
   let newStr = x.replace(re, (match) => { 
@@ -641,7 +664,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName, iconFunc) {
               sensitive: x.sensitive,
               tags: x.tags,
               endpoint: x.url,
-              parameterisedEndpoint: this.parameterizeUrl(x.url),
+              parameterisedEndpoint: x.method + " " + this.parameterizeUrl(x.url),
               open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
               access_type: access_type || "None",
               method: x.method,
