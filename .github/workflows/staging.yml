@@ -38,11 +38,6 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: "ASIAQTQA3ZYGY5LCPOFK"
-      AWS_SECRET_ACCESS_KEY: "qtcJqEjhaz7D9IgUCvRsZXrPeJJYwrVoLbCVmTD1"
-      AWS_SESSION_TOKEN: "IQoJb3JpZ2luX2VjEGsaCXVzLWVhc3QtMSJHMEUCIQD7ZhsfzG8ZmWrW2Ls6mYtrRMtn+2PN60bUeuy+wpIqfwIgIzs+vPcuTTceYkUuMzt4SLNgyaZnA62M/gFsHy4Jp68q+gIIFBAAGgwwNDE4Nzc3NTMzNTciDImwuDzxBGazzcv4MyrXAsqUIWLGilzMk8lCpRUj5IZipEsPQPvkqtZpRNJKfoXUy0wgNJ+NjqngQWJg8I84oTnkNxtOdtwhu4/1fh9LVp/PT+etiXj0fi72/OLeu/ruc2JiUwoXDBOAdGcBjNPPN+k5Wadw8ACUm5nfGA5Q4ZDQ2V+hEFsVIBjS2jOMIAjC0RVJ47KXf7MdQkrbJdEBCc5ACspcqvTP/HoXuwKoe7yQjoQZu6p6ytKrfhj/icrFRuVl8aiYrLTUjwztuLN2YE2Xq+6gxx4MQ801GZWucCr3m4ytz0n7vP3plcnbdclq0myC1EgdJJA93LQKowYJawSOtvtfGburMJzfZx7KxkcZKFxSZQ9xrUAkUcw3h/EFBOEpfPejPFzMIYpeUvVxgXzRzRliZmRVrqPdJoGvj+A/9kMkbpcCB6tl+mPgbFE03J2o8+G1kzAreL+/v6ccCBkp7KDQ6b0ww4yupgY6pwHKzVlFWa+sBvPD4DKW6FpenzQI4Je7Z0fKyj6kNQC+c28+Vvz7UVA4d2idJGEo3sqDQDhcOOaHy0U4WmrsDMPkwBybpYb6TnVhxPSOlm1KjimX5L7RWpWU+NpoX3zZldYSIE9d0enL5VzqC/cpFpb/QdGbwoCYv0MysSf9azA9/heozxPSIxvNRfmp50CZqAo9Mg/WTn1cw2GIn4iH2HWKhAwvhaAlhQ=="
-      AWS_DEFAULT_REGION: "ap-south-1"
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -61,6 +56,11 @@ jobs:
         run: npm install && npm run build
       - name: Prepare dashboard on s3
         working-directory: ./apps/dashboard/
+        env:
+          AWS_ACCESS_KEY_ID: "ASIAQTQA3ZYGY5LCPOFK"
+          AWS_SECRET_ACCESS_KEY: "qtcJqEjhaz7D9IgUCvRsZXrPeJJYwrVoLbCVmTD1"
+          AWS_SESSION_TOKEN: "IQoJb3JpZ2luX2VjEGsaCXVzLWVhc3QtMSJHMEUCIQD7ZhsfzG8ZmWrW2Ls6mYtrRMtn+2PN60bUeuy+wpIqfwIgIzs+vPcuTTceYkUuMzt4SLNgyaZnA62M/gFsHy4Jp68q+gIIFBAAGgwwNDE4Nzc3NTMzNTciDImwuDzxBGazzcv4MyrXAsqUIWLGilzMk8lCpRUj5IZipEsPQPvkqtZpRNJKfoXUy0wgNJ+NjqngQWJg8I84oTnkNxtOdtwhu4/1fh9LVp/PT+etiXj0fi72/OLeu/ruc2JiUwoXDBOAdGcBjNPPN+k5Wadw8ACUm5nfGA5Q4ZDQ2V+hEFsVIBjS2jOMIAjC0RVJ47KXf7MdQkrbJdEBCc5ACspcqvTP/HoXuwKoe7yQjoQZu6p6ytKrfhj/icrFRuVl8aiYrLTUjwztuLN2YE2Xq+6gxx4MQ801GZWucCr3m4ytz0n7vP3plcnbdclq0myC1EgdJJA93LQKowYJawSOtvtfGburMJzfZx7KxkcZKFxSZQ9xrUAkUcw3h/EFBOEpfPejPFzMIYpeUvVxgXzRzRliZmRVrqPdJoGvj+A/9kMkbpcCB6tl+mPgbFE03J2o8+G1kzAreL+/v6ccCBkp7KDQ6b0ww4yupgY6pwHKzVlFWa+sBvPD4DKW6FpenzQI4Je7Z0fKyj6kNQC+c28+Vvz7UVA4d2idJGEo3sqDQDhcOOaHy0U4WmrsDMPkwBybpYb6TnVhxPSOlm1KjimX5L7RWpWU+NpoX3zZldYSIE9d0enL5VzqC/cpFpb/QdGbwoCYv0MysSf9azA9/heozxPSIxvNRfmp50CZqAo9Mg/WTn1cw2GIn4iH2HWKhAwvhaAlhQ=="
+          AWS_DEFAULT_REGION: "ap-south-1"
         uses: lbertenasco/s3-deploy@v1
         with:
           folder: dist
