@@ -20,7 +20,7 @@ import func from "@/util/func"
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions } = props;
+    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus } = props;
 
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
@@ -31,7 +31,17 @@ function GithubRow(props) {
         [],
     );
     async function nextPage(data){
-        navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), {replace:true}));
+        if(data.nextUrl || getNextUrl){
+            navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), {replace:true}));
+        }
+    }
+
+    function handleRowClick(data){
+        if(onRowClick){
+            onRowClick(data);
+        } else {
+            nextPage(data);
+        }
     }
 
     const [rowClickable, setRowClickable] = useState(isRowClickable || false)
@@ -59,12 +69,13 @@ function GithubRow(props) {
                         {...(rowClickable ? { dataPrimaryLink: rowClickable } : {})}
                         monochrome
                         removeUnderline
-                        onClick={() => (nextPage(data))}
+                        onClick={() => (handleRowClick(data))}
                     >
                         <GithubCell
                             headers={headers}
                             data={data}
-                            getStatus={props.getStatus}
+                            getStatus={getStatus}
+                            width="50vw"
                         />
                     </Link>
                 </div>
