@@ -61,10 +61,10 @@ jobs:
         if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: "ASIAQTQA3ZYGQKNAJFWJ"
-          aws-secret-access-key: "2I975uv/wCZzeoNTn75PiglRkyhrw2OTlEazPO/s"
-          aws-session-token: "IQoJb3JpZ2luX2VjEG4aCXVzLWVhc3QtMSJHMEUCICIPFBUdPdrZMz1XHTlKFIlzfh4vNhvz9C740Svadr2UAiEA061trSUkJQuKDtt7sZoRnOivsMq1DYuOku/6dT7lWlQq+gIIFxAAGgwwNDE4Nzc3NTMzNTciDM7GZ8dXnarhRpQD6irXAvONhzWW7CCaWniNQv0Shxdseiyn9hx9brfTThQGRP74aQbLNpWTwQ7ijhDw6Vhkt1oH2XbciLEhXG9iCb2uAylXEzQy2/eKZc2DtWDXHsDuoU3YZG3aeWEdPrC+SiX/gbDLHR3ERIfBdxzfngaR2RCxVWwgIJAO24MMmInU1nGtn66VFsZqx4RnZh0ISG5paMADhub09wN00J9vUdpJCszhJsXCBX5gorfXwzhBdTpVKz3g6e075yrVGM1u5LqLeOrra++nbxlNMlBHcLPM4C3LuzGZBoy9lfbPuUFj8l9kE4I0j6TCToF1HQ14OrTQGX8mchhXeY0kSy//uRjbiMtSJvblWZ5kEEvv0L1Mekxte+F/+w1a4JcDInylARnN7v8LlappuD4Tv4N+Fkgb4Q688mM5pXoA3dg1gfgIbKtGhDLNZnwX2QiKFBX5VuA/T9dH6+PxwEIwntqupgY6pwEGAMq7BZ1N+icsVH8FF8W2wBAiuvgsj2yKDhAqul+6GoJxB9ZSGsuUyKHcWScdchlQmesvPBO0WUUJAObSjlKuddNxKeF+RQFbWX+sNbpoFC0Ip6FfOLWEEkHYWnccjuhlIwG20LgVbSUbCxgGMJCqfIUhCZ/ejwqBe6bXRpGRJbWsVU0QRXyHWpbS54HYjQaF2XB7grPyxMRx30pnyWvRylUBs4AfiQ=="
-          aws-region: "ap-south-1"
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+          aws-region: ${{secrets.AWS_REGION}}
 
       - name: Deploy static site to S3 bucket
         if: ${{ github.event.inputs.Environment == 'prod' }}
