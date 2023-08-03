@@ -25,7 +25,10 @@ on:
         options:
           - prod
           - staging
-        default: staging  
+        default: staging
+      release_version:
+        required: true
+        default: default
       Deploy:
         description: 'Deploy to flash staging'
         required: false
@@ -53,17 +56,19 @@ jobs:
           node-version: '17'
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && npm run build
+        run: npm install && RELEASE_VERSION=${{ github.event.inputs.release_version }} && npm run build
       - name: Configure AWS Credentials
+        if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: "ASIAQTQA3ZYG5G4BS7DU"
-          aws-secret-access-key: "q1uWh2gPidMGJNvGpFnyuNQ6MYtIBO0ezJwwTem6"
-          aws-session-token: "IQoJb3JpZ2luX2VjEG0aCXVzLWVhc3QtMSJHMEUCIAZUzPvnGHBEDKVQeYVrA+pY4w1RvtjaPJYXc6zQ+GO5AiEAhn1iCifgQt2D4BpVYzZjKY3k63HlUb+3Sa95RO1nqU4q+gIIFhAAGgwwNDE4Nzc3NTMzNTciDH4AzMlqP8LJiE79WirXAh5szMOPz+SXJrkXdYHtqfK8gyDXg0HCwJZhJMmbMfzfoCvX/mV0gUWrhwg5PjLxv/Rn5JJQh5/of0hjh+vO6zP8GzNRXXJR1p/npkhpigEMioiciujsx2LDdPZVzlA+CT3HQXLCDPtcPZjftu4WG/vohiPexqgyMn32kbbgZBIcBaAA5jBD6lpfS0jHSYRWMgFjTFctSO3UtgfBLNKR4uAM22HVieBcEHHlEMMR4AZ5g/vElVeFQAxZf76s2hXPY2a311D87G6DKhdpTOMrenwQCq/DfBfrlSt+HA7r9+YZp568AtMgyBmaKSw3gratGJELUGDisH4o0Pb5pAtOOtyi2YuQKIcZDWAJa/vtGdK0Y8k0UnwuPBIq9oFNFPGNOL1HaPQen4SxVmfJM2R5e7/iCbmwr9AQfEtdeE8BJ6G1TegzV9FiVbZ8ufwV+IHJJ8PW73F03GAwkbiupgY6pwFf6aI3eWI4uWikqx/WZVJxP6AkJCz1fTIjX+/F+S7O/G+/iMu/OrSdugBzGJox8zdLbLsSy25PlsfpVSlhyOrPYFl+DtNoRyRjjOZ87OFIOBB9B3fg0jkClbNjUa+LzUB6HPP7xxEgt7qJmqwq5WeNi49wQzLZrOEEWXvMAYzRCTvxOzBD6L3EyBqJtWsNwllgrbP2NoUgPkhgXHtvd7CThFI5mzrMQA=="
+          aws-access-key-id: "ASIAQTQA3ZYGQKNAJFWJ"
+          aws-secret-access-key: "2I975uv/wCZzeoNTn75PiglRkyhrw2OTlEazPO/s"
+          aws-session-token: "IQoJb3JpZ2luX2VjEG4aCXVzLWVhc3QtMSJHMEUCICIPFBUdPdrZMz1XHTlKFIlzfh4vNhvz9C740Svadr2UAiEA061trSUkJQuKDtt7sZoRnOivsMq1DYuOku/6dT7lWlQq+gIIFxAAGgwwNDE4Nzc3NTMzNTciDM7GZ8dXnarhRpQD6irXAvONhzWW7CCaWniNQv0Shxdseiyn9hx9brfTThQGRP74aQbLNpWTwQ7ijhDw6Vhkt1oH2XbciLEhXG9iCb2uAylXEzQy2/eKZc2DtWDXHsDuoU3YZG3aeWEdPrC+SiX/gbDLHR3ERIfBdxzfngaR2RCxVWwgIJAO24MMmInU1nGtn66VFsZqx4RnZh0ISG5paMADhub09wN00J9vUdpJCszhJsXCBX5gorfXwzhBdTpVKz3g6e075yrVGM1u5LqLeOrra++nbxlNMlBHcLPM4C3LuzGZBoy9lfbPuUFj8l9kE4I0j6TCToF1HQ14OrTQGX8mchhXeY0kSy//uRjbiMtSJvblWZ5kEEvv0L1Mekxte+F/+w1a4JcDInylARnN7v8LlappuD4Tv4N+Fkgb4Q688mM5pXoA3dg1gfgIbKtGhDLNZnwX2QiKFBX5VuA/T9dH6+PxwEIwntqupgY6pwEGAMq7BZ1N+icsVH8FF8W2wBAiuvgsj2yKDhAqul+6GoJxB9ZSGsuUyKHcWScdchlQmesvPBO0WUUJAObSjlKuddNxKeF+RQFbWX+sNbpoFC0Ip6FfOLWEEkHYWnccjuhlIwG20LgVbSUbCxgGMJCqfIUhCZ/ejwqBe6bXRpGRJbWsVU0QRXyHWpbS54HYjQaF2XB7grPyxMRx30pnyWvRylUBs4AfiQ=="
           aws-region: "ap-south-1"
 
       - name: Deploy static site to S3 bucket
-        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/dist --delete
+        if: ${{ github.event.inputs.Environment == 'prod' }}
+        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/${{ github.event.inputs.release_version }}/dist --delete
 
       - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
       - name: DockerHub login
