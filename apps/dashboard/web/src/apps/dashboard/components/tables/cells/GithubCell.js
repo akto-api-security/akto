@@ -1,48 +1,60 @@
-import func from '@/util/func';
 import {
     Text,
     Badge,
     VerticalStack,
     HorizontalStack,
     Icon,
-    Box} from '@shopify/polaris';
+    Box, Tooltip} from '@shopify/polaris';
 
 function GithubCell(props){
+
+    const {data, headers, getStatus, width} = props
     return (
     <HorizontalStack gap="1">
     {
-        props?.headers?.filter((header) => {
+        headers?.filter((header) => {
             return header.itemOrder==0
         }).map((header) => {
             return (
-                <div style={{ marginBottom: "auto" }} key={header.value} className='rowIconClass'>
+                <div style={{ marginBottom: "auto" }} key={header.value}>
                     <Box padding="05">
-                        <Icon source={props.data[header.value]} color="primary" />
+                        <Icon source={data[header.value]} color="primary" />
                     </Box>
                 </div>
             )
         })
     }
-    <VerticalStack gap="2">
+    <VerticalStack gap="2" inlineAlign='baseline'>
         <HorizontalStack gap="2" align='start'>
-            <Box maxWidth='50vw'>
-            <Text as="span" variant="headingMd" truncate={true}>
-                {
-                    props?.headers?.filter((header) => {
-                        return header.itemOrder==1
-                    }).map((header) => {
-                        return props.data[header.value]
-                    }) 
-                }
-            </Text>
-            </Box>
             {
-                props?.headers?.filter((header) => {
+                headers?.filter((header) => {
+                    return header.itemOrder == 1
+                }).map((header) => {
+                    if(header.component){
+                        return (
+                            <Box maxWidth={width} key={header.value}>
+                                {header.component(data[header.value])}
+                            </Box>
+                        )
+                    }
+                    return (
+                        <Box maxWidth={width} key={header.value}>
+                            <Tooltip hoverDelay={800} content={data[header.value]} key={header.value} width='wide' preferredPosition='mostSpace'>
+                                <Text as="span" variant="headingMd" truncate={true}>
+                                    {data[header.value]}
+                                </Text>
+                            </Tooltip>
+                        </Box>
+                    )
+                })
+            }
+            {
+                headers?.filter((header) => {
                     return header.itemOrder==2
                 }).map((header) => {
-                    return props?.data?.[header?.value]
+                    return data?.[header?.value]
                     ?.map((item) =>
-                    <Badge key={item} status={props.getStatus(item)}>
+                    <Badge key={item} status={getStatus(item)}>
                         {item}
                     </Badge>
                 )}) 
@@ -50,7 +62,7 @@ function GithubCell(props){
         </HorizontalStack>
         <HorizontalStack gap='2' align="start" >
             {
-                props?.headers?.filter((header) => {
+                headers?.filter((header) => {
                     return header.itemOrder==3
                 }).map((header) => {
                     return (
@@ -59,7 +71,7 @@ function GithubCell(props){
                                 <Icon source={header.icon} color="subdued" />
                             </div>
                             <Text as="div" variant="bodySm" color="subdued">
-                                {props.data[header.value]}
+                                {data[header.value]}
                             </Text>
                         </HorizontalStack>
                     )
