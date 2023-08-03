@@ -40,6 +40,7 @@ import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
+import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 
@@ -203,6 +204,10 @@ const router = createBrowserRouter([
       {
         path: "test-editor/:testId",
         element: <TestEditor />
+      },
+      {
+        path: "onboarding",
+        element: <Onboarding />
       },
     ]
   },
