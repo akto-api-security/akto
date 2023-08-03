@@ -19,7 +19,7 @@ module.exports = {
   entry: {"babel-polyfill": "babel-polyfill", main: './web/src/apps/main/main.js', chrome_plugin: './web/src/apps/chrome_plugin/main.js'},
   output: {
     path: path.resolve(__dirname, './dist'),
-    publicPath: '/dist/',
+    publicPath: 'https://d3as5gx79fwfqr.cloudfront.net/' + process.env.VERSION +  '/dist/',
     filename: '[name].js'
   },
   module: {
