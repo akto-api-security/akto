@@ -8,7 +8,8 @@ import {
   Pagination,  
   HorizontalStack, 
   Key, 
-  ChoiceList} from '@shopify/polaris';
+  ChoiceList,
+  Tabs} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
@@ -18,7 +19,7 @@ import "./style.css"
 function GithubServerTable(props) {
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
-  const [selected, setSelected] = useState(0);
+  //const [selected, setSelected] = useState(0);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length>0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -164,6 +165,7 @@ function GithubServerTable(props) {
         hasRowActions={props.hasRowActions || false}
         page={props.page || 0}
         getNextUrl={props?.getNextUrl}
+        onRowClick={props.onRowClick}
         />
     ),
   );
@@ -176,11 +178,19 @@ function GithubServerTable(props) {
     setPage((page) => (page-1));
   }
 
+  const handleOnSelect = (selectedIndex) => {
+    if (props.onSelect) {
+      setSelected(selectedIndex)
+      props.onSelect(selectedIndex)
+    }
+  }
+
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
       <LegacyCard>
         <LegacyCard.Section flush>
-          <IndexFilters
+        { props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
+        <IndexFilters
           sortOptions={props.sortOptions}
           sortSelected={sortSelected}
           queryValue={queryValue}
@@ -189,15 +199,15 @@ function GithubServerTable(props) {
           onQueryClear={handleFiltersQueryClear}
           {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
           onSort={setSortSelected}
-          // primaryAction={primaryAction}
+          //primaryAction={primaryAction}
           cancelAction={{
             onAction: fun,
             disabled: false,
             loading: false,
           }}
-          tabs={[]}
-          selected={selected}
-          onSelect={setSelected}
+          tabs={props.tabs || []}
+          selected={props.selected}
+          onSelect={props.onSelect}
           canCreateNewView={false}
           filters={filters}
           appliedFilters={appliedFilters}
@@ -224,7 +234,7 @@ function GithubServerTable(props) {
           ]}
           bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
           promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
-
+        
         >
           {rowMarkup}
           </IndexTable>

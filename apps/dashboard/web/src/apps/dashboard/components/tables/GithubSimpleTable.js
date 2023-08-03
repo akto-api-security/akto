@@ -79,6 +79,10 @@ function GithubSimpleTable(props) {
         rowClickable={props.rowClickable}
         promotedBulkActions = {props.promotedBulkActions}
         hideQueryField={props.hideQueryField}
+        tabs={props.tabs}
+        selected={props.selected}
+        onSelect={props.onSelect}
+        onRowClick={props.onRowClick}
     />
 
 }
