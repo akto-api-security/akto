@@ -63,7 +63,7 @@ jobs:
           aws-region: "ap-south-1"
 
       - name: Deploy static site to S3 bucket
-        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket --delete
+        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/dist --delete
 
       - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
       - name: DockerHub login
