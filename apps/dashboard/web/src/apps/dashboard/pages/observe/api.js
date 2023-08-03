@@ -519,6 +519,39 @@ export default {
             }).then((resp) => {
                 return resp
             })
-        }
-        
+        },
+        uploadHarFile(formData) {
+            return request({
+                url: '/api/uploadHar',
+                method: 'post',
+                data: formData,
+            })
+        },
+        uploadTcpFile(content, apiCollectionId, skipKafka) {
+            return request({
+                url: '/api/uploadTcp',
+                method: 'post',
+                data: {
+                    tcpContent: content, apiCollectionId, skipKafka
+                }
+            })
+        },
+        downloadOpenApiFile(apiCollectionId,lastFetchedUrl, lastFetchedMethod) {
+            return request({
+                url: '/api/generateOpenApiFile',
+                method: 'post',
+                data: {
+                    apiCollectionId, lastFetchedUrl, lastFetchedMethod
+                }
+            })
+        },
+        exportToPostman(apiCollectionId) {
+            return request({
+                url: '/api/createPostmanApi',
+                method: 'post',
+                data: {
+                    apiCollectionId
+                }
+            })
+        },
 }
