@@ -125,11 +125,6 @@ const iconFunc = (methodName) => {
     
 }
 
-const resourceName = {
-    singular: 'endpoint',
-    plural: 'endpoints',
-  };
-
 function ApiEndpoints() {
 
     const params = useParams()
@@ -171,6 +166,66 @@ function ApiEndpoints() {
         fetchData()    
     }, [])
 
+    const resourceName = {
+        singular: 'endpoint',
+        plural: 'endpoints',
+      };
+      const [itemStrings, setItemStrings] = useState([
+        'All',
+        'Unpaid',
+        'Open',
+        'Closed',
+        'Local delivery',
+        'Local pickup',
+      ]);
+    
+      const tabs = itemStrings.map((item, index) => ({
+        content: item,
+        index,
+        onAction: () => {},
+        id: `${item}-${index}`,
+        isLocked: index === 0,
+        actions:
+      index === 0
+        ? []
+        : [
+            {
+              type: 'rename',
+              onAction: () => {},
+              onPrimaryAction: async (value) => {
+                const newItemsStrings = tabs.map((item, idx) => {
+                  if (idx === index) {
+                    return value;
+                  }
+                  return item.content;
+                });
+                await sleep(1);
+                setItemStrings(newItemsStrings);
+                return true;
+              },
+            },
+            {
+              type: 'duplicate',
+              onPrimaryAction: async (value) => {
+                await sleep(1);
+                duplicateView(value);
+                return true;
+              },
+            },
+            {
+              type: 'edit',
+            },
+            {
+              type: 'delete',
+              onPrimaryAction: async () => {
+                await sleep(1);
+                deleteView(index);
+                return true;
+              },
+            },
+          ],
+      }));
+
     return(
         <PageWithMultipleCards
         title={
@@ -192,6 +247,7 @@ function ApiEndpoints() {
                         disambiguateLabel={()=>{}} 
                         headers={headers}
                         getStatus={() => {return "warning"}}
+                        tabs={tabs}
                     />
                 </div>
             ]}

@@ -17,7 +17,7 @@ import "./style.css"
 
 function GithubServerTable(props) {
 
-  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
+  const { mode, setMode } = useSetIndexFiltersMode();
   const [selected, setSelected] = useState(0);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length>0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
@@ -195,7 +195,7 @@ function GithubServerTable(props) {
             disabled: false,
             loading: false,
           }}
-          tabs={[]}
+          tabs={props.tabs || []}
           selected={selected}
           onSelect={setSelected}
           canCreateNewView={false}
