@@ -813,12 +813,12 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1);
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2);
 
-        mergeUrlsAndSave(1, true, true);
+        mergeUrlsAndSave(1, true);
 
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1.copy());
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2.copy());
 
-        mergeUrlsAndSave(1, true, true);
+        mergeUrlsAndSave(1, true);
 
         long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
         assertEquals(2, estimatedDocumentCount);
@@ -856,7 +856,7 @@ public class TestMergingNew extends MongoBasedTest {
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
 
-        mergeUrlsAndSave(apiCollection.getId(),true, true);
+        mergeUrlsAndSave(apiCollection.getId(),true);
 
         count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
