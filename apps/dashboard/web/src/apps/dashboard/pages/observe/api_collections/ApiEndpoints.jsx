@@ -166,11 +166,6 @@ const iconFunc = (methodName) => {
     
 }
 
-const resourceName = {
-    singular: 'endpoint',
-    plural: 'endpoints',
-  };
-
 function ApiEndpoints() {
 
     const params = useParams()
@@ -178,11 +173,17 @@ function ApiEndpoints() {
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
+
+    const [endpointData, setEndpointData] = useState([])
+    const [selectedTab, setSelectedTab] = useState("All")
+    const [selected, setSelected] = useState(0)
+    const [loading, setLoading] = useState(true)
     const [showDetails, setShowDetails] = useState(false);
     const [apiDetail, setApiDetail] = useState({})
     
     useEffect(() => {
         async function fetchData() {
+            setLoading(true)
             let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
             let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => {return {...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false}})
             let apiInfoListInCollection = apiCollectionData.data.apiInfoList
@@ -206,14 +207,51 @@ function ApiEndpoints() {
                 apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url] || new Set()
             })
 
+            let data = {}
+            let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null, iconFunc)
+            data['All'] = allEndpoints
+            data['Sensitive'] = allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
+            data['Unauthenticated'] = allEndpoints.filter(x => x.open)
+            data['Undocumented'] = allEndpoints.filter(x => x.shadow)
+            data['Deprecated'] = func.getDeprecatedEndpoints(apiInfoListInCollection, unusedEndpointsInCollection)
+            setEndpointData(data)
+            setSelectedTab("All")
+            setSelected(0)
+
             setApiEndpoints(apiEndpointsInCollection)
             setApiInfoList(apiInfoListInCollection)
             setUnusedEndpoints(unusedEndpointsInCollection)
+
+            setLoading(false)
         }
             
         fetchData()    
     }, [])
 
+    const resourceName = {
+        singular: 'endpoint',
+        plural: 'endpoints',
+    };
+
+    const tabStrings = [
+        'All',
+        'Sensitive',
+        'Unauthenticated',
+        'Undocumented',
+        'Deprecated'
+    ]
+
+    const tabs = tabStrings.map((item, index) => ({
+        content: item,
+        index,
+        id: `${item}-${index}`,
+    }));
+
+    const onSelect = (selectedIndex) => {
+       setSelectedTab(tabStrings[selectedIndex])
+       setSelected(selectedIndex)
+    }
+    
     function handleRowClick(data){
         const sameRow = func.deepComparison(apiDetail, data);
         setShowDetails((prev) => {
@@ -244,13 +282,16 @@ function ApiEndpoints() {
                     <GithubSimpleTable
                         key="table"
                         pageLimit={50}
-                        data={func.mergeApiInfoAndApiCollection(apiEndpoints, apiInfoList, null, iconFunc)}
+                        data={loading ? [] : endpointData[selectedTab]}
                         sortOptions={sortOptions} 
                         resourceName={resourceName} 
                         filters={[]}
                         disambiguateLabel={()=>{}} 
                         headers={headers}
                         getStatus={() => {return "warning"}}
+                        tabs={tabs}
+                        selected={selected}
+                        onSelect={onSelect}
                         onRowClick={handleRowClick}
                     />
                 </div>, 
@@ -267,4 +308,4 @@ function ApiEndpoints() {
     )
 }
 
-export default ApiEndpoints 
+export default ApiEndpoints

@@ -704,6 +704,45 @@ dayStart(epochMs) {
   date.setMinutes(0)
   date.setSeconds(0)
   return date
+},
+actionItemColors() {
+  return {
+      Total: 'rgba(71, 70, 106)',
+      Pending: 'rgba(246, 190, 79)',
+      Overdue: 'rgba(243, 107, 107)',
+      'This week': 'rgba(33, 150, 243)',
+      Completed: 'rgba(0, 191, 165)'
+  };
+},
+recencyPeriod: 60 * 24 * 60 * 60,
+getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
+  let ret = []
+  apiInfoList.forEach(apiInfo => {
+      if (apiInfo.lastSeen < (func.timeNow() - func.recencyPeriod)) {
+          ret.push({
+              endpoint: apiInfo.id.url, 
+              method: apiInfo.id.method,
+              lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
+              color: func.actionItemColors()["This week"]
+          })
+      }
+  })
+
+  try {
+      unusedEndpoints.forEach((x) => {
+          if (!x) return;
+          let arr = x.split(" ");
+          if (arr.length < 2) return;
+          ret.push({
+          endpoint : arr[0],
+          method : arr[1],
+          color: func.actionItemColors()["This week"],
+          lastSeen: 'in API spec file'
+          })
+      })
+  } catch (e) {
+  }
+  return ret
 }
 
 }
