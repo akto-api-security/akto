@@ -65,6 +65,8 @@ jobs:
         with:
           folder: dist
           bucket: my-cdn-test-bucket
+          dist-id: E136ISLUF4SBK8
+          invalidation: /*
       - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
