@@ -53,7 +53,6 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = false;
-    private boolean ignoreNonTemplateUrlForMerging = false;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -65,7 +64,6 @@ public class APICatalogSync {
             String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
             if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
                 mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
-                ignoreNonTemplateUrlForMerging = ApiCollectionsDao.instance.findOne("_id", 840395) != null;
             }
         } catch (Exception e) {
             
@@ -670,7 +668,7 @@ public class APICatalogSync {
     }
 
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean ignoreNonTemplateUrlForMerging) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
 
         String deletedStaticUrlsString = "";
@@ -710,9 +708,7 @@ public class APICatalogSync {
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
             String newTemplateUrl = urlTemplate.getTemplateString();
-            if (ignoreNonTemplateUrlForMerging) {
-                if (!APICatalog.isTemplateUrl(newTemplateUrl)) continue;
-            }
+            if (!APICatalog.isTemplateUrl(newTemplateUrl)) continue;
 
             boolean isFirst = true;
             for (String matchedURL: matchStaticURLs) {
@@ -1248,7 +1244,7 @@ public class APICatalogSync {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled, ignoreNonTemplateUrlForMerging);
+                                mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
@@ -1267,15 +1263,10 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
-            if (ignoreNonTemplateUrlForMerging) {
-                Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
-                Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
-                allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
-                allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
-            } else {
-                allParams = SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
-            }
-
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
+            Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+            allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
+            allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
