@@ -51,18 +51,18 @@ function ResultsSummary() {
             if(testingRunHexId){
                 setFetchTests(true)
                 await testingApi.fetchTestingRunResultSummaries(testingRunHexId).then((resp) => {
-                    // console.log(resp)
                     localCopy = JSON.parse(JSON.stringify(resp))
                 })
 
                 if(localCopy.testingRunResultSummaries && localCopy.testingRunResultSummaries.length > 0){
-                    setCountIssues(localCopy.testingRunResultSummaries[0].countIssues)
-                    // console.log(localCopy.testingRunResultSummaries[0].countIssues)
+                    if(Object.keys(localCopy.testingRunResultSummaries[0].countIssues) > 0){
+                        setCountIssues(localCopy.testingRunResultSummaries[0].countIssues)
+                    }
                     await testingApi.fetchTestingRunResults(localCopy?.testingRunResultSummaries[0]?.hexId).then((resp)=> {
-                        // console.log(resp,resp.testingRunResults)
-                        const convertedArr = onFunc.getConvertedTestResults(resp?.testingRunResults,subCategoryMap,subCategoryFromSourceConfigMap)
-                        // console.log(convertedArr)
-                        setTestingResults(convertedArr)
+                        if(resp.testingRunResults && resp.testingRunResults.length > 0){
+                            const convertedArr = onFunc.getConvertedTestResults(resp.testingRunResults,subCategoryMap,subCategoryFromSourceConfigMap)
+                            setTestingResults(convertedArr)
+                        }
                     })
                 }
 
@@ -104,7 +104,6 @@ function ResultsSummary() {
                     )
                 })}
             </VerticalStack>
-            {groupedResults[activeTab]?.truncate ? <Button plain onClick={()=> console.log("hey")}>See More</Button>: null}
         </VerticalStack>
     )
 }

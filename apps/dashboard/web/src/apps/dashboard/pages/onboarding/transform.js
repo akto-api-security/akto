@@ -54,6 +54,7 @@ const onFunc = {
                 )
             }
         });
+        return tempArr
     }
 }
 
