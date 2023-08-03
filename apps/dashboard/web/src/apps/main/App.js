@@ -41,6 +41,7 @@ import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDeta
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Dashboard from "../dashboard/pages/Dashboard";
+import Slack from "../dashboard/pages/settings/integrations/Slack";
 
 const router = createBrowserRouter([
   {
@@ -160,6 +161,10 @@ const router = createBrowserRouter([
           {
             path: "integrations/akto_gpt",
             element: <AktoGPT />,
+          },
+          {
+            path: "integrations/slack",
+            element: <Slack />,
           },
           {
             path: "integrations/webhooks",
