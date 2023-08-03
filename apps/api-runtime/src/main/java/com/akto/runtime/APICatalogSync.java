@@ -1275,7 +1275,9 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
-            allParams = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForHostHeader(0, false), Projections.exclude(SingleTypeInfo._VALUES));
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
+            Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+            allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
             allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
