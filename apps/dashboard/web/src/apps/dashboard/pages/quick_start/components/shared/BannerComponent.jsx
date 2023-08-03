@@ -7,7 +7,7 @@ function BannerComponent({title,docsUrl,content}) {
         window.open(docsUrl)
     }
     return (
-            <div>
+        <div className='card-items'>
             <Banner title={title} status='warning'>
                 <span>{content}</span>
                 <br/>
