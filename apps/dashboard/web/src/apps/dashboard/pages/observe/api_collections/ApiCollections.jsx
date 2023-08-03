@@ -79,24 +79,38 @@ function ApiCollections() {
     const createNewCollection = async () => {
         let newColl = await api.createCollection(newCollectionName)
         setNewCollectionName('')
-        setData([convertToCollectionData(newColl.apiCollections[0]), ...data])
+        //setData([convertToCollectionData(newColl.apiCollections[0]), ...data])
+        fetchData()
         setActive(false)
+        func.setToast(true, false, "API collection created successfully")
+    }
 
+    async function fetchData() {
+        let apiCollectionsResp = await api.getAllCollections()
+
+        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        setData(tmp)
     }
 
     useEffect(() => {
-        let tmp=[]
-        async function fetchData() {
-            let apiCollectionsResp = await api.getAllCollections()
-
-            tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-            setData(tmp)
-        }
-
         fetchData()    
     }, [])
 
     const createCollectionModalActivatorRef = useRef();
+
+    async function handleRemoveCollections(collectionIdList) {
+        const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
+        const response = await api.deleteMultipleCollections(collectionIdListObj)
+        fetchData()
+        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
+    }
+
+    const promotedBulkActions = [
+        {
+          content: 'Remove collections',
+          onAction: (collectionIdList) => handleRemoveCollections(collectionIdList)
+        },
+      ];
 
     return(
         <PageWithMultipleCards
@@ -144,6 +158,8 @@ function ApiCollections() {
                 filters={[]}
                 disambiguateLabel={()=>{}} 
                 headers={headers}
+                selectable={true}
+                promotedBulkActions={promotedBulkActions}
                 />)
             ]}
         />

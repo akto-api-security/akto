@@ -743,8 +743,14 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
   } catch (e) {
   }
   return ret
-}
-
+}, 
+ getCollectionName(collectionId) {
+    const collection = Store.getState().allCollections.find(x => x.id === collectionId)
+    if (collection) 
+      return collection.displayName
+    else 
+      return ""
+ }
 }
 
 export default func
