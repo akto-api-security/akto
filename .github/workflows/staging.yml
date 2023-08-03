@@ -63,11 +63,12 @@ jobs:
       - name: Install dependencies
         run: yarn
       - name: Build
+        working-directory: ./apps/dashboard/
         run: yarn build
       - name: Prepare dashboard on s3
         uses: lbertenasco/s3-deploy@v1
         with:
-          folder: dist
+          folder: ./apps/dashboard/dist
           bucket: my-cdn-test-bucket
           dist-id: E136ISLUF4SBK8
           invalidation: /*
