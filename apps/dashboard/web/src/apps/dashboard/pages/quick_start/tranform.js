@@ -4,6 +4,8 @@ import BurpSource from "./components/BurpSource"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
+import FutureConnection from "./components/shared/FutureConnection"
+import BannerComponent from "./components/shared/BannerComponent"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -19,14 +21,18 @@ const beanStalkObj = {
     icon: '/public/beanstalk.svg',
     label: "AWS Beanstalk",
     text: "You can deploy Akto in AWS and collect traffic through mirroring on your AWS Beanstalk setup.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/aws-beanstalk'
+    docsUrl: 'https://docs.akto.io/traffic-connections/aws-beanstalk',
+    component: <FutureConnection />,
+    key: "Bean Stalk",
 }
 
 const eksObj = {
     icon: '/public/eks.svg',
     label: 'AWS EKS',
     text: "You can deploy Akto in AWS and collect traffic through a daemonset on your AWS EKS configuration.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/aws-eks'
+    docsUrl: 'https://docs.akto.io/traffic-connections/aws-eks',
+    component: <Kubernetes docsUrl= 'https://docs.akto.io/traffic-connections/aws-eks' bannerTitle="Setup using AWS EKS"/>,
+    key: "EKS"
 }
 
 const fargateObj = {
@@ -34,7 +40,7 @@ const fargateObj = {
     label: 'AWS Fargate',
     text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
     docsUrl: 'https://docs.akto.io/traffic-connections/aws-fargate',
-    component: <FargateSource />,
+    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connections/aws-fargate' bannerTitle="Setup using Fargate"/>,
     key: "FARGATE"
 }
 
@@ -42,7 +48,6 @@ const burpObj = {
     icon: '/public/burp.svg',
     label: "Burp Suite",
     text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",   
-    badge: "Recommended",
     docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
     key: "BURP",
     component : <BurpSource/>
@@ -52,21 +57,26 @@ const dockerObj = {
     icon: '/public/docker.svg',
     label: "Docker",
     text: "This setup is recommended only if other setups for AWS or GCP don't work.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/docker'
+    docsUrl: 'https://docs.akto.io/traffic-connections/docker',
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/docker" bannerTitle="Setup using Docker" />,
+    key: "DOCKER"
 }
 
 const envoyObj = {
     icon: '/public/envoy.svg',
     label: 'Envoy',
     text: 'Akto-Envoy setup is recommended if your APIs are routed by Envoy.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/envoy'
+    docsUrl: 'https://docs.akto.io/traffic-connections/envoy',
+    key: "ENVOY",
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/envoy" bannerTitle="Setup using Envoy" />,
 }
 
 const ebpfObj = {
     icon: '/public/ebpf.svg',
     label: 'EBPF',
     text: 'eBPF, the extended Berkeley Packet Filter is a technology that can run sandboxed programs in a privileged context such as the operating system kernel.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/ebpf'
+    docsUrl: 'https://docs.akto.io/traffic-connections/ebpf',
+    component: <FutureConnection />
 }
 
 const gcpObj = {
@@ -76,20 +86,27 @@ const gcpObj = {
     badge: "Recommended",
     docsUrl: 'https://docs.akto.io/traffic-connections/google-cloud-gcp',
     key: "GCP",
+    component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connections/google-cloud-gcp"
+                    content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
 }
 
 const harFileUploadObj = {
     icon: '/public/HAR.svg',
     label: 'Har File Upload',
     text: "For a very quick view of your inventory, you can upload a HAR file that contains traffic to Akto.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/har-file-upload'
+    docsUrl: 'https://docs.akto.io/traffic-connections/har-file-upload',
+    key: "HAR",
+    component: <BannerComponent title="Upload .har file" docsUrl="https://docs.akto.io/traffic-connections/har-file-upload"
+                    content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
 }
 
 const kongObj = {
     icon: '/public/kong.svg',
     label: 'Kong',
     text: 'Kong Gateway is an open source API gateway, built for multi-cloud and hybrid, and optimized for microservices and distributed architectures.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/kong'
+    docsUrl: 'https://docs.akto.io/traffic-connections/kong',
+    key: "KONG",
+    component: <FutureConnection/>
 }
 
 const kubernetesObj = {
@@ -98,7 +115,7 @@ const kubernetesObj = {
     text: 'You can deploy Akto in Kubernetes and collect traffic through a daemonset on your Kubernetes configuration.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kubernetes',
     key: "KUBERNETES",
-    component: <Kubernetes />
+    component: <Kubernetes docsUrl="https://docs.akto.io/traffic-connections/kubernetes" bannerTitle="Setup using Kubernetes Daemonset"/>
 }
 
 const nginxObj = {
@@ -107,13 +124,13 @@ const nginxObj = {
     text: 'This setup is recommended if your APIs are routed by NGINX.',
     docsUrl: 'https://docs.akto.io/traffic-connections/nginx',
     key: "NGINX",
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/nginx" bannerTitle="Setup using NGINX" />
 }
 
 const postmanObj = {
     icon: '/public/postman.svg',
     label: 'Postman',
     text: 'This setup is recommended if you have updated API collections maintained in Postman.',
-    badge: 'Recommened',
     docsUrl: 'https://docs.akto.io/traffic-connections/postman',
     component: <PostmanSource/>,
     key: "POSTMAN"
@@ -123,7 +140,9 @@ const tcpObj = {
     icon: '/public/TCP.svg',
     label: 'TCP Agent',
     text: ' This setup is recommended only if other setups for AWS or GCP do not work.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/tcp-agent'
+    docsUrl: 'https://docs.akto.io/traffic-connections/tcp-agent',
+    key: "NGINX",
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" />
 }
 
 const quick_start_policy_lines= [
@@ -657,9 +676,9 @@ const yaml_kubernetes = [
 
 const quickStartFunc = {
     getConnectorsList: function (){
-        const connectorsList = [mirroringObj, gcpObj, burpObj, postmanObj,
-           beanStalkObj, eksObj, fargateObj, dockerObj, envoyObj, ebpfObj,
-           harFileUploadObj, kongObj, kubernetesObj, nginxObj, tcpObj
+        const connectorsList = [mirroringObj, gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
+           beanStalkObj, eksObj, dockerObj, envoyObj, ebpfObj,
+           harFileUploadObj, kongObj, tcpObj
         ]
         return connectorsList
     },
