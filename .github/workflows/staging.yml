@@ -56,7 +56,7 @@ jobs:
           node-version: '17'
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && RELEASE_VERSION=${{ github.event.inputs.release_version }} && npm run build
+        run: npm install && RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Configure AWS Credentials
         if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
