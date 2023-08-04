@@ -203,7 +203,7 @@ function GithubServerTable(props) {
   //   }
   // }) : []
 
-  console.log(data)
+  
 
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>

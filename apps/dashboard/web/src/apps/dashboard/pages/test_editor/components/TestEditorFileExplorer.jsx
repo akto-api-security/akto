@@ -116,7 +116,7 @@ const TestEditorFileExplorer = () => {
                 return{
                     label: (
                         <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
-                            <span className={"text-overflow " + (item.label === selectedTest.label ? "active" : "")} style={{'fontSize': '14px'}}>
+                            <span className={"text-overflow " + (item.label === selectedTest.label ? "active-left-test" : "")} style={{'fontSize': '14px'}}>
                                 {item.label} 
                             </span>
                         </Tooltip>
