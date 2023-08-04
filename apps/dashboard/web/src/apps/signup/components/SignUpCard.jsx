@@ -73,6 +73,7 @@ const SignUpCard = () => {
             <Divider />
 
             <TextField
+              id="email"
               label="Email"
               type="email"
               value={email}
@@ -81,6 +82,7 @@ const SignUpCard = () => {
               autoComplete="email"
             />
             <TextField
+              id="password"
               label="Password"
               type="password"
               value={password}
@@ -88,7 +90,7 @@ const SignUpCard = () => {
               onChange={handlePasswordChange}
               autoComplete="password"
             />
-            <Button size="large" fullWidth primary onClick={handleContinueWithEmail}>Continue with Email</Button>
+            <Button size="large" fullWidth primary onClick={handleContinueWithEmail} id="continueEmail">Continue with Email</Button>
 
             <HorizontalStack gap="3" align="end">
               <Button plain monochrome removeUnderline>Help</Button>
