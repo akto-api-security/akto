@@ -55,7 +55,7 @@ function ResultsSummary() {
                 })
 
                 if(localCopy.testingRunResultSummaries && localCopy.testingRunResultSummaries.length > 0){
-                    if(Object.keys(localCopy.testingRunResultSummaries[0].countIssues) > 0){
+                    if(Object.keys(localCopy.testingRunResultSummaries[0].countIssues).length > 0){
                         setCountIssues(localCopy.testingRunResultSummaries[0].countIssues)
                     }
                     await testingApi.fetchTestingRunResults(localCopy?.testingRunResultSummaries[0]?.hexId).then((resp)=> {

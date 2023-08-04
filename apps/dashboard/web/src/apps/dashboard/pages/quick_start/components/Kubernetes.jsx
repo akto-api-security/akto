@@ -1,36 +1,25 @@
 import React from 'react'
 import CompleteSetup from './CompleteSetup'
 import QuickStartStore from '../quickStartStore'
-import Store from '../../../store'
 import { HorizontalStack, VerticalStack } from '@shopify/polaris'
 import JsonComponent from './shared/JsonComponent'
+import func from '@/util/func'
 
-function Kubernetes() {
+function Kubernetes({bannerTitle, docsUrl}) {
 
     const yamlContent = QuickStartStore(state => state.yamlContent)
-    const setToastConfig = Store(state => state.setToastConfig)
-    const setToast = (isActive, isError, message) => {
-        setToastConfig({
-            isActive: isActive,
-            isError: isError,
-            message: message
-        })
-    }
-
     const copyYaml = () => {
         navigator.clipboard.writeText(yamlContent)
-        setToast(true, false, "Variables Copied to Clipboard !")
+        func.setToast(true, false, "Variables Copied to Clipboard !")
     }
 
     const copyText = () => {
       navigator.clipboard.writeText("kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>")
-      setToast(true, false, "Command Copied !!")
+      func.setToast(true, false, "Command Copied !!")
     }
 
     const deploymentMethod = "KUBERNETES"
     const localComponentText = "Use Kubernetes based traffic collector to send traffic to Akto."
-    const bannerTitle = "Setup using Kubernetes"
-    const docsUrl =  "https://docs.akto.io/traffic-connections/kubernetes"
     const bannerContent = "Akto daemonset config can duplicate your node-traffic inside Kubernetes and send to Akto dashboard." 
     const noAccessText = "Your dashboard's instance needs relevant access to setup daemonset stack, please do the following steps:"
     const setupButtonText = "Setup Daemonset stack"

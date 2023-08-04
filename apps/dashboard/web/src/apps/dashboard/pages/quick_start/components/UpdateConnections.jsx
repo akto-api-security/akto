@@ -24,6 +24,7 @@ function UpdateConnections(props) {
     const onButtonClick = (cardObj) => {
         setNewCol(2)
         setCurrentCardObj(cardObj)
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     useEffect(()=>{
