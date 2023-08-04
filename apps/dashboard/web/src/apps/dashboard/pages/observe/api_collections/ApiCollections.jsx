@@ -159,7 +159,7 @@ function ApiCollections() {
                 disambiguateLabel={()=>{}} 
                 headers={headers}
                 selectable={true}
-                promotedBulkActions={promotedBulkActions}
+                // promotedBulkActions={promotedBulkActions}
                 />)
             ]}
         />
