@@ -250,6 +250,8 @@ function ApiEndpoints() {
         setFilteredEndpoints(filteredItems)
     }
 
+    console.log(setFilteredEndpoints)
+
     const tabStrings = [
         'All',
         'Sensitive',
