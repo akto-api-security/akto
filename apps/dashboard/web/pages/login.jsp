@@ -57,6 +57,7 @@
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
                     window.ACCOUNT_NAME = '${requestScope.accountName}';
+                    window.RELEASE_VERSION = '${requestScope.releaseVersion}';
 
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
@@ -103,8 +104,11 @@
                     };
                 </script>
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
-
-                <script src="/dist/main.js"></script>
+                if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION =='${akto-release-version}') {
+                    <script src="/dist/main.js"></script>
+                } else {
+                    <script src="https://d3as5gx79fwfqr.cloudfront.net/"+ window.RELEASE_VERSION +"/dist/main.js"></script>
+                }
             </body>
 
             </html>

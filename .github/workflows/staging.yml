@@ -56,7 +56,7 @@ jobs:
           node-version: '17'
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Configure AWS Credentials
         if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
@@ -70,7 +70,7 @@ jobs:
         if: ${{ github.event.inputs.Environment == 'prod' }}
         run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/${{ github.event.inputs.release_version }}/dist --delete
 
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
         env:

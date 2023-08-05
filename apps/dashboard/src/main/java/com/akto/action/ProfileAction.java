@@ -9,6 +9,7 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.listener.InitializerListener;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBList;
@@ -88,7 +89,9 @@ public class ProfileAction extends UserAction {
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
-                .append("accountName", accountName);;
+                .append("accountName", accountName)
+                .append("releaseVersion", InitializerListener.RELEASE_VERSION);
+
 
         for (String k: userDetails.keySet()) {
             request.setAttribute(k, userDetails.get(k));
