@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 
 
 function RunTest() {
-    const [active, setActive] = useState(true);
+    const [active, setActive] = useState(false);
 
     const runTestRef = useRef(null);
 
@@ -23,17 +23,11 @@ function RunTest() {
                 activator={runTestRef}
                 open={active}
                 onClose={toggleRunTest}
-                title="Reach more shoppers with Instagram product tags"
+                title="Configure test"
                 primaryAction={{
-                    content: 'Add Instagram',
+                    content: 'Run once now',
                     onAction: toggleRunTest,
                 }}
-                secondaryActions={[
-                    {
-                        content: 'Learn more',
-                        onAction: toggleRunTest,
-                    },
-                ]}
             >
                 <Modal.Section>
                     <TextContainer>
