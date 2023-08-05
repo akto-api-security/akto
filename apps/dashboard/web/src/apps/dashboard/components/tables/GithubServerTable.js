@@ -177,14 +177,7 @@ function GithubServerTable(props) {
     setPage((page) => (page-1));
   }
 
-  const promotedBulkActions = props.promotedBulkActions ? props.promotedBulkActions.map(promotedBulkAction => {
-    return {
-      ...promotedBulkAction,
-      onAction: promotedBulkAction.onAction ? 
-        () => {promotedBulkAction.onAction(selectedResources)} :
-        () => {}
-    }
-  }) : []
+  
 
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
@@ -233,10 +226,10 @@ function GithubServerTable(props) {
               flush: true
             }
           ]}
-          // bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
-          // promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
-          bulkActions={props.selectable ? props.bulkActions : []}
-          promotedBulkActions={props.selectable ? promotedBulkActions : []}
+          bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
+          promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+          // bulkActions={props.selectable ? props.bulkActions : []}
+          // promotedBulkActions={props.selectable ? promotedBulkActions : []}
         >
           {rowMarkup}
           </IndexTable>
