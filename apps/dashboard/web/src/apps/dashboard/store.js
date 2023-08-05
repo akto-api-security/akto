@@ -27,7 +27,7 @@ let store = (set)=>({
     setAllCollections:(allCollections)=>{
         set({allCollections: allCollections})
     },
-    isLocalDeploy: window.DASHBOARD_MODE === "LOCAL_DEPLOY"
+    isLocalDeploy: window.DASHBOARD_MODE === "LOCAL_DEPLOY",
 })
 
 store = devtools(store)

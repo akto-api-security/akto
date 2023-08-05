@@ -11,7 +11,7 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
     )
 
     return (
-        <div className={"main-card-onboarding " + (currentStep === 4 ? 'shrink': '')}>
+        <div className={"main-card-onboarding " + (currentStep === 2 ? "expand " : "") + (currentStep === 4 ? "change-margin": "")}>
             <div className='titleContainer'>
                 <Text variant="heading3xl" color='subdued' as='h2'>{stepObj.title}</Text>
                 <Text variant="headingXl" color='subdued' as='h5'>{stepObj.subtitle}</Text>

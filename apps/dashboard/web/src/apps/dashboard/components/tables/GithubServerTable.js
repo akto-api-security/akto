@@ -19,7 +19,6 @@ import "./style.css"
 function GithubServerTable(props) {
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
-  //const [selected, setSelected] = useState(0);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length>0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -177,31 +176,6 @@ function GithubServerTable(props) {
   const onPagePrevious = () =>{
     setPage((page) => (page-1));
   }
-
-  const handleOnSelect = (selectedIndex) => {
-    if (props.onSelect) {
-      setSelected(selectedIndex)
-      props.onSelect(selectedIndex)
-    }
-  }
-
-  // const promotedBulkActions = props.promotedBulkActions ? props.promotedBulkActions.map(promotedBulkAction => {
-  //   return {
-  //     ...promotedBulkAction,
-  //     onAction: promotedBulkAction.onAction ? 
-  //       () => {promotedBulkAction.onAction(selectedResources)} :
-  //       () => {}
-  //   }
-  // }) : []
-
-  // const bulkActions = props.bulkActions ? props.bulkActions.map(bulkActions => {
-  //   return {
-  //     ...bulkActions,
-  //     onAction: bulkActions.onAction ? 
-  //       () => {bulkActions.onAction(selectedResources)} :
-  //       () => {}
-  //   }
-  // }) : []
 
   
 
