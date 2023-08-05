@@ -77,12 +77,12 @@ const settingRequests = {
     },
     
 
-    fetchAktoGptConfig(){
+    fetchAktoGptConfig(apiCollectionId){
         return request({
             url: '/api/fetchAktoGptConfig',
             method: 'post',
             data: {
-                "apiCollectionId": -1
+                "apiCollectionId": apiCollectionId
             }
         })
     },

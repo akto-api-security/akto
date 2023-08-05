@@ -49,7 +49,7 @@ const settingFunctions = {
 
     fetchGptCollections: async function(){
       let arr = []
-      await settingRequests.fetchAktoGptConfig().then((resp)=>{
+      await settingRequests.fetchAktoGptConfig(-1).then((resp)=>{
         resp.currentState.forEach((collection) =>{
           if(collection.state === 'ENABLED'){
             arr.push(collection.id)
