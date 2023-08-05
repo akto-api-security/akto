@@ -19,6 +19,7 @@ import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import Store from "../../../store"
 import UploadFile from "../../../components/shared/UploadFile"
+import RunTest from "./RunTest"
 
 const StyledEndpoint = (data) => {
     const { method, url } = func.toMethodUrlObject(data)
@@ -384,15 +385,11 @@ function ApiEndpoints() {
                     }
                 </Text>
             }
-            primaryAction={
-                <UploadFile 
-                    fileFormat=".har"
-                    fileChanged={file => handleFileChange(file)} 
-                    tooltipText="Upload traffic(.har)" 
-                    label="Upload traffic"/>
-            }
+            // primaryAction={
+            //     <RunTest />
+            // }
             secondaryActions={
-                <ButtonGroup spacing="loose">
+                <ButtonGroup>
                     <Tooltip content="Refresh">
                         <Button icon={RedoMajor} onClick={handleRefresh} plain helpText="Refresh" />
                     </Tooltip>
@@ -408,6 +405,13 @@ function ApiEndpoints() {
                     >
                         Export
                     </Button>
+                    <UploadFile 
+                        fileFormat=".har"
+                        fileChanged={file => handleFileChange(file)} 
+                        tooltipText="Upload traffic(.har)" 
+                        label="Upload traffic"
+                        primary={false}/>
+                    <RunTest />
                 </ButtonGroup>
             }
             components={[
