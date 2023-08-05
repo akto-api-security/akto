@@ -6,6 +6,7 @@ import SampleDataList from "../../../components/shared/SampleDataList";
 import { useEffect, useState } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
+import ObserveStore from "../observeStore"
 
 function ApiDetails(props) {
 
@@ -13,12 +14,14 @@ function ApiDetails(props) {
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
+    const setSamples = ObserveStore(state => state.setSamples)
 
     async function fetchData() {
         const { apiCollectionId, endpoint, method } = apiDetail
         await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
             if (res.sampleDataList.length > 0) {
                 setSampleData(res.sampleDataList[0].samples.map((sample) => ({ message: sample, highlightPaths: [] })))
+                setSamples(res.sampleDataList[0].samples)
             }
         })
 

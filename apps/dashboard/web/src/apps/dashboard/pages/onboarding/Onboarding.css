@@ -9,11 +9,19 @@
 
 .main-card-onboarding {
     margin: auto;
-    width: 45vw;
+    width: 32vw;
     margin-top: 4.5vw;
     display: flex;
     flex-direction: column;
     gap: 2vw;
+}
+
+.expand{
+    width: 42vw !important;
+}
+
+.change-margin{
+    margin-top: 1vw !important;
 }
 
 .titleContainer {
@@ -33,14 +41,6 @@
 
 .active-card {
     border: 2.5px solid #47466a !important;
-}
-
-.shrink .Polaris-LegacyCard{
-    width: 38vw !important;
-    margin: auto;
-}
-.shrink .titleContainer{
-    margin: auto;
 }
 
 .header-active{

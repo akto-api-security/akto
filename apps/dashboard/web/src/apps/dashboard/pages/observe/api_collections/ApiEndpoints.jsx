@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { useParams } from "react-router-dom"
+import { saveAs } from 'file-saver'
 import {
     ClockMinor,
     LockMinor,
@@ -20,6 +21,7 @@ import ApiDetails from "./ApiDetails"
 import Store from "../../../store"
 import UploadFile from "../../../components/shared/UploadFile"
 import RunTest from "./RunTest"
+import ObserveStore from "../observeStore"
 
 const StyledEndpoint = (data) => {
     const { method, url } = func.toMethodUrlObject(data)
@@ -177,6 +179,8 @@ function ApiEndpoints() {
     const apiCollectionId = params.apiCollectionId
 
     const allCollections = Store(state => state.allCollections)
+    const showDetails = ObserveStore(state => state.inventoryFlyout)
+    const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
 
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
@@ -186,8 +190,9 @@ function ApiEndpoints() {
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
     const [loading, setLoading] = useState(true)
-    const [showDetails, setShowDetails] = useState(false);
     const [apiDetail, setApiDetail] = useState({})
+
+    const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
 
     async function fetchData() {
         setLoading(true)
@@ -241,6 +246,10 @@ function ApiEndpoints() {
         plural: 'endpoints',
     };
 
+    const getFilteredItems = (filteredItems) => {
+        setFilteredEndpoints(filteredItems)
+    }
+
     const tabStrings = [
         'All',
         'Sensitive',
@@ -262,12 +271,11 @@ function ApiEndpoints() {
 
     function handleRowClick(data) {
         const sameRow = func.deepComparison(apiDetail, data);
-        setShowDetails((prev) => {
-            if (prev && !sameRow) {
-                return prev;
-            }
-            return !prev;
-        })
+        if(!sameRow){
+            setShowDetails(true)
+        }else{
+            setShowDetails(!showDetails)
+        }
         setApiDetail((prev) => {
             if (sameRow) {
                 return prev;
@@ -430,6 +438,7 @@ function ApiEndpoints() {
                         selected={selected}
                         onSelect={onSelect}
                         onRowClick={handleRowClick}
+                        getFilteredItems={getFilteredItems}
                     />
                 </div>,
                 <ApiDetails
