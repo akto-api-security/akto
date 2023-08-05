@@ -83,6 +83,7 @@ public class InitializerListener implements ServletContextListener {
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
+    public static String RELEASE_VERSION = "";
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -114,6 +115,28 @@ public class InitializerListener implements ServletContextListener {
             return true;
         }
         return true;
+    }
+
+    private void updateReleaseVersion() throws Exception{
+        int releaseVersionLine = 3;
+        try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
+            if (in != null) {
+                LineNumberReader lineNumberReader = new LineNumberReader(new InputStreamReader(in));
+                String line;
+                do  {
+                    line = lineNumberReader.readLine();
+                } while (line != null && lineNumberReader.getLineNumber() < releaseVersionLine);
+
+                if (line != null && lineNumberReader.getLineNumber() == releaseVersionLine) {
+                    InitializerListener.RELEASE_VERSION = line;
+                    System.out.println(line);
+                } else {
+                    logger.info("release version line not found");
+                }
+            } else  {
+                throw new Exception("Input stream null");
+            }
+        }
     }
 
     public void setUpPiiCleanerScheduler(){
@@ -920,7 +943,11 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         logger.info("MONGO URI " + mongoURI);
 
-
+        try {
+            updateReleaseVersion();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while running update release version", LogDb.DASHBOARD);
+        }
         executorService.schedule(new Runnable() {
             public void run() {
                 boolean calledOnce = false;
