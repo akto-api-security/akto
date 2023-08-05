@@ -58,7 +58,9 @@ function GithubSimpleTable(props) {
         })[0]?.sortKey;
 
         tempData = func.sortFunc(tempData, dataSortKey, sortOrder)
-        props?.getFilteredItems(tempData)
+        if(props.getFilteredItems){
+          props.getFilteredItems(tempData)
+        }
 
         return {value:tempData,total:tempData.length}
     }
