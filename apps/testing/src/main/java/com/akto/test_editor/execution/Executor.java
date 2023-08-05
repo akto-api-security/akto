@@ -1,8 +1,6 @@
 package com.akto.test_editor.execution;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -21,6 +19,8 @@ import com.akto.testing.ApiExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
+
+import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 
 public class Executor {
 
@@ -167,7 +167,7 @@ public class Executor {
                         }
                     }
                 }
-                
+
             }
         }
 
@@ -231,7 +231,100 @@ public class Executor {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
         }
     }
-    
+
+    private static Set<String> headerValuesUnchanged(Map<String, List<String>> originalRequestHeaders, Map<String, List<String>> testRequestHeaders) {
+        Set<String> diff = new HashSet<>();
+        if (originalRequestHeaders == null) return diff;
+        for (String key: testRequestHeaders.keySet()) {
+            List<String> originalHeaderValues = originalRequestHeaders.get(key);
+            List<String> testHeaderValues = testRequestHeaders.get(key);
+            if (originalHeaderValues == null || testHeaderValues == null) continue;
+            if (areListsEqual(originalHeaderValues, testHeaderValues)) {
+                diff.add(key);
+            }
+        }
+
+        return diff;
+    }
+
+    public static boolean areListsEqual(List<String> list1, List<String> list2) {
+        if (list1.size() != list2.size()) {
+            return false;
+        }
+
+        List<String> copyOfList1 = new ArrayList<>(list1);
+        List<String> copyOfList2 = new ArrayList<>(list2);
+
+        Collections.sort(copyOfList1);
+        Collections.sort(copyOfList2);
+
+        return copyOfList1.equals(copyOfList2);
+    }
+
+    private static Set<String> bodyValuesUnchanged(String originalPayload, String testPayload) {
+        Set<String> diff = new HashSet<>();
+
+        Map<String, Set<String>> originalRequestParamMap = new HashMap<>();
+        Map<String, Set<String>> testRequestParamMap= new HashMap<>();
+        try {
+            extractAllValuesFromPayload(originalPayload, originalRequestParamMap);
+            extractAllValuesFromPayload(testPayload, testRequestParamMap);
+        } catch (Exception e) {
+        }
+
+        for (String key: testRequestParamMap.keySet()) {
+            Set<String> testValues = testRequestParamMap.get(key);
+            Set<String> originalValues = originalRequestParamMap.get(key);
+            if (testValues == null) continue;
+            String[] keySplit = key.split("\\.");
+            String finalKey = keySplit[keySplit.length - 1];
+            if (testValues.equals(originalValues)) diff.add(finalKey); // todo: check null
+        }
+
+        return diff;
+    }
+
+    private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey) {
+        boolean removed = false;
+        // find set of all headers and body params that didn't change
+        Map<String, List<String>> originalRequestHeaders = originalRawApi.fetchReqHeaders();
+        Map<String, List<String>> testRequestHeaders = testRawApi.fetchReqHeaders();
+        Set<String> unchangedHeaders = headerValuesUnchanged(originalRequestHeaders, testRequestHeaders);
+
+        String originalJsonRequestBody = originalRawApi.getRequest().getJsonRequestBody();
+        String testJsonRequestBody = testRawApi.getRequest().getJsonRequestBody();
+        Set<String> unchangedBodyKeys = bodyValuesUnchanged(originalJsonRequestBody, testJsonRequestBody);
+
+        // then loop over custom auth types and hardcoded auth mechanism to see if any auth token hasn't changed
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+        List<String> authHeaders = new ArrayList<>();
+        List<String> authBodyParams = new ArrayList<>();
+
+        for (CustomAuthType customAuthType : customAuthTypes) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            authHeaders.addAll(customAuthTypeHeaderKeys);
+
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            authBodyParams.addAll(customAuthTypePayloadKeys);
+        }
+
+        authHeaders.add(authMechanismHeaderKey);
+
+        for (String headerAuthKey: authHeaders) {
+            if (unchangedHeaders.contains(headerAuthKey)) {
+                removed = Operations.deleteHeader(testRawApi, headerAuthKey).getErrMsg().isEmpty() || removed;
+            }
+        }
+
+        for (String payloadAuthKey: authBodyParams) {
+            if (unchangedBodyKeys.contains(payloadAuthKey)) {
+                removed = Operations.deleteBodyParam(testRawApi, payloadAuthKey).getErrMsg().isEmpty() || removed;
+            }
+        }
+
+        return removed;
+    }
+
     private static boolean removeCustomAuth(RawApi rawApi) {
         boolean removed = false;
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
@@ -298,7 +391,7 @@ public class Executor {
                                 for (AuthParam authParam1: authParamList) {
                                     ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
                                 }
-                                
+
                                 return ret;
                             }
                         }
@@ -307,7 +400,7 @@ public class Executor {
                     return new ExecutorSingleOperationResp(true, "Unable to match request headers " + key);
                 } else {
                     return Operations.modifyHeader(rawApi, keyStr, valStr);
-                }            
+                }
             case "delete_header":
                 return Operations.deleteHeader(rawApi, key.toString());
             case "add_query_param":
@@ -344,7 +437,7 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, "header key not present");
                 }
             case "replace_auth_header":
-                removeCustomAuth(rawApi);
+                RawApi copy = rawApi.copy();
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
                 if (authHeaders == null) {
@@ -358,20 +451,61 @@ public class Executor {
                 } else {
                     authHeader = authHeaders.get(0);
                 }
-
+                boolean modifiedAtLeastOne = false;
                 String authVal;
+
+                // value of replace_auth_header can be
+                //  1. boolean -> Then we only care about hardcoded auth params (handled in the else part)
+                //  2. auth_context
+                //      a. For hardcoded auth mechanism
+                //      b. For custom auths (header and body params)
+
                 if (VariableResolver.isAuthContext(key)) {
+                    // resolve context for auth mechanism keys
                     authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), authHeader);
+                    if (authVal != null) {
+                        ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal);
+                        modifiedAtLeastOne = modifiedAtLeastOne || authMechanismContextResult.getSuccess();
+                    }
+
+                    List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+                    for (CustomAuthType customAuthType : customAuthTypes) {
+                        // resolve context for custom auth header keys
+                        List<String> customAuthHeaderKeys = customAuthType.getHeaderKeys();
+                        for (String customAuthHeaderKey: customAuthHeaderKeys) {
+                            authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), customAuthHeaderKey);
+                            if (authVal == null) continue;
+                            ExecutorSingleOperationResp customAuthContextResult = Operations.modifyHeader(rawApi, customAuthHeaderKey, authVal);
+                            modifiedAtLeastOne = modifiedAtLeastOne || customAuthContextResult.getSuccess();
+                        }
+
+                        // resolve context for custom auth body params
+                        List<String> customAuthPayloadKeys = customAuthType.getPayloadKeys();
+                        for (String customAuthPayloadKey: customAuthPayloadKeys) {
+                            authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), customAuthPayloadKey);
+                            if (authVal == null) continue;
+                            ExecutorSingleOperationResp customAuthContextResult = Operations.modifyBodyParam(rawApi, customAuthPayloadKey, authVal);
+                            modifiedAtLeastOne = modifiedAtLeastOne || customAuthContextResult.getSuccess();
+                        }
+                    }
+
                 } else {
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
                     authVal = authMechanism.getAuthParams().get(0).getValue();
+                    ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authHeader, authVal);
+                    modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
                 }
-                if (authVal == null) {
-                    return new ExecutorSingleOperationResp(false, "auth value missing");
+
+                // once all the replacement has been done.. .remove all the auth keys that were not impacted by the change by comparing it with initial request
+                removeAuthIfNotChanged(copy,rawApi, authHeader);
+
+                if (modifiedAtLeastOne) {
+                    return new ExecutorSingleOperationResp(true, "");
+                } else {
+                    return new ExecutorSingleOperationResp(false, "Couldn't find token");
                 }
-                return Operations.modifyHeader(rawApi, authHeader, authVal);
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
 
