@@ -62,6 +62,8 @@ function Dashboard() {
             }
         }else if(path.includes('observe/sensitive')){
             setIsGptActive(true)
+            const activePrompts = dashboardFunc.getPrompts({key: "DATA_TYPES"})
+            setPrompts(activePrompts)
         }
     }
 
