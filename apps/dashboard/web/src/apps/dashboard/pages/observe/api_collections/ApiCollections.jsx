@@ -105,10 +105,10 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
     }
 
-    const promotedBulkActions = [
+    const promotedBulkActions = (selectedResources) => [
         {
           content: 'Remove collections',
-          onAction: (collectionIdList) => handleRemoveCollections(collectionIdList)
+          onAction: () => handleRemoveCollections(selectedResources)
         },
       ];
 
@@ -161,7 +161,7 @@ function ApiCollections() {
                 disambiguateLabel={()=>{}} 
                 headers={headers}
                 selectable={true}
-                // promotedBulkActions={promotedBulkActions}
+                promotedBulkActions={promotedBulkActions}
                 />)
             ]}
         />
