@@ -206,8 +206,8 @@ public class VariableResolver {
             }
             finalValue.add(modifiedHeaderVal);
         }
-        
-        return String.join( " ", finalValue);
+
+        return finalValue.isEmpty() ? null : String.join( " ", finalValue);
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
