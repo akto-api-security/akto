@@ -204,7 +204,7 @@ const handleRedirect = () => {
             {`Endpoints with ${subType}` }
           </Text>
         }
-        primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
+        primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
         components = {[
             <GithubServerTable
                 key="table"

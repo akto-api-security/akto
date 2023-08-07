@@ -63,22 +63,22 @@ function LoginForm({ step, setSteps }) {
             <div style={{ display: "grid", gridTemplateColumns: "40% 60%" }}>
                 <div style={{ maxWidth: "90%" }}>
                     <div style={{ paddingRight: "20px" }}>
-                        <TextField label="URL" value={step.url} requiredIndicator onChange={(url) => updateForm("url", url)} />
+                        <TextField id={"url"} label="URL" value={step.url} requiredIndicator onChange={(url) => updateForm("url", url)} />
                         <br />
-                        <TextField label="Query Params" value={step.queryParams} onChange={(queryParams) => updateForm("queryParams", queryParams)} />
+                        <TextField id={"query-params"} label="Query Params" value={step.queryParams} onChange={(queryParams) => updateForm("queryParams", queryParams)} />
                         <br />
-                        <TextField label="Method" value={step.method} requiredIndicator onChange={(method) => updateForm("method", method)} />
+                        <TextField id={"method"} label="Method" value={step.method} requiredIndicator onChange={(method) => updateForm("method", method)} />
                         <br />
-                        <TextField label="Headers" value={step.headers} onChange={(headers) => updateForm("headers", headers)} />
+                        <TextField id={"headers"} label="Headers" value={step.headers} onChange={(headers) => updateForm("headers", headers)} />
                         <br />
-                        <TextField label="Body" value={step.body} onChange={(body) => updateForm("body", body)} />
+                        <TextField id={"body"} label="Body" value={step.body} onChange={(body) => updateForm("body", body)} />
                     </div>
                 </div>
 
                 <LegacyCard subdued>
                     <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px", alignItems: "center", padding: "20px" }}>
                         <Text variant="headingMd">Test Response</Text>
-                        <Button onClick={handleLoginFlowTest} disabled={testDisable}>Test</Button>
+                        <Button id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</Button>
                     </div>
                     {step.testResponse ?
                         <div>

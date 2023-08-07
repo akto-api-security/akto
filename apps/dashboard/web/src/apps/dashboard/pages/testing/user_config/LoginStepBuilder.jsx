@@ -150,7 +150,7 @@ function LoginStepBuilder() {
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
                             <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
-                            <Button primary onClick={handleAddStep}>Add step</Button>
+                            <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
                         </div>
 
                         <Divider />
@@ -159,6 +159,7 @@ function LoginStepBuilder() {
                             <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
                                 <Text>Select step type:</Text>
                                 <DropdownSearch
+                                    id={"select-step-type-menu"}
                                     placeholder="Select step type"
                                     optionsList={stepOptions}
                                     setSelected={handleStepTypeChange}
@@ -171,7 +172,7 @@ function LoginStepBuilder() {
                                 {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
                                 {steps[selectedStep].type === "OTP_VERIFICATION" && <OtpVerification step={steps[selectedStep]} setSteps={setSteps}/>}
                                 <br />
-                                <Button destructive onClick={handleRemoveStep}>Remove step</Button>
+                                <Button id={"remove-step-button"} destructive onClick={handleRemoveStep}>Remove step</Button>
                             </div>
                         </LegacyCard.Section>
 
@@ -180,7 +181,7 @@ function LoginStepBuilder() {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    <Button primary onClick={handleSave}>Save changes</Button>
+                    <Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>
 
                 </div>
             }

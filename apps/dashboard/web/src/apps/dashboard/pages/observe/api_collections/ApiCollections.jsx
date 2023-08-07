@@ -121,7 +121,7 @@ function ApiCollections() {
             }
         </Text>
             }
-            primaryAction={<Button secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            primaryAction={<Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
             components={[
                
@@ -132,6 +132,7 @@ function ApiCollections() {
                     onClose={() => setActive(false)}
                     title="New collection"
                     primaryAction={{
+                    id:"create-new-collection",
                     content: 'Create',
                     onAction: createNewCollection,
                     }}
@@ -139,6 +140,7 @@ function ApiCollections() {
                     <Modal.Section>
 
                     <TextField
+                        id={"new-collection-input"}
                         label="Enter name for the new collection"
                         value={newCollectionName}
                         onChange={handleNewCollectionNameChange}

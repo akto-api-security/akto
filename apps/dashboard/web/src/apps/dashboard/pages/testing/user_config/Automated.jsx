@@ -41,6 +41,7 @@ function Automated() {
             <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center"}}>
                 <Text>Select automation type:</Text>
                 <DropdownSearch
+                    id={"select-automation-type"}
                     placeholder="Select automation type"
                     optionsList={automationOptions}
                     setSelected={(type) => setAutomationType(type)}

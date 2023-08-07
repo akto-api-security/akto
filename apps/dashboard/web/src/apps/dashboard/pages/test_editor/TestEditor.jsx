@@ -62,7 +62,7 @@ const TestEditor = () => {
 
         <Frame topBar={
             <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto", alignItems: "center", gap: "5px", height: "7vh", padding: "10px", background: "#ffffff" }}>
-                <Button icon={ExitMajor} plain onClick={handleExit} />
+                <Button id={"test-editor-exit-button"} icon={ExitMajor} plain onClick={handleExit} />
                 <Text variant="headingLg">
                     Test Editor
                 </Text>
@@ -70,7 +70,7 @@ const TestEditor = () => {
                     Beta
                 </Badge>
                 <div style={{ textAlign: "right" }}>
-                    <Button>
+                    <Button id={"create-custom-test"}>
                         Create custom test
                     </Button>
                 </div>

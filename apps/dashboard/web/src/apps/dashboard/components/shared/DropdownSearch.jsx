@@ -2,7 +2,11 @@ import { Autocomplete, Avatar, Icon, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
-function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName}) {
+function DropdownSearch(props) {
+
+    const id = props.id ? props.id : "dropdown-search"
+
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -99,6 +103,7 @@ function DropdownSearch({ disabled, label, placeholder, optionsList, setSelected
 
     const textField = (
         <Autocomplete.TextField
+            id={id}
             disabled={disabled}
             onChange={updateText}
             label={label}
