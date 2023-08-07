@@ -5,6 +5,8 @@ import {DeleteMinor} from "@shopify/polaris-icons"
 
 function ConditionsPicker(props) {
 
+    const id = props.id ? props.id : "condition"
+
     const {title, param, items, initialItems, conditionOp, fetchChanges, setChange} = props
     const [condition, setCondition] = useState('')
     const [textFields, setTextFields] = useState([]);
@@ -94,7 +96,7 @@ function ConditionsPicker(props) {
 
     const prefixLeft= (index) =>(
         <ButtonGroup>
-            {index > 0 ? (<Dropdown menuItems={getConditions(textFields[index])} initial={condition} selected={handleConditionSelected}/>) : null}
+            {index > 0 ? (<Dropdown id={`${id}-menu-${index}`} menuItems={getConditions(textFields[index])} initial={condition} selected={handleConditionSelected}/>) : null}
             <TextField value={param} />
             <Dropdown menuItems={items} initial={textFields[index].type} selected={(val) => handleRegexSelected(val,index)}/>
         </ButtonGroup>
@@ -103,8 +105,9 @@ function ConditionsPicker(props) {
     const textFieldsComponent = (
         <VerticalStack gap="4">
             {textFields.length > 0 && textFields.map((field,index)=> (
-                <TextField connectedLeft={prefixLeft(index)} connectedRight={<Button icon={DeleteMinor} onClick={() => handleDelete(index)} />} 
+                <TextField connectedLeft={prefixLeft(index)} connectedRight={<Button id={`${id}-delete-button-${index}`} icon={DeleteMinor} onClick={() => handleDelete(index)} />} 
                             value={field.value}
+                            id={`${id}-param-text-${index}`}
                             onChange={(newValue) => handleChange(newValue, index)}
                             key={index}
                 />
@@ -116,7 +119,7 @@ function ConditionsPicker(props) {
         <LegacyCard.Section title={title}>
             {textFieldsComponent}
             <br/>
-            <Button onClick={handleAddTextField}>Add condition</Button>
+            <Button id={`${id}-add-condition`} onClick={handleAddTextField}>Add condition</Button>
         </LegacyCard.Section>
     )
 }

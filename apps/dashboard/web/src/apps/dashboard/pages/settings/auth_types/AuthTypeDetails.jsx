@@ -10,6 +10,7 @@ import DetailsPage from "../../../components/DetailsPage";
 
 const selectOptions = [
     {
+        id:"EQUALS_TO",
         label: 'equals to',
         value: 'EQUALS_TO',
         operators: [
@@ -23,10 +24,12 @@ const selectOptions = [
 
 const activeItems = [
     {
+      id:"True",
       label: "True",
       value: "True",
     },
     {
+      id:"False",
       label: "False",
       value: "False",
     }
@@ -71,11 +74,12 @@ function AuthTypeDetails() {
             <LegacyCard.Section>
                 <HorizontalGrid gap="4" columns={2}>
                     <TextField
+                        id={"name-field"} 
                         label="Name" value={currState.name}
                         placeholder='New auth type name' onChange={(val) => { isNew ? handleChange({ name: val }) : {} }}
                     />
                     {isNew ? null :
-                    <Dropdown menuItems={activeItems} placeHolder={"Auth type active status"}
+                    <Dropdown id={"active-dropdown"} menuItems={activeItems} placeHolder={"Auth type active status"}
                     selected={(val) => { handleChange({ active: val }) }} initial={initialState.active} label= "Active" /> } 
                 </HorizontalGrid>
             </LegacyCard.Section>
@@ -85,6 +89,7 @@ function AuthTypeDetails() {
     const conditionsCard = (
         <LegacyCard title="Details" key="condition">
             <ConditionsPicker 
+              id={"header"}
               title="Header keys" 
               param = "key" 
               initialItems={currState.headerConditions || []} 
@@ -99,6 +104,7 @@ function AuthTypeDetails() {
               <div style={{ flexGrow: 1, borderBottom: '1px solid #ccc' }}></div>
             </div>
             <ConditionsPicker 
+              id={"payload"}
               title="Payload keys" 
               param = "key" 
               initialItems={currState.payloadConditions || []} 

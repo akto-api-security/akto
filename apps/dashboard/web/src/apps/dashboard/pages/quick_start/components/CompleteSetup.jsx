@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import Store from '../../../store'
 import BannerComponent from './shared/BannerComponent'
 import { Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
-import quickStartFunc from '../tranform'
+import quickStartFunc from '../transform'
 import api from '../api'
 import NoAccessComponent from './shared/NoAccessComponent'
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"

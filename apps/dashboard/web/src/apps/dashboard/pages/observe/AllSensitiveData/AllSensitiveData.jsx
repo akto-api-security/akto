@@ -140,7 +140,7 @@ function AllSensitiveData() {
             }
         </Text>
             }
-            primaryAction={<Button primary onClick={handleRedirect}>Create custom data types</Button>}
+            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
             isFirstPage={true}
             components={[
                 <GithubSimpleTable

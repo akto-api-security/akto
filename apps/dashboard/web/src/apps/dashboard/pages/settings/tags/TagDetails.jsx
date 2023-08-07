@@ -10,22 +10,27 @@ import DetailsPage from "../../../components/DetailsPage";
 
 const selectOptions = [
     {
+        id:"EQUALS_TO",
         label: 'Equals to',
         value: 'EQUALS_TO'
     },
     {
+        id:"REGEX",
         label: 'Matches regex',
         value: 'REGEX'
     },
     {
+        id:"STARTS_WITH",
         label: 'Starts with',
         value: 'STARTS_WITH'
     },
     {
+        id:"ENDS_WITH",
         label: 'Ends with',
         value: 'ENDS_WITH'
     },
     {
+        id:"IS_NUMBER",
         label: 'Is number',
         value: 'IS_NUMBER'
     }
@@ -33,10 +38,12 @@ const selectOptions = [
 
 const activeItems = [
     {
+        id:"True",
         label: "True",
         value: "True",
     },
     {
+        id:"False",
         label: "False",
         value: "False",
     }
@@ -83,6 +90,7 @@ function TagDetails() {
             <LegacyCard.Section>
                 <HorizontalGrid gap="4" columns={2}>
                     <TextField
+                        id={"name-field"} 
                         label="Name" value={currState.name}
                         placeholder='New tag name' onChange={(val) => { isNew ? handleChange({ name: val }) : {} }}
                     />
@@ -97,6 +105,7 @@ function TagDetails() {
     const conditionsCard = (
         <LegacyCard title="Details" key="condition">
             <ConditionsPicker
+                id={"url"} 
                 title="URL conditions"
                 param="param_name"
                 initialItems={currState.keyConditions || []}

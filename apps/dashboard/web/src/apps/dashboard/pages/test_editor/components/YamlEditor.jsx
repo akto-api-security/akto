@@ -132,12 +132,12 @@ const YamlEditor = ({ fetchAllTests }) => {
                     </Tooltip>       
                 </div>
                 <div style={{ textAlign: "right"}}>
-                    <Button disabled={!isEdited} onClick={handleSave}>Save</Button>
+                    <Button id={"save-button"} disabled={!isEdited} onClick={handleSave}>Save</Button>
                 </div>
             </div>
 
             <Divider />
-            <Box ref={yamlEditorRef} minHeight="80vh">
+            <Box id={"yaml-editor"} ref={yamlEditorRef} minHeight="80vh">
             </Box>
         </div>
     )

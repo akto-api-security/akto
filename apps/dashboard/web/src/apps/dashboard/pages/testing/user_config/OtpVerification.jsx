@@ -68,6 +68,7 @@ function OtpVerification({ step, setSteps }) {
                 title="Receive OTP"
                 padding='10px'
                 primaryAction={{
+                    id: "zapier-setup-button",
                     content: 'Zapier setup done',
                     onAction: pollOtpResponse,
                 }}
@@ -79,7 +80,7 @@ function OtpVerification({ step, setSteps }) {
                 <Text variant="bodyMd">Step 4: Verify the extracted OTP value and click on "SAVE"</Text>
 
                 <br />
-                <TextField label="Regex to extract OTP" value={step.regex} onChange={(regex) => updateRegex(regex)} />
+                <TextField id={"regex-input-field"} label="Regex to extract OTP" value={step.regex} onChange={(regex) => updateRegex(regex)} />
 
                 {showVerify &&
                     <Card>
