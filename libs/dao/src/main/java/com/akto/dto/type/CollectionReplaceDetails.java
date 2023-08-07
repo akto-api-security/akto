@@ -3,14 +3,15 @@ package com.akto.dto.type;
 public class CollectionReplaceDetails {
     String regex;
     String newName;
-
+    String headerName;
 
     public CollectionReplaceDetails() {
     }
 
-    public CollectionReplaceDetails(String regex, String newName) {
+    public CollectionReplaceDetails(String regex, String newName, String headerName) {
         this.regex = regex;
         this.newName = newName;
+        this.headerName = headerName;
     }
 
     public String getRegex() {
@@ -27,5 +28,13 @@ public class CollectionReplaceDetails {
 
     public void setNewName(String newName) {
         this.newName = newName;
+    }
+
+    public String getHeaderName() {
+        return this.headerName;
+    }
+
+    public void setHeaderName(String headerName) {
+        this.headerName = headerName;
     }
 }

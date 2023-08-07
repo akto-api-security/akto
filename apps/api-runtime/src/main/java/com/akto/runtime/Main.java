@@ -411,24 +411,27 @@ public class Main {
                 accWiseResponse = accWiseResponseFiltered;
             }
 
-            Map<Pattern, String> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
             if (apiCollectioNameMapper != null && !apiCollectioNameMapper.isEmpty()) {
                 for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
                     Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
-                    for(Map.Entry<Pattern, String> apiCollectioNameOrigXNew : apiCollectioNameMapper.entrySet()) {
-                        List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get("host");
+                    for(String headerName : apiCollectioNameMapper.keySet()) {
+                        List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get(headerName);
                         if (reqHeaderValues != null && !reqHeaderValues.isEmpty()) {
-                            for (int i = 0; i < reqHeaderValues.size(); i++) {
-                                String reqHeaderValue = reqHeaderValues.get(i);
-                                Pattern regex = apiCollectioNameOrigXNew.getKey();
-                                String newValue = apiCollectioNameOrigXNew.getValue();
+                            Map<Pattern, String> apiCollectioNameForGivenHeader = apiCollectioNameMapper.get(headerName);            
+                            for (Map.Entry<Pattern,String> apiCollectioNameOrigXNew: apiCollectioNameForGivenHeader.entrySet()) {
+                                for (int i = 0; i < reqHeaderValues.size(); i++) {
+                                    String reqHeaderValue = reqHeaderValues.get(i);
+                                    Pattern regex = apiCollectioNameOrigXNew.getKey();
+                                    String newValue = apiCollectioNameOrigXNew.getValue();
 
-                                try {
-                                    if (regex.matcher(reqHeaderValue).matches()) {
-                                        reqHeaderValues.set(i, newValue);
+                                    try {
+                                        if (regex.matcher(reqHeaderValue).matches()) {
+                                            reqHeaders.put("host", Collections.singletonList(newValue));
+                                        }
+                                    } catch (Exception e) {
+                                        // eat it
                                     }
-                                } catch (Exception e) {
-                                    // eat it
                                 }
                             }
                         }

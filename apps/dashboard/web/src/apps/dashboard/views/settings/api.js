@@ -252,13 +252,14 @@ export default {
         })
     },
 
-    addApiCollectionNameMapper(regex, newName) {
+    addApiCollectionNameMapper(regex, newName, headerName) {
         return request ({
             url: '/api/addApiCollectionNameMapper',
             method: 'post',
             data: {
                 regex, 
-                newName
+                newName,
+                headerName
             }
         })
     },
