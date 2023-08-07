@@ -21,6 +21,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
 
 import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
+import static com.akto.test_editor.Utils.bodyValuesUnchanged;
+import static com.akto.test_editor.Utils.headerValuesUnchanged;
 
 public class Executor {
 
@@ -232,57 +234,6 @@ public class Executor {
         }
     }
 
-    private static Set<String> headerValuesUnchanged(Map<String, List<String>> originalRequestHeaders, Map<String, List<String>> testRequestHeaders) {
-        Set<String> diff = new HashSet<>();
-        if (originalRequestHeaders == null) return diff;
-        for (String key: testRequestHeaders.keySet()) {
-            List<String> originalHeaderValues = originalRequestHeaders.get(key);
-            List<String> testHeaderValues = testRequestHeaders.get(key);
-            if (originalHeaderValues == null || testHeaderValues == null) continue;
-            if (areListsEqual(originalHeaderValues, testHeaderValues)) {
-                diff.add(key);
-            }
-        }
-
-        return diff;
-    }
-
-    public static boolean areListsEqual(List<String> list1, List<String> list2) {
-        if (list1.size() != list2.size()) {
-            return false;
-        }
-
-        List<String> copyOfList1 = new ArrayList<>(list1);
-        List<String> copyOfList2 = new ArrayList<>(list2);
-
-        Collections.sort(copyOfList1);
-        Collections.sort(copyOfList2);
-
-        return copyOfList1.equals(copyOfList2);
-    }
-
-    private static Set<String> bodyValuesUnchanged(String originalPayload, String testPayload) {
-        Set<String> diff = new HashSet<>();
-
-        Map<String, Set<String>> originalRequestParamMap = new HashMap<>();
-        Map<String, Set<String>> testRequestParamMap= new HashMap<>();
-        try {
-            extractAllValuesFromPayload(originalPayload, originalRequestParamMap);
-            extractAllValuesFromPayload(testPayload, testRequestParamMap);
-        } catch (Exception e) {
-        }
-
-        for (String key: testRequestParamMap.keySet()) {
-            Set<String> testValues = testRequestParamMap.get(key);
-            Set<String> originalValues = originalRequestParamMap.get(key);
-            if (testValues == null) continue;
-            String[] keySplit = key.split("\\.");
-            String finalKey = keySplit[keySplit.length - 1];
-            if (testValues.equals(originalValues)) diff.add(finalKey); // todo: check null
-        }
-
-        return diff;
-    }
 
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey) {
         boolean removed = false;
