@@ -178,7 +178,6 @@ function ApiEndpoints() {
     const params = useParams()
     const apiCollectionId = params.apiCollectionId
 
-    const allCollections = Store(state => state.allCollections)
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
 
@@ -192,6 +191,7 @@ function ApiEndpoints() {
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
 
+    const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
 
     async function fetchData() {
@@ -249,8 +249,6 @@ function ApiEndpoints() {
     const getFilteredItems = (filteredItems) => {
         setFilteredEndpoints(filteredItems)
     }
-
-    console.log(setFilteredEndpoints)
 
     const tabStrings = [
         'All',
@@ -395,9 +393,6 @@ function ApiEndpoints() {
                     }
                 </Text>
             }
-            // primaryAction={
-            //     <RunTest />
-            // }
             secondaryActions={
                 <ButtonGroup>
                     <Tooltip content="Refresh">
@@ -421,7 +416,11 @@ function ApiEndpoints() {
                         tooltipText="Upload traffic(.har)" 
                         label="Upload traffic"
                         primary={false}/>
-                    <RunTest />
+                    <RunTest 
+                        apiCollectionId={apiCollectionId}
+                        endpoints={filteredEndpoints}
+                        filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                    />
                 </ButtonGroup>
             }
             components={[
