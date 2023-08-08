@@ -1,12 +1,13 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, FormLayout, Label, Link, Badge } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, FormLayout, Label, Link, Badge, Banner } from "@shopify/polaris";
 import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
 import { useCallback, useEffect, useRef, useState } from "react";
-import api, { default as observeApi } from "../api";
+import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import homeFunctions from "../../home/module";
+import { useNavigate } from "react-router-dom"
 
 function RunTest({ endpoints, filtered, apiCollectionId }) {
 
@@ -23,8 +24,11 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
         testRunTimeLabel: "Till complete",
         maxConcurrentRequests: -1,
         maxConcurrentRequestsLabel: "Default ",
-        testName: ""
+        testName: "",
+        authMechanismPresent: false
     }
+
+    const navigate = useNavigate()
 
     const [testRun, setTestRun] = useState({
         ...initialState
@@ -61,7 +65,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                 arr[index]["selected"] = selectedTests.includes(test.value)
             })
         })
-        
+
         const apiCollections = await homeFunctions.getAllCollections()
         const apiCollection = apiCollections.find(collection => collection.id === parseInt(apiCollectionId))
         const apiCollectionName = apiCollection ? apiCollection.displayName : ""
@@ -69,12 +73,19 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
         const convertToLowerCaseWithUnderscores = (inputString) => inputString.toLowerCase().replace(/\s+/g, '_')
         const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(processMapCategoryToSubcategory).join("_")
 
+        //Auth Mechanism
+        let authMechanismPresent = false
+        const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
+        if (authMechanismDataResponse.authMechanism)
+            authMechanismPresent = true
+
         setTestRun(prev => ({
             ...prev,
             categories: categories,
             tests: processMapCategoryToSubcategory,
             selectedCategory: Object.keys(processMapCategoryToSubcategory)[0],
-            testName: testName
+            testName: testName,
+            authMechanismPresent: authMechanismPresent
         }))
 
         setLoading(false)
@@ -185,28 +196,22 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
     }
 
     const hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    //use set hour when setting the data or storing the timestamp
-    function setHour(label, hour) {
-        let dayStart = +func.dayStart(+new Date());
-        this.startTimestamp = parseInt(dayStart / 1000) + hour * 60 * 60
-        this.label = label
-    }
+
     const amTimes = hours.map(hour => {
         let hourStr = hour + (hour == 12 ? " noon" : " am")
-        //return { label: time, click: () => this.setHour(label, x) }
         return { label: hourStr, value: hour.toString() }
     })
     const pmTimes = hours.map(hour => {
         let hourStr = hour + (hour == 12 ? " midnight" : " pm")
         return { label: hourStr, value: `${hour + 12}` }
     })
-    
-    const hourlyTimes = [{ label: "Now", value: "Now" }, ...amTimes, ...pmTimes ]
+
+    const hourlyTimes = [{ label: "Now", value: "Now" }, ...amTimes, ...pmTimes]
 
     const runTimeMinutes = hours.reduce((abc, x) => {
         if (x < 6) {
             let label = x * 10 + " minutes"
-            abc.push({ label, value:`${x * 10 * 60}` })
+            abc.push({ label, value: `${x * 10 * 60}` })
         }
         return abc
     }, [])
@@ -220,7 +225,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
     }, [])
 
     const testRunTimeOptions = [{ label: "Till complete", value: "Till complete" }, ...runTimeMinutes, ...runTimeHours]
-    
+
     const maxRequests = hours.reduce((abc, x) => {
         if (x < 11) {
             let label = x * 10
@@ -252,7 +257,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
             const tests = { ...testRun.tests }
             Object.keys(tests).forEach(category => {
                 tests[category] = tests[category].map(test => ({ ...test, selected: false }))
-            }) 
+            })
 
             return { ...prev, tests: tests }
         })
@@ -264,7 +269,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
             .filter(category => {
                 let selectedCount = 0
                 category[1].forEach(test => {
-                    if (test.selected)  selectedCount += 1
+                    if (test.selected) selectedCount += 1
                 })
 
                 return selectedCount > 0
@@ -276,28 +281,33 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
         const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl } = testRun
         const collectionId = parseInt(apiCollectionId)
 
-        const tests = testRun.tests 
+        const tests = testRun.tests
         const selectedTests = []
 
         Object.keys(tests).forEach(category => {
             tests[category].forEach(test => {
                 if (test.selected) selectedTests.push(test.value)
             })
-        }) 
-        
+        })
+
         const apiInfoKeyList = endpoints.map(endpoint => ({
             apiCollectionId: endpoint.apiCollectionId,
             method: endpoint.method,
             url: endpoint.endpoint
         }))
-        
+
         if (filtered) {
-            await api.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests,  testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI")
         } else {
-            await api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI")
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl)
         }
 
         func.setToast(true, false, "Test run created successfully")
+    }
+
+    function getLabel(objList, value) {
+        const obj = objList.find(obj => obj.value === value)
+        return obj
     }
 
     return (
@@ -311,12 +321,40 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                 primaryAction={{
                     content: scheduleString(),
                     onAction: handleRun,
+                    disabled: !testRun.authMechanismPresent
                 }}
                 large
             >
                 {loading ? <SpinnerCentered /> :
                     <Modal.Section>
-                        <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px"}}>
+                        {!testRun.authMechanismPresent &&
+                            <div>
+                                <Banner
+                                    title="Authentication mechanism not configured"
+                                    action={
+                                        {
+                                            content: 'Configure authentication mechanism',
+                                            onAction: () => navigate("/dashboard/testing/user_config")
+                                        }}
+                                    status="critical"
+                                >
+
+                                    <Text variant="bodyMd">
+                                        Running specialized tests like Broken Object Level Authorization,
+                                        Broken User Authentication etc, require an additional attacker
+                                        authorization token. Hence before triggering Akto tests on your apis,
+                                        you may need to specify an authorization token which can be treated as
+                                        attacker token during test run. Attacker Token can be specified
+                                        manually, as well as in automated manner. We provide multiple ways to
+                                        automate Attacker token generation.
+                                    </Text>
+                                </Banner>
+                                <br />
+                            </div>
+                        }
+
+
+                        <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px" }}>
                             <Text variant="headingMd">Name:</Text>
                             <div style={{ maxWidth: "75%" }}>
                                 <TextField
@@ -325,7 +363,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                                     onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                                 />
                             </div>
-                           
+
                             <Button icon={CancelMajor} destructive onClick={handleRemoveAll}>Remove All</Button>
                         </div>
 
@@ -344,6 +382,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                                         ]}
                                         headings={[]}
                                         rows={categoryRows}
+                                        increasedTableDensity
                                     />
                                 </div>
                             </div>
@@ -360,6 +399,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                                         headings={[]}
                                         rows={testRows}
                                         hoverable={false}
+                                        increasedTableDensity
                                     />
                                 </div>
                             </div>
@@ -371,25 +411,26 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                             <Text>Select time:</Text>
                             <Dropdown
                                 menuItems={hourlyTimes}
-                                initial=""
+                                initial={testRun.hourlyLabel}
                                 selected={(hour) => {
                                     let startTimestamp
-                                    
+
                                     if (hour === "Now") startTimestamp = func.timeNow()
                                     else {
                                         const dayStart = +func.dayStart(+new Date());
                                         startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60
                                     }
 
-                                    const hourlyTime = hourlyTimes.find(hourlyTime => hourlyTime.value === hour)
-                                    setTestRun(prev => ({ 
-                                        ...prev, 
-                                        startTimestamp, 
-                                        hourlyLabel: hourlyTime ? hourlyTime.label : ""}))
-                                }}/>
+                                    const hourlyTime = getLabel(hourlyTimes, hour)
+                                    setTestRun(prev => ({
+                                        ...prev,
+                                        startTimestamp,
+                                        hourlyLabel: hourlyTime ? hourlyTime.label : ""
+                                    }))
+                                }} />
                         </ButtonGroup>
                         <br />
-                        
+
                         <ButtonGroup>
                             <Checkbox
                                 label="Run daily"
@@ -415,29 +456,41 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
                             <Text>Test run time:</Text>
                             <Dropdown
                                 menuItems={testRunTimeOptions}
-                                initial=""
+                                initial={testRun.testRunTimeLabel}
                                 selected={(timeInSeconds) => {
                                     let testRunTime
                                     if (timeInSeconds === "Till complete") testRunTime = -1
                                     else testRunTime = timeInSeconds
-                                
-                                    setTestRun(prev => ({ ...prev, testRunTime}))
-                                }}/>
+
+                                    const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
+
+                                    setTestRun(prev => ({
+                                        ...prev,
+                                        testRunTime: testRunTime,
+                                        testRunTimeLabel: testRunTimeOption.label
+                                    }))
+                                }} />
                         </ButtonGroup>
-                        
+
                         <br />
                         <ButtonGroup>
                             <Text>Max concurrent requests:</Text>
                             <Dropdown
                                 menuItems={maxConcurrentRequestsOptions}
-                                initial=""
+                                initial={testRun.maxConcurrentRequests}
                                 selected={(requests) => {
                                     let maxConcurrentRequests
                                     if (requests === "Default") maxConcurrentRequests = -1
                                     else maxConcurrentRequests = requests
-                                
-                                    setTestRun(prev => ({ ...prev, maxConcurrentRequests }))
-                                }}/>
+
+                                    const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
+
+                                    setTestRun(prev => ({
+                                        ...prev,
+                                        maxConcurrentRequests: maxConcurrentRequests,
+                                        maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
+                                    }))
+                                }} />
                         </ButtonGroup>
 
 
