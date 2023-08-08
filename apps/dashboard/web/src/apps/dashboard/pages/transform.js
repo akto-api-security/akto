@@ -68,9 +68,11 @@ const dashboardFunc = {
 
     parseMsg: function(jsonStr) {
         let json = JSON.parse(jsonStr)
+        let reqStr = json.requestPayload.length > 0 ? json.requestPayload : "{}"
+        let resStr = json.responsePayload.length > 0 ? json.responsePayload : "{}"
         return {
-            request: JSON.parse(json.requestPayload),
-            response: JSON.parse(json.responsePayload)
+            request: JSON.parse(reqStr),
+            response: JSON.parse(resStr)
         }
     },
 
@@ -130,7 +132,25 @@ const dashboardFunc = {
                 callback: (data) => console.log("callback create api groups", data)
             }
         ]
-        return parameterPrompts
+
+        let tempArr = parameterPrompts
+        if(jsonStr?.length === 0){
+            tempArr.slice(1)
+            return tempArr
+        }
+
+        let json = JSON.parse(jsonStr)
+        let type = ""
+        let payload = ""
+
+        if(json.contentType){type = json.contentType.toString()}
+        if(json.requestPayload){payload = json.responsePayload.toString()}
+
+        const pattern = /^\{.*\}$/;
+        if(!(type.indexOf('application/json') !== -1 ||  pattern.test(payload))){
+            tempArr = tempArr.slice(1)
+        }
+        return tempArr
     },
 
     getPrompts: function(requestObj) {

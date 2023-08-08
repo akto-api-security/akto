@@ -21,7 +21,9 @@ function ApiDetails(props) {
         await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
             if (res.sampleDataList.length > 0) {
                 setSampleData(res.sampleDataList[0].samples.map((sample) => ({ message: sample, highlightPaths: [] })))
-                setSamples(res.sampleDataList[0].samples)
+                setSamples(res.sampleDataList[0].samples[0])
+            }else{
+                setSamples("")
             }
         })
 

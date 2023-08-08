@@ -761,6 +761,75 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
       return collection.displayName
     else 
       return ""
+ },
+
+ getResponse(resp, queryType){
+    const responses = resp?.responses
+    if(!responses || responses.length === 0){
+      return{
+        message: " Sorry couldn't find any response with your prompt.Please try again."
+      }
+    }
+
+    else{
+      if(queryType === "generate_curl_for_test"){
+        if(responses[0] && responses[0].curl && responses[0].curl.includes('-H')){
+          return{
+            message: "handle code left"
+          }
+        }else{
+          const message = responses[0].error ? responses[0].error : `It seems that this API is not vulnerable to ${responses[0].test_type.toUpperCase()} vulnerability.`
+          return{
+            message: message
+          }
+        }
+      }
+
+      else if(queryType === "suggest_tests"){
+        if(responses[0].tests){
+          let arr = []
+          responses.tests.forEach((item) => {
+            if(responses.test_details[item]){
+              arr.push(responses.test_details[item])
+            }
+          })
+
+          if(arr.length === 0){
+            return {
+              message: "No tests available for the api."
+            }
+          }else{
+            return{
+              title: "This api is vulnerable to the following vulnerabilities:",
+              items: arr
+            }
+          }
+        }else{
+          return{
+            message: responses[0].error
+          }
+        }
+      }
+
+      else if(queryType === "generate_regex"){
+        if(responses[0] && responses[0].regex){
+          return{
+            message: "handle code"
+          }
+        }else{
+          return{
+            message: responses[0].error
+          }
+        }
+      }
+
+      else{
+        return {
+          responses: responses
+        }
+      }
+
+    }
  }
 }
 
