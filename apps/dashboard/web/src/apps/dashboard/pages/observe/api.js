@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 import request from "../../../../util/request"
 
 

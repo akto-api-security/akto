@@ -775,7 +775,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
       if(queryType === "generate_curl_for_test"){
         if(responses[0] && responses[0].curl && responses[0].curl.includes('-H')){
           return{
-            message: "handle code left"
+            message: responses[0].curl.trim()
           }
         }else{
           const message = responses[0].error ? responses[0].error : `It seems that this API is not vulnerable to ${responses[0].test_type.toUpperCase()} vulnerability.`
@@ -799,9 +799,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
               message: "No tests available for the api."
             }
           }else{
+            let tests = [{functionality: "This api is vulnerable to the following vulnerabilities", apis: arr}]
             return{
-              title: "This api is vulnerable to the following vulnerabilities:",
-              items: arr
+              responses: tests
             }
           }
         }else{
@@ -814,7 +814,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
       else if(queryType === "generate_regex"){
         if(responses[0] && responses[0].regex){
           return{
-            message: "handle code"
+            message: responses[0].regex
           }
         }else{
           return{

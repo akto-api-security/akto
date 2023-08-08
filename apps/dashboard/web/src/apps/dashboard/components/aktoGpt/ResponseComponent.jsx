@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import BotResponse from './BotResponse'
 import { VerticalStack } from '@shopify/polaris'
 
-function ResponseComponent({response,chatLogRef}) {
+function ResponseComponent({response,chatLogRef,onCompletion}) {
 
     const [currentResponseIndex, setCurrentResponseIndex] = useState(-1);
     const [currentItemIndex, setCurrentItemIndex] = useState(0)
@@ -20,40 +20,46 @@ function ResponseComponent({response,chatLogRef}) {
                 setCurrentResponseIndex(-1)
                 setCurrentItemIndex(currentItemIndex + 1)
             }
+        }else{
+            onCompletion()
         }
-        pre.current = [...pre.current, component(response?.responses, currentItemIndex, currentResponseIndex, chatLogRef, ()=>{})]
+        pre.current = [...pre.current, component(response?.responses, currentItemIndex, currentResponseIndex, chatLogRef, ()=>{},onCompletion)]
     };
 
     const handleString = () => {
         if(!singlePrint){
             setSinglePrint(true)
+        }else{
+            onCompletion()
         }
-        pre.current = [...pre.current,errorComp(response.message,singlePrint, chatLogRef, ()=>{})]
+        pre.current = [...pre.current,errorComp(response.message,singlePrint, chatLogRef, ()=>{},onCompletion)]
     }
 
     const handleArrResponse = () => {
         if (currentItemIndex < response?.responses?.length) {
             setCurrentItemIndex(currentItemIndex + 1)
+        }else{
+            onCompletion()
         }
-        pre.current = [...pre.current, arrComponent(response?.responses, currentItemIndex, chatLogRef, ()=>{})]
+        pre.current = [...pre.current, arrComponent(response?.responses, currentItemIndex, chatLogRef, ()=>{},onCompletion)]
     }
 
     return (
         <VerticalStack gap="2">
             {response.responses ?
                 response.responses[0].functionality ?
-                    [...pre.current, component(response?.responses, currentItemIndex, currentResponseIndex, chatLogRef, handleResponseComplete)]
-                :   [...pre.current, arrComponent(response?.responses, currentItemIndex, chatLogRef, handleArrResponse)]
+                    [...pre.current, component(response?.responses, currentItemIndex, currentResponseIndex, chatLogRef, handleResponseComplete,onCompletion)]
+                :   [...pre.current, arrComponent(response?.responses, currentItemIndex, chatLogRef, handleArrResponse,onCompletion)]
                 : 
                 response.message ?
-                [...pre.current, errorComp(response?.message, singlePrint, chatLogRef, handleString)]
-                : null
+                [...pre.current, errorComp(response?.message, singlePrint, chatLogRef, handleString,onCompletion)]
+                :null
             }
         </VerticalStack>
     );
 }
 
-function component(response, currentRow, currIndex, chatLogRef, handleResponseComplete){
+function component(response, currentRow, currIndex, chatLogRef, handleResponseComplete,onCompletion){
     if(currentRow < response.length){
         let prompt = ""
         let isTitle = false
@@ -71,10 +77,12 @@ function component(response, currentRow, currIndex, chatLogRef, handleResponseCo
                 isTitle={isTitle}
             />
         )
+    }else{
+        onCompletion()
     }
 }
 
-function errorComp(strPrompt, singlePrint ,chatLogRef, handleString,){
+function errorComp(strPrompt, singlePrint ,chatLogRef, handleString,onCompletion){
     if(!singlePrint){
         return(
             <BotResponse
@@ -83,21 +91,26 @@ function errorComp(strPrompt, singlePrint ,chatLogRef, handleString,){
                 chatLogRef={chatLogRef}
             />
         )
+    }else{
+        onCompletion()
     }
 }
 
-function arrComponent(responses, currentItemIndex, chatLogRef, handleArrResponse){
+function arrComponent(responses, currentItemIndex, chatLogRef, handleArrResponse,onCompletion){
     let prompt = ""
     if(currentItemIndex < responses.length){
         prompt = responses[currentItemIndex]
+        return(
+            <BotResponse
+                chatLogRef={chatLogRef}
+                response={prompt}
+                onComplete={handleArrResponse}
+            />
+        )
+    }else{
+        onCompletion()
     }
-    return(
-        <BotResponse
-            chatLogRef={chatLogRef}
-            response={prompt}
-            onComplete={handleArrResponse}
-        />
-    )
+    
 }
 
 export default ResponseComponent

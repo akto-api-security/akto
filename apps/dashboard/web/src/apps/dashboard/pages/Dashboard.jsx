@@ -9,6 +9,8 @@ import "./dashboard.css"
 import settingRequests from "./settings/api";
 import dashboardFunc from "./transform"
 import AktoGptLayout from "../components/aktoGpt/AktoGptLayout";
+import api from "./observe/api";
+import func from "@/util/func"
 
 function Dashboard() {
 
@@ -20,6 +22,7 @@ function Dashboard() {
     const isInsideCollection = ObserveStore(state => state.inventoryFlyout)
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const sampleData = ObserveStore(state => state.samples)
+    const selectedUrl = ObserveStore(state => state.selectedUrl)
 
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
@@ -68,13 +71,25 @@ function Dashboard() {
             setIsGptActive(true)
             const activePrompts = dashboardFunc.getPrompts({key: "DATA_TYPES"})
             setPrompts(activePrompts)
+        } else {
+            setIsGptActive(false)
         }
     }
 
     useEffect(()=> {
-        setIsGptActive(false)
         checkGptActive(location.pathname)
     },[location,filteredEndpoints,isInsideCollection,sampleData])
+
+    const runTests = async(testsList) => {
+        setIsGptScreenActive(false)
+        const apiKeyInfo={
+            apiCollectionId: apiCollectionId,
+            url: selectedUrl.url,
+            method: selectedUrl.method
+        }
+        await api.scheduleTestForCustomEndpoints(apiKeyInfo,func.timNow(),false,testsList,"akto_gpt_test",-1,-1)
+        func.setToast(true,false,"Triggered tests successfully!")
+    }
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
@@ -107,7 +122,7 @@ function Dashboard() {
             <div>
                 <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
                     <Modal.Section flush>
-                        <AktoGptLayout prompts={prompts} apiCollectionId={apiCollectionId}/>
+                        <AktoGptLayout prompts={prompts} apiCollectionId={apiCollectionId} closeModal={()=> setIsGptScreenActive(false)} runCustomTests={(tests)=> runTests(tests)}/>
                     </Modal.Section>
                 </Modal>
             </div>

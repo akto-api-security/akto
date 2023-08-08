@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, Icon, Scrollable, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Avatar, Box, Button, Icon, Scrollable, Spinner, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { ConversationMinor, SendMajor } from "@shopify/polaris-icons"
 import PromptContainer from './PromptContainer'
 import "./style.css"
@@ -8,8 +8,10 @@ import func from '@/util/func'
 import IntroComponent from './IntroComponent'
 import api from './api'
 import ResponseComponent from './ResponseComponent'
+import { useNavigate } from 'react-router-dom'
+import {ClipboardMinor} from '@shopify/polaris-icons';
 
-function AktoGptLayout({prompts, apiCollectionId}) {
+function AktoGptLayout({prompts,closeModal, runCustomTests}) {
 
     const [activePrompt, setActivePrompt] = useState("")
     const [currentObj, setCurrentObj] = useState(null)
@@ -20,6 +22,8 @@ function AktoGptLayout({prompts, apiCollectionId}) {
     const [queryType,setQueryType] = useState(null)
 
     const [buttonState, setButtonState] = useState(0)
+
+    const navigate = useNavigate()
 
     const chatLogRef = useRef(null);
 
@@ -52,7 +56,6 @@ function AktoGptLayout({prompts, apiCollectionId}) {
                 setLoading(false)
                 setResponse(resp.response)
                 setQueryType(resp.type)
-                setButtonState(2)
             }).catch(()=>{
                 setLoading(false)
             })
@@ -65,10 +68,20 @@ function AktoGptLayout({prompts, apiCollectionId}) {
     }
 
     const checkQuery = () => {
-        if(buttonState !== 0 || activePrompt.length === 0 || (activePrompt.includes("${input}") && inputPrompt.length === 0)){
+        if(buttonState === 1 || activePrompt.length === 0 || (activePrompt.includes("${input}") && inputPrompt.length === 0)){
             return true
         }
         return false
+    }
+
+    const addRegex = () => {
+        // send regex left
+        navigate("/dashboard/observe/data-types")
+        closeModal()
+    }
+
+    const runTests = () => {
+        runCustomTests(response.responses[0].tests)
     }
 
     return (
@@ -104,10 +117,28 @@ function AktoGptLayout({prompts, apiCollectionId}) {
                                         <Avatar name="Akto" source='/public/akto_logo.svg' size="medium"/>
                                     </span>
                                     {loading ? <Spinner size="small" /> 
-                                        : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef}/>
+                                        : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => setButtonState(2)}/>
                                     }
                                 </div>
                             </div>
+                            {buttonState === 2 ? 
+                                queryType === "generate_regex" && response?.responses[0]?.regex ?
+                                    <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
+                                        <Button primary onClick={addRegex}>Add Regex to Akto</Button>
+                                    </div>
+                                : queryType === "suggest_tests" && response?.responses[0]?.tests ?
+                                <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
+                                    <Button primary onClick={runTests}>Run tests via Akto</Button>
+                                </div>
+                                :queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
+                                <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
+                                    <Tooltip content="Copy curl command">
+                                        <Button icon={ClipboardMinor} onClick={()=> navigator.clipboard.writeText( response.responses[0].curl)} />
+                                    </Tooltip>
+                                </div>
+                                :null
+                                :null
+                            }
                         </Scrollable>
                     </div>
                      : <IntroComponent/>
