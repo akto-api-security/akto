@@ -18,7 +18,6 @@ import {
 
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
-import Store from "../../../store"
 import UploadFile from "../../../components/shared/UploadFile"
 import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
