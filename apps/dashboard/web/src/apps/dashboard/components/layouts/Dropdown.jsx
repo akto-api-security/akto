@@ -4,6 +4,9 @@ import {CircleRightMajor, ChevronDownMinor} from "@shopify/polaris-icons"
 import func from "@/util/func"
 
 function Dropdown(props) {
+
+    const id = props.id ? props.id : "dropdown";
+
     const deselectedOptions = useMemo(() => props.menuItems,[props.menuItems],);
     const [selectedOptions, setSelectedOptions] = useState([]);
     const [inputValue, setInputValue] = useState(props.initial);
@@ -48,6 +51,7 @@ function Dropdown(props) {
 
     const textField = (
         <Autocomplete.TextField
+            id={id}
             value={inputValue}
             autoComplete="off"
             {...props.label ? {label : props.label} : null}

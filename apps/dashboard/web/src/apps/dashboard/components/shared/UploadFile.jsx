@@ -3,7 +3,7 @@ import { UploadMajor } from '@shopify/polaris-icons';
 import { useRef } from "react"
 
 
-function UploadFile({ fileFormat, fileChanged, tooltipText, label}) {
+function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary}) {
 
     const fileUploadRef = useRef("")
 
@@ -24,7 +24,10 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label}) {
 
     return (
         <Tooltip content={tooltipText}>
-            <Button icon={UploadMajor} primary onClick={onPickFile}>
+            <Button 
+                icon={UploadMajor} 
+                primary={primary !== undefined ? primary : true}
+                onClick={onPickFile}>
                 {label}
                 <input
                     type="file"

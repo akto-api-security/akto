@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import api from '../api'
-import quickStartFunc from '../tranform'
+import quickStartFunc from '../transform'
 import { Box, Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
 import func from '@/util/func'
 import Store from '../../../store'

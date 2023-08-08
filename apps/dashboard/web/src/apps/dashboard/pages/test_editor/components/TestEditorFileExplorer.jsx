@@ -136,6 +136,7 @@ const TestEditorFileExplorer = () => {
         <div className="editor-navbar" style={{'overflowY' : 'scroll'}}>
             <Navigation location="/">
                 <TextField  
+                    id={"test-search"}
                     prefix={<Icon source={SearchMinor} />} 
                     onChange={searchResult} 
                     value={searchText}
@@ -143,7 +144,8 @@ const TestEditorFileExplorer = () => {
                 />
 
                 <Box>
-                    <Button plain monochrome onClick={()=> toggleFunc("CUSTOM")}>
+                    <Button id={"create-custom-test-button"}
+                    plain monochrome onClick={()=> toggleFunc("CUSTOM")}>
                         <span className="test-header">
                             <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor} className="left-icon" />
                             <span className="text">

@@ -228,8 +228,6 @@ function GithubServerTable(props) {
           ]}
           bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
           promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
-          // bulkActions={props.selectable ? props.bulkActions : []}
-          // promotedBulkActions={props.selectable ? promotedBulkActions : []}
         >
           {rowMarkup}
           </IndexTable>

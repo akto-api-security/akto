@@ -1,6 +1,6 @@
 import { Avatar, Badge, Box, Button, HorizontalGrid, LegacyCard, ProgressBar, RadioButton, ResourceItem, ResourceList, Scrollable, Text, VideoThumbnail } from '@shopify/polaris'
 import React, { useState } from 'react'
-import quickStartFunc from '../tranform'
+import quickStartFunc from '../transform'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import SearchField from "../../../components/shared/SearchField"
 import "../QuickStart.css"

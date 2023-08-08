@@ -112,6 +112,7 @@ function JsonRecording() {
                 title="Upload JSON Recording"
                 padding='10px'
                 primaryAction={{
+                    id:"upload-json-button",
                     content: 'Upload JSON Recording',
                     onAction: handleClick,
                 }}
@@ -125,7 +126,7 @@ function JsonRecording() {
                 <Text variant="bodyMd">Step 5: Specify the json script in AKTO Dashboard, and wait for couple of minutes for verifying the extracted token</Text>
 
                 <br />
-                <TextField label="Token Fetch Command" value={tokenFetchCommand} onChange={(command) => setTokenFetchCommand(command)} />
+                <TextField id={"token-input-field"} label="Token Fetch Command" value={tokenFetchCommand} onChange={(command) => setTokenFetchCommand(command)} />
 
                 <input
                     style={{ display: 'none' }}
@@ -156,7 +157,7 @@ function JsonRecording() {
             <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
             <br />
-            <Button onClick={handleSave} primary>Save changes</Button>
+            <Button id={"save-token"} onClick={handleSave} primary>Save changes</Button>
         </div>
     )
 }

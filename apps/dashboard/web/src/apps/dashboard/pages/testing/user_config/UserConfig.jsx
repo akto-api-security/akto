@@ -51,6 +51,7 @@ function UserConfig() {
                 <LegacyCard.Section>
                     <LegacyStack vertical>
                         <Button
+                            id={"hardcoded-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={hardcodedOpen}
                             icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
@@ -73,6 +74,7 @@ function UserConfig() {
                 <LegacyCard.Section>
                     <LegacyStack vertical>
                         <Button
+                            id={"automated-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={!hardcodedOpen}
                             icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}

@@ -18,8 +18,8 @@ import {
 
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
-import Store from "../../../store"
 import UploadFile from "../../../components/shared/UploadFile"
+import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
 
 const StyledEndpoint = (data) => {
@@ -177,7 +177,6 @@ function ApiEndpoints() {
     const params = useParams()
     const apiCollectionId = params.apiCollectionId
 
-    const allCollections = Store(state => state.allCollections)
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
 
@@ -191,6 +190,7 @@ function ApiEndpoints() {
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
 
+    const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
 
     async function fetchData() {
@@ -392,15 +392,8 @@ function ApiEndpoints() {
                     }
                 </Text>
             }
-            primaryAction={
-                <UploadFile 
-                    fileFormat=".har"
-                    fileChanged={file => handleFileChange(file)} 
-                    tooltipText="Upload traffic(.har)" 
-                    label="Upload traffic"/>
-            }
             secondaryActions={
-                <ButtonGroup spacing="loose">
+                <ButtonGroup>
                     <Tooltip content="Refresh">
                         <Button icon={RedoMajor} onClick={handleRefresh} plain helpText="Refresh" />
                     </Tooltip>
@@ -416,6 +409,17 @@ function ApiEndpoints() {
                     >
                         Export
                     </Button>
+                    <UploadFile 
+                        fileFormat=".har"
+                        fileChanged={file => handleFileChange(file)} 
+                        tooltipText="Upload traffic(.har)" 
+                        label="Upload traffic"
+                        primary={false}/>
+                    <RunTest 
+                        apiCollectionId={apiCollectionId}
+                        endpoints={filteredEndpoints}
+                        filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                    />
                 </ButtonGroup>
             }
             components={[

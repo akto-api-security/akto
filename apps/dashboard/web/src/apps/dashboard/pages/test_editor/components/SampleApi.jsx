@@ -237,7 +237,7 @@ const SampleApi = () => {
 
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
-            <Button removeUnderline monochrome plain 
+            <Button id={"test-results"} removeUnderline monochrome plain 
             onClick={testResult ? showResults : () => {}}
             icon={testResult ? ChevronUpMinor : undefined}>
                 {getResultDescription()}
@@ -250,8 +250,8 @@ const SampleApi = () => {
         <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
             <div style={{ display: "grid", gridTemplateColumns: "auto max-content max-content", alignItems: "center", gap: "10px", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px" }}>
                 <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
-                <Button onClick={toggleSelectApiActive}>Select Sample API</Button>
-                <Button loading={loading} primary onClick={runTest}>Run Test</Button>
+                <Button id={"select-sample-api"} onClick={toggleSelectApiActive}>Select Sample API</Button>
+                <Button id={"run-test"} loading={loading} primary onClick={runTest}>Run Test</Button>
             </div>
 
             <Divider />
@@ -277,11 +277,13 @@ const SampleApi = () => {
                 onClose={toggleSelectApiActive}
                 title="Select sample API"
                 primaryAction={{
+                    id:"save",
                     content: 'Save',
                     onAction: saveFunc,
                 }}
                 secondaryActions={[
                     {
+                        id:"cancel",
                         content: 'Cancel',
                         onAction: toggleSelectApiActive,
                     },
@@ -289,6 +291,7 @@ const SampleApi = () => {
             >
                 <Modal.Section>
                     <DropdownSearch
+                        id={"select-api-collection"}
                         label="Select collection"
                         placeholder="Select API collection"
                         optionsList={allCollectionsOptions}
@@ -300,6 +303,7 @@ const SampleApi = () => {
                     <br />
 
                     <DropdownSearch
+                        id={"select-api-endpoint"}
                         disabled={apiEndpointsOptions.length === 0}
                         label="API"
                         placeholder="Select API endpoint"

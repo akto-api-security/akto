@@ -59,20 +59,21 @@ function AuthParams({ authParams, setAuthParams }) {
                             <div key={index} >
                                 <div style={{ display: "grid", gridTemplateColumns: "auto max-content auto max-content auto max-content", gap: "30px", alignItems: "center"}}>
                                     <Dropdown
+                                        id={"auth-param-menu"}
                                         menuItems={authParamOptions} initial={authParam.where === "HEADER" ? "Header": "Body"}
                                         selected={(authParamLocation) => handleUpdate(index, "where", authParamLocation)} />
                                     <Text variant="bodyMd">Key: </Text>
-                                    <TextField value={authParam.key} onChange={(key) => handleUpdate(index, "key", key)} />
+                                    <TextField id={`auth-param-key-${index}`} value={authParam.key} onChange={(key) => handleUpdate(index, "key", key)} />
                                     <Text variant="bodyMd">Value: </Text>
-                                    <TextField value={authParam.value} onChange={(value) => handleUpdate(index, "value", value)} />
-                                    <Button icon={DeleteMajor} onClick={() => handleRemove(index)} plain />
+                                    <TextField id={`auth-param-value-${index}`} value={authParam.value} onChange={(value) => handleUpdate(index, "value", value)} />
+                                    <Button id={`delete-auth-param-${index}`} icon={DeleteMajor} onClick={() => handleRemove(index)} plain />
                                 </div>
                                 { index < authParams.length - 1 &&  <br /> }
                             </div>
                     )})}
                 </div>
                 <br />
-                <Button icon={CirclePlusMajor} onClick={handleAdd} plain />
+                <Button id={"add-auth-param"} icon={CirclePlusMajor} onClick={handleAdd} plain />
             </LegacyCard.Section>
         </LegacyCard>
     )
