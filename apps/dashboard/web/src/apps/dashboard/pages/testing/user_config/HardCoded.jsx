@@ -55,6 +55,7 @@ function HardCoded() {
             <FormLayout>
                 <FormLayout.Group>
                 <TextField
+                    id={"auth-header-key-field"}
                     label={(
                         <HorizontalStack gap="2">
                             <Text>Auth header key</Text>
@@ -64,7 +65,9 @@ function HardCoded() {
                         </HorizontalStack>
                     )}
                     value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />   
-                <TextField label={(
+                <TextField 
+                    id={"auth-header-value-field"}
+                    label={(
                         <HorizontalStack gap="2">
                             <Text>Auth header value</Text>
                             <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
@@ -77,6 +80,7 @@ function HardCoded() {
             </FormLayout>
             <br />
             <Button
+                id={"save-token"}
                 primary
                 disabled={!hasChanges}
                 onClick={handleSave}

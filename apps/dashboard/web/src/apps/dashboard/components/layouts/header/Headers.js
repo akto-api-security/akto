@@ -48,7 +48,7 @@ export default function Header() {
         <TopBar.UserMenu
             actions={[
                 {
-                    items: [{content: 'Manage Account'}, {content: 'Log out', onAction: handleLogOut}],
+                    items: [{id: "manage", content: 'Manage Account'}, {id: "log-out", content: 'Log out', onAction: handleLogOut}],
                 },
                 {
                     items: [{content: 'Documentation'},{content: 'Tutorials'},{content: 'Changelog'},{content: 'Discord Support'},{content: 'Star On Github'}],
@@ -92,11 +92,6 @@ export default function Header() {
 
     const topBarMarkup = (
         <div className='topbar'>
-            <div className='collapse_btn' onClick={handleLeftNavCollapse}>
-                <Tooltip content={leftNavCollapsed ? 'Show Navbar' : 'Hide Navbar'}>
-                    <Icon source= {leftNavCollapsed ? CircleChevronRightMinor : CircleChevronLeftMinor }/>
-                </Tooltip>
-            </div>
             <TopBar
                 showNavigationToggle
                 userMenu={userMenuMarkup}

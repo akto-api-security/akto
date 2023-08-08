@@ -30,10 +30,12 @@ function DataTypes() {
 
   const statusItems = [
     {
+      id:"True",
       label: "True",
       value: "true",
     },
     {
+      id:"False",
       label: "False",
       value: "false",
     }
@@ -41,10 +43,12 @@ function DataTypes() {
 
   const operatorOptions = [
     {
+      id:"OR",
       label: "OR",
       value: "OR"
     },
     {
+      id:"AND",
       label: "AND",
       value: "AND"
     }
@@ -52,22 +56,27 @@ function DataTypes() {
 
   const selectOptions = [
     {
+      id:"EQUALS_TO",
       label: 'Equals to',
       value: 'EQUALS_TO'
     },
     {
+      id:"REGEX",
       label: 'Matches regex',
       value: 'REGEX'
     },
     {
+      id:"STARTS_WITH",
       label: 'Starts with',
       value: 'STARTS_WITH'
     },
     {
+      id:"ENDS_WITH",
       label: 'Ends with',
       value: 'ENDS_WITH'
     },
     {
+      id:"IS_NUMBER",
       label: 'Is number',
       value: 'IS_NUMBER'
     }
@@ -75,18 +84,22 @@ function DataTypes() {
 
   const requestItems = [
     {
+      id:"1",
       label: 'Request',
       value: '1'
     },
     {
+      id:"2",
       label: 'Response',
       value: '2'
     },
     {
+      id:"3",
       label: 'Both Request and Response',
       value: '3'
     },
     {
+      id:"4",
       label: 'Neither Request nor Response',
       value: '4'
     }
@@ -196,8 +209,8 @@ function DataTypes() {
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
         <HorizontalGrid gap="4" columns={2}>
-          <TextField label="Name" helpText="Name the data type" value={typeName} placeholder='NEW_CUSTOM_DATA_TYPE' onChange={handleChange}/>
-          {dataType === 'Custom' ? <Dropdown menuItems={statusItems} selected={handleValue} initial={status} label= "Active" /> : null}
+          <TextField id={"name-field"} label="Name" helpText="Name the data type" value={typeName} placeholder='NEW_CUSTOM_DATA_TYPE' onChange={handleChange}/>
+          {dataType === 'Custom' ? <Dropdown id={"active-dropdown"} menuItems={statusItems} selected={handleValue} initial={status} label= "Active" /> : null}
         </HorizontalGrid>
       </LegacyCard.Section>
     </LegacyCard>
@@ -206,6 +219,7 @@ function DataTypes() {
   const conditionsCard = (
     <LegacyCard title="Details" key="condition">
         <ConditionsPicker 
+          id={"key"}
           title="Key Conditions" 
           param = "param_name" 
           initialItems={keyConditions.predicates} 
@@ -216,10 +230,11 @@ function DataTypes() {
         />
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div style={{ flexGrow: 1, borderBottom: '1px solid #ccc' }}></div>
-          <Dropdown menuItems={operatorOptions} initial={operator} selected={handleOperator} />
+          <Dropdown id={"condition"} menuItems={operatorOptions} initial={operator} selected={handleOperator} />
           <div style={{ flexGrow: 1, borderBottom: '1px solid #ccc' }}></div>
         </div>
         <ConditionsPicker 
+          id={"value"}
           title="Value Conditions" 
           param = "param_value" 
           initialItems={valueConditions.predicates} 
@@ -238,12 +253,12 @@ function DataTypes() {
           <p>Mark the location where you want the data type to be sensitive</p>
           <br/>
           <HorizontalGrid columns="4">
-            <Dropdown menuItems = {requestItems} initial={sensitiveState} selected={getRequest}/>
+            <Dropdown id={"sensitive-position"} menuItems = {requestItems} initial={sensitiveState} selected={getRequest}/>
           </HorizontalGrid >
         </LegacyCard.Section>
       </LegacyCard>
       <div className='footer-save'>
-        <Button onClick={saveAction} {...compareFunc() ? {disabled: true} : {}}> Save </Button>
+        <Button id={"save-button"} onClick={saveAction} {...compareFunc() ? {disabled: true} : {}}> Save </Button>
       </div>
     </VerticalStack>
   )

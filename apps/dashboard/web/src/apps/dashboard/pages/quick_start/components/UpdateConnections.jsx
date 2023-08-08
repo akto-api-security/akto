@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import quickStartFunc from '../tranform';
-import { Badge, Button, Card, HorizontalStack, Page, Text } from '@shopify/polaris';
+import quickStartFunc from '../transform';
+import { Badge, Button, Card, HorizontalStack, Page, Tag, Text } from '@shopify/polaris';
 import {CancelMinor} from "@shopify/polaris-icons"
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
@@ -34,16 +34,21 @@ function UpdateConnections(props) {
     return (
         <Page divider title='Quick start' fullWidth>
             <div style={{marginBottom: '16px'}}>
-                <Text variant="headingMd" as="h6"> Your Connections </Text>
+            <HorizontalStack gap={"3"}>
+                <Text variant="headingMd" as="h6" color='subdued'> Your connections </Text>
+                <Tag>{obj.myConnections.length.toString()}</Tag>
+            </HorizontalStack>
             </div>
             <GridRows CardComponent={RowCard} columns="3" 
                 items={obj.myConnections} buttonText="Configure" onButtonClick={onButtonClick}
                 changedColumns={newCol}
             />
 
-            <div style={{margin: '24px 0 16px 0', display: 'flex', gap: '4px'}}>
-                <Text variant="headingMd" as="h6"> Explore Other Connections </Text>
-                <Badge size='small' status='info'>{obj.moreConnections.length.toString()}</Badge>
+            <div style={{margin: '24px 0 16px 0'}}>
+            <HorizontalStack gap={"3"}>
+                <Text variant="headingMd" as="h6" color='subdued'> Explore other connections </Text>
+                <Tag>{obj.moreConnections.length.toString()}</Tag>
+            </HorizontalStack>
             </div>
             <GridRows CardComponent={RowCard} columns="3" 
                 items={obj.moreConnections} buttonText="Connect" onButtonClick={onButtonClick}     
