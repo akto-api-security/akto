@@ -7,7 +7,7 @@ const PageWithMultipleCards = (props) => {
 
     const location = useLocation();
     const navigate = useNavigate()
-    const isNewTab = location.key=='default' || !(window.history.state && window.history.state.idx > 0)
+    const isNewTab = location.key==='default' || !(window.history.state && window.history.state.idx > 0)
 
     const navigateBack = () => {
         navigate(-1)
