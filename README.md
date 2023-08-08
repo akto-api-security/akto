@@ -23,8 +23,13 @@
   <img src="https://img.shields.io/github/issues/akto-api-security/akto/hackfest?logo=github"/>
 </a>
 
-<a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
+<!--a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
   <img src="https://img.shields.io/docker/pulls/aktosecurity/akto-api-security-dashboard?logo=docker"/>
+</a-->
+
+
+<a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
+  <img src="https://img.shields.io/badge/Docker_pulls-10K+-blue?logo=docker"/>
 </a>
 
 
