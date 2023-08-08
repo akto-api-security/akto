@@ -71,6 +71,7 @@ function component(response, currentRow, currIndex, chatLogRef, handleResponseCo
         }
         return (
             <BotResponse
+                key={prompt}
                 response={prompt}
                 chatLogRef={chatLogRef}
                 onComplete={handleResponseComplete}
@@ -89,6 +90,7 @@ function errorComp(strPrompt, singlePrint ,chatLogRef, handleString,onCompletion
                 onComplete={handleString}
                 response={strPrompt}
                 chatLogRef={chatLogRef}
+                key={strPrompt}
             />
         )
     }else{
@@ -105,6 +107,7 @@ function arrComponent(responses, currentItemIndex, chatLogRef, handleArrResponse
                 chatLogRef={chatLogRef}
                 response={prompt}
                 onComplete={handleArrResponse}
+                key={prompt}
             />
         )
     }else{

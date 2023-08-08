@@ -32,6 +32,12 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
         setActivePrompt(item.label)
     }
 
+    const handleCompletion = () => {
+        setTimeout(()=> {
+            setButtonState(2)
+        },100)
+    }
+
     useEffect(() => {
         if (chatLogRef.current) {
           chatLogRef.current.scrollIntoView({
@@ -117,7 +123,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                         <Avatar name="Akto" source='/public/akto_logo.svg' size="medium"/>
                                     </span>
                                     {loading ? <Spinner size="small" /> 
-                                        : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => setButtonState(2)}/>
+                                        : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => handleCompletion()}/>
                                     }
                                 </div>
                             </div>
