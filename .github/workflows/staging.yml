@@ -83,9 +83,6 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
-      - name: Convert github branch name to be compatible with docker tag name convention
-        id: docker_tag
-        run: echo "TAG_SUFFIX=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
       - name: Build, tag, and push the image to DockerHub
         if: ${{ github.event.inputs.Environment == 'prod' }}
         id: build-image-dockerhub
