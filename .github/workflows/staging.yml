@@ -26,9 +26,6 @@ on:
           - prod
           - staging
         default: staging
-      release_version:
-        required: true
-        default: default
       Deploy:
         description: 'Deploy to flash staging'
         required: false
@@ -54,9 +51,15 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
+      - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
+        id: docker_tag
+        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      - name: Prepare Dashboard polaris UI
+        working-directory: ./apps/dashboard/polaris_web
+        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Configure AWS Credentials
         if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
@@ -67,9 +70,12 @@ jobs:
 
       - name: Deploy static site to S3 bucket
         if: ${{ github.event.inputs.Environment == 'prod' }}
-        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/${{ github.event.inputs.release_version }}/dist --delete
+        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      - name: Deploy polaris site to S3 bucket
+        if: ${{ github.event.inputs.Environment == 'prod' }}
+        run: aws s3 sync ./apps/dashboard/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
 
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
         env:
@@ -86,7 +92,7 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
           IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
         run: |
