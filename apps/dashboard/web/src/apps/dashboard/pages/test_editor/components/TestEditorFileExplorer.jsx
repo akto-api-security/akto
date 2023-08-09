@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Box, Button, Icon, Navigation, TextField, Tooltip } from "@shopify/polaris"
+import { Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
 
 import TestEditorStore from "../testEditorStore"
@@ -10,7 +10,7 @@ import convertFunc from "../transform"
 
 import "../TestEditor.css"
 
-const TestEditorFileExplorer = () => {
+const TestEditorFileExplorer = ({addCustomTest}) => {
 
     const testObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
@@ -31,10 +31,18 @@ const TestEditorFileExplorer = () => {
 
     const toggleFunc = (param) =>{
         if(param === 'CUSTOM'){
-            setShowCustom(true)
+            if(showCustom){
+                setShowCustom(false)
+            }else{
+                setShowCustom(true)
+            }
             setShowAkto(false)
         }else{
-            setShowAkto(true)
+            if(showAkto){
+                setShowAkto(false)
+            }else{
+                setShowAkto(true)
+            }
             setShowCustom(false)
         }
     }
@@ -97,7 +105,6 @@ const TestEditorFileExplorer = () => {
     useEffect(() => {
         if (selectedTest) {
             const testData = testObj.mapTestToData[selectedTest.label]
-            toggleFunc(testData.type)
             if(testData.type === 'CUSTOM'){
                 setSelectedCategory(testData.superCategory + '_custom')
             }else{
@@ -106,6 +113,11 @@ const TestEditorFileExplorer = () => {
         }
      
     }, [selectedTest])
+
+    useEffect(()=> {
+        const testData = testObj.mapTestToData[selectedTest.label]
+        toggleFunc(testData.type)
+    },[])
 
     function getItems(aktoItems){
         const arr = aktoItems.map(obj => ({
@@ -116,9 +128,14 @@ const TestEditorFileExplorer = () => {
                 return{
                     label: (
                         <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
-                            <span className={"text-overflow " + (item.label === selectedTest.label ? "active-left-test" : "")} style={{'fontSize': '14px'}}>
-                                {item.label} 
-                            </span>
+                            <div className={item.label === selectedTest.label ? "active-left-test" : ""}>
+                                <Text 
+                                    variant={item.label === selectedTest.label ? "headingSm" : "bodyMd"} as="h4" 
+                                    color={item.label === selectedTest.label ? "default" : "subdued"} truncate
+                                >
+                                    {item.label} 
+                                </Text>
+                            </div>
                         </Tooltip>
                     ),
                     onClick: (()=> {
@@ -135,40 +152,45 @@ const TestEditorFileExplorer = () => {
     return (
         <div className="editor-navbar" style={{'overflowY' : 'scroll'}}>
             <Navigation location="/">
-                <TextField  
-                    id={"test-search"}
-                    prefix={<Icon source={SearchMinor} />} 
-                    onChange={searchResult} 
-                    value={searchText}
-                    placeholder={`Search for Tests`}
-                />
+                <VerticalStack gap="4">
+                    <TextField  
+                        id={"test-search"}
+                        prefix={<Icon source={SearchMinor} />} 
+                        onChange={searchResult} 
+                        value={searchText}
+                        placeholder={`Search for Tests`}
+                    />
 
-                <Box>
-                    <Button id={"create-custom-test-button"}
-                    plain monochrome onClick={()=> toggleFunc("CUSTOM")}>
-                        <span className="test-header">
-                            <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor} className="left-icon" />
-                            <span className="text">
-                                Custom
-                            </span>
-                            <Box onClick={()=> console.log("Icon Clicked")}>
-                                <Icon source={CirclePlusMinor} />
-                            </Box>
-                        </span>
-                    </Button>
-                    {showCustom ? <Navigation.Section items={getItems(customItems)} /> : null}
-                </Box>
-                <Box>
-                    <Button plain monochrome onClick={() => toggleFunc("Akto")}>
-                        <span className="test-header">
-                            <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor} className="left-icon" />
-                            <span className="text">
-                                Akto Default
-                            </span>
-                        </span>
-                    </Button>
-                    {showAkto ? <Navigation.Section items={getItems(aktoItems)} /> : null}
-                </Box>
+                    <Box>
+                        <Button id={"create-custom-test-button"}
+                            plain monochrome onClick={()=> toggleFunc("CUSTOM")} removeUnderline fullWidth
+                        >
+                            <HorizontalStack align="space-between">
+                                <HorizontalStack gap={"1"}>
+                                    <Box>
+                                        <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor}/>
+                                    </Box>
+                                    <Text variant="headingMd" as="h5" color="subdued">Custom</Text>
+                                </HorizontalStack>
+                                <Box onClick={(e) => addCustomTest(e)}>
+                                    <Icon source={CirclePlusMinor} />
+                                </Box>
+                            </HorizontalStack>
+                        </Button>
+                        {showCustom ? <Navigation.Section items={getItems(customItems)} /> : null}
+                    </Box>
+                    <Box>
+                        <Button plain monochrome onClick={() => toggleFunc("Akto")} removeUnderline fullWidth>
+                            <HorizontalStack gap="1">
+                                <Box>
+                                    <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
+                                </Box>
+                                <Text variant="headingMd" as="h5" color="subdued">Akto Default</Text>
+                            </HorizontalStack>
+                        </Button>
+                        {showAkto ? <Navigation.Section items={getItems(aktoItems)} /> : null}
+                    </Box>
+                </VerticalStack>
             </Navigation>
         </div>
     )

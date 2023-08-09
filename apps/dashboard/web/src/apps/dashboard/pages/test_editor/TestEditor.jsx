@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Button, Frame, Text } from "@shopify/polaris"
+import { Badge, Button, Frame, HorizontalStack, Text, TopBar } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -54,38 +54,47 @@ const TestEditor = () => {
         }
     }
 
+    const addCustomTest = (e) => {
+        e.stopPropagation()
+        console.log("add test")
+    }
+
+    const headerComp = (
+        <div className="header-css">
+            <HorizontalStack gap="5">
+                <Button onClick={handleExit} icon={ExitMajor} plain/>
+                <HorizontalStack gap={"2"}>
+                    <Text variant="headingLg" as="h3">Test Editor</Text>
+                    <Badge status="success">Beta</Badge>
+                </HorizontalStack>
+            </HorizontalStack>
+
+            <Button onClick={addCustomTest}>Create custom test</Button>
+        </div>
+    )
+    const headerEditor = (
+        <TopBar userMenu = {headerComp} />
+    )
+
     useEffect(() => {
         fetchAllTests()
     }, [])
 
     return (
-
+        loading ?
+            <SpinnerCentered />
+        : 
         <Frame topBar={
-            <div style={{ display: "grid", gridTemplateColumns: "4vw max-content max-content auto", alignItems: "center", gap: "5px", height: "7vh", padding: "10px", background: "#ffffff" }}>
-                <Button id={"test-editor-exit-button"} icon={ExitMajor} plain onClick={handleExit} />
-                <Text variant="headingLg">
-                    Test Editor
-                </Text>
-                <Badge status="success">
-                    Beta
-                </Badge>
-                <div style={{ textAlign: "right" }}>
-                    <Button id={"create-custom-test"}>
-                        Create custom test
-                    </Button>
-                </div>
-            </div>
+            headerEditor
         }
-        navigation={ loading ? <SpinnerCentered />: <TestEditorFileExplorer /> }
+            navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
         >
-            {loading ?
-                <SpinnerCentered />
-                : 
-                    <div style={{ "paddingLeft":"6vh", display: "grid", gridTemplateColumns: "50% 50%" }}>
-                        <YamlEditor fetchAllTests={fetchAllTests} />
-                        <SampleApi />
-                    </div>
-            }
+            
+            <div style={{ "paddingLeft":"6vh", display: "grid", gridTemplateColumns: "50% 50%" }}>
+                <YamlEditor fetchAllTests={fetchAllTests} />
+                <SampleApi />
+            </div>
+            
 
         </Frame>
     )
