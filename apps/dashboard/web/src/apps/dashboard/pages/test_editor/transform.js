@@ -1,5 +1,5 @@
 import func from "@/util/func"
-import {Tooltip, Box, Icon} from "@shopify/polaris"
+import {Tooltip, Box, Icon, Text, HorizontalStack} from "@shopify/polaris"
 import {FolderMajor} from "@shopify/polaris-icons"
 
 const convertFunc = {
@@ -61,12 +61,14 @@ const convertFunc = {
                     let item = {
                         label: (
                             <Tooltip content={testObj?.customTests[key][0]?.category} dismissOnMouseOut width="wide">
-                                <span className="text-overflow" style={{'fontSize': '14px', 'gap': '6px'}}>
+                                <HorizontalStack gap="2">
                                     <Box>
                                         <Icon source={FolderMajor} color="base"/>
                                     </Box>
-                                    {testObj?.customTests[key][0]?.category}
-                                </span>
+                                    <Text truncate variant="bodyMd" as="h5">
+                                        {testObj?.customTests[key][0]?.category}
+                                    </Text>
+                                </HorizontalStack>
                             </Tooltip>
                         ),
                         badge: testObj?.customTests[key]?.length.toString(),
@@ -74,7 +76,8 @@ const convertFunc = {
                         onClick: (()=> selectedFunc(key+'_custom')),
                         subNavigationItems: testObj?.customTests[key],
                         key: key,
-                        param: '_custom'
+                        param: '_custom',
+                        truncateText: true,
                     }
                     if(item.subNavigationItems.length > 0){
                         arr.push(item)
@@ -87,12 +90,14 @@ const convertFunc = {
                     let item = {
                         label: (
                             <Tooltip content={testObj?.aktoTests[key][0]?.category} dismissOnMouseOut width="wide">
-                                <span className="text-overflow" style={{'fontSize': '14px', gap:'6px'}}>
+                                <HorizontalStack gap="2">
                                     <Box>
                                         <Icon source={FolderMajor} color="base"/>
                                     </Box>
-                                    {testObj?.aktoTests[key][0]?.category}
-                                </span>
+                                    <Text truncate variant="bodyMd" as="h5">
+                                      {testObj?.aktoTests[key][0]?.category}
+                                   </Text>
+                                </HorizontalStack>
                             </Tooltip>
                         ),
                         badge: testObj.aktoTests[key]?.length.toString(),
@@ -101,6 +106,7 @@ const convertFunc = {
                         subNavigationItems: testObj?.aktoTests[key],
                         key: key,
                         param: '_akto',
+                        truncateText: true,
                     }
                     if(item.subNavigationItems.length > 0){
                         arr.push(item)

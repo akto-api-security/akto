@@ -247,15 +247,16 @@ const SampleApi = () => {
     )
 
     return (
-        <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
-            <div style={{ display: "grid", gridTemplateColumns: "auto max-content max-content", alignItems: "center", gap: "10px", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px" }}>
+        <div>
+            <div className="editor-header">
                 <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
-                <Button id={"select-sample-api"} onClick={toggleSelectApiActive}>Select Sample API</Button>
-                <Button id={"run-test"} loading={loading} primary onClick={runTest}>Run Test</Button>
+                <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">Select Sample API</Button>
+                <Button id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
             </div>
 
             <Divider />
-            <Box ref={jsonEditorRef} minHeight="75vh"/>
+
+            <Box ref={jsonEditorRef} minHeight="80vh"/>
             {resultComponent}
             <Modal
                 open={showTestResult}

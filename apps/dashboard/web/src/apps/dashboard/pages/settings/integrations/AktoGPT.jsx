@@ -5,6 +5,7 @@ import {SortMinor, SearchMinor} from "@shopify/polaris-icons"
 import Store from "../../../store"
 import "../settings.css"
 import settingFunctions from '../module'
+import func from "@/util/func"
 
 function AktoGPT() {
 
@@ -12,17 +13,8 @@ function AktoGPT() {
     const [selectedItems, setSelectedItems] = useState([]);
     const [clonedItems, setClonedItems] = useState([]);
     const [searchValue, setSearchValue] = useState("")
-    const [displayItems , setDisplayItems] = useState(apiCollections)
+    const [displayItems , setDisplayItems] = useState([])
     const [sortOrder, setSortOrder] = useState(true)
-
-    const setToastConfig = Store(state => state.setToastConfig)
-    const setToast = (isActive, isError, message) => {
-        setToastConfig({
-          isActive: isActive,
-          isError: isError,
-          message: message
-        })
-    }
 
     async function fetchSelectedCollections(){
         let arr = await settingFunctions.fetchGptCollections() 
@@ -30,16 +22,20 @@ function AktoGPT() {
         setClonedItems(arr)
     }
 
+    useEffect(()=> {
+        setDisplayItems(apiCollections)
+    },[apiCollections])
+
     useEffect(()=>{
         fetchSelectedCollections()
     },[])
 
     function renderItem(item) {
-        const {id,name} = item;
+        const {id, displayName} = item;
         return (
             <ResourceItem id={id}>
                 <Text fontWeight="bold" as="h3">
-                    {name}
+                    {displayName}
                 </Text>
             </ResourceItem>
         );
@@ -47,18 +43,17 @@ function AktoGPT() {
 
     const discardAction = () =>{
         setSelectedItems(clonedItems)
-        setToast(true,true,"Changes Discarded.")
+        func.setToast(true,true,"Changes Discarded.")
     }
 
     const saveAction = async() =>{
         await settingFunctions.updateGptCollections(selectedItems,apiCollections)
-        setToast(true,false,"Collections updated successfully")
+        setClonedItems(selectedItems)
+        func.setToast(true,false,"Collections updated successfully")
     }
 
     function compareItems (){
-        let a = new Set(clonedItems)
-        let b = new Set(selectedItems)
-        return a.size === b.size && [...a].every(value => b.has(value))
+        return func.deepComparison(selectedItems,clonedItems)
     }
 
     const sortItems = () =>{

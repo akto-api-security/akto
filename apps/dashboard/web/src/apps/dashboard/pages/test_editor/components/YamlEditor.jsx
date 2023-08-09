@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { Box, Button, Divider, Icon, Text, Tooltip } from "@shopify/polaris"
+import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
 import { InfoMinor, ClipboardMinor } from "@shopify/polaris-icons"
 
@@ -120,25 +120,26 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     return (
-        <div style={{ borderWidth: "0px, 1px, 1px, 0px", borderStyle: "solid", borderColor: "#E1E3E5"}}>
-            <div style={{ display: "grid", gridTemplateColumns: "max-content auto", alignItems: "center", background: tokens.color["color-bg-app"], height: "10vh", padding: "10px"}}>
-                <div style={{ maxWidth: "30vw", display: "grid", gridTemplateColumns: "auto max-content max-content"}}>
-                    <Text variant="bodyMd" truncate>{selectedTest.label + '.yaml'}</Text>
+        <div>
+            <div className="editor-header">
+                <HorizontalStack>
+                    <Tooltip content={selectedTest.label + '.yaml'} width="wide">
+                        <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
+                    </Tooltip>
                     <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="below" dismissOnMouseOut>
                         <Icon source={InfoMinor}/> 
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
                         <Button icon={ClipboardMinor} plain onClick={copyTestName} />
-                    </Tooltip>       
-                </div>
-                <div style={{ textAlign: "right"}}>
-                    <Button id={"save-button"} disabled={!isEdited} onClick={handleSave}>Save</Button>
-                </div>
+                    </Tooltip>  
+                </HorizontalStack>
+        
+                <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
             </div>
 
             <Divider />
-            <Box id={"yaml-editor"} ref={yamlEditorRef} minHeight="80vh">
-            </Box>
+
+            <Box id={"yaml-editor"} ref={yamlEditorRef} minHeight="85vh" borderInlineEndWidth="1" borderColor="border-subdued"/>
         </div>
     )
 }
