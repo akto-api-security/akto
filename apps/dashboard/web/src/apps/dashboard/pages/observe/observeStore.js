@@ -16,7 +16,12 @@ let observeStore = (set)=>({
     samples: [],
     setSamples:(samples)=>{
         set({samples: samples})
-    }, 
+    },
+    
+    selectedUrl: {},
+    setSelectedUrl:(selectedUrl)=>{
+        set({selectedUrl: selectedUrl})
+    },
 })
 
 observeStore = devtools(observeStore)
