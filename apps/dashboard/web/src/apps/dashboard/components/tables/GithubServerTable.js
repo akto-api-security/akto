@@ -9,8 +9,7 @@ import {
   HorizontalStack,
   Key,
   ChoiceList,
-  Tabs
-} from '@shopify/polaris';
+  Tabs} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
@@ -118,8 +117,7 @@ function GithubServerTable(props) {
       filter:
         (<DateRangePicker ranges={values.ranges}
           getDate={handleFilterStatusChange("dateRange")}
-          setPopoverState={() => { }}
-          setButtonValue={() => { }}
+          setPopoverState={() => {}}
         />),
       pinned: true
     })

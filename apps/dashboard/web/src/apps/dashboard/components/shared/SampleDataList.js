@@ -17,9 +17,9 @@ function SampleDataList(props) {
     }, [sampleData])
   
     return (
-      <VerticalStack gap="4">
+      <VerticalStack gap="3">
         <HorizontalStack align='space-between'>
-        <Text variant='headingLg'>
+        <Text variant='headingMd'>
           {heading}
         </Text>
         <Pagination

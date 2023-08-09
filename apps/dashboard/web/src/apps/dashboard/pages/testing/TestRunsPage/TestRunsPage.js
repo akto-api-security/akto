@@ -11,7 +11,6 @@ import {
   ClockMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import Store from "../../../store";
 import TestingStore from "../testingStore";
 import { useEffect, useState } from 'react';
 import transform from "../transform";
@@ -113,28 +112,19 @@ function disambiguateLabel(key, value) {
 
 function TestRunsPage() {
 
-  const setToastConfig = Store(state => state.setToastConfig)
-  const setToast = (isActive, isError, message) => {
-      setToastConfig({
-        isActive: isActive,
-        isError: isError,
-        message: message
-      })
-  }
-
   const stopTest = (hexId) =>{
     api.stopTest(hexId).then((resp) => {
-      setToast(true, false, "Test run stopped")
+      func.setToast(true, false, "Test run stopped")
     }).catch((resp) => {
-      setToast(true, true, "Unable to stop test run")
+      func.setToast(true, true, "Unable to stop test run")
     });
   }
 
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {
-      setToast(true, false, "Test re-run")
+      func.setToast(true, false, "Test re-run")
     }).catch((resp) => {
-      setToast(true, true, "Unable to re-run test")
+      func.setToast(true, true, "Unable to re-run test")
     });
   }
 

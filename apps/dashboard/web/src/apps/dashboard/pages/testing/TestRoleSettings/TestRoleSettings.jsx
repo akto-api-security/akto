@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useReducer } from 'react'
 import { LegacyCard, HorizontalGrid, TextField } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
@@ -6,6 +6,7 @@ import func from "@/util/func";
 import api from '../api';
 import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
+import {produce} from "immer"
 
 const selectOptions = [
     {
@@ -41,13 +42,13 @@ function TestRoleSettings() {
     const isNew = location?.state != undefined && Object.keys(location?.state).length > 0 ? false : true
     const pageTitle = isNew ? "Add test role" : "Configure test role"
     const initialItems = isNew ? { name: "" } : location.state;
-    const [conditions, setConditions] = useState([]);
+    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [roleName, setRoleName] = useState("");
     const [change, setChange] = useState(false)
     const resetFunc = () => {
         setChange(false);
         setRoleName(initialItems.name ? initialItems.name : "");
-        setConditions(transform.createConditions(initialItems.endpoints));
+        dispatchConditions({type:"replace", conditions:transform.createConditions(initialItems.endpoints)})
     }
     useEffect(() => {
         resetFunc()
@@ -115,13 +116,35 @@ function TestRoleSettings() {
         </LegacyCard>
     )
 
+    function conditionsReducer(draft, action){
+
+        switch(action.type){
+            case "replace": return action.conditions; break;
+            case "add": draft.push(action.condition); break;
+            case "update": 
+                if(action.obj.type){
+                    if(func.getOption(selectOptions, action.obj.type).type == "MAP"){
+                        if(func.getOption(selectOptions, draft[action.index].type).type==undefined){
+                            draft[action.index].value={}
+                        }
+                    } else {
+                        draft[action.index].value=""
+                    }
+                    draft[action.index].operator = func.getConditions(selectOptions, action.obj.type)[0].label
+                }
+                draft[action.index] = {...draft[action.index], ...action.obj}; break;
+            case "delete": draft = draft.filter((item, index) => index !== action.index);
+            default: break;
+        }
+    }
+
     const conditionsCard = (
         <LegacyCard title="Details" key="condition">
             <TestRolesConditionsPicker
                 title="Role endpoint conditions"
                 param="Endpoint"
                 conditions={conditions}
-                setConditions={setConditions}
+                dispatch={dispatchConditions}
                 selectOptions={selectOptions}
             />
         </LegacyCard>

@@ -1,4 +1,15 @@
 const func = {
+    initialObj: {
+        id:"",
+        active: 'false',
+        name: "",
+        valueConditions: { predicates: [], operator: "OR" },
+        keyConditions: { predicates: [], operator: "OR" },
+        sensitiveState: '4',
+        operator: "OR",
+        dataType: "Custom"
+      },
+
     convertToSensitiveData: function(state) {
         let sensitiveAlways = false;
         let sensitivePosition = [] ;
@@ -33,10 +44,30 @@ const func = {
         else if(sensitivePosition.includes("REQUEST_PAYLOAD")){return '1'}
         else{ return '2'}
     },
+    
+    fillInitialState: function({dataObj, type}){
+        let initialObj = {...func.initialObj};
+        initialObj.id = dataObj.id;
+        initialObj.name = dataObj.name
+        initialObj.dataType = type
+        let state = func.convertDataToState(dataObj.sensitiveAlways, dataObj.sensitivePosition)
+        initialObj.sensitiveState = state
+        if(type === 'Custom'){
+          initialObj.active = dataObj.active.toString()
+          initialObj.operator= dataObj.operator
+        }
+        if(dataObj.keyConditions){
+          initialObj.keyConditions = dataObj.keyConditions
+        }
+        if(dataObj.valueConditions){
+          initialObj.valueConditions = dataObj.valueConditions
+        }
+        return initialObj;
+    },
 
-    convertDataForCustomPayload : function(keyConditions,keyOp,valueConditions,valueOp,operator,typeName,sensitiveState,status,id){
+    convertDataForCustomPayload : function(state){
 
-        const keyArr = keyConditions.map((element)=> {
+        const keyArr = state.keyConditions.predicates.map((element)=> {
             return{
                 type: element.type,
                 valueMap:{
@@ -45,7 +76,7 @@ const func = {
             }
         })
 
-        const valueArr = valueConditions.map((element)=> {
+        const valueArr = state.valueConditions.predicates.map((element)=> {
             return{
                 type: element.type,
                 valueMap:{
@@ -54,20 +85,20 @@ const func = {
             }
         })
 
-        let sensitiveObj = this.convertToSensitiveData(sensitiveState)
+        let sensitiveObj = this.convertToSensitiveData(state.sensitiveState)
 
         let finalObj = {
-            active: JSON.parse(status),
-            createNew: id ? false : true,
-            id: id,
+            active: JSON.parse(state.active),
+            createNew: state.id ? false : true,
+            id: state.id,
             keyConditionFromUsers: keyArr,
-            keyOperator: keyOp,
-            name: typeName,
-            operator: operator,
+            keyOperator: state.keyConditions.operator,
+            name: state.name,
+            operator: state.operator,
             sensitiveAlways: sensitiveObj.sensitiveAlways,
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
-            valueOperator: valueOp,
+            valueOperator: state.valueConditions.operator,
         }
 
         return finalObj

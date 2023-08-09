@@ -1,23 +1,37 @@
 import { Button, Popover } from "@shopify/polaris";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarMinor } from "@shopify/polaris-icons"
 import DateRangePicker from "./DateRangePicker";
 import values from "../../../../util/values";
+import func from "@/util/func"
 
 function DateRangeFilter(props){
 
+    const {initialDate, getDate} = props;
+
     const [popoverActive, setPopoverActive] = useState(false);
     const [buttonValue, setButtonValue] = useState(values.ranges[0].title);
-    const handleDate = (dateRange) =>{
-        props.getDate(dateRange)
+
+    useEffect(()=>{
+      if(initialDate){
+        const buttonValue = func.prettifyEpoch(initialDate.since) + " - " + func.prettifyEpoch(initialDate.until)
+        setButtonValue(buttonValue)
+      }
+    }, [])
+
+    const handleDate = (dateRange) => {
+      const buttonValue =
+        dateRange.title === "Custom"
+          ? dateRange.period.since.toDateString() +
+          " - " +
+          dateRange.period.until.toDateString()
+          : dateRange.title;
+      setButtonValue(buttonValue)
+      getDate(dateRange)
     }
     
     const handlePopoverState = (popoverState) =>{
         setPopoverActive(popoverState)
-    }
-
-    const handleButtonValue = (buttonValue) => {
-        setButtonValue(buttonValue)
     }
     
     return (
@@ -43,7 +57,7 @@ function DateRangeFilter(props){
             ranges={values.ranges}
             getDate={handleDate} 
             setPopoverState={handlePopoverState} 
-            setButtonValue={handleButtonValue}/>
+        />
         </Popover>
     )
 

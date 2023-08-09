@@ -43,6 +43,7 @@ import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
+import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 
 const router = createBrowserRouter([
   {
@@ -94,6 +95,10 @@ const router = createBrowserRouter([
               {
                 path: "inventory",
                 element: <ApiCollections/>
+              },
+              {
+                path: "changes",
+                element: <ApiChanges/>
               },
               {
                 path: "inventory/:apiCollectionId",

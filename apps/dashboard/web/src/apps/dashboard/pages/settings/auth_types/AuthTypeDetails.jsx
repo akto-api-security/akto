@@ -1,12 +1,13 @@
 import { LegacyCard, HorizontalGrid, TextField } from "@shopify/polaris";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useReducer } from "react";
 import authTypesApi from "./api";
 import ConditionsPicker from "../../../components/ConditionsPicker";
 import Dropdown from "../../../components/layouts/Dropdown";
 import transform from "./transform";
 import func from "@/util/func";
 import DetailsPage from "../../../components/DetailsPage";
+import {produce} from "immer"
 
 const selectOptions = [
     {
@@ -43,12 +44,10 @@ function AuthTypeDetails() {
     const pageTitle = isNew ? "Add auth type" : "Configure auth type"
     const initialState = isNew ? { name: "", active:undefined, headerConditions: [], payloadConditions: [] } : 
         transform.fillInitialState(location.state, selectOptions[0]);
-    const [currState, setCurrentState] = useState({});
+    const [currState, dispatchCurrState] = useReducer(produce((draft, action) => func.conditionStateReducer(draft, action)), {});
     const [change, setChange] = useState(false)
     const resetFunc = () => {
-        setCurrentState((prev) => {
-            return {...initialState}
-        });
+        dispatchCurrState({type:"update", obj:initialState})
         setChange(false);
     }
     useEffect(() => {
@@ -64,9 +63,7 @@ function AuthTypeDetails() {
     }, [currState])
 
     const handleChange = (obj) => {
-        setCurrentState((prev) => {
-            return { ...prev, ...obj };
-        })
+        dispatchCurrState({type:"update", obj:obj})
     }
 
     const descriptionCard = (
@@ -79,12 +76,22 @@ function AuthTypeDetails() {
                         placeholder='New auth type name' onChange={(val) => { isNew ? handleChange({ name: val }) : {} }}
                     />
                     {isNew ? null :
-                    <Dropdown id={"active-dropdown"} menuItems={activeItems} placeHolder={"Auth type active status"}
-                    selected={(val) => { handleChange({ active: val }) }} initial={initialState.active} label= "Active" /> } 
+                    <Dropdown id={"active-dropdown"} 
+                    menuItems={activeItems} placeHolder={"Auth type active status"}
+                    selected={(val) => { handleChange({ active: val }) }} 
+                    initial={currState.active} label= "Active" /> } 
                 </HorizontalGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )
+
+    const handleDispatch = (val, key) => {
+        if(val?.key==="condition"){
+            dispatchCurrState({...val, key:key})
+        } else {
+            dispatchCurrState(val);
+        }
+    }
 
     const conditionsCard = (
         <LegacyCard title="Details" key="condition">
@@ -92,11 +99,10 @@ function AuthTypeDetails() {
               id={"header"}
               title="Header keys" 
               param = "key" 
-              initialItems={currState.headerConditions || []} 
-              items={selectOptions} 
-              conditionOp={"AND"}
-              fetchChanges={(val) => { handleChange({ headerConditions: val.predicates }) }}
-              setChange={setChange}
+              conditions={currState.headerConditions || []}
+              selectOptions={selectOptions}
+              operator={"AND"}
+              dispatch={(val) => {handleDispatch(val, "headerConditions")}}
             />
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <div style={{ flexGrow: 1, borderBottom: '1px solid #ccc' }}></div>
@@ -106,12 +112,11 @@ function AuthTypeDetails() {
             <ConditionsPicker 
               id={"payload"}
               title="Payload keys" 
-              param = "key" 
-              initialItems={currState.payloadConditions || []} 
-              items={selectOptions} 
-              conditionOp={"AND"}
-              fetchChanges={(val) => { handleChange({ payloadConditions: val.predicates }) }}
-              setChange={setChange}
+              param = "key"
+              conditions={currState.payloadConditions || []}
+              selectOptions={selectOptions}
+              operator={"AND"}
+              dispatch={(val) => {handleDispatch(val, "payloadConditions")}}
             />
         </LegacyCard>
       )

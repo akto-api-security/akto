@@ -72,7 +72,7 @@ function AllSensitiveData() {
     }
 
     const handleRedirect = () => {
-        navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
+        navigate("/dashboard/observe/data-types")
     }
     
     useEffect(() => {

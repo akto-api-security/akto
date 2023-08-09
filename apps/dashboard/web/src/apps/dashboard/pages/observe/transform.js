@@ -1,5 +1,5 @@
 import func from "@/util/func";
-
+import Store from "../../store";
 
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
@@ -38,6 +38,61 @@ const transform = {
             paths.push({message:c, highlightPaths:highlightPaths}); 
         }
         return paths;
+    },
+    findNewParametersCount: (resp, startTimestamp, endTimestamp) => {
+        let newParametersCount = 0
+        let todayDate = new Date(endTimestamp * 1000)
+        let twoMonthsAgo = new Date(startTimestamp * 1000)
+
+        let currDate = twoMonthsAgo
+        let ret = []
+        let dateToCount = resp.reduce((m, e) => {
+            let detectDate = func.toYMD(new Date(e._id * 86400 * 1000))
+            m[detectDate] = (m[detectDate] || 0) + e.count
+            newParametersCount += e.count
+            return m
+        }, {})
+        while (currDate <= todayDate) {
+            ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
+            currDate = func.incrDays(currDate, 1)
+        }
+        return newParametersCount
+    },
+    fillSensitiveParams: (sensitiveParams, apiCollection) => {
+        sensitiveParams = sensitiveParams.reduce((z,e) => {
+            let key = [e.apiCollectionId + "-" + e.url + "-" + e.method]
+            z[key] = z[key] || new Set()
+            z[key].add(e.subType || {"name": "CUSTOM"})
+            return z
+        },{})
+        Object.entries(sensitiveParams).forEach(p => {
+            let apiCollectionIndex = apiCollection.findIndex(e => {
+                return (e.apiCollectionId + "-" + e.url + "-" + e.method) === p[0]
+            })
+            if (apiCollectionIndex > -1) {
+                apiCollection[apiCollectionIndex].sensitive = p[1]
+            }
+        })
+        return apiCollection;
+    },
+    prepareEndpointForTable(x, index) {
+        const idToNameMap = func.mapCollectionIdToName(Store.getState().allCollections);
+        return {
+            id:index,
+            name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
+            endpoint: x.url,
+            url: x.url,
+            method: x.method,
+            added: func.prettifyEpoch(x.timestamp),
+            location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+            type: x.subType.name,
+            detectedTs: x.timestamp,
+            apiCollectionId: x.apiCollectionId,
+            apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
+            x: x,
+            domain: func.prepareDomain(x),
+            valuesString: func.prepareValuesTooltip(x)
+        }
     }
 }
 
