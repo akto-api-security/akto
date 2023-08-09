@@ -9,8 +9,7 @@ import {
   HorizontalStack,
   Key,
   ChoiceList,
-  Tabs
-} from '@shopify/polaris';
+  Tabs} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
@@ -182,18 +181,20 @@ function GithubServerTable(props) {
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
       <LegacyCard>
-        { props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
+        {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
+          <div>
             <LegacyCard.Section flush>
               <IndexFilters
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Searching in ${total} ${total==1 ? props.resourceName.singular:props.resourceName.plural}`}
+                queryPlaceholder={`Searching in ${total} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
-                {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
+                {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
                 onSort={setSortSelected}
+                //primaryAction={primaryAction}
                 cancelAction={{
                   onAction: fun,
                   disabled: false,
@@ -231,13 +232,14 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
+            </LegacyCard.Section>
             <LegacyCard.Section>
               <HorizontalStack
                 align="center">
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
-                    `Showing ${page * pageLimit + Math.min(1, total)}-${Math.min((page + 1) * pageLimit, total)} of ${total}`
+                      `Showing ${page * pageLimit + Math.min(1, total)}-${Math.min((page + 1) * pageLimit, total)} of ${total}`
                   }
                   hasPrevious={page > 0}
                   previousKeys={[Key.LeftArrow]}
@@ -245,11 +247,12 @@ function GithubServerTable(props) {
                   hasNext={total > (page + 1) * pageLimit}
                   nextKeys={[Key.RightArrow]}
                   onNext={onPageNext}
-                  />
+                />
               </HorizontalStack>
             </LegacyCard.Section>
-          </LegacyCard.Section> 
+          </div>
         }
+
       </LegacyCard>
     </div>
   );
