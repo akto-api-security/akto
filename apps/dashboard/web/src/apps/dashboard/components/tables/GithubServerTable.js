@@ -186,70 +186,70 @@ function GithubServerTable(props) {
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
             <LegacyCard.Section flush>
               <IndexFilters
-              sortOptions={props.sortOptions}
-              sortSelected={sortSelected}
-              queryValue={queryValue}
-              queryPlaceholder={`Searching in ${total} ${total==1 ? props.resourceName.singular:props.resourceName.plural}`}
-              onQueryChange={handleFiltersQueryChange}
-              onQueryClear={handleFiltersQueryClear}
-              {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
-              onSort={setSortSelected}
-              cancelAction={{
-                onAction: fun,
-                disabled: false,
-                loading: false,
-              }}
-              tabs={props.tabs || []}
-              selected={props.selected}
-              onSelect={props.onSelect}
-              canCreateNewView={false}
-              filters={filters}
-              appliedFilters={appliedFilters}
-              onClearAll={handleFiltersClearAll}
-              mode={mode}
-              setMode={setMode}
-              loading={props.loading || false}
-            />
-            <IndexTable
-              resourceName={props.resourceName}
-              itemCount={data.length}
-              selectedItemsCount={
-                allResourcesSelected ? 'All' : selectedResources.length
-              }
-              // condensed
-              selectable={props.selectable || false}
-              onSelectionChange={handleSelectionChange}
-              headings={[
-                {
-                  id: "data",
-                  hidden: true,
-                  flush: true
-                }
-              ]}
-              bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
-              promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
-            >
-              {rowMarkup}
-              </IndexTable>
-              </LegacyCard.Section> 
-            }
-          <LegacyCard.Section>
-            <HorizontalStack
-              align="center">
-              <Pagination
-                label={
-                  total == 0 ? 'No data found' :
-                    `Showing ${page * pageLimit + Math.min(1, total)}-${Math.min((page + 1) * pageLimit, total)} of ${total}`
-                }
-                hasPrevious={page > 0}
-                previousKeys={[Key.LeftArrow]}
-                onPrevious={onPagePrevious}
-                hasNext={total > (page + 1) * pageLimit}
-                nextKeys={[Key.RightArrow]}
-                onNext={onPageNext}
+                sortOptions={props.sortOptions}
+                sortSelected={sortSelected}
+                queryValue={queryValue}
+                queryPlaceholder={`Searching in ${total} ${total==1 ? props.resourceName.singular:props.resourceName.plural}`}
+                onQueryChange={handleFiltersQueryChange}
+                onQueryClear={handleFiltersQueryClear}
+                {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
+                onSort={setSortSelected}
+                cancelAction={{
+                  onAction: fun,
+                  disabled: false,
+                  loading: false,
+                }}
+                tabs={props.tabs || []}
+                selected={props.selected}
+                onSelect={props.onSelect}
+                canCreateNewView={false}
+                filters={filters}
+                appliedFilters={appliedFilters}
+                onClearAll={handleFiltersClearAll}
+                mode={mode}
+                setMode={setMode}
+                loading={props.loading || false}
               />
-            </HorizontalStack>
-          </LegacyCard.Section>
+              <IndexTable
+                resourceName={props.resourceName}
+                itemCount={data.length}
+                selectedItemsCount={
+                  allResourcesSelected ? 'All' : selectedResources.length
+                }
+                // condensed
+                selectable={props.selectable || false}
+                onSelectionChange={handleSelectionChange}
+                headings={[
+                  {
+                    id: "data",
+                    hidden: true,
+                    flush: true
+                  }
+                ]}
+                bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
+                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+              >
+                {rowMarkup}
+              </IndexTable>
+            <LegacyCard.Section>
+              <HorizontalStack
+                align="center">
+                <Pagination
+                  label={
+                    total == 0 ? 'No data found' :
+                    `Showing ${page * pageLimit + Math.min(1, total)}-${Math.min((page + 1) * pageLimit, total)} of ${total}`
+                  }
+                  hasPrevious={page > 0}
+                  previousKeys={[Key.LeftArrow]}
+                  onPrevious={onPagePrevious}
+                  hasNext={total > (page + 1) * pageLimit}
+                  nextKeys={[Key.RightArrow]}
+                  onNext={onPageNext}
+                  />
+              </HorizontalStack>
+            </LegacyCard.Section>
+          </LegacyCard.Section> 
+        }
       </LegacyCard>
     </div>
   );
