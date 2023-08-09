@@ -93,8 +93,8 @@ export default {
 
     saveAktoDataType(dataObj) {
         return request({
-            url:'/api/saveAktoDataType',
-            method:'post',
+            url: '/api/saveAktoDataType',
+            method: 'post',
             data: dataObj
         })
     },
@@ -114,6 +114,7 @@ export default {
         })
         return resp
     },
+
     async getAllCollections() {
         return await request({
             url: '/api/getAllCollections',
@@ -125,7 +126,7 @@ export default {
         return await request({
             url: '/api/createCollection',
             method: 'post',
-            data: {collectionName:name}
+            data: { collectionName: name }
         })
     },
 
@@ -133,7 +134,7 @@ export default {
         return await request({
             url: '/api/deleteCollection',
             method: 'post',
-            data: {apiCollectionId}
+            data: { apiCollectionId }
         })
     },
 
@@ -141,8 +142,8 @@ export default {
         return await request({
             url: '/api/deleteMultipleCollections',
             method: 'post',
-            data: {apiCollections: items}
-        })        
+            data: { apiCollections: items }
+        })
     },
     askAi(data) {
         return request({
@@ -217,6 +218,7 @@ export default {
             return resp
         })
     },
+
     async fetchAllUrlsAndMethods (apiCollectionId) {
         const resp = await request({
             url: '/api/fetchAllUrlsAndMethods',
@@ -227,6 +229,7 @@ export default {
         })
         return resp
     },
+
     addSensitiveField (x) {
         return request({
             url: 'api/addSensitiveField',
@@ -236,7 +239,7 @@ export default {
             }
         })
     },
-    listAllSensitiveFields () {
+    listAllSensitiveFields() {
         return request({
             url: 'api/listAllSensitiveFields',
             method: 'post',
@@ -256,6 +259,166 @@ export default {
             url: '/api/fetchSensitiveParamsForEndpoints',
             method: 'post',
             data: { urls }
+        })
+        return resp
+    },
+    async fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
+        const resp = await request({
+            url: '/api/fetchEndpointTrafficData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method, startEpoch, endEpoch
+            }
+        })
+        return resp
+    },
+    async fetchApiInfoList(apiCollectionId) {
+        const resp = await request({
+            url: '/api/fetchApiInfoList',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+        return resp
+    },
+    async fetchFilters() {
+        const resp = await request({
+            url: '/api/fetchFilters',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
+    fetchWorkflowTests() {
+        return request({
+            url: '/api/fetchWorkflowTests',
+            method: 'post',
+            data: {}
+        })
+    },
+    createWorkflowTest(nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId) {
+        return request({
+            url: '/api/createWorkflowTest',
+            method: 'post',
+            data: {nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId}
+        })
+    },
+
+    editWorkflowTest(id, nodes, edges, mapNodeIdToWorkflowNodeDetails) {
+        return request({
+            url: '/api/editWorkflowTest',
+            method: 'post',
+            data: {id, nodes, edges, mapNodeIdToWorkflowNodeDetails}
+        })
+    },
+
+    setWorkflowTestState(id, state) {
+        return request({
+            url: '/api/setWorkflowTestState',
+            method: 'post',
+            data: {id, state}
+        })
+    },
+
+    exportWorkflowTestAsString(id) {
+        return request({
+            url: '/api/exportWorkflowTestAsString',
+            method: 'post',
+            data: {id}
+        })
+    },
+    editWorkflowNodeDetails(id, nodeId, workflowNodeDetails) {
+        let mapNodeIdToWorkflowNodeDetails = {}
+        mapNodeIdToWorkflowNodeDetails[nodeId] = workflowNodeDetails
+        return request({
+            url: '/api/editWorkflowNodeDetails',
+            method: 'post',
+            data: {id, mapNodeIdToWorkflowNodeDetails}
+        })
+    },
+
+    runWorkflowTest(id) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {
+                "testIdConfig" : 1,
+                "workflowTestId": id,
+                "type": "WORKFLOW",
+                testName: id
+            }
+        })
+    },
+
+    scheduleWorkflowTest(id, recurringDaily, startTimestamp) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {
+                "testIdConfig" : 1,
+                "workflowTestId": id,
+                "type": "WORKFLOW",
+                "recurringDaily": recurringDaily,
+                "startTimestamp": startTimestamp,
+                testName: id
+            }
+        })
+    },
+
+    fetchWorkflowTestingRun(workflowId) {
+        return request({
+            url: '/api/fetchWorkflowTestingRun',
+            method: 'post',
+            data: {
+                "workflowTestId" : workflowId
+            }
+        })
+    },
+
+    deleteScheduledWorkflowTests(workflowId) {
+        return request({
+            url: '/api/deleteScheduledWorkflowTests',
+            method: 'post',
+            data: {
+                "workflowTestId" : workflowId
+            }
+        })
+    },
+
+    fetchWorkflowResult(id) {
+        return request({
+            url: '/api/fetchWorkflowResult',
+            method: 'post',
+            data: {
+                "workflowTestId": id,
+            }
+        })
+    },
+
+    downloadWorkflowAsJson(id) {
+        return request({
+            url: '/api/downloadWorkflowAsJson',
+            method: 'post',
+            data: {
+                "id": id,
+            }
+        })
+    },
+
+    uploadWorkflowJson(workflowTestJson, apiCollectionId) {
+        return request({
+            url: '/api/uploadWorkflowJson',
+            method: 'post',
+            data: { workflowTestJson, apiCollectionId }
+        })
+    },
+
+    async setFalsePositives (falsePositives) {
+        const resp = await request({
+            url: '/api/setFalsePositives',
+            method: 'post',
+            data: { falsePositives: falsePositives }
         })
         return resp
     },
@@ -293,187 +456,24 @@ export default {
             return resp
         })        
     },
-        async loadParamsOfEndpoint (apiCollectionId, url, method) {
-            const resp = await request({
-                url: '/api/loadParamsOfEndpoint',
-                method: 'post',
-                data: {
-                    apiCollectionId,
-                    url,
-                    method
-                }
-            })
-            return resp
-        },
-        async fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
-            const resp = await request({
-                url: '/api/fetchEndpointTrafficData',
-                method: 'post',
-                data: {
-                    url, apiCollectionId, method, startEpoch, endEpoch
-                }
-            })
-            return resp
-        },
-    
-        async fetchApiInfoList(apiCollectionId) {
-            const resp = await request({
-                url: '/api/fetchApiInfoList',
-                method: 'post',
-                data: {
-                    apiCollectionId
-                }
-            })
-            return resp
-        },
-        async fetchFilters() {
-            const resp = await request({
-                url: '/api/fetchFilters',
-                method: 'post',
-                data: {}
-            })
-            return resp
-        },
-        fetchWorkflowTests() {
-            return request({
-                url: '/api/fetchWorkflowTests',
-                method: 'post',
-                data: {}
-            })
-        },
-    
-        createWorkflowTest(nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId) {
-            return request({
-                url: '/api/createWorkflowTest',
-                method: 'post',
-                data: {nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId}
-            })
-        },
-    
-        editWorkflowTest(id, nodes, edges, mapNodeIdToWorkflowNodeDetails) {
-            return request({
-                url: '/api/editWorkflowTest',
-                method: 'post',
-                data: {id, nodes, edges, mapNodeIdToWorkflowNodeDetails}
-            })
-        },
-    
-        setWorkflowTestState(id, state) {
-            return request({
-                url: '/api/setWorkflowTestState',
-                method: 'post',
-                data: {id, state}
-            })
-        },
-    
-        exportWorkflowTestAsString(id) {
-            return request({
-                url: '/api/exportWorkflowTestAsString',
-                method: 'post',
-                data: {id}
-            })
-        },
-    
-        editWorkflowNodeDetails(id, nodeId, workflowNodeDetails) {
-            let mapNodeIdToWorkflowNodeDetails = {}
-            mapNodeIdToWorkflowNodeDetails[nodeId] = workflowNodeDetails
-            return request({
-                url: '/api/editWorkflowNodeDetails',
-                method: 'post',
-                data: {id, mapNodeIdToWorkflowNodeDetails}
-            })
-        },
-    
-        runWorkflowTest(id) {
-            return request({
-                url: '/api/startTest',
-                method: 'post',
-                data: {
-                    "testIdConfig" : 1,
-                    "workflowTestId": id,
-                    "type": "WORKFLOW",
-                    testName: id
-                }
-            })
-        },
-    
-        scheduleWorkflowTest(id, recurringDaily, startTimestamp) {
-            return request({
-                url: '/api/startTest',
-                method: 'post',
-                data: {
-                    "testIdConfig" : 1,
-                    "workflowTestId": id,
-                    "type": "WORKFLOW",
-                    "recurringDaily": recurringDaily,
-                    "startTimestamp": startTimestamp,
-                    testName: id
-                }
-            })
-        },
-    
-        fetchWorkflowTestingRun(workflowId) {
-            return request({
-                url: '/api/fetchWorkflowTestingRun',
-                method: 'post',
-                data: {
-                    "workflowTestId" : workflowId
-                }
-            })
-        },
-    
-        deleteScheduledWorkflowTests(workflowId) {
-            return request({
-                url: '/api/deleteScheduledWorkflowTests',
-                method: 'post',
-                data: {
-                    "workflowTestId" : workflowId
-                }
-            })
-        },
-    
-        fetchWorkflowResult(id) {
-            return request({
-                url: '/api/fetchWorkflowResult',
-                method: 'post',
-                data: {
-                    "workflowTestId": id,
-                }
-            })
-        },
-    
-        downloadWorkflowAsJson(id) {
-            return request({
-                url: '/api/downloadWorkflowAsJson',
-                method: 'post',
-                data: {
-                    "id": id,
-                }
-            })
-        },
-    
-        uploadWorkflowJson(workflowTestJson, apiCollectionId) {
-            return request({
-                url: '/api/uploadWorkflowJson',
-                method: 'post',
-                data: { workflowTestJson, apiCollectionId }
-            })
-        },
-    
-        async setFalsePositives (falsePositives) {
-            const resp = await request({
-                url: '/api/setFalsePositives',
-                method: 'post',
-                data: { falsePositives: falsePositives }
-            })
-            return resp
-        },
-        async fetchNewParametersTrend(startTimestamp, endTimestamp) {
-            const resp = await request({
-                url: '/api/fetchNewParametersTrend',
-                method: 'post',
-                data: { startTimestamp, endTimestamp }
-            })
-            return resp.data.endpoints
-        },
+    async loadParamsOfEndpoint (apiCollectionId, url, method) {
+        const resp = await request({
+            url: '/api/loadParamsOfEndpoint',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method
+            }
+        })
+        return resp
+    },
+    async fetchNewParametersTrend(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchNewParametersTrend',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp.data.endpoints
+    },
 }
