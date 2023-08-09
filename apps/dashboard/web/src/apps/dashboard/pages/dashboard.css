@@ -16,3 +16,14 @@
 .aktoButton .Polaris-Avatar--imageHasLoaded {
     width: 16px !important;
 }
+
+.header-css {
+    position: absolute;
+    width: 100vw;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 2vw;
+}
+.Polaris-TopBar{
+    border-bottom: 1px solid #E1E3E5;
+}

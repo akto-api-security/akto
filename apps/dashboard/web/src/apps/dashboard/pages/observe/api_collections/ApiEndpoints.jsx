@@ -18,11 +18,12 @@ import {
 
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
-import Store from "../../../store"
 import UploadFile from "../../../components/shared/UploadFile"
 import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
 import StyledEndpoint from "./component/StyledEndpoint"
+import WorkflowTests from "./WorkflowTests"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 
 const headers = [
     {
@@ -100,7 +101,6 @@ function ApiEndpoints() {
     const params = useParams()
     const apiCollectionId = params.apiCollectionId
 
-    const allCollections = Store(state => state.allCollections)
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
 
@@ -114,6 +114,7 @@ function ApiEndpoints() {
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
 
+    const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
 
     async function fetchData() {
@@ -186,6 +187,18 @@ function ApiEndpoints() {
         id: `${item}-${index}`,
     }));
 
+    tabs.push(
+        {
+            content: "Workflow tests",
+            index: tabs.length,
+            id: `Tests-${tabs.length}`,
+            component: <WorkflowTests   
+                    apiCollectionId={apiCollectionId} 
+                    endpointsList={loading ? [] : endpointData["All"]}
+                />
+        },
+    )
+
     const onSelect = (selectedIndex) => {
         setSelectedTab(tabStrings[selectedIndex])
         setSelected(selectedIndex)
@@ -193,9 +206,9 @@ function ApiEndpoints() {
 
     function handleRowClick(data) {
         const sameRow = func.deepComparison(apiDetail, data);
-        if(!sameRow){
+        if (!sameRow) {
             setShowDetails(true)
-        }else{
+        } else {
             setShowDetails(!showDetails)
         }
         setApiDetail((prev) => {
@@ -250,16 +263,16 @@ function ApiEndpoints() {
 
     async function exportPostman() {
         const result = await api.exportToPostman(apiCollectionId)
-        if (result) 
+        if (result)
             func.setToast(true, false, "Postman collection downloaded successfully")
     }
 
     function handleFileChange(file) {
         if (file) {
             const reader = new FileReader();
-            
+
             let isHar = file.name.endsWith(".har")
-            if(isHar && file.size >= 52428800){
+            if (isHar && file.size >= 52428800) {
                 func.setToast(true, true, "Please limit the file size to less than 50 MB")
                 return
             }
@@ -281,7 +294,7 @@ function ApiEndpoints() {
                     func.setToast(true, false, "We are uploading your har file, please dont refresh the page!")
 
                     api.uploadHarFile(formData).then(resp => {
-                        if(file.size > 2097152){
+                        if (file.size > 2097152) {
                             func.setToast(true, false, "We have successfully read your file")
                         }
                         else {
@@ -289,7 +302,7 @@ function ApiEndpoints() {
                         }
                         fetchData()
                     }).catch(err => {
-                        if(err.message.includes(404)){
+                        if (err.message.includes(404)) {
                             func.setToast(true, true, "Please limit the file size to less than 50 MB")
                         } else {
                             func.setToast(true, true, "Something went wrong while processing the file")
@@ -301,7 +314,7 @@ function ApiEndpoints() {
                     var bytes = new Uint8Array(arrayBuffer);
 
                     await api.uploadTcpFile([...bytes], apiCollectionId, skipKafka)
-                } 
+                }
             }
         }
     }
@@ -315,9 +328,6 @@ function ApiEndpoints() {
                     }
                 </Text>
             }
-            // primaryAction={
-            //     <RunTest />
-            // }
             secondaryActions={
                 <ButtonGroup>
                     <Tooltip content="Refresh">
@@ -335,44 +345,50 @@ function ApiEndpoints() {
                     >
                         Export
                     </Button>
-                    <UploadFile 
+                    <UploadFile
                         fileFormat=".har"
-                        fileChanged={file => handleFileChange(file)} 
-                        tooltipText="Upload traffic(.har)" 
+                        fileChanged={file => handleFileChange(file)}
+                        tooltipText="Upload traffic(.har)"
                         label="Upload traffic"
-                        primary={false}/>
-                    <RunTest />
+                        primary={false} />
+                    <RunTest
+                        apiCollectionId={apiCollectionId}
+                        endpoints={filteredEndpoints}
+                        filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                        disabled={tabs[selected].component !== undefined}
+                    />
                 </ButtonGroup>
             }
-            components={[
-                <div className="apiEndpointsTable" key="table">
-                    <GithubSimpleTable
-                        key="table"
-                        pageLimit={50}
-                        data={loading ? [] : endpointData[selectedTab]}
-                        loading={loading}
-                        sortOptions={sortOptions}
-                        resourceName={resourceName}
-                        filters={[]}
-                        disambiguateLabel={() => { }}
-                        headers={headers}
-                        getStatus={() => { return "warning" }}
-                        tabs={tabs}
-                        selected={selected}
-                        onSelect={onSelect}
-                        onRowClick={handleRowClick}
-                        getFilteredItems={getFilteredItems}
-                    />
-                </div>,
-                <ApiDetails
-                    key="details"
-                    showDetails={showDetails}
-                    setShowDetails={setShowDetails}
-                    apiDetail={apiDetail}
-                    headers={headers}
-                    getStatus={() => { return "warning" }}
-                />
-            ]}
+            components={
+                loading ? [<SpinnerCentered key="loading" />] :
+                    [
+                        <div className="apiEndpointsTable" key="table">
+                            <GithubSimpleTable
+                                key="table"
+                                pageLimit={50}
+                                data={tabs[selected].component ? [] : endpointData[selectedTab]}
+                                sortOptions={sortOptions}
+                                resourceName={resourceName}
+                                filters={[]}
+                                disambiguateLabel={() => { }}
+                                headers={headers}
+                                getStatus={() => { return "warning" }}
+                                tabs={tabs}
+                                selected={selected}
+                                onSelect={onSelect}
+                                onRowClick={handleRowClick}
+                                getFilteredItems={getFilteredItems}
+                            />
+                        </div>,
+                        <ApiDetails
+                            key="details"
+                            showDetails={showDetails}
+                            setShowDetails={setShowDetails}
+                            apiDetail={apiDetail}
+                            headers={headers}
+                            getStatus={() => { return "warning" }}
+                        />
+                    ]}
         />
     )
 }

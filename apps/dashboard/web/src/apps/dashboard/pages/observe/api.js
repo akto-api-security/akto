@@ -24,14 +24,6 @@ export default {
         })
         return resp.response.data
     },
-    async fetchDataTypeNames() {
-        const resp = await request({
-            url: '/api/fetchDataTypeNames',
-            method: 'post',
-            data: {}
-        })
-        return resp
-    },
     fetchSubTypeCountMap(startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchSubTypeCountMap',
@@ -42,45 +34,12 @@ export default {
             }
         })
     },
-    async fetchSampleData (url, apiCollectionId, method) {
-        const resp = await request({
-            url: '/api/fetchSampleData',
-            method: 'post',
-            data: {
-                url, apiCollectionId, method
-            }
-        })
-        return resp
-    },
-    async fetchSensitiveSampleData(url, apiCollectionId, method) {
-        const resp = await request({
-            url: '/api/fetchSensitiveSampleData',
-            method: 'post',
-            data: {
-                url, apiCollectionId, method
-            }
-        })
-        return resp
-    },
     fetchDataTypes() {
         return request({
             url: '/api/fetchDataTypes',
             method: 'post',
             data: { }
         })
-    },
-    async loadSensitiveParameters (apiCollectionId, url, method, subType) {
-        const resp = await request({
-            url: '/api/loadSensitiveParameters',
-            method: 'post',
-            data: {
-                apiCollectionId,
-                url,
-                method,
-                subType
-            }
-        })
-        return resp
     },
 
     saveCustomDataType(dataObj) {
@@ -98,23 +57,6 @@ export default {
             data: dataObj
         })
     },
-    async convertSampleDataToCurl(sampleData) {
-        const resp = await request({
-            url: '/api/convertSampleDataToCurl',
-            method: 'post',
-            data: { sampleData }
-        })
-        return resp
-    },
-    async convertSampleDataToBurpRequest(sampleData) {
-        const resp = await request({
-            url: '/api/convertSamleDataToBurpRequest',
-            method: 'post',
-            data: { sampleData }
-        })
-        return resp
-    },
-    
     async getAllCollections () {
         return await request({
             url: '/api/getAllCollections',
@@ -152,6 +94,40 @@ export default {
                 data: data
             })
         },
+    fetchAktoGptConfig(apiCollectionId) {
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: { apiCollectionId }
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchAllMarketplaceSubcategories() {
+        return request({
+            url: 'api/fetchAllMarketplaceSubcategories',
+            method: 'post',
+            data: {}
+        })
+    },
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl }
+        }).then((resp) => {
+            return resp
+        })
+    },
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source}
+        }).then((resp) => {
+            return resp
+        })        
+    },
         saveContent(apiSpec) {
             return request({
                 url: '/api/saveContent',
@@ -495,48 +471,6 @@ export default {
                 data: { falsePositives: falsePositives }
             })
             return resp
-        },
-        async fetchAktoGptConfig(apiCollectionId){
-            const resp = await request({
-                url: '/api/fetchAktoGptConfig',
-                method: 'post',
-                data: { apiCollectionId }
-            })
-            return resp
-        },
-        uploadHarFile(formData) {
-            return request({
-                url: '/api/uploadHar',
-                method: 'post',
-                data: formData,
-            })
-        },
-        uploadTcpFile(content, apiCollectionId, skipKafka) {
-            return request({
-                url: '/api/uploadTcp',
-                method: 'post',
-                data: {
-                    tcpContent: content, apiCollectionId, skipKafka
-                }
-            })
-        },
-        downloadOpenApiFile(apiCollectionId,lastFetchedUrl, lastFetchedMethod) {
-            return request({
-                url: '/api/generateOpenApiFile',
-                method: 'post',
-                data: {
-                    apiCollectionId, lastFetchedUrl, lastFetchedMethod
-                }
-            })
-        },
-        exportToPostman(apiCollectionId) {
-            return request({
-                url: '/api/createPostmanApi',
-                method: 'post',
-                data: {
-                    apiCollectionId
-                }
-            })
         },
         async fetchNewParametersTrend(startTimestamp, endTimestamp) {
             const resp = await request({

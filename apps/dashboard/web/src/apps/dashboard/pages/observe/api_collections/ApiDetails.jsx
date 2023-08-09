@@ -15,13 +15,17 @@ function ApiDetails(props) {
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
     const setSamples = ObserveStore(state => state.setSamples)
+    const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
 
     async function fetchData() {
         const { apiCollectionId, endpoint, method } = apiDetail
+        setSelectedUrl({url: endpoint, method: method})
         await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
             if (res.sampleDataList.length > 0) {
                 setSampleData(res.sampleDataList[0].samples.map((sample) => ({ message: sample, highlightPaths: [] })))
-                setSamples(res.sampleDataList[0].samples)
+                setSamples(res.sampleDataList[0].samples[0])
+            }else{
+                setSamples("")
             }
         })
 

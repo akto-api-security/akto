@@ -10,6 +10,7 @@ import {
   } from '@shopify/polaris-icons';
 
 import { useNavigate } from "react-router-dom"
+import ObserveStore from "../observeStore"
 
 const headers = [
     {
@@ -70,7 +71,16 @@ function ApiCollections() {
         []);
     
     
-    const navigate = useNavigate()
+    const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
+    const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
+    const setSamples = ObserveStore(state => state.setSamples)
+    const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
+    const resetFunc = () => {
+        setInventoryFlyout(false)
+        setFilteredItems([])
+        setSamples("")
+        setSelectedUrl({})
+    }
 
     const showCreateNewCollectionPopup = () => {
         setActive(true)
@@ -93,7 +103,8 @@ function ApiCollections() {
     }
 
     useEffect(() => {
-        fetchData()    
+        fetchData()
+        resetFunc()    
     }, [])
 
     const createCollectionModalActivatorRef = useRef();
