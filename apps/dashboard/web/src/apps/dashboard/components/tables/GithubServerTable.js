@@ -182,59 +182,57 @@ function GithubServerTable(props) {
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
       <LegacyCard>
-        <LegacyCard.Section flush>
         { props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
-        <LegacyCard.Section flush>
-          <IndexFilters
-          sortOptions={props.sortOptions}
-          sortSelected={sortSelected}
-          queryValue={queryValue}
-          queryPlaceholder={`Searching in ${total} ${total==1 ? props.resourceName.singular:props.resourceName.plural}`}
-          onQueryChange={handleFiltersQueryChange}
-          onQueryClear={handleFiltersQueryClear}
-          {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
-          onSort={setSortSelected}
-          cancelAction={{
-            onAction: fun,
-            disabled: false,
-            loading: false,
-          }}
-          tabs={props.tabs || []}
-          selected={props.selected}
-          onSelect={props.onSelect}
-          canCreateNewView={false}
-          filters={filters}
-          appliedFilters={appliedFilters}
-          onClearAll={handleFiltersClearAll}
-          mode={mode}
-          setMode={setMode}
-          loading={props.loading || false}
-        />
-        <IndexTable
-          resourceName={props.resourceName}
-          itemCount={data.length}
-          selectedItemsCount={
-            allResourcesSelected ? 'All' : selectedResources.length
-          }
-          // condensed
-          selectable={props.selectable || false}
-          onSelectionChange={handleSelectionChange}
-          headings={[
-            {
-              id: "data",
-              hidden: true,
-              flush: true
+          <LegacyCard.Section flush>
+            <IndexFilters
+            sortOptions={props.sortOptions}
+            sortSelected={sortSelected}
+            queryValue={queryValue}
+            queryPlaceholder={`Searching in ${total} ${total==1 ? props.resourceName.singular:props.resourceName.plural}`}
+            onQueryChange={handleFiltersQueryChange}
+            onQueryClear={handleFiltersQueryClear}
+            {...(props.hideQueryField ? {hideQueryField: props.hideQueryField} : {})}
+            onSort={setSortSelected}
+            cancelAction={{
+              onAction: fun,
+              disabled: false,
+              loading: false,
+            }}
+            tabs={props.tabs || []}
+            selected={props.selected}
+            onSelect={props.onSelect}
+            canCreateNewView={false}
+            filters={filters}
+            appliedFilters={appliedFilters}
+            onClearAll={handleFiltersClearAll}
+            mode={mode}
+            setMode={setMode}
+            loading={props.loading || false}
+          />
+          <IndexTable
+            resourceName={props.resourceName}
+            itemCount={data.length}
+            selectedItemsCount={
+              allResourcesSelected ? 'All' : selectedResources.length
             }
-          ]}
-          bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
-          promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
-        >
-          {rowMarkup}
-          </IndexTable>
-          </LegacyCard.Section> 
+            // condensed
+            selectable={props.selectable || false}
+            onSelectionChange={handleSelectionChange}
+            headings={[
+              {
+                id: "data",
+                hidden: true,
+                flush: true
+              }
+            ]}
+            bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
+            promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+          >
+            {rowMarkup}
+            </IndexTable>
+            </LegacyCard.Section> 
           }
-        </LegacyCard.Section>
         <LegacyCard.Section>
           <HorizontalStack
             align="center">

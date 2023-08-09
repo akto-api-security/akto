@@ -24,22 +24,63 @@ export default {
         })
         return resp.response.data
     },
+    async fetchDataTypeNames() {
+        const resp = await request({
+            url: '/api/fetchDataTypeNames',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
     fetchSubTypeCountMap(startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchSubTypeCountMap',
             method: 'post',
             data: {
-                startTimestamp, 
+                startTimestamp,
                 endTimestamp
             }
         })
+    },
+    async fetchSampleData(url, apiCollectionId, method) {
+        const resp = await request({
+            url: '/api/fetchSampleData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method
+            }
+        })
+        return resp
+    },
+    async fetchSensitiveSampleData(url, apiCollectionId, method) {
+        const resp = await request({
+            url: '/api/fetchSensitiveSampleData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method
+            }
+        })
+        return resp
     },
     fetchDataTypes() {
         return request({
             url: '/api/fetchDataTypes',
             method: 'post',
-            data: { }
+            data: {}
         })
+    },
+    async loadSensitiveParameters(apiCollectionId, url, method, subType) {
+        const resp = await request({
+            url: '/api/loadSensitiveParameters',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method,
+                subType
+            }
+        })
+        return resp
     },
 
     saveCustomDataType(dataObj) {
@@ -57,7 +98,23 @@ export default {
             data: dataObj
         })
     },
-    async getAllCollections () {
+    async convertSampleDataToCurl(sampleData) {
+        const resp = await request({
+            url: '/api/convertSampleDataToCurl',
+            method: 'post',
+            data: { sampleData }
+        })
+        return resp
+    },
+    async convertSampleDataToBurpRequest(sampleData) {
+        const resp = await request({
+            url: '/api/convertSamleDataToBurpRequest',
+            method: 'post',
+            data: { sampleData }
+        })
+        return resp
+    },
+    async getAllCollections() {
         return await request({
             url: '/api/getAllCollections',
             method: 'post',
@@ -87,13 +144,121 @@ export default {
             data: {apiCollections: items}
         })        
     },
-        askAi(data){
-            return request({
-                url: '/api/ask_ai',
-                method: 'post',
-                data: data
-            })
-        },
+    askAi(data) {
+        return request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: data
+        })
+    },
+    saveContent(apiSpec) {
+        return request({
+            url: '/api/saveContent',
+            method: 'post',
+            data: {
+                apiSpec: apiSpec.swaggerContent,
+                filename: apiSpec.filename,
+                apiCollectionId: apiSpec.apiCollectionId
+            }
+        })
+    },
+    loadContent(apiCollectionId) {
+        return request({
+            url: '/api/loadContent',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+    },
+    uploadHarFile(formData) {
+        return request({
+            url: '/api/uploadHar',
+            method: 'post',
+            data: formData,
+        })
+    },
+    uploadTcpFile(content, apiCollectionId, skipKafka) {
+        return request({
+            url: '/api/uploadTcp',
+            method: 'post',
+            data: {
+                tcpContent: content, apiCollectionId, skipKafka
+            }
+        })
+    },
+    downloadOpenApiFile(apiCollectionId, lastFetchedUrl, lastFetchedMethod) {
+        return request({
+            url: '/api/generateOpenApiFile',
+            method: 'post',
+            data: {
+                apiCollectionId, lastFetchedUrl, lastFetchedMethod
+            }
+        })
+    },
+    exportToPostman(apiCollectionId) {
+        return request({
+            url: '/api/createPostmanApi',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+    fetchAPICollection(apiCollectionId) {
+        return request({
+            url: '/api/fetchAPICollection',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+                useHost: !!window.useHost
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+    async fetchAllUrlsAndMethods (apiCollectionId) {
+        const resp = await request({
+            url: '/api/fetchAllUrlsAndMethods',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
+    },
+    addSensitiveField (x) {
+        return request({
+            url: 'api/addSensitiveField',
+            method: 'post',
+            data: {
+                ...x
+            }
+        })
+    },
+    listAllSensitiveFields () {
+        return request({
+            url: 'api/listAllSensitiveFields',
+            method: 'post',
+            data: {}
+        })
+    },
+    async loadRecentEndpoints (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/loadRecentEndpoints',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+    async fetchSensitiveParamsForEndpoints (urls) {
+        const resp = await request({
+            url: '/api/fetchSensitiveParamsForEndpoints',
+            method: 'post',
+            data: { urls }
+        })
+        return resp
+    },
     fetchAktoGptConfig(apiCollectionId) {
         return request({
             url: '/api/fetchAktoGptConfig',
@@ -128,128 +293,6 @@ export default {
             return resp
         })        
     },
-        saveContent(apiSpec) {
-            return request({
-                url: '/api/saveContent',
-                method: 'post',
-                data: {
-                    apiSpec: apiSpec.swaggerContent,
-                    filename: apiSpec.filename,
-                    apiCollectionId: apiSpec.apiCollectionId
-                }
-            })
-        },
-        loadContent(apiCollectionId) {
-            return request({
-                url: '/api/loadContent',
-                method: 'post',
-                data: {
-                    apiCollectionId: apiCollectionId
-                }
-            })
-        },
-        uploadHarFile(formData) {
-            return request({
-                url: '/api/uploadHar',
-                method: 'post',
-                data: formData,
-            })
-        },
-        uploadTcpFile(content, apiCollectionId, skipKafka) {
-            return request({
-                url: '/api/uploadTcp',
-                method: 'post',
-                data: {
-                    tcpContent: content, apiCollectionId, skipKafka
-                }
-            })
-        },
-        downloadOpenApiFile(apiCollectionId,lastFetchedUrl, lastFetchedMethod) {
-            return request({
-                url: '/api/generateOpenApiFile',
-                method: 'post',
-                data: {
-                    apiCollectionId, lastFetchedUrl, lastFetchedMethod
-                }
-            })
-        },
-        exportToPostman(apiCollectionId) {
-            return request({
-                url: '/api/createPostmanApi',
-                method: 'post',
-                data: {
-                    apiCollectionId
-                }
-            })
-        },
-        async fetchAPICollection (apiCollectionId) {
-            const resp = await request({
-                url: '/api/fetchAPICollection',
-                method: 'post',
-                data: {
-                    apiCollectionId: apiCollectionId,
-                    useHost: !!window.useHost
-                }
-            })
-            return resp
-        },
-    
-        async fetchAllUrlsAndMethods (apiCollectionId) {
-            const resp = await request({
-                url: '/api/fetchAllUrlsAndMethods',
-                method: 'post',
-                data: {
-                    apiCollectionId: apiCollectionId
-                }
-            })
-            return resp
-        },
-    
-        addSensitiveField (x) {
-            return request({
-                url: 'api/addSensitiveField',
-                method: 'post',
-                data: {
-                    ...x
-                }
-            })
-        },
-        listAllSensitiveFields () {
-            return request({
-                url: 'api/listAllSensitiveFields',
-                method: 'post',
-                data: {}
-            })
-        },
-        async loadRecentEndpoints (startTimestamp, endTimestamp) {
-            const resp = await request({
-                url: '/api/loadRecentEndpoints',
-                method: 'post',
-                data: { startTimestamp, endTimestamp }
-            })
-            return resp
-        },
-        async fetchSensitiveParamsForEndpoints (urls) {
-            const resp = await request({
-                url: '/api/fetchSensitiveParamsForEndpoints',
-                method: 'post',
-                data: { urls }
-            })
-            return resp
-        },
-        async loadSensitiveParameters (apiCollectionId, url, method, subType) {
-            const resp = await request({
-                url: '/api/loadSensitiveParameters',
-                method: 'post',
-                data: {
-                    apiCollectionId,
-                    url,
-                    method,
-                    subType
-                }
-            })
-            return resp
-        },
         async loadParamsOfEndpoint (apiCollectionId, url, method) {
             const resp = await request({
                 url: '/api/loadParamsOfEndpoint',
@@ -268,27 +311,6 @@ export default {
                 method: 'post',
                 data: {
                     url, apiCollectionId, method, startEpoch, endEpoch
-                }
-            })
-            return resp
-        },
-        async fetchSampleData (url, apiCollectionId, method) {
-            const resp = await request({
-                url: '/api/fetchSampleData',
-                method: 'post',
-                data: {
-                    url, apiCollectionId, method
-                }
-            })
-            return resp
-        },
-    
-        async fetchSensitiveSampleData(url, apiCollectionId, method) {
-            const resp = await request({
-                url: '/api/fetchSensitiveSampleData',
-                method: 'post',
-                data: {
-                    url, apiCollectionId, method
                 }
             })
             return resp
@@ -312,32 +334,6 @@ export default {
             })
             return resp
         },
-        async convertSampleDataToCurl(sampleData) {
-            const resp = await request({
-                url: '/api/convertSampleDataToCurl',
-                method: 'post',
-                data: { sampleData }
-            })
-            return resp
-        },
-        async convertSampleDataToBurpRequest(sampleData) {
-            const resp = await request({
-                url: '/api/convertSamleDataToBurpRequest',
-                method: 'post',
-                data: { sampleData }
-            })
-            return resp
-        },
-    
-        async fetchDataTypeNames() {
-            const resp = await request({
-                url: '/api/fetchDataTypeNames',
-                method: 'post',
-                data: {}
-            })
-            return resp
-        },
-    
         fetchWorkflowTests() {
             return request({
                 url: '/api/fetchWorkflowTests',
