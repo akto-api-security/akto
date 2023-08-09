@@ -579,4 +579,18 @@ export default {
             return resp
         })        
     },
+    fetchWorkflowTests() {
+        return request({
+            url: '/api/fetchWorkflowTests',
+            method: 'post',
+            data: {}
+        })
+    },
+    uploadWorkflowJson(workflowTestJson, apiCollectionId) {
+        return request({
+            url: '/api/uploadWorkflowJson',
+            method: 'post',
+            data: { workflowTestJson, apiCollectionId }
+        })
+    }
 }

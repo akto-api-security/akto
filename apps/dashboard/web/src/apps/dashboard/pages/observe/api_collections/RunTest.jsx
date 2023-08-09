@@ -9,7 +9,7 @@ import func from "@/util/func"
 import homeFunctions from "../../home/module";
 import { useNavigate } from "react-router-dom"
 
-function RunTest({ endpoints, filtered, apiCollectionId }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     const initialState = {
         categories: [],
@@ -135,7 +135,7 @@ function RunTest({ endpoints, filtered, apiCollectionId }) {
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary>Run Test</Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled}>Run Test</Button>
         </div>
     );
 
