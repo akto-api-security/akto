@@ -1,12 +1,13 @@
 import { LegacyCard, HorizontalGrid, TextField } from "@shopify/polaris";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useReducer } from "react";
 import ConditionsPicker from "../../../components/ConditionsPicker";
 import Dropdown from "../../../components/layouts/Dropdown";
 import transform from "./transform";
 import func from "@/util/func";
 import tagsApi from "./api";
 import DetailsPage from "../../../components/DetailsPage";
+import {produce} from "immer"
 
 const selectOptions = [
     {
@@ -32,7 +33,8 @@ const selectOptions = [
     {
         id:"IS_NUMBER",
         label: 'Is number',
-        value: 'IS_NUMBER'
+        value: 'IS_NUMBER',
+        type: "NUMBER"
     }
 ]
 
@@ -58,13 +60,11 @@ function TagDetails() {
     const pageTitle = isNew ? "Add tag" : "Configure tag"
     const initialState = isNew ? { name: "", active: undefined, keyConditions: [], operator: "OR" } :
         transform.fillInitialState(location.state);
-    const [currState, setCurrentState] = useState({});
+    const [currState, dispatchCurrState] = useReducer(produce((draft, action) => func.conditionStateReducer(draft, action)), {});
     const [change, setChange] = useState(false)
 
     const resetFunc = () => {
-        setCurrentState((prev) => {
-            return { ...initialState }
-        });
+        dispatchCurrState({type:"update", obj:initialState})
         setChange(false);
     }
     useEffect(() => {
@@ -80,9 +80,7 @@ function TagDetails() {
     }, [currState])
 
     const handleChange = (obj) => {
-        setCurrentState((prev) => {
-            return { ...prev, ...obj };
-        })
+        dispatchCurrState({type:"update", obj:obj})
     }
 
     const descriptionCard = (
@@ -96,11 +94,20 @@ function TagDetails() {
                     />
                     {isNew ? null :
                         <Dropdown menuItems={activeItems} placeHolder={"Tag active status"}
-                            selected={(val) => { handleChange({ active: val }) }} initial={initialState.active} label="Active" />}
+                            selected={(val) => { handleChange({ active: val }) }} 
+                            initial={currState.active} label="Active" />}
                 </HorizontalGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )
+
+    const handleDispatch = (val, key) => {
+        if(val?.key==="condition"){
+            dispatchCurrState({...val, key:key})
+        } else {
+            dispatchCurrState(val);
+        }
+    }
 
     const conditionsCard = (
         <LegacyCard title="Details" key="condition">
@@ -108,11 +115,10 @@ function TagDetails() {
                 id={"url"} 
                 title="URL conditions"
                 param="param_name"
-                initialItems={currState.keyConditions || []}
-                items={selectOptions}
-                conditionOp={currState.operator}
-                fetchChanges={(val) => { handleChange({ keyConditions: val.predicates, operator: val.operator }) }}
-                setChange={setChange}
+                conditions={currState.keyConditions || []}
+                selectOptions={selectOptions}
+                operator={currState.operator}
+                dispatch={(val) => {handleDispatch(val, "keyConditions")}}
             />
         </LegacyCard>
     )

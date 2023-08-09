@@ -97,21 +97,13 @@ const resourceName = {
 let promotedBulkActions = (selectedResources) => {
     return [
         {
-            content: 'Ignore',
+            content: 'Ignore key for this API',
             onAction: () => console.log('Todo: implement function'),
           },
           {
-            content: 'Mark as false positive',
+            content: 'Ignore key for all APIs',
             onAction: () => console.log('Todo: implement function'),
-          },
-          {
-            content: 'Create issue',
-            onAction: () => console.log('Todo: implement function'),
-          },
-          {
-            content: 'Configure data types',
-            onAction: () => console.log('Todo: implement function'),
-          },
+          }
     ]
 }
 
@@ -167,8 +159,8 @@ function SensitiveDataExposure() {
         let startTimestamp = 0;
         let endTimestamp = func.timeNow()
         if(dateRange){
-            startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
-            endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
+            startTimestamp = Math.floor(Date.parse(dateRange.period.since) / 1000);
+            endTimestamp = Math.floor(Date.parse(dateRange.period.until) / 1000)
         }
         await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
             res.endpoints.forEach((endpoint, index) => {
@@ -194,7 +186,7 @@ function SensitiveDataExposure() {
 const navigate = useNavigate();
 
 const handleRedirect = () => {
-    navigate("/dashboard/observe/data-types", {state: {name: "", dataObj: {}}})
+    navigate("/dashboard/observe/data-types")
 }
 
     return (
@@ -213,11 +205,11 @@ const handleRedirect = () => {
                 appliedFilters={appliedFilters}
                 sortOptions={sortOptions}
                 disambiguateLabel={disambiguateLabel}
-                selectable = {true}
+                // selectable = {true}
                 loading={loading}
                 fetchData={fetchData}
                 filters={filters}
-                promotedBulkActions={promotedBulkActions}
+                // promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
                 calenderFilter={true}
                 getStatus={func.getTestResultStatus}

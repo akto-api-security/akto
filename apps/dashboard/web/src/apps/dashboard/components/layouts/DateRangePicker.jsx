@@ -124,7 +124,7 @@ function DateRangePicker(props) {
         setActiveDateRange(newDateRange);
       }
       function apply() {
-        props.getDate(activeDateRange.period)
+        props.getDate(activeDateRange)
         props.setPopoverState(false);
       }
       function cancel() {
@@ -158,13 +158,6 @@ function DateRangePicker(props) {
             });
           }
         }
-        const buttonValue =
-          activeDateRange.title === "Custom"
-            ? activeDateRange.period.since.toDateString() +
-              " - " +
-              activeDateRange.period.until.toDateString()
-            : activeDateRange.title;
-          props.setButtonValue(buttonValue);
       }, [activeDateRange]);
 
       return (

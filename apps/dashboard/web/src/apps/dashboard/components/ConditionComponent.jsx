@@ -8,7 +8,8 @@ import api from '../pages/testing/api';
 
 function ConditionComponent(props) {
 
-    const { condition, setConditions, index, param, selectOptions } = props
+    const { id, condition, index, param, selectOptions, dispatch } = props
+
     useEffect(()=>{
         fetchApiEndpoints(condition)
     },[condition])
@@ -58,70 +59,22 @@ function ConditionComponent(props) {
     const [apiEndpoints, setApiEndpoints] = useState({})
 
     const handleTextChange = (value) => {
-        setConditions((prev) => {
-            prev[index].value = value;
-            return [...prev];
-        })
+        dispatch({ type: "update", index: index, obj: { value: value } })
     };
 
-    const orAndConditions = [
-        {
-            label: 'OR',
-            value: 'OR',
-        },
-        {
-            label: 'AND',
-            value: 'AND'
-        }
-    ]
-
-    const getOption = (type) => {
-        const option = selectOptions.filter((item) => {
-            return item.value == type
-        })[0]
-        return option;
-    }
-    const getConditions = (type) => {
-        const option = getOption(type)
-        if (option.operators) {
-            return option.operators
-        }
-        return orAndConditions;
-    }
-
     const handleTypeSelected = (type) => {
-        setConditions((prev) => {
-            if(getOption(type).type == "MAP"){
-                if(getOption(prev[index].type).type==undefined){
-                    prev[index].value={}
-                }
-            } else {
-                prev[index].value=""
-            }
-            prev[index].type = type;
-            prev[index].operator = getConditions(type)[0].label;
-            return [...prev];
-        })
+        dispatch({ type: "update", index: index, obj: { type: type } })
     }
 
     const handleCollectionSelected = (collectionId) => {
-        let value = {};
-        value[collectionId] = []
-        setConditions((prev) => {
-            prev[index].value = value;
-            return [...prev];
-        })
-        fetchApiEndpoints(condition)
+        dispatch({ type: "update", index: index, obj: { value: { [collectionId]: [] } } })
     }
 
     const handleEndpointsSelected = (apiEndpoints, field) => {
-        let value = field.value;
         let collectionId = getCollectionId(field);
-        value[collectionId]=apiEndpoints;
-        setConditions((prev) => {
-            prev[index].value = value;
-            return [...prev];
-        })
+        if (collectionId) {
+            dispatch({ type: "update", index: index, obj: { value: { [collectionId]: apiEndpoints } } })
+        }
     }
 
     function getEndpointCount(field){
@@ -154,6 +107,7 @@ function ConditionComponent(props) {
             <div style={{display:"flex", gap:"4px"}}>
                 <div style={{flexGrow:"1"}}>
                 <DropdownSearch
+                    id={`${id}-api-collection-${index}`}
                     placeholder="Select API collection"
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
@@ -163,6 +117,7 @@ function ConditionComponent(props) {
                 </div>
                 <div style={{flexGrow:"1"}}>
                 <DropdownSearch
+                    id={`${id}-api-endpoint-${index}`}
                     disabled={apiEndpoints?.endpoints == undefined || apiEndpoints.endpoints.length === 0}
                     placeholder="Select API endpoint"
                     optionsList={apiEndpoints?.endpoints == undefined || typeof apiEndpoints.then == 'function' ? [] : 
@@ -179,20 +134,28 @@ function ConditionComponent(props) {
         )
     }
 
+    const component = (condition) => {
+        let type = func.getOption(selectOptions, condition.type).type;
+
+        switch (type) {
+            case "MAP": return collectionComponent(condition);
+            case "NUMBER": return <TextField id={`${id}-param-text-${index}`} disabled/>;
+            default:
+                return <TextField
+                id={`${id}-param-text-${index}`}
+                value={condition.value}
+                onChange={(newValue) => handleTextChange(newValue)}
+            />
+        }
+    }
+
     return (
         <div style={{ display: "flex", gap:"4px" }}>
             <div style={{ flex: "2" }}>
                 {prefixLeft(condition)}
             </div>
             <div style={{ flex: "3" }}>
-                {
-                    getOption(condition.type).type == "MAP" ?
-                        collectionComponent(condition) :
-                        <TextField
-                            value={condition.value}
-                            onChange={(newValue) => handleTextChange(newValue)}
-                        />
-                }
+                {component(condition)}
             </div>
         </div>
     )

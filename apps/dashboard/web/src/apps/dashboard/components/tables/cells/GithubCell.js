@@ -60,7 +60,8 @@ function GithubCell(props){
                 )}) 
             }
         </HorizontalStack>
-        <HorizontalStack gap='2' align="start" >
+        <Box maxWidth={width}>
+        <HorizontalStack gap='2' align="start">
             {
                 headers?.filter((header) => {
                     return header.itemOrder==3
@@ -70,14 +71,17 @@ function GithubCell(props){
                             <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                                 <Icon source={header.icon} color="subdued" />
                             </div>
-                            <Text as="div" variant="bodySm" color="subdued">
+                            <Box maxWidth={width}>
+                            <Text as="div" variant="bodySm" color="subdued" truncate>
                                 {data[header.value]}
                             </Text>
+                            </Box>
                         </HorizontalStack>
                     )
                 }) 
             }
         </HorizontalStack>
+        </Box>
     </VerticalStack>
 </HorizontalStack>
 )

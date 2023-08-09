@@ -4,8 +4,14 @@
     right: -40vw;
     transition: right 0.3s ease-in-out;
     width:40vw;
-    height: 100%;
     z-index: 400;
+    height: 100vh;
+}
+
+.innerFlyLayout{
+    height: 100vh;
+    position: fixed;
+    overflow-y: scroll;
 }
 
 .show{

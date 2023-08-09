@@ -66,8 +66,8 @@ function Metrics() {
     },[startTime,endTime,groupBy])
 
     const handleDate = (dateRange) =>{
-        setStartTime(Math.floor(Date.parse(dateRange.since) / 1000))
-        setEndTime(Math.floor(Date.parse(dateRange.until) / 1000))
+        setStartTime(Math.floor(Date.parse(dateRange.period.since) / 1000))
+        setEndTime(Math.floor(Date.parse(dateRange.period.until) / 1000))
     }
 
     function changeItems(){

@@ -206,29 +206,27 @@ export default {
                 }
             })
         },
-        fetchAPICollection (apiCollectionId) {
-            return request({
+        async fetchAPICollection (apiCollectionId) {
+            const resp = await request({
                 url: '/api/fetchAPICollection',
                 method: 'post',
                 data: {
                     apiCollectionId: apiCollectionId,
                     useHost: !!window.useHost
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
     
-        fetchAllUrlsAndMethods (apiCollectionId) {
-            return request({
+        async fetchAllUrlsAndMethods (apiCollectionId) {
+            const resp = await request({
                 url: '/api/fetchAllUrlsAndMethods',
                 method: 'post',
                 data: {
                     apiCollectionId: apiCollectionId
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
     
         addSensitiveField (x) {
@@ -247,40 +245,37 @@ export default {
                 data: {}
             })
         },
-        loadRecentEndpoints (startTimestamp, endTimestamp) {
-            return request({
+        async loadRecentEndpoints (startTimestamp, endTimestamp) {
+            const resp = await request({
                 url: '/api/loadRecentEndpoints',
                 method: 'post',
-                data: {startTimestamp, endTimestamp}
-            }).then((resp) => {
-                return resp
+                data: { startTimestamp, endTimestamp }
             })
+            return resp
         },
-        fetchSensitiveParamsForEndpoints (urls) {
-            return request({
+        async fetchSensitiveParamsForEndpoints (urls) {
+            const resp = await request({
                 url: '/api/fetchSensitiveParamsForEndpoints',
                 method: 'post',
-                data: {urls}
-            }).then((resp) => {
-                return resp
+                data: { urls }
             })
+            return resp
         },
-        loadSensitiveParameters (apiCollectionId, url, method, subType) {
-            return request({
+        async loadSensitiveParameters (apiCollectionId, url, method, subType) {
+            const resp = await request({
                 url: '/api/loadSensitiveParameters',
                 method: 'post',
                 data: {
                     apiCollectionId,
-                    url, 
+                    url,
                     method,
                     subType
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
-        loadParamsOfEndpoint (apiCollectionId, url, method) {
-            return request({
+        async loadParamsOfEndpoint (apiCollectionId, url, method) {
+            const resp = await request({
                 url: '/api/loadParamsOfEndpoint',
                 method: 'post',
                 data: {
@@ -288,92 +283,83 @@ export default {
                     url,
                     method
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
-        fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
-            return request({
+        async fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
+            const resp = await request({
                 url: '/api/fetchEndpointTrafficData',
                 method: 'post',
                 data: {
                     url, apiCollectionId, method, startEpoch, endEpoch
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
-        fetchSampleData (url, apiCollectionId, method) {
-            return request({
+        async fetchSampleData (url, apiCollectionId, method) {
+            const resp = await request({
                 url: '/api/fetchSampleData',
                 method: 'post',
                 data: {
                     url, apiCollectionId, method
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
     
-        fetchSensitiveSampleData(url, apiCollectionId, method) {
-            return request({
+        async fetchSensitiveSampleData(url, apiCollectionId, method) {
+            const resp = await request({
                 url: '/api/fetchSensitiveSampleData',
                 method: 'post',
                 data: {
                     url, apiCollectionId, method
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
     
-        fetchApiInfoList(apiCollectionId) {
-            return request({
+        async fetchApiInfoList(apiCollectionId) {
+            const resp = await request({
                 url: '/api/fetchApiInfoList',
                 method: 'post',
                 data: {
                     apiCollectionId
                 }
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
-        fetchFilters() {
-            return request({
+        async fetchFilters() {
+            const resp = await request({
                 url: '/api/fetchFilters',
                 method: 'post',
                 data: {}
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
-        convertSampleDataToCurl(sampleData) {
-            return request({
+        async convertSampleDataToCurl(sampleData) {
+            const resp = await request({
                 url: '/api/convertSampleDataToCurl',
                 method: 'post',
-                data: {sampleData}
-            }).then((resp) => {
-                return resp
+                data: { sampleData }
             })
+            return resp
         },
-        convertSampleDataToBurpRequest(sampleData) {
-            return request({
+        async convertSampleDataToBurpRequest(sampleData) {
+            const resp = await request({
                 url: '/api/convertSamleDataToBurpRequest',
                 method: 'post',
-                data: {sampleData}
-            }).then((resp) => {
-                return resp
+                data: { sampleData }
             })
+            return resp
         },
     
-        fetchDataTypeNames() {
-            return request({
+        async fetchDataTypeNames() {
+            const resp = await request({
                 url: '/api/fetchDataTypeNames',
                 method: 'post',
                 data: {}
-            }).then((resp) => {
-                return resp
             })
+            return resp
         },
     
         fetchWorkflowTests() {
@@ -502,23 +488,21 @@ export default {
             })
         },
     
-        setFalsePositives (falsePositives) {
-            return request({
+        async setFalsePositives (falsePositives) {
+            const resp = await request({
                 url: '/api/setFalsePositives',
                 method: 'post',
-                data: {falsePositives:falsePositives}
-            }).then((resp) => {
-                return resp
+                data: { falsePositives: falsePositives }
             })
+            return resp
         },
-        fetchAktoGptConfig(apiCollectionId){
-            return request({
+        async fetchAktoGptConfig(apiCollectionId){
+            const resp = await request({
                 url: '/api/fetchAktoGptConfig',
                 method: 'post',
-                data: {apiCollectionId}
-            }).then((resp) => {
-                return resp
+                data: { apiCollectionId }
             })
+            return resp
         },
         uploadHarFile(formData) {
             return request({
@@ -553,5 +537,13 @@ export default {
                     apiCollectionId
                 }
             })
+        },
+        async fetchNewParametersTrend(startTimestamp, endTimestamp) {
+            const resp = await request({
+                url: '/api/fetchNewParametersTrend',
+                method: 'post',
+                data: { startTimestamp, endTimestamp }
+            })
+            return resp.data.endpoints
         },
 }

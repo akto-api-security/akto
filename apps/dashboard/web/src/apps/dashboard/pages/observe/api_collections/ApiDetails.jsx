@@ -72,7 +72,7 @@ function ApiDetails(props) {
                 key="Sample values"
                 sampleData={sampleData}
                 heading={"Sample values"}
-                minHeight={"200px"}
+                minHeight={"35vh"}
                 vertical={true}
             />
         </Box>,

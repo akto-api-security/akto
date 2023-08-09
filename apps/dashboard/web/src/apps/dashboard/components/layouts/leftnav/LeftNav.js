@@ -81,6 +81,12 @@ export default function LeftNav(){
                         },
                       },
                       {
+                        label: 'API Changes',
+                        onClick: ()=>{
+                          navigate('/dashboard/observe/changes')
+                        },
+                      },
+                      {
                         label: 'Sensitive data',
                         onClick: ()=>{
                           navigate('/dashboard/observe/sensitive')

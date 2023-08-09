@@ -7,6 +7,7 @@ import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
+import { current } from 'immer';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -605,7 +606,7 @@ isSubTypeSensitive(x) {
 prepareValuesTooltip(x) {
   let result = "";
   let values = x["values"]
-  if (!values) return "No values recorded"
+  if (!values) return ""
   let elements = values["elements"] ? values["elements"] : []
   let count = 0;
   for (let elem of elements) {
@@ -617,7 +618,7 @@ prepareValuesTooltip(x) {
       count += 1
   }
 
-  return (count == 0 ? "No values recorded" : result)
+  return (count == 0 ? "" : result)
 },
 
 parameterizeUrl(x) {
@@ -627,7 +628,7 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName, iconFunc) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
   let ret = {}
   let apiInfoMap = {}
 
@@ -659,7 +660,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName, iconFunc) {
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
 
           ret[key] = {
-              id: x.method+ " " + x.url,
+              id: x.method+ " " + x.url + Math.random(),
               shadow: x.shadow ? x.shadow : false,
               sensitive: x.sensitive,
               tags: x.tags,
@@ -679,7 +680,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName, iconFunc) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
-              method_icon: iconFunc ? iconFunc(x.method) : null
           }
 
       }
@@ -761,7 +761,109 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
       return collection.displayName
     else 
       return ""
- }
+ },
+  getOption: (selectOptions, type) => {
+    const option = selectOptions.filter((item) => {
+      return item.value == type
+    })[0]
+    return option;
+  },
+  getConditions: (selectOptions, type) => {
+    const option = func.getOption(selectOptions, type)
+    if (option.operators) {
+      return option.operators
+    }
+    return [{
+      label: 'OR',
+      value: 'OR',
+    },
+    {
+      label: 'AND',
+      value: 'AND'
+    }];
+  },
+  conditionStateReducer(draft, action) {
+    try{
+        switch (action.type) {
+            case "add": {
+                if (action.key) {
+                    draft[action.key].push(action.condition);
+                }
+                break;
+            }
+            case "update": {
+                if (action.key) {
+                    Object.assign(draft[action.key][action.index], action.obj);
+                } else {
+                    Object.assign(draft, action.obj);
+                }
+                break;
+            }
+            case "delete": {
+                if(Array.isArray(current(draft[action.key]))){
+                    draft[action.key] = draft[action.key].filter((i, index) => index !== action.index);
+                } else {
+                    delete draft[action.key];
+                }
+                break;
+            }
+            default: break;
+        }
+    } catch {
+        return draft;
+    }
+},
+  toYMD(date) {
+    var d = date.getDate();
+    var m = date.getMonth() + 1; //Month from 0 to 11
+    var y = date.getFullYear();
+    return y * 10000 + m * 100 + d
+  },
+  toDate(yyyymmdd) {
+    return +new Date(yyyymmdd / 10000, (yyyymmdd / 100) % 100 - 1, yyyymmdd % 100)
+  },
+  incrDays(date, days) {
+    var ret = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    ret.setDate(ret.getDate() + days)
+    return ret
+  },
+  prepareDomain(x) {
+    let NO_VALUES_RECORDED = "-";
+    if (x.domain === "RANGE") {
+      return x.minValue + " - " + x.maxValue
+    } else if (x.domain === "ANY") {
+      return "ANY"
+    } else {
+      let values = x["values"]
+      if (!values) return NO_VALUES_RECORDED
+
+      let elements = values["elements"]
+      if (!elements) return NO_VALUES_RECORDED
+
+      let size = elements.length
+      if (size === 0) {
+        return NO_VALUES_RECORDED
+      }
+      let count = 0
+      let result = ""
+      const limit = 2
+      for (var elem of elements) {
+        if (count >= limit) {
+          result += " and " + (size - limit) + " more"
+          return result
+        }
+
+        if (count !== 0) {
+          result += ", "
+        }
+
+        result += elem
+        count += 1
+
+      }
+      return result;
+    }
+  },
 }
 
 export default func
