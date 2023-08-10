@@ -33,7 +33,7 @@ export default {
         return request({
             url: 'api/updateAktoUIMode',
             method: 'post',
-            data: { aktoUIMode: aktoUIMode }
+            data: aktoUIMode
         })
     },
 }
