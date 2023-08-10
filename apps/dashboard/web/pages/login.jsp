@@ -94,6 +94,8 @@
 
 
                 </script>
+                 <!-- needed for react -->
+                <div id="root"></div>
                 <script>
                     var beamer_config = {
                         product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
@@ -104,11 +106,18 @@
                     };
                 </script>
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
-                if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION =='${akto-release-version}') {
-                    <script src="/dist/main.js"></script>
-                } else {
-                    <script src="https://d3as5gx79fwfqr.cloudfront.net/"+ window.RELEASE_VERSION +"/dist/main.js"></script>
-                }
+                <script>
+                    var script = document.createElement('script');
+
+                    // since release_version is not available till a user login, 
+                    // the user will always see the old login screen
+                    if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == '${akto-release-version}') {
+                        script.src = "/dist/main.js";
+                    } else {
+                        script.src = "https://d3as5gx79fwfqr.cloudfront.net/" + window.RELEASE_VERSION + "/dist/main.js";
+                    }
+                    document.body.appendChild(script);
+                </script>
             </body>
 
             </html>
