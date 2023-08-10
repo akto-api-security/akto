@@ -141,7 +141,7 @@
                 <div v-if="apiCollectionNameMapper">
                     <div v-for="({newName, regex, headerName}) in Object.values(apiCollectionNameMapper)">
                             <div>
-                                <span class="fs-14 fw-500">{{headerName}}={{regex}}</span>
+                                <span class="fs-14 fw-500">{{headerName ? headerName: "host"}}={{regex}}</span>
                                 <span class="ml-4 fs-14">{{newName}}</span>
                                 <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
                                     <v-icon size="12">$fas_trash</v-icon>
