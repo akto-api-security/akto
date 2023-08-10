@@ -1,10 +1,29 @@
 <template>
     <div class="testing-run-results-container" ref="detailsDialog">
-        <div class="testing-run-header">
-            <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
-            <span>({{endpoints}})</span> | 
-            <span>{{getScheduleStr()}}</span> | 
-            <span>{{collectionName}}</span>
+        <div class="d-flex justify-space-between">
+            <div class="testing-run-header pt-2">
+                <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
+                <span>({{endpoints}})</span> | 
+                <span>{{getScheduleStr()}}</span> | 
+                <span>{{collectionName}}</span>
+            </div>
+
+            <div  v-if="this.currentTest.state === 'COMPLETED'" class="mr-5">
+                <v-tooltip bottom>
+                    <template v-slot:activator='{on, attrs}'>
+                        <v-btn 
+                            icon 
+                            color="var(--themeColorDark)" 
+                            @click="rerunTest"
+                            v-on="on"
+                            v-bind="attrs"
+                        >
+                            <v-icon>$fas_redo</v-icon>
+                        </v-btn>
+                    </template>
+                    Rerun test
+                </v-tooltip>
+            </div>
         </div>
 
         <div class="loading-bar" v-if="loading">
@@ -40,6 +59,10 @@
                     <div>
                         <span>Test results: </span>    
                         <span>{{selectedDateStr()}}</span>
+                    </div>
+                    <div v-if="this.currentTest.state === 'COMPLETED'">
+                        <span>Time taken: </span>    
+                        <span>{{getTimeTakenByTest()}}</span>
                     </div>
                     <div style="display: flex; text-transform: capitalize;">
                         <div v-if="this.currentTest.state">Test status: {{this.currentTest.state.toLowerCase()}}</div>
@@ -203,6 +226,27 @@ export default {
         },
         selectedDateStr() {
             return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
+        },
+        getTimeTakenByTest(){
+            const timeDiff = Math.abs(this.currentTest.endTimestamp - this.currentTest.startTimestamp);
+            const hours = Math.floor(timeDiff / 3600);
+            const minutes = Math.floor((timeDiff % 3600) / 60);
+            const seconds = timeDiff % 60;
+
+            let duration = '';
+            if (hours > 0) {
+                duration += hours + 'h ';
+            }
+            if (minutes > 0) {
+                duration += minutes + 'm ';
+            }
+            if (seconds > 0 || (hours === 0 && minutes === 0)) {
+                duration += seconds + 's';
+            }
+            return duration.trim();
+        },
+        async rerunTest(){
+            await this.$store.dispatch('testing/rerunTest', {testingRunHexId: this.testingRunHexId})
         },
         getScheduleStr() {
             return this.isDaily ? "Running daily" : "Run once"
