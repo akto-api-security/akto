@@ -103,7 +103,7 @@ function Dashboard() {
     }
 
     const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={4000} />
+        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
     ) : null;
 
     return (
@@ -112,7 +112,7 @@ function Dashboard() {
             {isGptActive ? <div className="aktoButton">
                 <Button removeUnderline plain monochrome onClick={()=> setIsGptScreenActive(!isGptScreenActive)}>
                     <HorizontalStack gap="1">
-                        Ask AktoGpt
+                        Ask AktoGPT
                         <Avatar customer size="small" name="gpt" source="/public/gpt_logo.svg" />
                     </HorizontalStack>
                 </Button>

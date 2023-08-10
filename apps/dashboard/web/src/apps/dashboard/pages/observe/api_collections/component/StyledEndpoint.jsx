@@ -26,7 +26,7 @@ const StyledEndpoint = (data) => {
         }
     }
     return (
-        <Tooltip hoverDelay={2000} content={data} width='wide' preferredPosition='mostSpace'>
+        <Tooltip hoverDelay={800} content={data} width='wide' preferredPosition='mostSpace'>
             <HorizontalStack gap={"1"} wrap={false}>
                 <Box color={getMethodColor(method)}>
                     <Text as="span" variant="headingMd" >

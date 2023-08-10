@@ -1,4 +1,4 @@
-import {TopBar, Icon, Text, Tooltip, Button} from '@shopify/polaris';
+import {TopBar, Icon, Text, Tooltip, Button, ActionList} from '@shopify/polaris';
 import {NotificationMajor, CircleChevronRightMinor,CircleChevronLeftMinor} from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,8 @@ import func from '../../../../../util/func';
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
+    const [isSearchActive, setIsSearchActive] = useState(false);
+    const [searchValue, setSearchValue] = useState('');
     
     const navigate = useNavigate()
 
@@ -44,14 +46,28 @@ export default function Header() {
         navigate("/login")  
     }
 
+    const handleSwitchUI = async () => {
+
+    }
+
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
                 {
-                    items: [{id: "manage", content: 'Manage Account'}, {id: "log-out", content: 'Log out', onAction: handleLogOut}],
+                    items: [
+                        {id: "manage", content: 'Manage Account'}, 
+                        {id: "log-out", content: 'Log out', onAction: handleLogOut}
+                    ],
                 },
                 {
-                    items: [{content: 'Documentation'},{content: 'Tutorials'},{content: 'Changelog'},{content: 'Discord Support'},{content: 'Star On Github'}],
+                    items: [
+                        {id: "switch-ui", content: 'Switch to legacy', onAction: handleSwitchUI}, 
+                        {content: 'Documentation', onAction: ()=>{window.open("https://docs.akto.io/readme")}},
+                        {content: 'Tutorials', onAction: ()=>{window.open("https://www.youtube.com/@aktodotio")}},
+                        {content: 'Changelog', onAction: ()=>{window.open("https://app.getbeamer.com/akto/en")}},
+                        {content: 'Discord Support', onAction: ()=>{window.open("https://discord.com/invite/Wpc6xVME4s")}},
+                        {content: 'Star On Github', onAction: ()=>{window.open("https://github.com/akto-api-security/akto")}}
+                    ],
                 },
             ]}
             initials={func.initials(username)}
@@ -60,10 +76,41 @@ export default function Header() {
         />
     );
 
+    const handleSearchResultsDismiss = useCallback(() => {
+        setIsSearchActive(false);
+        setSearchValue('');
+    }, []);
+
+    const handleSearchChange = useCallback((value) => {
+        setSearchValue(value);
+        setIsSearchActive(value.length > 0);
+    }, []);
+
+    const searchItems = [
+        { content: 'API collections', onAction: () => { navigate("/dashboard/observe/inventory"); handleSearchResultsDismiss(); } }, 
+        { content: 'Sensitive data exposure', onAction: () => { navigate("/dashboard/observe/sensitive"); handleSearchResultsDismiss(); } }, 
+        { content: 'API changes', onAction: () => { navigate("/dashboard/observe/changes"); handleSearchResultsDismiss(); } }, 
+        { content: 'API issues', onAction: () => { navigate("/dashboard/issues"); handleSearchResultsDismiss(); } }, 
+        { content: 'Quick start', onAction: () => { navigate("/dashboard/quick-start"); handleSearchResultsDismiss(); } }, 
+        { content: 'Settings', onAction: () => { navigate("/dashboard/settings/about"); handleSearchResultsDismiss(); } }, 
+        { content: 'Test editor', onAction: () => { navigate("/dashboard/test-editor/REMOVE_TOKENS"); handleSearchResultsDismiss(); } }, 
+        { content: 'Testing runs', onAction: () => { navigate("/dashboard/testing"); handleSearchResultsDismiss(); } }, 
+        { content: 'Testing roles', onAction: () => { navigate("/dashboard/testing/roles"); handleSearchResultsDismiss(); } }, 
+        { content: 'Testing user configuration', onAction: () => { navigate("/dashboard/testing/user-config"); handleSearchResultsDismiss(); } }, 
+    ]
+
+    const searchResultsMarkup = (
+        <ActionList
+            items={searchItems.filter(x => x.content.toLowerCase().includes(searchValue.toLowerCase()))}
+        />
+    );
+
     const searchFieldMarkup = (
         <TopBar.SearchField
             placeholder="Search"
             showFocusBorder
+            onChange={handleSearchChange}
+            value={searchValue}
         />
     );
 
@@ -97,6 +144,9 @@ export default function Header() {
                 userMenu={userMenuMarkup}
                 secondaryMenu={secondaryMenuMarkup}
                 searchField={searchFieldMarkup}
+                searchResultsVisible={isSearchActive}
+                searchResults={searchResultsMarkup}
+                onSearchResultsDismiss={handleSearchResultsDismiss}
             />
         </div>
     );

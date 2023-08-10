@@ -334,7 +334,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                     action={
                                         {
                                             content: 'Configure authentication mechanism',
-                                            onAction: () => navigate("/dashboard/testing/user_config")
+                                            onAction: () => navigate("/dashboard/testing/user-config")
                                         }}
                                     status="critical"
                                 >
