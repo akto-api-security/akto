@@ -1,9 +1,0 @@
-.collapse > nav.Polaris-Navigation {
-    min-width: 60px !important;
-    width: 60px !important;
-    padding-right: 8px;
-}
-
-.Polaris-Navigation__PrimaryNavigation{
-    justify-content: space-between;
-}
