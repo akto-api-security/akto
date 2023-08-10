@@ -160,8 +160,8 @@ const team = {
                 return resp
             })
         },
-        addApiCollectionNameMapper({commit, dispatch}, {regex, newName}) {
-            return api.addApiCollectionNameMapper(regex, newName).then(resp => {
+        addApiCollectionNameMapper({commit, dispatch}, {regex, newName, headerName}) {
+            return api.addApiCollectionNameMapper(regex, newName, headerName).then(resp => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
                     text: "Collection replacement added successfully",

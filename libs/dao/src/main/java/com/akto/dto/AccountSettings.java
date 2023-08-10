@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.akto.dto.type.CollectionReplaceDetails;
 
 public class AccountSettings {
@@ -77,16 +79,26 @@ public class AccountSettings {
         PROD, QA, STAGING, DEV
     }
 
-    public Map<Pattern, String> convertApiCollectionNameMapperToRegex() {
+    public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
         
-        Map<Pattern, String> ret = new HashMap<>();
+         Map<String, Map<Pattern, String>> ret = new HashMap<>();
 
         if (apiCollectionNameMapper == null) return ret;
         
         for(CollectionReplaceDetails collectionReplaceDetails: apiCollectionNameMapper.values()) {
             try {
+                String headerName = collectionReplaceDetails.getHeaderName();
+                if (StringUtils.isEmpty(headerName)) {
+                    headerName = "host";
+                }
 
-                ret.put(Pattern.compile(collectionReplaceDetails.getRegex()), collectionReplaceDetails.getNewName());
+                Map<Pattern, String> regexMapperForGivenHeader = ret.get(headerName);
+                if (regexMapperForGivenHeader == null) {
+                    regexMapperForGivenHeader = new HashMap<>();
+                    ret.put(headerName, regexMapperForGivenHeader);
+                }
+
+                regexMapperForGivenHeader.put(Pattern.compile(collectionReplaceDetails.getRegex()), collectionReplaceDetails.getNewName());
             } catch (Exception e) {
                 // eat it
             }

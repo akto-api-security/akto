@@ -131,7 +131,6 @@
                         Save
                     </v-btn>
                 </div>
-
             </div>
         </div>
 
@@ -139,24 +138,38 @@
             <div class="entry-text">Replace collection</div>
             <div>
 
-                <div v-for="({newName, regex}) in apiCollectionNameMapper">
-                    <div>
-                        <span class="fs-14 fw-500">{{regex}}</span>
-                        <span class="fs-14">{{newName}}</span>
-                        <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
-                            <v-icon size="12">$fas_trash</v-icon>
-                        </v-btn>
+                <div v-if="apiCollectionNameMapper">
+                    <div v-for="({newName, regex, headerName}) in Object.values(apiCollectionNameMapper)">
+                            <div>
+                                <span class="fs-14 fw-500">{{headerName ? headerName: "host"}}={{regex}}</span>
+                                <span class="ml-4 fs-14">{{newName}}</span>
+                                <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
+                                    <v-icon size="12">$fas_trash</v-icon>
+                                </v-btn>
+                            </div>
                     </div>
                 </div>
 
                 <div class="d-flex traffic-filter-div">
                     <div class="input-value-key">
+                        <v-text-field v-model="newApiCollectionNameMapperHeaderName" style="width: 200px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Header key
+                                    <help-tooltip :size="12"
+                                        text="Please enter the header name eg host" />
+                                </div>
+                            </template>
+                        </v-text-field>
+
+                    </div>
+                    <div class="input-value-key">
                         <v-text-field v-model="newApiCollectionNameMapperKey" style="width: 200px">
                             <template slot="label">
                                 <div class="d-flex">
-                                    Host
+                                    Regex to match header value
                                     <help-tooltip :size="12"
-                                        text="Please enter the regex to match host" />
+                                        text="Please enter the regex to match " />
                                 </div>
                             </template>
                         </v-text-field>
@@ -202,6 +215,7 @@ import {mapState} from 'vuex'
                 setup_types: ["STAGING", "PROD", "QA", "DEV"],
                 newKey: null,
                 newVal: null,
+                newApiCollectionNameMapperHeaderName: null,
                 newApiCollectionNameMapperKey: null,
                 newApiCollectionNameMapperValue: null
             }
@@ -217,7 +231,8 @@ import {mapState} from 'vuex'
                 this.$store.dispatch('team/addFilterHeaderValueMap', {"filterHeaderValueMapKey" : this.newKey, "filterHeaderValueMapValue": this.newVal})
             },
             async addApiCollectionNameMapper() {
-                await this.$store.dispatch('team/addApiCollectionNameMapper', {"regex" : this.newApiCollectionNameMapperKey, "newName": this.newApiCollectionNameMapperValue})
+                await this.$store.dispatch('team/addApiCollectionNameMapper', {"regex" : this.newApiCollectionNameMapperKey, "newName": this.newApiCollectionNameMapperValue, headerName: this.newApiCollectionNameMapperHeaderName})
+                this.newApiCollectionNameMapperHeaderName = null
                 this.newApiCollectionNameMapperKey = null
                 this.newApiCollectionNameMapperValue = null
             },
