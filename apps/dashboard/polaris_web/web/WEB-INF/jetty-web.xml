@@ -1,0 +1,26 @@
+<?xml version="1.0"  encoding="ISO-8859-1"?>
+<!DOCTYPE Configure PUBLIC "-//Mort Bay Consulting//DTD Configure//EN"
+        "http://www.eclipse.org/jetty/configure.dtd">
+<Configure class="org.eclipse.jetty.webapp.WebAppContext">
+    <Set name="contextPath">/</Set>
+    <Set name="war">dashboard.war</Set>
+    <Set name="handler">
+        <New class="org.eclipse.jetty.server.handler.gzip.GzipHandler">
+            <Set name="includedMethods">
+            <Array type="String">
+                <Item>GET</Item>
+                <Item>POST</Item>
+                <Item>OPTIONS</Item>
+            </Array>
+            </Set>  
+            <Set name="includedPaths">
+            <Array type="String">
+                <Item>/*</Item>   
+            </Array>
+            </Set>
+        </New>
+
+        <!-- package name might have changed in Jetty 9; possibly org.eclipse.jetty.server.handler.gzip.GzipHandler
+             as per https://stackoverflow.com/questions/35725538/jetty-gziphandler-configuration -->
+    </Set>    
+</Configure>
