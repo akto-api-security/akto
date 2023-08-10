@@ -1,7 +1,0 @@
-.linkClass > .Polaris-Link--removeUnderline:hover {
-    text-decoration: none !important;
-}
-
-.linkClass > .Polaris-Link:focus:not(:active){
-    outline: none !important;
-}
