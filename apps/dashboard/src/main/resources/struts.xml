@@ -1613,6 +1613,18 @@
             </result>
         </action>
 
+        <action name="api/updateAktoUIMode" class="com.akto.action.user.UserInfoAction" method="updateAktoUIMode">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchSubTypeCountMap" class="com.akto.action.observe.InventoryAction" method="fetchSubTypeCountMap">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
