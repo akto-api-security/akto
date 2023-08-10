@@ -81,6 +81,8 @@ public class ProfileAction extends UserAction {
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
+        String dashboardVersion = accountSettings.getDashboardVersion();
+        String[] versions = dashboardVersion.split(" - ");
 
         userDetails.append("accounts", accounts)
                 .append("username",username)
@@ -90,7 +92,10 @@ public class ProfileAction extends UserAction {
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("accountName", accountName)
-                .append("releaseVersion", InitializerListener.RELEASE_VERSION);
+                .append("aktoUIMode", user.getAktoUIMode().name());
+        if (versions.length == 3) {
+            userDetails.append("releaseVersion", versions[2]);
+        }
 
 
         for (String k: userDetails.keySet()) {
