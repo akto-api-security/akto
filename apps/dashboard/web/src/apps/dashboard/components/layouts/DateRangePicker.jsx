@@ -1,16 +1,19 @@
 import { Box, Button, ButtonGroup, DatePicker, HorizontalGrid, HorizontalStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
-import { useEffect, useRef, useState } from "react";
+import {useRef, useState } from "react";
 import { CalendarMinor, ArrowRightMinor } from "@shopify/polaris-icons"
 
 function DateRangePicker(props) {
       const { mdDown, lgUp } = useBreakpoints();
       const shouldShowMultiMonth = lgUp;
       const ranges = props.ranges;
-      const [activeDateRange, setActiveDateRange] = useState(ranges[0]);
-      const [inputValues, setInputValues] = useState({});
+      const [activeDateRange, setActiveDateRange] = useState(props.initialDispatch);
+      const [inputValues, setInputValues] = useState({
+        since: formatDate(props.initialDispatch.period.since),
+        until: formatDate(props.initialDispatch.period.until),
+      });
       const [{ month, year }, setDate] = useState({
-        month: activeDateRange.period.since.getMonth(),
-        year: activeDateRange.period.since.getFullYear(),
+        month: props.initialDispatch.period.since.getMonth(),
+        year: props.initialDispatch.period.since.getFullYear(),
       });
 
       const datePickerRef = useRef(null);
@@ -124,41 +127,13 @@ function DateRangePicker(props) {
         setActiveDateRange(newDateRange);
       }
       function apply() {
-        props.getDate(activeDateRange)
+        props.dispatch({type: "update", period: activeDateRange})
         props.setPopoverState(false);
       }
       function cancel() {
-        setActiveDateRange(ranges[0])
+        setActiveDateRange(props.initialDispatch)
         props.setPopoverState(false);
       }
-      useEffect(() => {
-        if (activeDateRange) {
-          setInputValues({
-            since: formatDate(activeDateRange.period.since),
-            until: formatDate(activeDateRange.period.until),
-          });
-          function monthDiff(referenceDate, newDate) {
-            return (
-              newDate.month -
-              referenceDate.month +
-              12 * (referenceDate.year - newDate.year)
-            );
-          }
-          const monthDifference = monthDiff(
-            { year, month },
-            {
-              year: activeDateRange.period.until.getFullYear(),
-              month: activeDateRange.period.until.getMonth(),
-            }
-          );
-          if (monthDifference > 1 || monthDifference < 0) {
-            setDate({
-              month: activeDateRange.period.until.getMonth(),
-              year: activeDateRange.period.until.getFullYear(),
-            });
-          }
-        }
-      }, [activeDateRange]);
 
       return (
         <Box>

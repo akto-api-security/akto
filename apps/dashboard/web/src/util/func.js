@@ -932,6 +932,32 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
       }
 
     }
+ },
+
+ dateRangeReducer(draft, action){
+  try {
+    switch(action.type){
+      case "update": {
+         if(action.period){
+          Object.assign(draft, action.period);
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+
+  } catch {
+    return draft
+  }
+ },
+
+ getDateValue(dateRange){
+  const dateStr = dateRange.title === "Custom"
+          ? dateRange.period.since.toDateString() + " - " + dateRange.period.until.toDateString()
+          : dateRange.title;
+  return dateStr
  }
 }
 
