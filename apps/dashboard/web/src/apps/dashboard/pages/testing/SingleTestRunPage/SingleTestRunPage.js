@@ -21,6 +21,7 @@ import TestingStore from "../testingStore";
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 let headers = [
   {
@@ -121,20 +122,24 @@ function SingleTestRunPage() {
 useEffect(()=>{
     const hexId = params.hexId;
     async function fetchData() {
+      setLoading(true);
       if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.id != hexId){
         await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
           if(testingRun.testIdConfig == 1){
             setWorkflowTest(workflowTest);
+            setLoading(false);
           }
           let selectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
             setSelectedTestRun(selectedTestRun);
           })
       } else if(Object.keys(subCategoryMap)!=0 && Object.keys(subCategoryFromSourceConfigMap)!=0){
-        await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-          let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-          setTestRunResults(testRunResults)
-          setLoading(false);
-        })
+        if(selectedTestRun.testingRunResultSummaryHexId){
+          await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
+            let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+            setTestRunResults(testRunResults)
+          })
+        }
+        setLoading(false);
       }
     }
     fetchData();
@@ -214,7 +219,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
           </VerticalStack>
     }
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
-    components = {components}
+      components={loading ?
+        [<SpinnerCentered />]
+        : components}
     />
   );
 }

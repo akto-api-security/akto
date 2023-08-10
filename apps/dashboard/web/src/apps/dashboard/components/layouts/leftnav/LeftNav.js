@@ -112,12 +112,6 @@ export default function LeftNav(){
                   selected: leftNavSelected === 'testing',
                   subNavigationItems:[
                     {
-                      label: 'Create Tests',
-                      onClick: ()=>{
-                        navigate('/dashboard/testing')
-                      }
-                    },
-                    {
                       label: 'Results',
                       onClick: ()=>{
                         navigate('/dashboard/testing')
@@ -132,7 +126,7 @@ export default function LeftNav(){
                     {
                       label: 'User config',
                       onClick: ()=>{
-                        navigate('/dashboard/testing/user_config')
+                        navigate('/dashboard/testing/user-config')
                       }
                     }
                   ],

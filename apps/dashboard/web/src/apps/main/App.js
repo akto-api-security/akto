@@ -79,7 +79,7 @@ const router = createBrowserRouter([
                 element:<TestRoleSettings/>
               },
               {
-                path:"user_config",
+                path:"user-config",
                 element:<UserConfig/>
               }
             ]
