@@ -1,0 +1,19 @@
+.flyLayout{
+    position: absolute;
+    top: 0;
+    right: -40vw;
+    transition: right 0.3s ease-in-out;
+    width:40vw;
+    z-index: 400;
+    height: 100vh;
+}
+
+.innerFlyLayout{
+    height: 100vh;
+    position: fixed;
+    overflow-y: scroll;
+}
+
+.show{
+    right:0;
+}

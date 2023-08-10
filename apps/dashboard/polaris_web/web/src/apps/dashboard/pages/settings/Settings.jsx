@@ -1,0 +1,40 @@
+import { Button, Frame, Icon, Text, Box, TopBar, HorizontalStack } from "@shopify/polaris"
+import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
+import { Outlet, useNavigate } from "react-router-dom"
+import './settings.css'
+import SettingsLeftNav from "./nav/SettingsLeftNav";
+
+function SettingsHeader() {
+    const navigate = useNavigate();
+    const handleSettingsClose = () => {
+        navigate('/dashboard/testing')
+    }
+
+    const buttonComp = (
+        <div className="header-css">
+            <HorizontalStack gap="2">
+                <Box>
+                    <Icon source={SettingsMinor}/>
+                </Box>
+                <Text variant="headingMd" as="h4">Settings</Text>
+            </HorizontalStack>
+            <Button plain icon={CancelMajor} onClick={handleSettingsClose} />
+        </div>
+    )
+
+    return (
+        <TopBar userMenu={buttonComp} />
+    )
+}
+
+const Settings = () => {
+
+    return (
+        <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
+            <Box paddingBlockEnd={"20"}>
+                <Outlet />
+            </Box>
+        </Frame>
+    )
+}
+export default Settings

@@ -1,0 +1,29 @@
+.dashboard {
+    overflow-x: hidden;
+}
+
+.aktoButton {
+    z-index: 600;
+    position: fixed;
+    right: 9vw;
+    top: 11px;
+    padding: 4px 12px;
+    background: #10a37f;
+    color: white;
+    border-radius: 8px;
+}
+
+.aktoButton .Polaris-Avatar--imageHasLoaded {
+    width: 16px !important;
+}
+
+.header-css {
+    position: absolute;
+    width: 100vw;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 2vw;
+}
+.Polaris-TopBar{
+    border-bottom: 1px solid #E1E3E5;
+}
