@@ -139,8 +139,8 @@ useEffect(()=>{
             setTestRunResults(testRunResults)
           })
         }
-        setLoading(false);
       }
+      setLoading(false);
     }
     fetchData();
 }, [selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
