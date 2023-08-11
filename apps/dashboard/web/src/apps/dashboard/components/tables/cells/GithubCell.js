@@ -18,7 +18,12 @@ function GithubCell(props){
             return (
                 <div style={{ marginBottom: "auto" }} key={header.value}>
                     <Box padding="05">
-                        <Icon source={data[header.value]} color="primary" />
+                        {data.iconTooltip ? 
+                            <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
+                                <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "primary"} />
+                            </Tooltip>
+                            :<Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "primary"} />
+                        }
                     </Box>
                 </div>
             )
@@ -40,9 +45,11 @@ function GithubCell(props){
                     return (
                         <Box maxWidth={width} key={header.value}>
                             <Tooltip hoverDelay={800} content={data[header.value]} key={header.value} width='wide' preferredPosition='mostSpace'>
-                                <Text as="span" variant="headingMd" truncate={true}>
-                                    {data[header.value]}
-                                </Text>
+                                <span className="row-heading">
+                                    <Text as="span" variant="headingMd" truncate={true}>
+                                        {data[header.value]}
+                                    </Text>
+                                </span>
                             </Tooltip>
                         </Box>
                     )
