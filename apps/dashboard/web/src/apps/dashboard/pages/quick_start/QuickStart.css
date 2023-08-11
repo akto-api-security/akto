@@ -24,10 +24,11 @@
     padding: 8px !important;
 }
 .right-card .Polaris-Box {
-    position: absolute;
-    right: 0;
-    top: 1px;
+    position: fixed;
+    right: 2px;
+    top: 54px;
     width: 27vw;
+    border-radius: unset;
 }
 .settings {
     display: flex;
@@ -63,4 +64,15 @@
     border: 1px solid #dde0e4;
     padding: 4px;
     border-radius: 4px;
+}
+
+.update-connections .Polaris-Page--divider{
+    padding-top: 20px !important;
+}
+.connection-card-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: space-between;
+    gap: 8px;
 }
