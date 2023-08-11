@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { Button, LegacyCard, HorizontalGrid, TextField, VerticalStack } from '@shopify/polaris'
+import { Button, LegacyCard, HorizontalGrid, TextField, VerticalStack, Text } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -128,8 +128,8 @@ function DataTypes() {
 
   const location = useLocation();
   const navigate = useNavigate()
-  const isNew = location?.state != undefined && Object.keys(location?.state).length > 0 ? false : true
-  const pageTitle = isNew ? "Add Data Type" : "Configure Data Types"
+  const isNew = location?.state == undefined || Object.keys(location?.state).length == 0
+  const pageTitle = isNew ? "Add data type" : "Configure data type"
   const initialState = isNew ? transform.initialObj : transform.fillInitialState(location.state);
 
   const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), transform.initialObj);
@@ -215,10 +215,15 @@ function DataTypes() {
   }
 
   const conditionsCard = (
-    <LegacyCard title="Details" key="condition">
+    <LegacyCard title={
+      <Text variant='headingMd'>
+        Data type conditions
+      </Text>
+    }
+      key="condition">
         <ConditionsPicker 
           id={"key"}
-          title="Key Conditions" 
+          title="Key conditions" 
           param = "param_name" 
           conditions={currState.keyConditions.predicates}
           selectOptions={selectOptions}
@@ -233,7 +238,7 @@ function DataTypes() {
         </div>
         <ConditionsPicker 
           id={"value"}
-          title="Value Conditions" 
+          title="Value conditions" 
           param = "param_value" 
           conditions={currState.valueConditions.predicates}
           selectOptions={selectOptions}
@@ -260,7 +265,7 @@ function DataTypes() {
         </LegacyCard.Section>
       </LegacyCard>
       <div className='footer-save'>
-        <Button id={"save-button"} onClick={saveAction} {...compareFunc() ? {disabled: true} : {}}> Save </Button>
+        <Button id={"save-button"} primary onClick={saveAction} {...compareFunc() ? {disabled: true} : {}}> Save </Button>
       </div>
     </VerticalStack>
   )

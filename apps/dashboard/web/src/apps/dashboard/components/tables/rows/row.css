@@ -6,10 +6,6 @@
     outline: none !important;
 }
 
-.row-heading :hover{
-    text-decoration: underline !important;
-}
-
 .Polaris-IndexTable__TableCell--first{
     padding-top: 12px !important;
     vertical-align: top !important;

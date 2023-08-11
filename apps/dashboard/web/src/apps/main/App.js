@@ -46,6 +46,7 @@ import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 
 import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
+import { useEffect } from "react";
 
 const router = createBrowserRouter([
   {
@@ -228,6 +229,22 @@ function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
   setAllRoutes(searchData)
+
+  useEffect(() => {
+    const script = document.createElement('script')
+    const scriptText = document.createTextNode(`
+    self.MonacoEnvironment = {
+      getWorkerUrl: function (moduleId, label) {
+          if (label === 'json') {
+              return '/dist/json.worker.js';
+          }
+          return '/dist/editor.worker.js';
+      }
+      };
+    `);
+    script.appendChild(scriptText);
+    document.body.appendChild(script)
+  }, [])
 
   return (
     <AppProvider>

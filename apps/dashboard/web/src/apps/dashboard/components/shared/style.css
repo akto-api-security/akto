@@ -23,3 +23,13 @@
 .active {
     background: #47466a !important;
 }
+
+.tooltipSpan {
+    overflow-x:hidden; 
+    text-overflow: ellipsis; 
+    white-space: nowrap;
+}
+
+.onHover:hover{
+    text-decoration: underline !important;
+}

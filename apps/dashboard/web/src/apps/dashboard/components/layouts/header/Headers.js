@@ -51,7 +51,8 @@ export default function Header() {
     }
 
     const handleSwitchUI = async () => {
-
+        await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
+        navigate("/login")
     }
 
     const userMenuMarkup = (
@@ -110,7 +111,7 @@ export default function Header() {
 
     const searchFieldMarkup = (
         <TopBar.SearchField
-            placeholder="Search for pages and collection name"
+            placeholder="Search for pages and API collections"
             showFocusBorder
             onChange={handleSearchChange}
             value={searchValue}
