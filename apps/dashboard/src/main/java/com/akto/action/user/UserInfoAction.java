@@ -6,6 +6,7 @@ import com.akto.dto.User;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
 public class UserInfoAction extends UserAction {
@@ -31,10 +32,9 @@ public class UserInfoAction extends UserAction {
         try {
             User.AktoUIMode mode = User.AktoUIMode.valueOf(aktoUIMode);
             User user = getSUser();
-            UsersDao.instance.updateOne(Filters.eq(User.LOGIN, user.getLogin()),
-                    new BasicDBObject(UsersDao.SET, new BasicDBObject(User.AKTO_UI_MODE, mode)));
+            UsersDao.instance.updateOne(Filters.eq("_id", user.getId()),
+                    Updates.set(User.AKTO_UI_MODE, mode.name()));
         } catch (Exception e) {
-
         }
         return Action.SUCCESS.toUpperCase();
     }

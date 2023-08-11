@@ -270,9 +270,17 @@ export default {
         }
       ],
       myAccountItems: [
-        {
+      {
           label: "Settings",
           click: () => this.$router.push('/dashboard/settings')
+        },
+        {
+          label: "Switch to new UI",
+          click: () => {
+            api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
+              this.$router.push('/login')
+            })
+          }
         },
         {
           label: "Terms and Policies",
