@@ -22,6 +22,7 @@ import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+import TooltipText from "../../../components/shared/TooltipText";
 
 let headers = [
   {
@@ -193,11 +194,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
                 <Icon color="primary" source={selectedTestRun.icon }></Icon>
               </Box>
               }
-              <Text variant='headingLg'>
-                {
-                  selectedTestRun?.name || "Test run name"
-                }
-              </Text>
+              <Box maxWidth="50vw">
+                <TooltipText 
+                  tooltip={selectedTestRun?.name} 
+                  text={selectedTestRun?.name || "Test run name"} 
+                  textProps={{variant:"headingLg"}}/>
+              </Box>
               {
                 selectedTestRun?.severity && 
                 selectedTestRun.severity
@@ -220,7 +222,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
       components={loading ?
-        [<SpinnerCentered />]
+        [<SpinnerCentered key={"loading"}/>]
         : components}
     />
   );
