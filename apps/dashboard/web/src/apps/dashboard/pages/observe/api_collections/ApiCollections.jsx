@@ -14,11 +14,6 @@ import ObserveStore from "../observeStore"
 
 const headers = [
     {
-        text: "",
-        value: "icon",
-        itemOrder: 0,
-    },
-    {
         text: "API collection name",
         value: "displayName",
         showFilter:true,
@@ -132,7 +127,7 @@ function ApiCollections() {
             }
         </Text>
             }
-            primaryAction={<Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
             components={[
                

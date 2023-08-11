@@ -43,13 +43,13 @@ function TokensLayout(props) {
   const emptyComponent = (
       <LegacyCard.Section>
         <EmptyState
-          heading="Something here about what is token"
+          heading='No tokens found'
           action={{content: 'Generate Token',onAction: generateNewToken}}
-          secondaryAction={{
-            content: 'Learn more',
-          }}
+          // secondaryAction={{
+          //   content: 'Learn more',
+          // }}
         >
-          <p>Something how it can help it? Maybe telling them why should they generate one?</p>
+          <p>A token is required to use this integration. Click "Generate token" to generate one.</p>
         </EmptyState>
       </LegacyCard.Section>
   )
@@ -57,7 +57,7 @@ function TokensLayout(props) {
   const BurpSuiteCard = (
     <LegacyCard title="Tokens" 
         secondaryFooterActions={tokenList.length > 0 ? [{content: 'See how it works', onAction: seeWork}] : []}
-        primaryFooterAction={tokenList.length > 0 ? {content: 'Generate Token', onAction: generateNewToken} : null}
+        primaryFooterAction={tokenList.length > 0 ? {content: 'Generate token', onAction: generateNewToken} : null}
     >
         {tokenList.length > 0 ? listComponent : emptyComponent}
     </LegacyCard>

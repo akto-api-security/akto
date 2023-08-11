@@ -5,6 +5,7 @@ import {
     HorizontalStack,
     Icon,
     Box, Tooltip} from '@shopify/polaris';
+import './cell.css'
 
 function GithubCell(props){
 
@@ -40,9 +41,11 @@ function GithubCell(props){
                     return (
                         <Box maxWidth={width} key={header.value}>
                             <Tooltip hoverDelay={800} content={data[header.value]} key={header.value} width='wide' preferredPosition='mostSpace'>
-                                <Text as="span" variant="headingMd" truncate={true}>
-                                    {data[header.value]}
-                                </Text>
+                                <div className='order1Title'>
+                                    <Text as="span" variant="headingMd" truncate={true}>
+                                        {data[header.value]}
+                                    </Text>
+                                </div>
                             </Tooltip>
                         </Box>
                     )
