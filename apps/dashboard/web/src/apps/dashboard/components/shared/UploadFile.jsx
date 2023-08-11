@@ -25,8 +25,9 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary}) {
     return (
         <Tooltip content={tooltipText}>
             <Button 
-                icon={UploadMajor} 
+                // icon={UploadMajor} 
                 primary={primary !== undefined ? primary : true}
+                plain monochrome removeUnderline
                 onClick={onPickFile}>
                 {label}
                 <input

@@ -147,10 +147,16 @@ function ApiCollections() {
 
                     <TextField
                         id={"new-collection-input"}
-                        label="Enter name for the new collection"
+                        label="Name"
+                        helpText="Enter name for the new collection"
                         value={newCollectionName}
                         onChange={handleNewCollectionNameChange}
                         autoComplete="off"
+                        maxLength="24"
+                        suffix={(
+                            <Text>{newCollectionName.length}/24</Text>
+                        )}
+                        autoFocus
                     />
 
 

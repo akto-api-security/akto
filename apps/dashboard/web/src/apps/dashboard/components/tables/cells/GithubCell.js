@@ -42,7 +42,7 @@ function GithubCell(props){
                         <Box maxWidth={width} key={header.value}>
                             <Tooltip hoverDelay={800} content={data[header.value]} key={header.value} width='wide' preferredPosition='mostSpace'>
                                 <div className='order1Title'>
-                                    <Text as="span" variant="headingMd" truncate={true}>
+                                    <Text as="span" variant="headingMd" truncate={true} color='#2C6ECB'>
                                         {data[header.value]}
                                     </Text>
                                 </div>
