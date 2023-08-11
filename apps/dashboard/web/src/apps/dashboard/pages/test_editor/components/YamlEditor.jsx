@@ -139,7 +139,7 @@ const YamlEditor = ({ fetchAllTests }) => {
 
             <Divider />
 
-            <Box id={"yaml-editor"} ref={yamlEditorRef} minHeight="85vh" borderInlineEndWidth="1" borderColor="border-subdued"/>
+            <Box id={"yaml-editor"} ref={yamlEditorRef} minHeight="86vh" borderInlineEndWidth="1" borderColor="border-subdued" />
         </div>
     )
 }

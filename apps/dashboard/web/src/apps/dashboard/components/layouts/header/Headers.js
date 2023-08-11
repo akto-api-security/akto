@@ -6,7 +6,7 @@ import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
 import './Headers.css'
 import api from '../../../../signup/api';
-import func from '../../../../../util/func';
+import func from '@/util/func';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -21,6 +21,10 @@ export default function Header() {
     const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
+
+    const allRoutes = Store((state) => state.allRoutes)
+    const allCollections = Store((state) => state.allCollections)
+    const searchItemsArr = func.getSearchItemsArr(allRoutes,allCollections)
 
     const handleLeftNavCollapse = () => {
         if (!leftNavCollapsed) {
@@ -86,18 +90,17 @@ export default function Header() {
         setIsSearchActive(value.length > 0);
     }, []);
 
-    const searchItems = [
-        { content: 'API collections', onAction: () => { navigate("/dashboard/observe/inventory"); handleSearchResultsDismiss(); } }, 
-        { content: 'Sensitive data exposure', onAction: () => { navigate("/dashboard/observe/sensitive"); handleSearchResultsDismiss(); } }, 
-        { content: 'API changes', onAction: () => { navigate("/dashboard/observe/changes"); handleSearchResultsDismiss(); } }, 
-        { content: 'API issues', onAction: () => { navigate("/dashboard/issues"); handleSearchResultsDismiss(); } }, 
-        { content: 'Quick start', onAction: () => { navigate("/dashboard/quick-start"); handleSearchResultsDismiss(); } }, 
-        { content: 'Settings', onAction: () => { navigate("/dashboard/settings/about"); handleSearchResultsDismiss(); } }, 
-        { content: 'Test editor', onAction: () => { navigate("/dashboard/test-editor/REMOVE_TOKENS"); handleSearchResultsDismiss(); } }, 
-        { content: 'Testing runs', onAction: () => { navigate("/dashboard/testing"); handleSearchResultsDismiss(); } }, 
-        { content: 'Testing roles', onAction: () => { navigate("/dashboard/testing/roles"); handleSearchResultsDismiss(); } }, 
-        { content: 'Testing user configuration', onAction: () => { navigate("/dashboard/testing/user-config"); handleSearchResultsDismiss(); } }, 
-    ]
+    const handleNavigateSearch = (url) =>{
+        navigate(url)
+        handleSearchResultsDismiss()
+    }
+
+    const searchItems = searchItemsArr.map((item)=>{
+        return{
+            content: item.content,
+            onAction: ()=> handleNavigateSearch(item.url),
+        }
+    })
 
     const searchResultsMarkup = (
         <ActionList
@@ -107,7 +110,7 @@ export default function Header() {
 
     const searchFieldMarkup = (
         <TopBar.SearchField
-            placeholder="Search"
+            placeholder="Search for pages and collection name"
             showFocusBorder
             onChange={handleSearchChange}
             value={searchValue}
