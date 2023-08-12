@@ -35,7 +35,6 @@ import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
-import AwsSource from "../dashboard/pages/quick_start/components/AwsSource";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
@@ -44,6 +43,10 @@ import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
+
+import Store from "../dashboard/store";
+import { generateSearchData } from "@/util/searchItems"
+import { useEffect } from "react";
 
 const router = createBrowserRouter([
   {
@@ -79,7 +82,7 @@ const router = createBrowserRouter([
                 element:<TestRoleSettings/>
               },
               {
-                path:"user_config",
+                path:"user-config",
                 element:<UserConfig/>
               }
             ]
@@ -126,10 +129,6 @@ const router = createBrowserRouter([
             path: "quick-start",
             element: <QuickStart/>,
           },
-          {
-            path: "quick-start/aws-setup",
-            element: <AwsSource />
-          }
         ]
       },
       {
@@ -227,6 +226,26 @@ const router = createBrowserRouter([
 ])
 
 function App() {
+  const setAllRoutes = Store(state => state.setAllRoutes)
+  const searchData= generateSearchData(router.routes)
+  setAllRoutes(searchData)
+
+  useEffect(() => {
+    const script = document.createElement('script')
+    const scriptText = document.createTextNode(`
+    self.MonacoEnvironment = {
+      getWorkerUrl: function (moduleId, label) {
+          if (label === 'json') {
+              return '/dist/json.worker.js';
+          }
+          return '/dist/editor.worker.js';
+      }
+      };
+    `);
+    script.appendChild(scriptText);
+    document.body.appendChild(script)
+  }, [])
+
   return (
     <AppProvider>
       <RouterProvider router={router} />

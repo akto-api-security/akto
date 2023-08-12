@@ -10,7 +10,7 @@ import {
   Text,
   Button,
   VerticalStack,
-  HorizontalStack, Icon, Box, Badge, LegacyCard
+  HorizontalStack, Icon, LegacyCard
   } from '@shopify/polaris';
 import TestingStore from '../testingStore';
 import api from '../api';
@@ -20,21 +20,46 @@ import func from "@/util/func"
 import parse from 'html-react-parser';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import SampleDataList from '../../../components/shared/SampleDataList';
+import GithubCell from '../../../components/tables/cells/GithubCell';
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
-let headerDetails = [
+const headerDetails = [
+  {
+    text: "",
+    value: "icon",
+    itemOrder:0,
+  },
+  {
+    text: "Name",
+    value: "name",
+    itemOrder:1,
+    dataProps: {variant:"headingLg"}
+  },
+  {
+    text: "Severity",
+    value: "severity",
+    itemOrder:2,
+    dataProps: {fontWeight:"regular"}
+  },
   {
     text: "Detected time",
     value: "detected_time",
+    itemOrder:3,
+    dataProps:{fontWeight:'regular'},
     icon: SearchMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
+    itemOrder:3,
+    dataProps:{fontWeight:'regular'},
     icon: FraudProtectMinor
   },
   {
     text: 'url',
     value: 'url',
+    itemOrder:3,
+    dataProps:{fontWeight:'regular'},
     icon: LinkMinor
   },
 ]
@@ -107,6 +132,7 @@ function TestRunResultPage(props) {
   const hexId2 = params.hexId2;
   const [infoState, setInfoState] = useState(moreInfoSections)
   const [fullDescription, setFullDescription] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   function getDescriptionText(fullDescription){
     let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
@@ -130,6 +156,7 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true);
       if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
         if (hexId2 != undefined) {
           if (testingRunResult == undefined) {
@@ -145,57 +172,13 @@ function TestRunResultPage(props) {
       } else {
         transform.setTestMetadata();
       }
+      setLoading(false);
     }
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
-  return (
-    <PageWithMultipleCards
-    title = {
-        <VerticalStack gap="3">
-          <HorizontalStack gap="2" align="start" blockAlign='start'>
-            {selectedTestRunResult?.icon &&
-              <Box> {<Icon color="primary" source={selectedTestRunResult.icon}></Icon>}
-              </Box>
-            }
-            <Text variant='headingLg'>
-              {
-                selectedTestRunResult?.name || "Test run name"
-              }
-            </Text>
-            {
-              selectedTestRunResult?.severity &&
-              selectedTestRunResult.severity
-                .map((item) =>
-                  <Badge key={item} status={func.getTestResultStatus(item)}>
-                    <Text fontWeight="regular">
-                    {item}
-                    </Text></Badge>
-                )
-            }
-          </HorizontalStack>
-          <HorizontalStack gap='2' align="start" >
-            {
-              headerDetails?.map((header) => {
-                return (
-                  <HorizontalStack key={header.value} gap="1">
-                    <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                      <Icon source={header.icon} color="subdued" />
-                    </div>
-                    <Text as="div" variant="bodySm" color="subdued" fontWeight='regular'>
-                      {selectedTestRunResult[header.value]}
-                    </Text>
-                  </HorizontalStack>
-                )
-              })
-            }
-          </HorizontalStack>
-        </VerticalStack>
-    }
-    isFirstPage = {props.source == "editor" ? true : false}
-    primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
-    secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
-    components = {[
+  const components = [
+    loading ? [<SpinnerCentered key="loading" />] :
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
         {
@@ -219,7 +202,24 @@ function TestRunResultPage(props) {
         key="info"
         sections={infoState}
       />
-    ]}
+  ]
+
+  return (
+    <PageWithMultipleCards
+    title = {
+      <GithubCell
+      key="heading"
+      width="65vw"
+      nameWidth="50vw"
+      data={selectedTestRunResult}
+      headers={headerDetails}
+      getStatus={func.getTestResultStatus}
+      />
+    }
+    isFirstPage = {props?.source == "editor"}
+    primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
+    secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
+    components = {components}
     />
   )
 }

@@ -75,7 +75,8 @@ function GithubRow(props) {
                             headers={headers}
                             data={data}
                             getStatus={getStatus}
-                            width="50vw"
+                            width="65vw"
+                            nameWidth="50vw"
                         />
                     </Link>
                 </div>

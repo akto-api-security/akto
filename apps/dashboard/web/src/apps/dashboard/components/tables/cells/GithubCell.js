@@ -1,20 +1,26 @@
 import {
-    Text,
     Badge,
     VerticalStack,
     HorizontalStack,
     Icon,
-    Box, Tooltip} from '@shopify/polaris';
+    Box, 
+    Text,
+    Tooltip} from '@shopify/polaris';
+
 import './cell.css'
+   
+import TooltipText from '../../shared/TooltipText';
 
 function GithubCell(props){
 
-    const {data, headers, getStatus, width} = props
+    const {data, headers, getStatus, width, nameWidth} = props
     return (
     <HorizontalStack gap="1">
     {
         headers?.filter((header) => {
             return header.itemOrder==0
+        }).filter((header) => {
+            return data[header.value]!=undefined && data[header.value]!="";
         }).map((header) => {
             return (
                 <div style={{ marginBottom: "auto" }} key={header.value}>
@@ -30,23 +36,25 @@ function GithubCell(props){
             {
                 headers?.filter((header) => {
                     return header.itemOrder == 1
+                }).filter((header) => {
+                    return data[header.value]!=undefined && data[header.value]!="";
                 }).map((header) => {
                     if(header.component){
                         return (
-                            <Box maxWidth={width} key={header.value}>
+                            <Box maxWidth={nameWidth || width} key={header.value}>
                                 {header.component(data[header.value])}
                             </Box>
                         )
                     }
                     return (
-                        <Box maxWidth={width} key={header.value}>
-                            <Tooltip hoverDelay={800} content={data[header.value]} key={header.value} width='wide' preferredPosition='mostSpace'>
-                                <div className='order1Title'>
-                                    <Text as="span" variant="headingMd" truncate={true} color='#2C6ECB'>
-                                        {data[header.value]}
-                                    </Text>
-                                </div>
-                            </Tooltip>
+                        <Box maxWidth={nameWidth || width} key={header.value}>
+                            <div className='order1Title'>
+                                <TooltipText
+                                    tooltip={data[header.value]}
+                                    text = {data[header.value]}
+                                    textProps={{variant:"headingMd", ...header.dataProps}}
+                                />
+                            </div>
                         </Box>
                     )
                 })
@@ -54,11 +62,15 @@ function GithubCell(props){
             {
                 headers?.filter((header) => {
                     return header.itemOrder==2
+                }).filter((header) => {
+                    return data[header.value]!=undefined && data[header.value]!="";
                 }).map((header) => {
                     return data?.[header?.value]
                     ?.map((item) =>
                     <Badge key={item} status={getStatus(item)}>
-                        {item}
+                        <Text {...header.dataProps}>
+                            {item}
+                        </Text>
                     </Badge>
                 )}) 
             }
@@ -68,17 +80,19 @@ function GithubCell(props){
             {
                 headers?.filter((header) => {
                     return header.itemOrder==3
+                }).filter((header) => {
+                    return data[header.value]!=undefined && data[header.value]!="";
                 }).map((header) => {
                     return (
                         <HorizontalStack key={header.value} gap="1">
                             <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                                 <Icon source={header.icon} color="subdued" />
                             </div>
-                            <Box maxWidth={width}>
-                            <Text as="div" variant="bodySm" color="subdued" truncate>
-                                {data[header.value]}
-                            </Text>
-                            </Box>
+                            <TooltipText
+                                tooltip={data[header.value]}
+                                text = {data[header.value]}
+                                textProps={{variant:"bodySm", color:"subdued", ...header.dataProps}}
+                            />
                         </HorizontalStack>
                     )
                 }) 
