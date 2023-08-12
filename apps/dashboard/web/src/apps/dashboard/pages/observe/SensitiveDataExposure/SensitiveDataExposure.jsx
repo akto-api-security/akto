@@ -9,12 +9,14 @@ import { useNavigate, useParams } from "react-router-dom"
 import {
     SearchMinor,
     FraudProtectMinor  } from '@shopify/polaris-icons';
+import StyledEndpoint from "../api_collections/component/StyledEndpoint"
 
 const headers = [
     {
         text: "Endpoint",
         value: "url",
         itemOrder: 1,
+        component: StyledEndpoint
     },
     {
         text: "Collection",
@@ -120,9 +122,9 @@ function SensitiveDataExposure() {
     function disambiguateLabel(key, value) {
         switch (key) {
             case "location":
-                return (value).map((val) => val).join(', ');
+                return func.convertToDisambiguateLabelObj(value, null, 2)
             case "apiCollectionId": 
-                return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
+            return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             case "isRequest":
                 return value[0] ? "In request" : "In response"
             case "dateRange":
@@ -159,8 +161,8 @@ function SensitiveDataExposure() {
         let startTimestamp = 0;
         let endTimestamp = func.timeNow()
         if(dateRange){
-            startTimestamp = Math.floor(Date.parse(dateRange.period.since) / 1000);
-            endTimestamp = Math.floor(Date.parse(dateRange.period.until) / 1000)
+            startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
+            endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
         }
         await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
             res.endpoints.forEach((endpoint, index) => {

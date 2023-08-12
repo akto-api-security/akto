@@ -975,7 +975,25 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
   })
 
   return combinedArr
- }
+ },
+
+ convertToDisambiguateLabel(value, convertFunc, maxAllowed){
+  if (value.length > maxAllowed) {
+      return `${value.slice(0, maxAllowed).map(val => convertFunc(val)).join(", ")} +${value.length - maxAllowed} more`;
+  } else {
+      return value.map(val => convertFunc(val)).join(", ");
+  }   
+},
+
+convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if (value.length > maxAllowed) {
+      return `${value.slice(0, maxAllowed)
+                     .map(val => convertObj ? convertObj[val] : val)
+                     .join(", ")} +${value.length - maxAllowed} more`;
+  } else {
+      return value.map(val => convertObj ? convertObj[val] : val).join(", ");
+  }   
+}
 }
 
 export default func

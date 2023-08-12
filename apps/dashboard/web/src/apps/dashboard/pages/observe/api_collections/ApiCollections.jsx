@@ -97,6 +97,10 @@ function ApiCollections() {
         setData(tmp)
     }
 
+    function disambiguateLabel(key, value) {
+        return func.convertToDisambiguateLabelObj(value, null, 2)
+    }
+
     useEffect(() => {
         fetchData()
         resetFunc()    
@@ -170,7 +174,7 @@ function ApiCollections() {
                 sortOptions={sortOptions} 
                 resourceName={resourceName} 
                 filters={[]}
-                disambiguateLabel={()=>{}} 
+                disambiguateLabel={disambiguateLabel} 
                 headers={headers}
                 selectable={true}
                 promotedBulkActions={promotedBulkActions}

@@ -76,7 +76,7 @@ function disambiguateLabel(key, value) {
       return value.length + 'API' + (value.length==1 ? '' : 's')
     case 'categoryFilter':
     case 'testFilter':
-      return (value).map((val) => val).join(', ');
+      return func.convertToDisambiguateLabelObj(value, null, 2)
     default:
       return value;
   }

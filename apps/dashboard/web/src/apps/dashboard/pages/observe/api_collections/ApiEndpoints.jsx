@@ -268,6 +268,17 @@ function ApiEndpoints() {
             func.setToast(true, false, "Postman collection downloaded successfully")
     }
 
+    function disambiguateLabel(key, value) {
+        switch (key) {
+            case "parameterisedEndpoint":
+                return func.convertToDisambiguateLabelObj(value, null, 1)
+            case "method":
+                return func.convertToDisambiguateLabelObj(value, null, 3)
+            default:
+              return func.convertToDisambiguateLabelObj(value, null, 2);
+          }          
+    }
+
     function handleFileChange(file) {
         if (file) {
             const reader = new FileReader();
@@ -379,7 +390,7 @@ function ApiEndpoints() {
                                 sortOptions={sortOptions}
                                 resourceName={resourceName}
                                 filters={[]}
-                                disambiguateLabel={() => { }}
+                                disambiguateLabel={disambiguateLabel}
                                 headers={headers}
                                 getStatus={() => { return "warning" }}
                                 tabs={tabs}
