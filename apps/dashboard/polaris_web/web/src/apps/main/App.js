@@ -235,9 +235,11 @@ function App() {
     self.MonacoEnvironment = {
       getWorkerUrl: function (moduleId, label) {
           if (label === 'json') {
-              return '/dist/json.worker.js';
+              return "https://d3as5gx79fwfqr.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/json.worker.js";
+//              return '/dist/json.worker.js';
           }
-          return '/dist/editor.worker.js';
+          return "https://d3as5gx79fwfqr.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/editor.worker.js";
+//          return '/dist/editor.worker.js';
       }
       };
     `);
