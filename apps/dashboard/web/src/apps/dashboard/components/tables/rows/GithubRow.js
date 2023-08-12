@@ -27,7 +27,12 @@ function GithubRow(props) {
     const [data, setData] = useState(dataObj);
 
     const togglePopoverActive = (index) => useCallback(
-        () => setPopoverActive(index),
+        () => setPopoverActive((prev) => {
+            if(prev==index){
+                return -1;
+            } 
+            return index;
+        }),
         [],
     );
     async function nextPage(data){

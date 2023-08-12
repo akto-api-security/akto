@@ -216,6 +216,7 @@ function TestRunResultPage(props) {
       getStatus={func.getTestResultStatus}
       />
     }
+    divider= {true}
     isFirstPage = {props?.source == "editor"}
     primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
     secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}

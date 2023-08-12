@@ -6,7 +6,6 @@ function TooltipText(props) {
 
     // do not send the "as" property as it is being hardcoded to allow using refs.
     const { text, textProps, tooltip } = props;
-    console.log(textProps)
     const ref = useRef(null);
     const [isTruncated, setIsTruncated] = useState(false);
 
@@ -16,15 +15,15 @@ function TooltipText(props) {
     }, []);
 
     const TextContent = (
-        <Text as={"span"} truncate {...textProps}>
-            <span ref={ref} className="tooltipSpan">
+        <div className="tooltipSpan" ref={ref}>
+            <Text as={"span"} {...textProps}>
                 {text}
-            </span>
-        </Text>
+            </Text>
+        </div>
     )
 
     return (
-        isTruncated ? <Tooltip content={tooltip} hoverDelay={900}>
+        isTruncated ? <Tooltip content={tooltip} hoverDelay={400}>
             {TextContent}
         </Tooltip> :
             TextContent

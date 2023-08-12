@@ -7,11 +7,13 @@ import {
   Icon,
   Badge,
   Box,
+  Tooltip,
 } from '@shopify/polaris';
 import {
   SearchMinor,
   FraudProtectMinor,
-  LinkMinor
+  LinkMinor,
+  ReplayMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -119,28 +121,29 @@ function SingleTestRunPage() {
   const params= useParams()
   const [loading, setLoading] = useState(true);
   const [workflowTest, setWorkflowTest ] = useState(false);
+  const hexId = params.hexId;
 
 useEffect(()=>{
-    const hexId = params.hexId;
     async function fetchData() {
       setLoading(true);
-      if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.id != hexId){
         await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
           if(testingRun.testIdConfig == 1){
             setWorkflowTest(workflowTest);
             setLoading(false);
           }
-          let selectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
-            setSelectedTestRun(selectedTestRun);
-          })
-      } else if(Object.keys(subCategoryMap)!=0 && Object.keys(subCategoryFromSourceConfigMap)!=0){
-        if(selectedTestRun.testingRunResultSummaryHexId){
-          await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-            let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-            setTestRunResults(testRunResults)
-          })
-        }
-      }
+          let localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
+          if (!func.deepComparison(selectedTestRun, localSelectedTestRun)) {
+            setSelectedTestRun(localSelectedTestRun);
+          }
+          if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
+            if (localSelectedTestRun.testingRunResultSummaryHexId) {
+              await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
+                let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+                setTestRunResults(testRunResults)
+              })
+            }
+          }
+      }) 
       setLoading(false);
     }
     fetchData();
@@ -185,6 +188,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const components = [!workflowTest ? ResultTable : workflowTestBuilder];
 
+  const rerunTest = (hexId) =>{
+    api.rerunTest(hexId).then((resp) => {
+      func.setToast(true, false, "Test re-run")
+    }).catch((resp) => {
+      func.setToast(true, true, "Unable to re-run test")
+    });
+  }
+
   return (
     <PageWithMultipleCards
     title={
@@ -210,6 +221,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
                   </Text>
                 </Badge>
                 )}
+                <Tooltip content={"Re-run test"} hoverDelay={400}>
+                  <Button icon={ReplayMinor} plain onClick={() => {rerunTest(hexId)}}/>
+                </Tooltip>
             </HorizontalStack>
             <Text color="subdued" fontWeight="regular" variant="bodyMd">
               {
