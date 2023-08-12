@@ -45,7 +45,7 @@ function Webhooks() {
         fetchCustomWebhooks()
     }, [])
 
-    const webhooksCardContent = "Webhooks integration"
+    const webhooksCardContent = "Configure custom webhooks to get alerted about inventory events like new endpoints discovered etc."
 
     const resourceName = {
         singular: 'Webhook',

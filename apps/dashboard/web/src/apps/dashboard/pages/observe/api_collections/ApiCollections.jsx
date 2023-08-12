@@ -14,11 +14,6 @@ import ObserveStore from "../observeStore"
 
 const headers = [
     {
-        text: "",
-        value: "icon",
-        itemOrder: 0,
-    },
-    {
         text: "API collection name",
         value: "displayName",
         showFilter:true,
@@ -136,7 +131,7 @@ function ApiCollections() {
             }
         </Text>
             }
-            primaryAction={<Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
             components={[
                
@@ -156,10 +151,16 @@ function ApiCollections() {
 
                     <TextField
                         id={"new-collection-input"}
-                        label="Enter name for the new collection"
+                        label="Name"
+                        helpText="Enter name for the new collection"
                         value={newCollectionName}
                         onChange={handleNewCollectionNameChange}
                         autoComplete="off"
+                        maxLength="24"
+                        suffix={(
+                            <Text>{newCollectionName.length}/24</Text>
+                        )}
+                        autoFocus
                     />
 
 

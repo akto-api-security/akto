@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Tooltip, Text, HorizontalStack, Button, ButtonGroup, Box } from "@shopify/polaris"
+import { Tooltip, Text, HorizontalStack, Button, ButtonGroup, Box, Popover, ActionList } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -113,6 +113,7 @@ function ApiEndpoints() {
     const [selected, setSelected] = useState(0)
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
+    const [exportOpen, setExportOpen] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -192,10 +193,10 @@ function ApiEndpoints() {
             content: "Workflow tests",
             index: tabs.length,
             id: `Tests-${tabs.length}`,
-            component: <WorkflowTests   
-                    apiCollectionId={apiCollectionId} 
-                    endpointsList={loading ? [] : endpointData["All"]}
-                />
+            component: <WorkflowTests
+                apiCollectionId={apiCollectionId}
+                endpointsList={loading ? [] : endpointData["All"]}
+            />
         },
     )
 
@@ -340,22 +341,29 @@ function ApiEndpoints() {
                 </Text>
             }
             secondaryActions={
-                <ButtonGroup>
-                    <Tooltip content="Refresh">
-                        <Button icon={RedoMajor} onClick={handleRefresh} plain helpText="Refresh" />
-                    </Tooltip>
-                    <Button
-                        icon={ImportMinor}
-                        connectedDisclosure={{
-                            actions: [
+                <ButtonGroup spacing="loose">
+                    <Button onClick={handleRefresh} plain monochrome removeUnderline>Refresh</Button>
+                    <Popover
+                        active={exportOpen}
+                        activator={(
+                            <Button
+                                disclosure="select"
+                                plain monochrome removeUnderline
+                                onClick={() => setExportOpen(true)}>
+                                Export
+                            </Button>
+                        )}
+                        autofocusTarget="first-node"
+                        onClose={() => { setExportOpen(false) }}
+                    >
+                        <ActionList
+                            items={[
                                 { content: 'OpenAPI spec', onAction: exportOpenApi },
                                 { content: 'Postman', onAction: exportPostman },
                                 { content: 'CSV', onAction: exportCsv },
-                            ],
-                        }}
-                    >
-                        Export
-                    </Button>
+                            ]}
+                        />
+                    </Popover>
                     <UploadFile
                         fileFormat=".har"
                         fileChanged={file => handleFileChange(file)}
@@ -369,6 +377,7 @@ function ApiEndpoints() {
                         disabled={tabs[selected].component !== undefined}
                     />
                 </ButtonGroup>
+
             }
             components={
                 loading ? [<SpinnerCentered key="loading" />] :
