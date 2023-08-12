@@ -5,3 +5,8 @@
 .linkClass > .Polaris-Link:focus:not(:active){
     outline: none !important;
 }
+
+.Polaris-IndexTable__TableCell--first{
+    padding-top: 12px !important;
+    vertical-align: top !important;
+}

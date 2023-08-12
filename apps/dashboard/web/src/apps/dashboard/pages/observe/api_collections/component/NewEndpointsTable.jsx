@@ -6,6 +6,7 @@ import {
     FraudProtectMinor
 } from '@shopify/polaris-icons';
 import StyledEndpoint from "./StyledEndpoint";
+import func from "@/util/func"
 
 
 const resourceName = {
@@ -65,6 +66,10 @@ const headers = [
     }
 ]
 
+function disambiguateLabel(key, value) {
+    return func.convertToDisambiguateLabelObj(value, null, 2)
+}
+
 const sortOptions = [
     { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
     { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
@@ -88,7 +93,7 @@ function NewEndpointsTable(props){
         data={newEndpoints}
         sortOptions={sortOptions}
         filters={[]}
-        disambiguateLabel={() => { }}
+        disambiguateLabel={disambiguateLabel}
         headers={headers}
         loading={loading}
         getStatus={() => { return "warning" }}

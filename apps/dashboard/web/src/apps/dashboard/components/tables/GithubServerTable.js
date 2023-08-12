@@ -11,10 +11,12 @@ import {
   ChoiceList,
   Tabs} from '@shopify/polaris';
 import GithubRow from './rows/GithubRow';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useReducer } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
-import values from '../../../../util/values';
 import "./style.css"
+import func from '@/util/func';
+import { produce } from "immer"
+import values from "@/util/values"
 
 function GithubServerTable(props) {
 
@@ -27,6 +29,8 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
+
+  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
   useEffect(() => {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
@@ -81,8 +85,14 @@ function GithubServerTable(props) {
     [],
   );
 
-  const handleFilterStatusChange = (key) => (value) => {
+  const handleFilterStatusChange = (key,value) => {
     changeAppliedFilters(key, value);
+  }
+
+  const getDate = (dateObj) => {
+    dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})
+    let obj = dateObj.period.period;
+    handleFilterStatusChange("dateRange",obj)
   }
 
   let filters = formatFilters(props.filters)
@@ -101,7 +111,7 @@ function GithubServerTable(props) {
                 appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
                   appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
               }
-              onChange={handleFilterStatusChange(filter.key)}
+              onChange={(value) => handleFilterStatusChange(filter.key,value)}
               {...(filter.singleSelect ? {} : { allowMultiple: true })}
             />
           ),
@@ -116,7 +126,8 @@ function GithubServerTable(props) {
       label: "Discovered",
       filter:
         (<DateRangePicker ranges={values.ranges}
-          getDate={handleFilterStatusChange("dateRange")}
+          initialDispatch = {currDateRange} 
+          dispatch={(dateObj) => getDate(dateObj)}
           setPopoverState={() => {}}
         />),
       pinned: true
@@ -136,9 +147,6 @@ function GithubServerTable(props) {
       resourceIDResolver,
     });
 
-  const fun = () => {
-    console.log("func", sortSelected)
-  }
 
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
@@ -196,7 +204,6 @@ function GithubServerTable(props) {
                 onSort={setSortSelected}
                 //primaryAction={primaryAction}
                 cancelAction={{
-                  onAction: fun,
                   disabled: false,
                   loading: false,
                 }}

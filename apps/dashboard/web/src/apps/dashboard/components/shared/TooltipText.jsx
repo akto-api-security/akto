@@ -5,7 +5,7 @@ import "./style.css"
 function TooltipText(props) {
 
     // do not send the "as" property as it is being hardcoded to allow using refs.
-    const { text, textProps, tooltip } = props;
+    const { text, textProps, tooltip, highlightOnHover } = props;
     const ref = useRef(null);
     const [isTruncated, setIsTruncated] = useState(false);
 

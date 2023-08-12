@@ -93,8 +93,8 @@ function GithubRow(props) {
             }).map((header) => {
                 return (
                     <IndexTable.Cell key={header.text}>
-                        <VerticalStack>
-                            <Text>
+                        <VerticalStack gap="2">
+                            <Text variant='bodyMd' fontWeight="medium">
                                 {header.text}
                             </Text>
                             <HorizontalStack>

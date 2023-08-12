@@ -3,8 +3,12 @@ import {
     VerticalStack,
     HorizontalStack,
     Icon,
-    Box,
-    Text} from '@shopify/polaris';
+    Box, 
+    Text,
+    Tooltip} from '@shopify/polaris';
+
+import './cell.css'
+   
 import TooltipText from '../../shared/TooltipText';
 
 function GithubCell(props){
@@ -21,7 +25,12 @@ function GithubCell(props){
             return (
                 <div style={{ marginBottom: "auto" }} key={header.value}>
                     <Box padding="05">
-                        <Icon source={data[header.value]} color="primary" />
+                        {data.iconTooltip ? 
+                            <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
+                                <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "primary"} />
+                            </Tooltip>
+                            :<Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "primary"} />
+                        }
                     </Box>
                 </div>
             )
@@ -44,11 +53,13 @@ function GithubCell(props){
                     }
                     return (
                         <Box maxWidth={nameWidth || width} key={header.value}>
-                            <TooltipText
-                                tooltip={data[header.value]}
-                                text = {data[header.value]}
-                                textProps={{variant:"headingMd", ...header.dataProps}}
-                            />
+                            <div className='order1Title'>
+                                <TooltipText
+                                    tooltip={data[header.value]}
+                                    text = {data[header.value]}
+                                    textProps={{variant:"headingMd", ...header.dataProps}}
+                                />
+                            </div>
                         </Box>
                     )
                 })
