@@ -155,6 +155,7 @@ function TestRoleSettings() {
     return (
         <DetailsPage
         pageTitle={pageTitle}
+        backUrl="/dashboard/testing/roles"
         saveAction={saveAction}
         discardAction={resetFunc}
         isDisabled={compareFunc}

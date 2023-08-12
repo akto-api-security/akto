@@ -340,6 +340,7 @@ function ApiEndpoints() {
                     }
                 </Text>
             }
+            backUrl="/dashboard/observe/inventory"
             secondaryActions={
                 <ButtonGroup spacing="loose">
                     <Button onClick={handleRefresh} plain monochrome removeUnderline>Refresh</Button>

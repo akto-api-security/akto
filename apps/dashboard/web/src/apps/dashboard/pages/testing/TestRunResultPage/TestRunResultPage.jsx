@@ -156,7 +156,6 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     async function fetchData() {
-      setLoading(true);
       if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
         if (hexId2 != undefined) {
           if (testingRunResult == undefined) {
@@ -217,6 +216,7 @@ function TestRunResultPage(props) {
       />
     }
     divider= {true}
+    backUrl = {props?.source == "editor" ? undefined : (hexId=="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
     isFirstPage = {props?.source == "editor"}
     primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
     secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}

@@ -275,6 +275,7 @@ function DataTypes() {
   return (
     <DetailsPage
     pageTitle={pageTitle}
+    backUrl="/dashboard/observe/sensitive"
     saveAction={saveAction}
     discardAction={resetFunc}
     isDisabled={compareFunc}

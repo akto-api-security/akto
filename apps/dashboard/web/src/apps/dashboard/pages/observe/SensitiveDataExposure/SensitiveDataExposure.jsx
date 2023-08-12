@@ -198,6 +198,7 @@ const handleRedirect = () => {
             {`Endpoints with ${subType}` }
           </Text>
         }
+        backUrl="/dashboard/observe/sensitive"
         primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
         components = {[
             <GithubServerTable

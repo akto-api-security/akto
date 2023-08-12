@@ -123,7 +123,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest ] = useState(false);
   const hexId = params.hexId;
 
-useEffect(()=>{
+  useEffect(()=>{
     async function fetchData() {
       setLoading(true);
         await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
@@ -132,22 +132,28 @@ useEffect(()=>{
             setLoading(false);
           }
           let localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
-          if (!func.deepComparison(selectedTestRun, localSelectedTestRun)) {
             setSelectedTestRun(localSelectedTestRun);
-          }
-          if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
-            if (localSelectedTestRun.testingRunResultSummaryHexId) {
-              await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-                let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-                setTestRunResults(testRunResults)
-              })
-            }
-          }
       }) 
       setLoading(false);
     }
     fetchData();
-}, [selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
+}, [])
+
+useEffect(()=>{
+  async function fetchData(){
+    setLoading(true);
+    if (Object.keys(subCategoryMap) != 0 && 
+    Object.keys(subCategoryFromSourceConfigMap) != 0 && 
+    selectedTestRun.testingRunResultSummaryHexId) {
+        await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
+          let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+          setTestRunResults(testRunResults)
+        })
+    }
+    setLoading(false);
+  }
+  fetchData();
+},[selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
@@ -234,6 +240,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
             </Text>
           </VerticalStack>
     }
+    backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
       components={loading ?
         [<SpinnerCentered key={"loading"}/>]
