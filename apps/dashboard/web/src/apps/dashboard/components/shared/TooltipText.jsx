@@ -16,7 +16,7 @@ function TooltipText(props) {
 
     const TextContent = (
         <Text as={"span"} truncate {...textProps}>
-            <span ref={ref} className={"tooltipSpan " + (highlightOnHover ? "onHover" : "")}>
+            <span ref={ref} className="tooltipSpan">
                 {text}
             </span>
         </Text>

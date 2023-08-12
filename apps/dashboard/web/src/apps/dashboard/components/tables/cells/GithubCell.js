@@ -4,7 +4,8 @@ import {
     HorizontalStack,
     Icon,
     Box,
-    Text} from '@shopify/polaris';
+    Text,
+    Tooltip} from '@shopify/polaris';
 import TooltipText from '../../shared/TooltipText';
 
 function GithubCell(props){
@@ -53,7 +54,6 @@ function GithubCell(props){
                                 tooltip={data[header.value]}
                                 text = {data[header.value]}
                                 textProps={{variant:"headingMd", ...header.dataProps}}
-                                highlightOnHover={true}
                             />
                         </Box>
                     )

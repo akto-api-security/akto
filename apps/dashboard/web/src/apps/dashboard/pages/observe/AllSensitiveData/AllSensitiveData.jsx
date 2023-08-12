@@ -71,6 +71,15 @@ function AllSensitiveData() {
         }]
     }
 
+    function disambiguateLabel(key, value) {
+        switch(key){
+            case "subType": 
+                return func.convertToDisambiguateLabelObj(value, null, 4)
+            default:
+                return value
+        }
+    }
+
     const handleRedirect = () => {
         navigate("/dashboard/observe/data-types")
     }
@@ -153,7 +162,7 @@ function AllSensitiveData() {
                 sortOptions={sortOptions} 
                 resourceName={resourceName} 
                 filters={[]}
-                disambiguateLabel={()=>{}} 
+                disambiguateLabel={disambiguateLabel} 
                 headers={headers}
                 hasRowActions={true}
                 getActions={getActions}
