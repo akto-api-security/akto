@@ -112,7 +112,7 @@
 
                     // since release_version is not available till a user login, 
                     // the user will always see the old login screen
-                    if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == '${akto-release-version}') {
+                    if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
                         script.src = "/dist/main.js";
                     } else {
                         if (window.AKTO_UI_MODE == 'VERSION_2') {
