@@ -21,7 +21,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, './dist'),
     // the path here and in login.jsp are different.
-    publicPath: 'https://d3as5gx79fwfqr.cloudfront.net/polaris_web/' + process.env.VERSION +  '/dist/',
+    publicPath: process.env.VERSION ==='' || process.env.VERSION.includes("akto-release-version") ? '/dist/':  'https://d3as5gx79fwfqr.cloudfront.net/polaris_web/' + process.env.VERSION +  '/dist/',
     filename: '[name].js'
   },
   module: {

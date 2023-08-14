@@ -48,7 +48,7 @@ export default function Header() {
 
     const handleSwitchUI = async () => {
         await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
-        navigate("/login")
+        window.location.reload()
     }
 
     const userMenuMarkup = (

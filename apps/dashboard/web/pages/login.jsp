@@ -58,6 +58,7 @@
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
                     window.ACCOUNT_NAME = '${requestScope.accountName}';
                     window.RELEASE_VERSION = '${requestScope.releaseVersion}';
+                    window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
                     window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
 
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
@@ -113,7 +114,7 @@
                     // since release_version is not available till a user login, 
                     // the user will always see the old login screen
                     if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
-                        script.src = "/dist/main.js";
+                        script.src = "https://d3as5gx79fwfqr.cloudfront.net/web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
                     } else {
                         if (window.AKTO_UI_MODE == 'VERSION_2') {
                             script.src = "https://d3as5gx79fwfqr.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
