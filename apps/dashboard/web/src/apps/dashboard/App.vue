@@ -278,7 +278,7 @@ export default {
           label: "Switch to new UI",
           click: () => {
             api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
-              this.$router.push('/login')
+              window.location.reload()
             })
           }
         },

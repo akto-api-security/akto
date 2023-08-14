@@ -10,10 +10,12 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.listener.InitializerListener;
+import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -83,7 +85,7 @@ public class ProfileAction extends UserAction {
         String accountName = emailAccountName.getAccountName();
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
-
+        User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -92,7 +94,7 @@ public class ProfileAction extends UserAction {
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("accountName", accountName)
-                .append("aktoUIMode", user.getAktoUIMode().name());
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
         if (versions.length == 3) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");
