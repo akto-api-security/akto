@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, Icon, Scrollable, Spinner, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Avatar, Box, Button, Icon, Scrollable, Spinner,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { ConversationMinor, SendMajor } from "@shopify/polaris-icons"
 import PromptContainer from './PromptContainer'
 import "./style.css"
@@ -166,7 +166,11 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 <div className='input-gpt'>
                     <TextField 
                         prefix={<span style={{color: "#fff"}}>{activePrompt.split("${input}")[0]}</span>} 
-                        suffix={<Button plain icon={SendMajor} disabled={checkQuery()} onClick={handleClick}/>} 
+                        suffix={
+                            <div {...checkQuery() ? null : {style: {background: "#19C37D", padding: "4px", borderRadius: "4px"}}}>
+                                <Button plain disabled={checkQuery()} onClick={handleClick} icon={SendMajor}/>
+                            </div>
+                        } 
                         placeholder={placeHolderText}
                         {...activePrompt.includes("${input}") ? {onChange: setInputPrompt} : null}
                         value={inputPrompt}
