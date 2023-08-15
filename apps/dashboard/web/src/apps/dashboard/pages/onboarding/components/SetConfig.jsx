@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import api from "../../testing/api"
 import OnboardingStore from '../OnboardingStore'
 import TextFieldWithInfo from "../../../components/shared/TextFieldWithInfo"
-import { VerticalStack } from '@shopify/polaris'
+import { Spinner, VerticalStack } from '@shopify/polaris'
 
 function SetConfig() {
 
@@ -22,7 +21,7 @@ function SetConfig() {
                     setAuthObject(obj)
                 })
             }
-            if(localCopy.key || authObject.key){
+            if(Object.keys(localCopy).length > 0 || Object.keys(authObject).length > 0){
                 setLoading(false)
                 clearInterval(interval)
             }
@@ -57,7 +56,7 @@ function SetConfig() {
     )
 
     return (
-        loading ? <SpinnerCentered />
+        loading ? <div style={{margin: "auto"}}><Spinner size='small'/></div>
         : formLayout
     )
 }

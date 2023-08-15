@@ -6,7 +6,7 @@ function GridRows(props) {
     const {columns , items, CardComponent, buttonText, onButtonClick, changedColumns} = props;
     let usedColumns = changedColumns && changedColumns > 0 ? changedColumns : columns
 
-    const rows = Math.ceil((items.length)/usedColumns)
+    const rows = Math.ceil((items?.length)/usedColumns)
     const widthChanged = Math.floor(((usedColumns * 100)/columns)) + '%'
 
     return (

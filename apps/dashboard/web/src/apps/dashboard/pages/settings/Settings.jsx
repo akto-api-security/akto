@@ -23,7 +23,7 @@ function SettingsHeader() {
     )
 
     return (
-        <TopBar userMenu={buttonComp} />
+        <TopBar secondaryMenu={buttonComp} />
     )
 }
 
