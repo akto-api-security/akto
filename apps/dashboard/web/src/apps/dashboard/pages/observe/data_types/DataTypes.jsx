@@ -127,14 +127,14 @@ function conditionStateReducer(draft, action) {
 function DataTypes() {
 
   const location = useLocation();
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const isNew = location?.state == undefined || Object.keys(location?.state).length == 0
-  const pageTitle = isNew ? "Add data type" : "Configure data type"
-  const initialState = isNew ? transform.initialObj : transform.fillInitialState(location.state);
+  const pageTitle = (isNew || (location?.state?.regexObj)) ? "Add data type" : "Configure data type"
+  const currObj = location?.state?.regexObj ? transform.getRegexObj(location?.state?.regexObj) : transform.initialObj
+  const initialState = pageTitle === "Add data type" ? isNew ? transform.initialObj : currObj : transform.fillInitialState(location.state);
 
-  const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), transform.initialObj);
+  const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), currObj);
   const [change, setChange] = useState(false)
-
   const resetFunc =()=>{
     dispatchCurrState({type:"update", obj:initialState})
     setChange(false)
@@ -170,7 +170,7 @@ function DataTypes() {
     else {
       let payloadObj = transform.convertDataForCustomPayload(currState)
       api.saveCustomDataType(payloadObj).then((response) => {
-        if (isNew) {
+        if (pageTitle === "Add data type") {
           func.setToast(true, false, "Data type added successfully");
         } else {
           func.setToast(true, false, "Data type updated successfully");
@@ -189,13 +189,15 @@ function DataTypes() {
     dispatchCurrState({type:"update", obj:obj})
 }
 
+console.log(change)
+
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
         <HorizontalGrid gap="4" columns={2}>
           <TextField id={"name-field"} label="Name" helpText="Name the data type"
             value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
-            onChange={(val) => { isNew ? handleChange({ name: val }) : {} }} />
+            onChange={(val) => { pageTitle === "Add data type" ? handleChange({ name: val }) : {} }} />
           {currState.dataType === 'Custom' ?
             <Dropdown id={"active-dropdown"} menuItems={statusItems}
               selected={(val) => { handleChange({ active: val }) }}
