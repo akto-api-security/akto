@@ -256,7 +256,7 @@ const SampleApi = () => {
 
             <Divider />
 
-            <Box ref={jsonEditorRef} minHeight="81vh"/>
+            <Box ref={jsonEditorRef} minHeight="80vh"/>
             {resultComponent}
             <Modal
                 open={showTestResult}
