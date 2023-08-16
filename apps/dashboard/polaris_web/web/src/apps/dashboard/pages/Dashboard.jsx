@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
-import ObserveStore from "./observe/observeStore"
+import ObserveStore from "../pages/observe/observeStore"
 import homeFunctions from "./home/module";
 import { useEffect, useState } from "react";
 import { Avatar, Button, Frame, HorizontalStack, Modal, Toast } from "@shopify/polaris";

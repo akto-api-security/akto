@@ -10,7 +10,6 @@
             <Array type="String">
                 <Item>GET</Item>
                 <Item>POST</Item>
-                <Item>OPTIONS</Item>
             </Array>
             </Set>  
             <Set name="includedPaths">

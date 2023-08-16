@@ -1,12 +1,12 @@
 import HomePage from "../dashboard/pages/home/HomePage"
-import TestRunsPage from "../dashboard/pages/testing/test_run/TestRunsPage";
-import SingleTestRunPage from "../dashboard/pages/testing/test_run/SingleTestRunPage"
-import TestRunResultPage from "../dashboard/pages/testing/test_run/TestRunResultPage";
-import AllSensitiveData from "../dashboard/pages/observe/sensitive_data/AllSensitiveData";
+import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
+import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
+import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
+import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiEndpoints from  "../dashboard/pages/observe/api_collections/ApiEndpoints";
-import SensitiveDataExposure from "../dashboard/pages/observe/sensitive_data/SensitiveDataExposure";
-import SingleRequest from "../dashboard/pages/observe/sensitive_data/SingleRequest";
+import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
+import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
 import { AppProvider } from "@shopify/polaris"
@@ -28,14 +28,13 @@ import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
-import IssuesPage from "../dashboard/pages/issues/IssuesPage";
+import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
-import TestRolesPage from "../dashboard/pages/testing/test_roles/TestRolesPage"
-import TestRoleDetails from "../dashboard/pages/testing/test_roles/TestRoleDetails";
+import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
+import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
-import AwsSource from "../dashboard/pages/quick_start/components/AwsSource";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
@@ -44,6 +43,9 @@ import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
+
+import Store from "../dashboard/store";
+import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 
 const router = createBrowserRouter([
@@ -77,7 +79,7 @@ const router = createBrowserRouter([
               },
               {
                 path:"roles/details",
-                element:<TestRoleDetails/>
+                element:<TestRoleSettings/>
               },
               {
                 path:"user-config",
@@ -127,10 +129,6 @@ const router = createBrowserRouter([
             path: "quick-start",
             element: <QuickStart/>,
           },
-          {
-            path: "quick-start/aws-setup",
-            element: <AwsSource />
-          }
         ]
       },
       {
@@ -186,7 +184,7 @@ const router = createBrowserRouter([
             element: <Webhook />,
           },
           {
-            path: "health-logs",
+            path: "logs",
             element: <HealthLogs />,
           },
           {
@@ -228,6 +226,9 @@ const router = createBrowserRouter([
 ])
 
 function App() {
+  const setAllRoutes = Store(state => state.setAllRoutes)
+  const searchData= generateSearchData(router.routes)
+  setAllRoutes(searchData)
 
   useEffect(() => {
     const script = document.createElement('script')
@@ -235,11 +236,9 @@ function App() {
     self.MonacoEnvironment = {
       getWorkerUrl: function (moduleId, label) {
           if (label === 'json') {
-              return "https://d3as5gx79fwfqr.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/json.worker.js";
-//              return '/dist/json.worker.js';
+              return '/dist/json.worker.js';
           }
-          return "https://d3as5gx79fwfqr.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/editor.worker.js";
-//          return '/dist/editor.worker.js';
+          return '/dist/editor.worker.js';
       }
       };
     `);

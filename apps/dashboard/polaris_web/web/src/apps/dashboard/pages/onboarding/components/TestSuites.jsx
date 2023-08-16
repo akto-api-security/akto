@@ -23,7 +23,7 @@ function TestSuites() {
 
     return (
         loading ? <SpinnerCentered /> :
-        <GridRows columns={2} items={testSuites} CardComponent={SuitesCard} />
+        <GridRows columns={1} items={testSuites} CardComponent={SuitesCard} />
     )
 }
 

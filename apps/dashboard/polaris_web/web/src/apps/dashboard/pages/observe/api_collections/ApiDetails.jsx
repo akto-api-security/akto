@@ -86,6 +86,7 @@ function ApiDetails(props) {
             <GithubCell
             key="heading"
             width="30vw"
+            nameWidth="25vw"
             data={apiDetail}
             headers={headers}
             getStatus={getStatus}

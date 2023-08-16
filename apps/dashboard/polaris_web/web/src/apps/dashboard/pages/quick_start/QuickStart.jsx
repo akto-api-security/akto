@@ -28,7 +28,10 @@ function QuickStart() {
 
     const component = (
         loading ? <SpinnerCentered/> :
-            myConnections.length > 0 ? <UpdateConnections myConnections={myConnections}/> : <NewConnection/>
+            myConnections.length > 0 ?
+            <div className='update-connections'>
+                <UpdateConnections myConnections={myConnections}/>
+            </div> : <NewConnection/>
     )
 
     return (

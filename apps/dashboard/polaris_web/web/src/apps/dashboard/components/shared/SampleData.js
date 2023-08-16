@@ -87,7 +87,10 @@ function SampleData(props) {
             scrollBeyondLastLine: false,
             readOnly: true,
             enableSplitViewResizing: false,
-		        renderSideBySide: false
+		        renderSideBySide: false,
+            // this prop doesn't work currently might be fixed in future versions.
+            // solving this using custom CSS.
+            lightbulb: { enabled: false },
         }
         let instance = "";
         if(showDiff){

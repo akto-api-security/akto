@@ -9,7 +9,7 @@ const onFunc = {
                         result[severity] = { truncate: false, items: [] };
                     }
                     
-                    if (result[severity].items.length < 4) {
+                    if (result[severity].items.length < 3) {
                         result[severity].items.push(item);
                     } else {
                         result[severity].truncate = true;
@@ -55,6 +55,20 @@ const onFunc = {
             }
         });
         return tempArr
+    },
+
+    getTextColor: function(method){
+        switch (method) {
+            case "GET": return "text-info";
+            case "POST": return "text-primary";
+            case "PUT": return "text-interactive";
+            case "PATCH": return "text-magic";
+            case "DELETE": return "text-warning-strong";
+            case "OPTIONS": return "text-caution-strong";
+            case "HEAD": return "text-caution";
+            default:
+                return "";
+        }
     }
 }
 

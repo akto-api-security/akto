@@ -45,7 +45,7 @@ function Webhooks() {
         fetchCustomWebhooks()
     }, [])
 
-    const webhooksCardContent = "Webhooks integration"
+    const webhooksCardContent = "Configure custom webhooks to get alerted about inventory events like new endpoints discovered etc."
 
     const resourceName = {
         singular: 'Webhook',
@@ -101,6 +101,16 @@ function Webhooks() {
         }]
     }
 
+    function disambiguateLabel(key, value) {
+        switch (key) {
+            case "createTime":
+            case "lastSentTimestamp":
+                return func.convertToDisambiguateLabel(value, func.prettifyEpoch, 2)
+            default:
+                return func.convertToDisambiguateLabelObj(value, null, 2)
+          }          
+    }
+
     const WebhooksCard = (
         <div>
             {
@@ -113,7 +123,7 @@ function Webhooks() {
                             sortOptions={sortOptions}
                             resourceName={resourceName}
                             filters={[]}
-                            disambiguateLabel={() => { }}
+                            disambiguateLabel={disambiguateLabel}
                             headers={headers}
                             hasRowActions={true}
                             getActions={getActions}

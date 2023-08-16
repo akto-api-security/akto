@@ -113,7 +113,12 @@ function AktoGPT() {
                     secondaryFooterActions={[{content: 'Discard Changes', destructive: true, onAction: discardAction, disabled: compareItems() }]}
                     primaryFooterAction={{content: 'Save', onAction: saveAction, disabled: compareItems()}}
         >
-            <LegacyCard.Section title="Manage using AktoGPT for all your collections">
+            <LegacyCard.Section 
+                title={(
+                    <Text variant='bodyMd'>Manage using AktoGPT for all your collections</Text>
+                )}
+                fullWidth
+            >
                 <ResourceList
                     headerContent="Select All Collections"
                     items={displayItems}

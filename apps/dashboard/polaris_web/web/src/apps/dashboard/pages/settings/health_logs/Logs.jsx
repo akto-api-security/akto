@@ -86,7 +86,7 @@ const Logs = () => {
             title="Logs"
             actions={[
                 { content: 'Export', onAction: exportLogsCsv },
-                { content: 'Configure log level' }
+                { content: 'Configure log level'}
             ]}
         >
             <Text variant="bodyMd">

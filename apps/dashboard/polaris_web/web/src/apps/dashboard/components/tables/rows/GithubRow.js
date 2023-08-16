@@ -27,7 +27,12 @@ function GithubRow(props) {
     const [data, setData] = useState(dataObj);
 
     const togglePopoverActive = (index) => useCallback(
-        () => setPopoverActive(index),
+        () => setPopoverActive((prev) => {
+            if(prev==index){
+                return -1;
+            } 
+            return index;
+        }),
         [],
     );
     async function nextPage(data){
@@ -75,7 +80,8 @@ function GithubRow(props) {
                             headers={headers}
                             data={data}
                             getStatus={getStatus}
-                            width="50vw"
+                            width="65vw"
+                            nameWidth="50vw"
                         />
                     </Link>
                 </div>
@@ -87,8 +93,8 @@ function GithubRow(props) {
             }).map((header) => {
                 return (
                     <IndexTable.Cell key={header.text}>
-                        <VerticalStack>
-                            <Text>
+                        <VerticalStack gap="2">
+                            <Text variant='bodyMd' fontWeight="medium">
                                 {header.text}
                             </Text>
                             <HorizontalStack>
