@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {LegacyCard} from '@shopify/polaris';
+import {Divider, LegacyCard, Text} from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
@@ -64,18 +64,29 @@ function Postman() {
         setToast(true,false,"Collection Saved")
     }
     const PostmanCard = (
-        <LegacyCard title="Integrate Postman" 
+        <LegacyCard
             secondaryFooterActions={[{content: 'See how it works',onAction: seeWork}]}
             primaryFooterAction={{content: 'Save', onAction: saveCollection}}
         >
-          <LegacyCard.Section title="Postman API key">
+          <LegacyCard.Section>
+            <Text variant="headingMd">Integrate Postman</Text>
+          </LegacyCard.Section>
+
+          <LegacyCard.Section>
             <PasswordTextField text={postmanKey} helpText="Paste your Postman api key here."
-                                setField={setPostmanKey} onFunc={true} field={postmanKey}
+                                setField={setPostmanKey} onFunc={true} field={postmanKey} 
+                                label="Postman API key"
             />
-          </LegacyCard.Section>    
-          <LegacyCard.Section title="Select Postman workspace">
-            <Dropdown helpText="Select the Postman workspace you wish to import." menuItems={workspaces} selected={handleSelectChange} initial={selected}/>
+            <br/>
+            <Dropdown 
+              helpText="Select the Postman workspace you wish to import." 
+              menuItems={workspaces} selected={handleSelectChange} 
+              initial={selected}
+              label="Select Postman workspace"/>
           </LegacyCard.Section> 
+          
+          <Divider />
+          <br/>
         </LegacyCard>
     )
 

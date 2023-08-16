@@ -29,7 +29,7 @@ import func from "@/util/func";
 import TestEditorStore from "../testEditorStore"
 import "../TestEditor.css"
 import { useNavigate } from "react-router-dom";
-import TestRunResultPage from "../../testing/test_run/TestRunResultPage";
+import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 
 const SampleApi = () => {
 

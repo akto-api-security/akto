@@ -1,6 +1,7 @@
 import { Tooltip, Text, HorizontalStack, Box } from "@shopify/polaris"
 import func from "@/util/func"
 import "../api_inventory.css"
+import { useRef, useEffect, useState } from "react"
 
 const StyledEndpoint = (data) => {
     const { method, url } = func.toMethodUrlObject(data)
@@ -25,15 +26,23 @@ const StyledEndpoint = (data) => {
                 return "";
         }
     }
-    return (
-        <Tooltip hoverDelay={800} content={data} width='wide' preferredPosition='mostSpace'>
-            <HorizontalStack gap={"1"} wrap={false}>
+
+    const ref = useRef(null);
+    const [isTruncated, setIsTruncated] = useState(false);
+
+    useEffect(() => {
+        const element = ref.current;
+        setIsTruncated(element.scrollWidth > element.clientWidth);
+    }, []);
+
+    const endpoint = (
+        <HorizontalStack gap={"1"} wrap={false}>
                 <Box color={getMethodColor(method)}>
                     <Text as="span" variant="headingMd" >
                         {method}
                     </Text>
                 </Box>
-                <div className="styled-endpoint">
+                <div className="styled-endpoint" ref={ref}>
                     {
                         arr?.map((item, index) => {
                             return (
@@ -47,7 +56,14 @@ const StyledEndpoint = (data) => {
                     }
                 </div>
             </HorizontalStack>
+    )
+
+    return (
+        isTruncated ? 
+        <Tooltip hoverDelay={900} content={data} width='wide' preferredPosition='mostSpace'>
+            {endpoint}
         </Tooltip>
+        : endpoint
     )
 }
 

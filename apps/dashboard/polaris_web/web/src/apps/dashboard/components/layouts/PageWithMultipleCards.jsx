@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 const PageWithMultipleCards = (props) => {
 
-    const {backAction, isFirstPage, title, primaryAction, secondaryActions, divider, components} = props
+    const {backUrl, isFirstPage, title, primaryAction, secondaryActions, divider, components} = props
 
     const location = useLocation();
     const navigate = useNavigate()
@@ -14,8 +14,8 @@ const PageWithMultipleCards = (props) => {
     }
 
     function getBackAction() {
-        if(backAction){
-            return backAction
+        if(backUrl){
+            return { onAction: ()=>navigate(backUrl) }
         }
         return isNewTab || isFirstPage ? null : { onAction: navigateBack }
     }

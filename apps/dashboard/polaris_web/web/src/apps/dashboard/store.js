@@ -28,6 +28,11 @@ let store = (set)=>({
         set({allCollections: allCollections})
     },
     isLocalDeploy: window.DASHBOARD_MODE === "LOCAL_DEPLOY",
+
+    allRoutes: [],
+    setAllRoutes:(allRoutes)=>{
+        set({allRoutes: allRoutes})
+    },
 })
 
 store = devtools(store)

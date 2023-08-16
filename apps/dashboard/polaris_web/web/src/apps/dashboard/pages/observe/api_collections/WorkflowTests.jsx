@@ -83,6 +83,10 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
         }]
     }
 
+    function disambiguateLabel(key, value) {
+        return func.convertToDisambiguateLabelObj(value, null, 3)
+     }
+
     function handleFileChange(file) {
         if (file) {
             const reader = new FileReader();
@@ -153,7 +157,7 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
                         sortOptions={sortOptions}
                         resourceName={resourceName}
                         filters={[]}
-                        disambiguateLabel={() => { }}
+                        disambiguateLabel={disambiguateLabel}
                         headers={headers}
                         hasRowActions={true}
                         getActions={getActions}

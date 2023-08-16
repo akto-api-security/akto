@@ -166,6 +166,7 @@ function AuthTypeDetails() {
     return (
         <DetailsPage
         pageTitle={pageTitle}
+        backUrl="/dashboard/settings/auth-types"
         saveAction={saveAction}
         discardAction={resetFunc}
         isDisabled={compareFunc}

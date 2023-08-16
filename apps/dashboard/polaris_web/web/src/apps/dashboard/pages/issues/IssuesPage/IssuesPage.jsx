@@ -1,11 +1,11 @@
-import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import GithubServerTable from "../../components/tables/GithubServerTable"
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
+import GithubServerTable from "../../../components/tables/GithubServerTable"
 import { useState } from "react";
-import api from "./api"
-import testingApi from "../testing/api"
-import Store from "../../store";
-import TestingStore from "../testing/testingStore";
-import transform from "./transform";
+import api from "../api"
+import testingApi from "../../testing/api"
+import Store from "../../../store";
+import TestingStore from "../../testing/testingStore";
+import transform from "../transform";
 import func from "@/util/func";
 import {
     SearchMinor,
@@ -233,16 +233,18 @@ function IssuesPage(){
 
     function disambiguateLabel(key, value) {
         switch (key) {
-            case "startTimestamp": return (value).map((val) => func.prettifyEpoch(val)).join(" ");
+            case "startTimestamp":
+                return func.convertToDisambiguateLabel(value, func.prettifyEpoch, 2)
             case "issueStatus":
-            case "severity": return (value).map((val) => func.toSentenceCase(val)).join(', ');
-            case "issueCategory": 
-                return (value).map((val) => val).join(', ');
-            case "apiCollectionId": 
-                return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
+            case "severity":
+                return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
+            case "issueCategory":
+                return func.convertToDisambiguateLabelObj(value, null, 3)
+            case "apiCollectionId":
+                return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             default:
-                return value;
-        }
+              return value;
+          }          
     }
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
