@@ -27,7 +27,10 @@ public class TeamAction extends UserAction {
     BasicDBList users;
 
     public String fetchTeamData() {
-        List<RBAC> allRoles = RBACDao.instance.findAll(RBAC.ACCOUNT_ID, Context.accountId.get());
+        List<RBAC> allRoles = RBACDao.instance.findAll(Filters.or(
+                Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get()),
+                Filters.exists(RBAC.ACCOUNT_ID, false)
+        ));
 
         Map<Integer, RBAC> userToRBAC = new HashMap<>();
         for(RBAC rbac: allRoles) {
@@ -42,7 +45,10 @@ public class TeamAction extends UserAction {
             userObj.append("role", status);
         }
 
-        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(RBAC.ACCOUNT_ID, Context.accountId.get());
+        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(Filters.or(
+                Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get()),
+                Filters.exists(RBAC.ACCOUNT_ID, false)
+        ));
 
         for(PendingInviteCode pendingInviteCode: pendingInviteCodes) {
             users.add(
