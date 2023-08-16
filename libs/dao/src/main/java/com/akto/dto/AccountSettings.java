@@ -91,6 +91,7 @@ public class AccountSettings {
                 if (StringUtils.isEmpty(headerName)) {
                     headerName = "host";
                 }
+                headerName = headerName.toLowerCase();
 
                 Map<Pattern, String> regexMapperForGivenHeader = ret.get(headerName);
                 if (regexMapperForGivenHeader == null) {
