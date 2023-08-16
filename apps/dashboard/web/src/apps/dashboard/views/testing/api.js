@@ -54,6 +54,16 @@ export default {
         })        
     },
 
+    rerunTest(testingRunHexId) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {"testingRunHexId": testingRunHexId}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
     scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
         return request({
             url: '/api/startTest',
