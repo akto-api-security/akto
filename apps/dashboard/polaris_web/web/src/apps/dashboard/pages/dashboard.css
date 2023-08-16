@@ -19,6 +19,7 @@
 
 .header-css {
     width: 100vw;
+    margin-left: -22vw;
     display: flex;
     justify-content: space-between;
     padding: 0 2vw;
