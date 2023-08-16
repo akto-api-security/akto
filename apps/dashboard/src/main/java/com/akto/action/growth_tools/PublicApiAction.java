@@ -73,11 +73,9 @@ public class PublicApiAction extends ActionSupport implements Action, ServletRes
             int requestIndex = 0;
             String[] requestURL = requestLines[requestIndex].split(" ");
             map.put(METHOD, requestURL[0].trim());
+            map.put(PATH, requestURL[1].trim());
             map.put(TYPE, requestURL[2].trim());
 
-            String[] requestHost = requestLines[++requestIndex].split(":");
-            String host = requestHost[1].trim();
-            map.put(PATH, host + requestURL[1].trim());
 
             Map<String, String> requestHeaders = new HashMap<>();
             for (requestIndex = requestIndex+1; requestIndex < requestLines.length; requestIndex++) {

@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONObject;
+
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
@@ -119,6 +121,10 @@ public class Operations {
 
     public static ExecutorSingleOperationResp modifyBodyParam(RawApi rawApi, String key, Object value) {
         BasicDBObject payload = rawApi.fetchReqPayload();
+        BasicDBObject obj = Utils.fetchJsonObjForString(value);
+        if (obj != null) {
+            value = obj;
+        }
         boolean modified = Utils.modifyValueInPayload(payload, null, key, value);
         if (!modified) {
             return new ExecutorSingleOperationResp(true, "body param not present " + key);
@@ -127,7 +133,7 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
-    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key, Object value) {
+    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key) {
         rawApi.getRequest().setBody(key.toString());
         return new ExecutorSingleOperationResp(true, "");
     }

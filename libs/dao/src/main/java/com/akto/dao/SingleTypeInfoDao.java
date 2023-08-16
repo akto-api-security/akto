@@ -152,7 +152,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         // Custom data type sensitive
-        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
             if (customDataType.isSensitiveAlways()) {
                 sensitiveSubTypes.add(customDataType.getName());
             }
@@ -169,7 +169,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             }
         }
 
-        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
             if (customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
                 sensitiveInRequest.add(customDataType.getName());
             }
@@ -184,7 +184,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 sensitiveInResponse.add(subType.getName());
             }
         }
-        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
             if (customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
                 sensitiveInResponse.add(customDataType.getName());
             }

@@ -21,6 +21,8 @@ import static com.mongodb.client.model.Filters.*;
 public abstract class MCollection<T> {
     private Logger logger = LoggerFactory.getLogger(getClassT());
     public static MongoClient[] clients = new MongoClient[1];
+    public static final String SET = "$set";
+    public static final String ID = "_id";
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();

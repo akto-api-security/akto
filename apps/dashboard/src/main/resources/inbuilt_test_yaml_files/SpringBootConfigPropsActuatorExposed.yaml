@@ -1,0 +1,50 @@
+id: SPRING_BOOT_CONFIG_PROPS_ACTUATOR_EXPOSED
+info:
+  name: Spring Boot Configuration Properties Actuator Exposed 
+  description: Spring Boot Configuration Properties Actuator Exposed Misconfiguration.
+  details: >
+       The Spring Boot Configuration Properties Actuator Exposed misconfiguration occurs when the Actuator endpoint, which 
+       provides detailed configuration properties of the application, is accessible to unauthorized users. This 
+       misconfiguration can lead to potential security risks as sensitive configuration information, including 
+       properties related to security, database, and third-party services, can be exposed. It falls under the 
+       Security Misconfiguration category with a low severity level. Proper access control and secure configuration
+        of the Actuator endpoints are essential to prevent unauthorized access and protect sensitive configuration 
+        details.
+  impact: Exposing Spring Boot Configuration Properties Actuator can lead to unauthorized access and exposure of sensitive application configuration properties.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Spring Boot
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/actuator/configprops
+
+validate:
+  response_code: 
+    eq: 200
+  response_payload:
+    contains_all:
+      - "org.springframework.boot.actuate"
+      - "beans"
+      - "contexts"
+        

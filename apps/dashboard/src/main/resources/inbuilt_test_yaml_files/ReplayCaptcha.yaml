@@ -1,0 +1,50 @@
+id: REPLAY_CAPTCHA
+info:
+  name: "Replaying request with same captcha"
+  description: "The server fails to enforce captcha expiration, allowing users to submit multiple requests using the same captcha value without time restrictions."
+  details: >
+            "Successful replaying of captchas presents a significant problem for companies, as it enables malicious actors to bypass security measures, potentially leading to spamming, data breaches, and reputation damage."
+  impact: "Bypassing CAPTCHA protection enables hackers to automate malicious activities, such as unauthorized account access, spamming, data harvesting, and DDoS attacks."
+  category:
+    name: RL
+    shortName: Lack of Resources & Rate Limiting
+    displayName: Lack of Resources & Rate Limiting (RL)
+  subCategory: REPLAY_CAPTCHA
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://hackerone.com/reports/223324"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either: captcha
+    - query_param:
+        for_one:
+          key:
+            contains_either: captcha
+
+execute:
+  type: single
+  requests:
+    - req:
+        - add_header: 
+            x-akto-ignore: "0"
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match: 
+      gt: 80
+    length:
+      gt: 0

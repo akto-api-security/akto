@@ -16,6 +16,8 @@ import java.util.concurrent.Future;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.cloud.stack.dto.StackState;
+import com.amazonaws.services.autoscaling.AmazonAutoScaling;
+import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsync;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsyncClientBuilder;
@@ -34,6 +36,9 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             .standard().build();
     private static final AmazonCloudFormation CLOUD_FORMATION_SYNC = AmazonCloudFormationClientBuilder.standard()
             .build();
+
+    private static final AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
+
 
     private AwsStack(){
     }
@@ -67,6 +72,10 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             throw e;
         }
+    }
+
+    public AmazonAutoScaling getAsc() {
+        return asc;
     }
 
     private Collection<Parameter> fetchParamters(Map<String, String> parametersMap) {

@@ -7,6 +7,7 @@ import java.util.List;
 public class ApiToken {
     private int id;
     private int accountId;
+    public static final String ACCOUNT_ID = "accountId";
     private String name;
     private String key;
     public static final String KEY ="key";

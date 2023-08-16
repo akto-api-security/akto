@@ -5,21 +5,22 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
+import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.User;
+import com.akto.dto.UserAccountEntry;
+import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import org.bson.internal.Base64;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
-import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Filters.in;
 
 public class ProfileAction extends UserAction {
 
@@ -75,13 +76,19 @@ public class ProfileAction extends UserAction {
             }
             return;
         }
+        String username = user.getLogin();
+
+        EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
+        String accountName = emailAccountName.getAccountName();
 
         userDetails.append("accounts", accounts)
-                .append("username",user.getName())
+                .append("username",username)
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
-                .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()));
+                .append("isSaas","true".equals(System.getenv("IS_SAAS")))
+                .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
+                .append("accountName", accountName);;
 
         for (String k: userDetails.keySet()) {
             request.setAttribute(k, userDetails.get(k));

@@ -98,9 +98,8 @@ public class TestInitializerListener extends MongoBasedTest {
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey1.url));
         assertNotNull(testingRunIssues);
 
-        InitializerListener initializerListener = new InitializerListener();
         BackwardCompatibility backwardCompatibility = new BackwardCompatibility();
-        initializerListener.deleteNullSubCategoryIssues(backwardCompatibility);
+        InitializerListener.deleteNullSubCategoryIssues(backwardCompatibility);
 
         testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey1.url));
         assertNull(testingRunIssues);
