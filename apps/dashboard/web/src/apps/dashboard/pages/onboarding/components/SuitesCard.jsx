@@ -1,4 +1,4 @@
-import { Box, Card, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Card, HorizontalStack, Icon, RadioButton, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import { QuestionMarkMinor } from "@shopify/polaris-icons"
 import React from 'react'
 import OnboardingStore from '../OnboardingStore'
@@ -9,20 +9,23 @@ function SuitesCard({cardObj}) {
     const selectedTest = OnboardingStore(state => state.selectedTestSuite)
 
     return (
-        <div onClick={() => setSelectedTest(cardObj._name)} className={"suite-card " + (selectedTest === cardObj._name ? "active-card" : '')}>
-            <Card background="bg-subdued">
+        <div onClick={() => setSelectedTest(cardObj.name)}>
+            <Card>
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between">
-                        <Text variant="headingXl" as='h4' color='subdued'>{cardObj?.name}</Text>
+                        <HorizontalStack gap="1">
+                            <RadioButton checked={selectedTest === cardObj.name} />
+                            <Text variant="bodyLg" fontWeight="semibold">{cardObj?.name}</Text>
+                        </HorizontalStack>
                         <Tooltip content={cardObj?.description}>
                             <Box>
-                                <Icon color="subdued" source={QuestionMarkMinor} />
+                                <Icon color="base" source={QuestionMarkMinor} />
                             </Box>
                         </Tooltip>
                     </HorizontalStack>
 
-                    <Box as="span">
-                        <Text variant="headingMd">
+                    <Box as="span" paddingInlineStart="8">
+                        <Text variant="bodyMd">
                             {cardObj?.tests?.length} Tests
                         </Text>
                     </Box>
