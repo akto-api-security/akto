@@ -71,6 +71,15 @@ function AllSensitiveData() {
         }]
     }
 
+    function disambiguateLabel(key, value) {
+        switch(key){
+            case "subType": 
+                return func.convertToDisambiguateLabelObj(value, null, 4)
+            default:
+                return value
+        }
+    }
+
     const handleRedirect = () => {
         navigate("/dashboard/observe/data-types")
     }
@@ -89,6 +98,8 @@ function AllSensitiveData() {
                         id:type.name,
                         nextUrl:type.name,
                         icon: CircleTickMinor,
+                        iconColor: "primary",
+                        iconTooltip: "Active",
                         sensitiveCount:0
                     })
                 })
@@ -102,6 +113,8 @@ function AllSensitiveData() {
                         id:type.name,
                         nextUrl:type.name,
                         icon: type.active ? CircleTickMinor : CircleCancelMinor,
+                        iconColor: type.active ? "primary" : "critical",
+                        iconTooltip: type.active ? "Active" : "Inactive",
                         sensitiveCount:0
                     })
                 })
@@ -149,7 +162,7 @@ function AllSensitiveData() {
                 sortOptions={sortOptions} 
                 resourceName={resourceName} 
                 filters={[]}
-                disambiguateLabel={()=>{}} 
+                disambiguateLabel={disambiguateLabel} 
                 headers={headers}
                 hasRowActions={true}
                 getActions={getActions}

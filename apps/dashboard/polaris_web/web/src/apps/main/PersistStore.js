@@ -4,6 +4,11 @@ import {devtools, persist, createJSONStorage} from "zustand/middleware"
 let persistStore = (set) => ({
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
+
+    quickstartTasksCompleted: 0,
+    setQuickstartTasksCompleted: (quickstartTasksCompleted)=>{
+        set({quickstartTasksCompleted: quickstartTasksCompleted})
+    }
 })
 
 persistStore = devtools(persistStore)

@@ -89,6 +89,7 @@ function SingleRequest(){
               </VerticalStack>
                 
             }
+            backUrl={`/dashboard/observe/sensitive/${subType}`}
             secondaryActions = {
                 <Popover
                 active={popoverActive}

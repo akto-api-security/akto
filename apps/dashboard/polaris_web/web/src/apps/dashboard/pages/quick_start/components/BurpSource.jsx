@@ -61,7 +61,7 @@ function BurpSource() {
     const steps = [
         {
             text: "Download Akto's Burp extension.",
-            component: <div><Button onClick={downloadBurpExt}>Download</Button></div>,
+            component: <div><Button size='slim' onClick={downloadBurpExt}>Download</Button></div>,
             textComponent: <DownloadTextComponent param_value={downloadInfo}/>
         },
         {

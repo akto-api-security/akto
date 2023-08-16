@@ -3,8 +3,8 @@ import { LegacyCard, HorizontalGrid, TextField } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
-import api from './api';
-import transform from './transform';
+import api from '../api';
+import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
 import {produce} from "immer"
 
@@ -35,7 +35,7 @@ const selectOptions = [
     }
 ]
 
-function TestRoleDetails() {
+function TestRoleSettings() {
 
     const location = useLocation();
     const navigate = useNavigate()
@@ -155,6 +155,7 @@ function TestRoleDetails() {
     return (
         <DetailsPage
         pageTitle={pageTitle}
+        backUrl="/dashboard/testing/roles"
         saveAction={saveAction}
         discardAction={resetFunc}
         isDisabled={compareFunc}
@@ -163,4 +164,4 @@ function TestRoleDetails() {
     )
 }
 
-export default TestRoleDetails;
+export default TestRoleSettings;

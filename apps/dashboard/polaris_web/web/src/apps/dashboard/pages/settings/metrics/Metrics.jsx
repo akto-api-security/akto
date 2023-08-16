@@ -1,13 +1,14 @@
 import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useReducer, useState } from 'react'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
-
+import {produce} from "immer"
 import func from '@/util/func'
 import Store from "../../../store"
 import "../settings.css"
 import settingFunctions from '../module'
 import GraphMetric from '../../../components/GraphMetric'
+import values from '@/util/values'
 
 function Metrics() {
     
@@ -15,10 +16,16 @@ function Metrics() {
     const apiCollections = Store(state => state.allCollections)
     const [metricsList, setMetricList] = useState([])
     const [orderedResult, setOrderedResult] = useState([])
-    const [startTime, setStartTime] = useState(Math.floor(Date.now() / 1000))
-    const [endTime, setEndTime] = useState(Math.floor(Date.now() / 1000))
     const [hostsActive, setHostsActive] = useState(false)
     const [currentHost, setCurrentHost] = useState(null)
+
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
+    const startTime = getTimeEpoch("since")
+    const endTime = getTimeEpoch("until")
 
     const initialItems = [
         { label: "All", value: "ALL" },
@@ -63,12 +70,7 @@ function Metrics() {
 
     useEffect(()=>{
         getGraphData(startTime,endTime)
-    },[startTime,endTime,groupBy])
-
-    const handleDate = (dateRange) =>{
-        setStartTime(Math.floor(Date.parse(dateRange.period.since) / 1000))
-        setEndTime(Math.floor(Date.parse(dateRange.period.until) / 1000))
-    }
+    },[currDateRange,groupBy])
 
     function changeItems(){
         setMenuItems(hosts)
@@ -137,7 +139,7 @@ function Metrics() {
             <LegacyCard >
                 <LegacyCard.Section>
                     <LegacyCard.Header title="Metrics">
-                        <DateRangeFilter getDate={handleDate}/>
+                        <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
                         <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
                                     subItems={hosts.length > 0} subContent="Group by Id" subClick={changeItems}
                         />

@@ -73,7 +73,7 @@ const TestEditor = () => {
         </div>
     )
     const headerEditor = (
-        <TopBar userMenu = {headerComp} />
+        <TopBar secondaryMenu={headerComp} />
     )
 
     useEffect(() => {

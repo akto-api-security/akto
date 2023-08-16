@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import quickStartFunc from '../transform';
-import { Badge, Button, Card, HorizontalStack, Page, Tag, Text } from '@shopify/polaris';
+import { Badge, Button, Card, HorizontalStack, Page, Scrollable, Tag, Text } from '@shopify/polaris';
 import {CancelMinor} from "@shopify/polaris-icons"
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
@@ -24,7 +24,6 @@ function UpdateConnections(props) {
     const onButtonClick = (cardObj) => {
         setNewCol(2)
         setCurrentCardObj(cardObj)
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     useEffect(()=>{
@@ -59,15 +58,17 @@ function UpdateConnections(props) {
                 currentCardObj ? 
                 <div className="right-card">
                     <Card>
-                        <div className='settings'>
-                            <Text variant="headingMd" as="h6">Setup guide </Text>
-                            <Button plain icon={CancelMinor} onClick={closeAction} />
-                        </div>
-                        <HorizontalStack gap="1">
-                            <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
-                            {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
-                        </HorizontalStack>
-                        {currentCardObj.component}
+                        <Scrollable shadow style={{maxHeight: '85vh'}} focusable>
+                            <div className='settings'>
+                                <Text variant="headingMd" as="h6">Setup guide </Text>
+                                <Button plain icon={CancelMinor} onClick={closeAction} />
+                            </div>
+                            <HorizontalStack gap="1">
+                                <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
+                                {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
+                            </HorizontalStack>
+                            {currentCardObj.component}
+                        </Scrollable>
                     </Card>
                 </div>
                 : null

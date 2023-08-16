@@ -4,9 +4,10 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import api from "../api"
 import onFunc from '../transform'
 import TestSuitesCard from "./TestSuitesCard"
-import { Badge, Button, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
 import testingApi from "../../testing/api"
 import TestingStore from '../../testing/testingStore'
+import GridRows from '../../../components/shared/GridRows'
 
 function ResultsSummary() {
 
@@ -82,28 +83,21 @@ function ResultsSummary() {
         loading ? <SpinnerCentered /> :   
         <VerticalStack gap="5">
             {fetchTests ? <div style={{margin : "auto"}}> <Spinner size="small" /> </div> : null}
-            <HorizontalStack align="space-around">
+            <ButtonGroup segmented>
                 {severities.map((item,index)=> {
                     return(
-                        <div className={(item === activeTab ? "header-active": '')} key={index}>
-                            <Button plain monochrome onClick={() => setActiveTab(item)} removeUnderline>
-                                <HorizontalStack gap="1">
-                                    <Text variant = "headingMd" as="h5">{item}</Text>
-                                    <Badge status="info">{countIssues[item.toUpperCase()]?.toString()}</Badge>
+                        <Button onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
+                            <div style={{display: "flex", justifyContent: "center", width: "9.4vw"}}>
+                                <HorizontalStack gap="2">
+                                    <Text variant="bodyLg" fontWeight="medium">{item}</Text>
+                                    <Badge>{countIssues[item.toUpperCase()]?.toString()}</Badge>
                                 </HorizontalStack>
-                            </Button>
-                        </div>
+                            </div>
+                        </Button>
                     )
                 })}
-            </HorizontalStack>
-
-            <VerticalStack gap="3">
-                {groupedResults[activeTab]?.items?.map((item,index)=> {
-                    return(
-                        <TestSuitesCard cardObj={item} key={index} />
-                    )
-                })}
-            </VerticalStack>
+            </ButtonGroup>
+            <GridRows columns={1} items={groupedResults[activeTab]?.items} CardComponent={TestSuitesCard} />
         </VerticalStack>
     )
 }

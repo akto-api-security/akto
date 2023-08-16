@@ -171,6 +171,7 @@ function TagDetails() {
     return (
         <DetailsPage
         pageTitle={pageTitle}
+        backUrl="/dashboard/settings/tags"
         saveAction={saveAction}
         discardAction={resetFunc}
         isDisabled={compareFunc}

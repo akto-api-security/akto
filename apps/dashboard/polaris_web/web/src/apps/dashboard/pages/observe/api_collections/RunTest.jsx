@@ -135,7 +135,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled}>Run Test</Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled} >Run Test</Button>
         </div>
     );
 

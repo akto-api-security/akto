@@ -32,7 +32,7 @@ const LogsContainer = ({ logs }) => {
             </div>
             <br />
 
-            <Scrollable style={{height: '60vh'}}>
+            <Scrollable style={{height: '30vh'}}>
                {logContent.map((logText, idx) => (
                 <div key={idx}>
                     <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"], lineHeight: "16px", letterSpacing: "0px", textAlign: "left"}}>

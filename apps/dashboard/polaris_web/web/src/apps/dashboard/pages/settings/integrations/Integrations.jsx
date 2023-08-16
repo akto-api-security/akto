@@ -12,7 +12,7 @@ import {
 import {useState} from 'react';
 import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
-import {useNavigate} from 'react-router-dom'
+import {Outlet, useNavigate} from 'react-router-dom'
 
 function Integrations() {
 

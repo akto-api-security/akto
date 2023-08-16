@@ -76,7 +76,7 @@ const Users = () => {
             <br />
             <Text variant="headingMd">Team details</Text>
             <Text variant="bodyMd">Find and manage your team permissions here</Text>
-            <div style={{ paddingTop: "5vh" }}>
+            <div style={{ paddingTop: "20px" }}>
                 <LegacyCard>
                     <ResourceList
                         resourceName={{ singular: 'user', plural: 'users' }}

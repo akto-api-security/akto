@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, Icon, Scrollable, Spinner, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Avatar, Box, Button, Icon, Scrollable, Spinner,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { ConversationMinor, SendMajor } from "@shopify/polaris-icons"
 import PromptContainer from './PromptContainer'
 import "./style.css"
@@ -20,6 +20,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     const [loading, setLoading] = useState(false)
     const [response, setResponse] = useState(null)
     const [queryType,setQueryType] = useState(null)
+    const [allResponse, setAllResponse] = useState(null)
 
     const [buttonState, setButtonState] = useState(0)
 
@@ -60,6 +61,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
             setLoading(true)
             await api.ask_ai(queryPayload).then((resp)=> {
                 setLoading(false)
+                setAllResponse(resp)
                 setResponse(resp.response)
                 setQueryType(resp.type)
             }).catch(()=>{
@@ -81,8 +83,19 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     }
 
     const addRegex = () => {
-        // send regex left
-        navigate("/dashboard/observe/data-types")
+        const regexObj = {
+            name: allResponse.meta.input_query.toUpperCase(),
+            valueConditions: {
+                operator: "OR",
+                predicates: [
+                    {
+                        type: "REGEX",
+                        value: response.responses[0].regex
+                    }
+                ]
+            },
+        }
+        navigate("/dashboard/observe/data-types", {state: {regexObj}})
         closeModal()
     }
 
@@ -153,7 +166,11 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 <div className='input-gpt'>
                     <TextField 
                         prefix={<span style={{color: "#fff"}}>{activePrompt.split("${input}")[0]}</span>} 
-                        suffix={<Button plain icon={SendMajor} disabled={checkQuery()} onClick={handleClick}/>} 
+                        suffix={
+                            <div {...checkQuery() ? null : {style: {background: "#19C37D", padding: "4px", borderRadius: "4px"}}}>
+                                <Button plain disabled={checkQuery()} onClick={handleClick} icon={SendMajor}/>
+                            </div>
+                        } 
                         placeholder={placeHolderText}
                         {...activePrompt.includes("${input}") ? {onChange: setInputPrompt} : null}
                         value={inputPrompt}

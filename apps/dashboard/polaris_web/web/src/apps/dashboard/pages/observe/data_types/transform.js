@@ -103,6 +103,18 @@ const func = {
 
         return finalObj
     },
+
+    getRegexObj: function(regexObj){
+        const obj = {
+            ...this.initialObj,
+            name: regexObj.name,
+            valueConditions: regexObj.valueConditions,
+            active: true,
+            sensitiveState: '2'
+        }
+
+        return obj
+    }
 }
 
 export default func

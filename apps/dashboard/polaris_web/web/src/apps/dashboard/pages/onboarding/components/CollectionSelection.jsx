@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react'
 import Store from "../../../store"
 import homeRequests from '../../home/api'
 import OnboardingStore from '../OnboardingStore'
-import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from '../../../../../util/func'
+import { Spinner } from '@shopify/polaris'
 
 function CollectionSelection() {
     const apiCollections = Store(state => state.allCollections)
@@ -64,7 +64,7 @@ function CollectionSelection() {
     })
 
     return (
-        loading ? <SpinnerCentered /> :
+        loading ? <div style={{margin: "auto"}}><Spinner size='small'/></div>:
         <DropdownSearch label="Select collection"
                     placeholder="Select API collection"
                     optionsList={allCollectionsOptions}

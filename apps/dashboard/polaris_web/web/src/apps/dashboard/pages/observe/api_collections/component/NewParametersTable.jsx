@@ -5,6 +5,7 @@ import transform from "../../transform";
 import {
     GlobeMinor} from '@shopify/polaris-icons';
 import Store from "../../../../store";
+import func from "@/util/func"
 
 const headers = [
     {
@@ -103,7 +104,7 @@ function NewParametersTable(props) {
     function disambiguateLabel(key, value) {
         switch (key) {
             case "apiCollectionId": 
-                return (value).map((val) => `${apiCollectionMap[val]}`).join(', ');
+                return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
             default:
                 return value;
         }

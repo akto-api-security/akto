@@ -7,8 +7,8 @@ import TextField from '@mui/material/TextField'
 import FormControl from '@mui/material/FormControl';
 import InputArgumentsDialog from './InputArgumentsDialog.jsx'
 import './start-node.css';
-import useStore from './store.js'
-import { Tooltip } from '@mui/material';
+import useStore from './store'
+import { Tooltip, Popper } from '@mui/material';
 
 const BlankNode = (nodeData) => {
     const endpointsList = useStore(state => state.endpointsList)
@@ -85,6 +85,12 @@ const BlankNode = (nodeData) => {
                                 </span>
                             </Box>
                         )}
+                        PopperComponent={({ style, ...props }) => (
+                            <Popper
+                              {...props}
+                              style={{ ...style, height: 0 }}
+                            />
+                          )}
                         renderInput={(params) => {
                             let method = "";
                             if (params.inputProps.value && params.inputProps.value.indexOf(" ") > -1) {
@@ -94,25 +100,27 @@ const BlankNode = (nodeData) => {
                             }
                             return (
                             
-                            <Tooltip title={params.inputProps.value}>
-                                <TextField
-                                {...params}
-                                placeholder="Select API"
-                                InputProps={{
-                                    ...params.InputProps,
-                                    componentsProps: { input: params.inputProps },
-                                    autoComplete: 'new-password',
-                                    disableUnderline: true,
-                                    startAdornment: (
-                                        <span className={"MuiInput-input " + method}>
-                                            {method}
-                                        </span>
-                                    )
-                                }}
-                                
-                                variant="standard"
-                                />
-                            </Tooltip>)
+                                <Tooltip title={params.inputProps.value}>
+                                    <TextField
+                                        {...params}
+                                        placeholder="Select API"
+                                        InputProps={{
+                                            ...params.InputProps,
+                                            componentsProps: { input: params.inputProps },
+                                            autoComplete: 'new-password',
+                                            disableUnderline: true,
+                                            startAdornment: (
+                                                <span className={"MuiInput-input " + method}>
+                                                    {method}
+                                                </span>
+                                            )
+                                        }}
+                                        
+                                        variant="standard"
+                                    />
+                                </Tooltip>
+                              
+                            )
                         }}
                         
                     ></Autocomplete>

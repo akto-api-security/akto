@@ -1,14 +1,16 @@
-import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
+import { Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import api from "../api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 import Store from "../../../store";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import transform from "../transform";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import NewEndpointsTable from "./component/NewEndpointsTable";
 import NewParametersTable from "./component/NewParametersTable";
+import {produce} from "immer"
+import values from "@/util/values";
 
 
 function ApiChanges() {
@@ -19,8 +21,14 @@ function ApiChanges() {
     const [newParametersCount, setNewParametersCount] = useState("")
     const [sensitiveParams, setSensitiveParams] = useState([])
     const [loading, setLoading] = useState(true);
-    const [startTimestamp, setStartTimestamp] = useState(func.timeNow() - func.recencyPeriod);
-    const [endTimestamp, setEndTimestamp] = useState(func.timeNow());
+    
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
+    const startTimestamp = getTimeEpoch("since")
+    const endTimestamp = getTimeEpoch("until")
 
     useEffect(() => {
         async function fetchData() {
@@ -45,7 +53,7 @@ function ApiChanges() {
         if (allCollections.length > 0) {
             fetchData();
         }
-    }, [allCollections, startTimestamp, endTimestamp])
+    }, [allCollections, currDateRange])
 
     const infoItems = [
         {
@@ -65,11 +73,6 @@ function ApiChanges() {
             data: sensitiveParams.filter(x => x.timestamp > startTimestamp && x.timestamp < endTimestamp && func.isSubTypeSensitive(x)).length
         }
     ]
-
-    const handleDate = (dateRange) => {
-        setStartTimestamp(Math.floor(Date.parse(dateRange.period.since) / 1000))
-        setEndTimestamp(Math.floor(Date.parse(dateRange.period.until) / 1000))
-    }
 
     const infoCard = (
         <Card key="info">
@@ -120,7 +123,7 @@ function ApiChanges() {
                 </Text>
             }
             isFirstPage={true}
-            primaryAction={<DateRangeFilter getDate={handleDate} initialDate={{since:startTimestamp, until:endTimestamp}}/>}
+            primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
             components={components}
         />
 

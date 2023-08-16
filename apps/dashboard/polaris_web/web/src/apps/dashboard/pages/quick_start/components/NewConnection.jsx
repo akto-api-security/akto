@@ -1,15 +1,16 @@
-import { Avatar, Badge, Box, Button, HorizontalGrid, LegacyCard, ProgressBar, RadioButton, ResourceItem, ResourceList, Scrollable, Text, VideoThumbnail } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, HorizontalGrid, HorizontalStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
 import React, { useState } from 'react'
 import quickStartFunc from '../transform'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import SearchField from "../../../components/shared/SearchField"
 import "../QuickStart.css"
+import PersistStore from '../../../../main/PersistStore'
 
 function NewConnection() {
 
     const totalTasks = 3
-    const [tasksCompleted, setTasksCompleted] = useState(0)
-    const maxWidth = 600
+    const tasksCompleted = PersistStore(state => state.quickstartTasksCompleted)
+    const setTasksCompleted = PersistStore(state => state.setQuickstartTasksCompleted)
 
     const calculateWidth = () => {
         let width = Math.floor((tasksCompleted * 100)/ totalTasks)
@@ -21,28 +22,22 @@ function NewConnection() {
     const [connectors, setConnectors] = useState(null)
     
     const dropdownList = quickStartFunc.convertListForMenu(connectorsList)
+    const thumbnailUrl = "https://yt3.ggpht.com/yti/AOXPAcVS-5hNHxwUE26HRxgpz8LXef9xp3_bd-Tbrw=s88-c-k-c0x00ffffff-no-rj-mo"
 
     const knowMoreLabel = (
-        tasksCompleted === 0 ?
-            <HorizontalGrid gap="10" columns="2">
-                <Box>
-                    <br/>
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin tempus risus purus, vitae tempus magna ullamcorper non. Maecenas placerat tempor aliquet. Etiam magna dolor, interdum ac turpis sed, ornare fringilla nibh.
-                    <br/>
-                    <br/>
-                    <Button onClick={() => setTasksCompleted(1)} primary>Mark as complete</Button>
-                </Box>
-                <Box>
-                    <br/>
-                    <VideoThumbnail
-                        videoLength={80}
-                        thumbnailUrl="https://burst.shopifycdn.com/photos/business-woman-smiling-in-office.jpg?width=1850"
-                        onClick={() => console.log('clicked')}
-                    />
-                </Box>
-                <br/>
-            </HorizontalGrid>
-        : <br/>
+        <HorizontalGrid gap="10" columns="2">
+            <VerticalStack gap="4">
+                <Text variant='bodyMd'>
+                    Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
+                </Text>
+                <Button onClick={() => setTasksCompleted(1)} primary>Mark as complete</Button>
+            </VerticalStack>
+            <VideoThumbnail
+                videoLength={195}
+                thumbnailUrl={thumbnailUrl}
+                onClick={() => window.open("https://www.youtube.com/watch?v=fRyusl8ppdY&ab_channel=Akto")}
+            />
+        </HorizontalGrid>
     )
 
     const searchFunc = (items) => {
@@ -67,13 +62,17 @@ function NewConnection() {
 
     function renderItem(item){
         const {icon,label,text,badge, docsUrl} = item
-        const media = <Avatar customer size="small" name={label} source={icon}/>;
+        const media = (
+            <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
+                <Avatar customer size="extraSmall" name={label} source={icon} shape="square"/>
+            </Box>
+        )
         return(
             <ResourceItem id={label} onClick={()=> connectorSelected(item)} media={media}>
                 <div className='connector-item'>
-                    <Text fontWeight="bold" as="h3" on>
+                    <Text fontWeight="semibold" variant="bodySm">
                         {label}
-                        {badge && badge.length > 0 ? <Badge size='small' status='success'>{badge}</Badge> : null}
+                        {badge && badge.length > 0 ? <Badge size='small' status='info'>{badge}</Badge> : null}
                     </Text>
                     <div className='see-docs'>
                     <Button plain onClick={(event) => { 
@@ -85,58 +84,49 @@ function NewConnection() {
                     </Button>
                     </div>
                 </div>
-                <div>{text}</div>
+                <Text variant='bodySm' color="subdued">{text}</Text>
             </ResourceItem>
         )
     }
 
-    const headerComponent = (
-        <SearchField getSearchedItems={searchFunc} placeholder={`Search within ${connectorsList.length} connectors available.`} items={connectorsList} />
-    )
-
     const allConnectorsLabel = (
-        tasksCompleted === 1 ?
-        <Box>
+        <VerticalStack gap="3">
+            <SearchField getSearchedItems={searchFunc} placeholder={`Search within ${connectorsList.length} connectors available.`} items={connectorsList} />
             <Scrollable style={{height: '300px'}} focusable shadow>
                 <div className='items-list'>
                     <ResourceList 
                         renderItem={renderItem}
                         items={listItems}
-                        filterControl={headerComponent}
                     />
                 </div>
             </Scrollable>
-            <br/>
-        </Box> 
-        : <br/>
+        </VerticalStack>
     )
 
     const trafficScreenLabel = (
-        tasksCompleted === 2 ?
         <div className='connector-container'>
-            <DropdownSearch optionsList={dropdownList} value={connectors.label} avatarIcon={connectors.icon} setSelected={(item)=> setConnector(item)}/>
-            <br/>
-            {connectors.component}
-            <br/> 
+            <VerticalStack gap="4">
+                <DropdownSearch optionsList={dropdownList} value={connectors?.label} avatarIcon={connectors?.icon} setSelected={(item)=> setConnector(item)}/>
+                {connectors?.component}
+            </VerticalStack>
         </div>
-        : <br/>
     )
 
     const tasksList = [
         {
             id: "know_more",
             label: "Know Akto",
-            helpText: knowMoreLabel,
+            component: knowMoreLabel,
         },
         {
             id: "all_connectors",
             label: "Select Data Source",
-            helpText: allConnectorsLabel
+            component: allConnectorsLabel
         },
         {
             id: "connectors_screen",
             label: "Connector traffic data",
-            helpText: trafficScreenLabel,
+            component: trafficScreenLabel,
         }
     ]
         
@@ -144,19 +134,34 @@ function NewConnection() {
         <div style={{padding: '32px 15vw'}}>
             <LegacyCard title="Your quick start guide">
                 <LegacyCard.Section>
-                    <p>Use this personalized guide to get your traffic and start testing.</p>
-                    <div style={{display: 'flex', gap: '15px', marginTop: '20px', alignItems: 'center'}}>
-                        <span>{tasksCompleted} of {totalTasks} completed</span>
-                        <div style={{width: `${maxWidth}px`}}>
-                            <ProgressBar progress={calculateWidth()} size='small'/>
-                        </div>
-                    </div>
+                    <VerticalStack gap="5">
+                        <p>Use this personalized guide to get your traffic and start testing.</p>
+                        <HorizontalStack gap="3">
+                            <Text variant='bodyMd' color='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
+                            <Box width='36vw'>
+                                <ProgressBar color='success' progress={calculateWidth()} size='small'/>
+                            </Box>
+                        </HorizontalStack>
+                    </VerticalStack>
                 </LegacyCard.Section>
 
                 <LegacyCard.Section>
-                    {tasksList.map((element,index) =>(
-                        <RadioButton key={element.id} id={element.id} label={element.label} helpText={element.helpText} checked={tasksCompleted > index}/>
-                    ))}
+                    <VerticalStack gap="5">
+                        {tasksList.map((element,index) => (
+                            <VerticalStack gap="5" key={element?.id}>
+                                <HorizontalStack gap="3">
+                                    <Button plain monochrome onClick={() => setTasksCompleted(index)}>
+                                        <Avatar customer name='circle' size="extraSmall"
+                                            source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
+                                        />
+                                    </Button>
+                                    <Text variant='bodyMd' fontWeight={tasksCompleted === index ? "semibold" : "medium"}>{element?.label}</Text>
+                                    {tasksCompleted === index ? element?.component : null}
+                                </HorizontalStack>
+                            </VerticalStack>
+                        
+                        ))}
+                    </VerticalStack>
                 </LegacyCard.Section>
             </LegacyCard>
         </div>

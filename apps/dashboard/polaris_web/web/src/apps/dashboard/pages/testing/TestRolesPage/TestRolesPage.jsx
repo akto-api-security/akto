@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
-import api from "./api"
+import api from "../api"
 import { Button } from "@shopify/polaris"
 import { useNavigate } from "react-router-dom"
 import func from "@/util/func"
