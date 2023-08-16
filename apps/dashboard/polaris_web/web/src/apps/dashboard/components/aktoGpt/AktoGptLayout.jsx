@@ -104,7 +104,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     }
 
     return (
-        <div style={{display: 'flex !important'}}>
+        <div style={{display:"flex"}}>
             <div className='left-nav-gpt'>
                 <span className='header-left-nav'>
                     <Box>
