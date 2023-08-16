@@ -182,13 +182,12 @@ export default {
 
         },
         getTabs() {
-          if(this.tab && this.tab=="health"){
-            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
-          }
-          else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
-          }
-          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
+            if (window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true') {
+                return ['Data types', 'Auth types', 'Tags', 'Users', 'Integrations'];
+            } else if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy') {
+                return ['Data types', 'Auth types', 'Tags', 'Users', 'Health', 'Integrations'];
+            }
+            return ['Data types', 'Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
         }
     },
     computed: {

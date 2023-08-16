@@ -1,0 +1,37 @@
+id: AMAZON_DOCKER_CONFIG
+info:
+  name: Dockerrun AWS Configuration Exposure
+  description: "Attackers can get access to sensitive AWS Dockerrun configuration files."
+  details: >
+              "Dockerrun AWS Configuration Exposure refers to the vulnerability arising from misconfigured AWS Dockerrun configuration files. This misconfiguration allows unauthorized access to sensitive files, potentially exposing critical information and compromising system security. Attackers can exploit this vulnerability to manipulate container definitions, leading to potential disruptions in system integrity and availability. It is crucial to address this issue promptly to prevent unauthorized access and protect the system from potential risks."
+  impact: "Unauthorized access enables manipulation of container definitions, risking system integrity and availability."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: AMAZON_DOCKER_CONFIG
+  severity: MEDIUM
+  references:
+    - https://beaglesecurity.com/blog/vulnerability/dockerrun-aws-configuration-exposure.html
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/Dockerrun.aws.json
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    contains_all:
+      - 'AWSEBDockerrunVersion'
+      - 'containerDefinitions'

@@ -59,7 +59,7 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
-            <version>2.5.31</version>
+            <version>2.5.30</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -209,6 +209,11 @@
             <type>test-jar</type>
             <version>${project.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>mvc-auth-commons</artifactId>
+            <version>1.9.5</version>
         </dependency>
     </dependencies>
     <build>
