@@ -249,7 +249,6 @@ export default {
         ...mapState('collections', ['apiCollections', 'loading', 'testingRuns']),
         ...mapState('testing', ['testingRuns', 'authMechanism']),
         apiCollectionsForTable() {
-            console.log("arr", this.apiCollections)
             return this.apiCollections.map(c => {
                 return {
                     ...c,
