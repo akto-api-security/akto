@@ -21,7 +21,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
                                 )
                 )
         );
-        return rbac != null;
+        if (rbac != null && rbac.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
+            rbac.setAccountId(1_000_000);
+        }
+        return rbac != null && rbac.getAccountId() == accountId;
     }
 
     @Override
