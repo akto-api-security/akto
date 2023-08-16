@@ -6,10 +6,9 @@ const HealthLogs = () => {
 
     return (
         <Page
-            title="Health & Logs"
+            title="Logs"
             divider
         >
-            <br />
             <Logs />
         </Page>
     )
