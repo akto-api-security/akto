@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEdit, faCaretSquareDown } from '@fortawesome/free-regular-svg-icons'
 
 import TemplateStringEditor from './TemplateStringEditor.jsx';
-import useStore from './store.js'
+import useStore from './store'
 
 import FormControlLabel from '@mui/material/FormControlLabel';
 

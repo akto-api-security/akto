@@ -1,4 +1,4 @@
-import request from "@/util/request"
+import request from "../../../../util/request"
 
 export default {
     async fetchTestRunTableInfo() {
@@ -86,6 +86,14 @@ export default {
         })
         return resp        
     },
+    async fetchTestRoles() {
+        const resp = await request({
+            url: '/api/fetchTestRoles',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
     stopAllTests() {
         return request({
             url: '/api/stopAllTests',
@@ -140,7 +148,22 @@ export default {
             return resp
         })
     },
-
+    async addTestRoles (roleName, andConditions, orConditions) {
+        const resp = await request({
+            url: '/api/addTestRoles',
+            method: 'post',
+            data: { roleName, andConditions, orConditions }
+        })
+        return resp        
+    },
+    async updateTestRoles (roleName, andConditions, orConditions) {
+        const resp = await request({
+            url: '/api/updateTestRoles',
+            method: 'post',
+            data: { roleName, andConditions, orConditions }
+        })
+        return resp        
+    },
     fetchOtpData(url) {
         return request({
             url: url,

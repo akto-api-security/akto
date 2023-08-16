@@ -7,11 +7,13 @@ import {
   Icon,
   Badge,
   Box,
+  Tooltip,
 } from '@shopify/polaris';
 import {
   SearchMinor,
   FraudProtectMinor,
-  LinkMinor
+  LinkMinor,
+  ReplayMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -22,6 +24,7 @@ import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+import TooltipText from "../../../components/shared/TooltipText";
 
 let headers = [
   {
@@ -75,7 +78,7 @@ function disambiguateLabel(key, value) {
       return value.length + 'API' + (value.length==1 ? '' : 's')
     case 'categoryFilter':
     case 'testFilter':
-      return (value).map((val) => val).join(', ');
+      return func.convertToDisambiguateLabelObj(value, null, 2)
     default:
       return value;
   }
@@ -118,32 +121,39 @@ function SingleTestRunPage() {
   const params= useParams()
   const [loading, setLoading] = useState(true);
   const [workflowTest, setWorkflowTest ] = useState(false);
+  const hexId = params.hexId;
 
-useEffect(()=>{
-    const hexId = params.hexId;
+  useEffect(()=>{
     async function fetchData() {
       setLoading(true);
-      if(selectedTestRun==null || Object.keys(selectedTestRun)==0 || selectedTestRun.id != hexId){
         await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
           if(testingRun.testIdConfig == 1){
             setWorkflowTest(workflowTest);
             setLoading(false);
           }
-          let selectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
-            setSelectedTestRun(selectedTestRun);
-          })
-      } else if(Object.keys(subCategoryMap)!=0 && Object.keys(subCategoryFromSourceConfigMap)!=0){
-        if(selectedTestRun.testingRunResultSummaryHexId){
-          await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-            let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-            setTestRunResults(testRunResults)
-          })
-        }
-        setLoading(false);
-      }
+          let localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
+            setSelectedTestRun(localSelectedTestRun);
+      }) 
+      setLoading(false);
     }
     fetchData();
-}, [selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
+}, [])
+
+useEffect(()=>{
+  async function fetchData(){
+    setLoading(true);
+    if (Object.keys(subCategoryMap) != 0 && 
+    Object.keys(subCategoryFromSourceConfigMap) != 0 && 
+    selectedTestRun.testingRunResultSummaryHexId) {
+        await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
+          let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+          setTestRunResults(testRunResults)
+        })
+    }
+    setLoading(false);
+  }
+  fetchData();
+},[selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
@@ -184,6 +194,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const components = [!workflowTest ? ResultTable : workflowTestBuilder];
 
+  const rerunTest = (hexId) =>{
+    api.rerunTest(hexId).then((resp) => {
+      func.setToast(true, false, "Test re-run")
+    }).catch((resp) => {
+      func.setToast(true, true, "Unable to re-run test")
+    });
+  }
+
   return (
     <PageWithMultipleCards
     title={
@@ -193,11 +211,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
                 <Icon color="primary" source={selectedTestRun.icon }></Icon>
               </Box>
               }
-              <Text variant='headingLg'>
-                {
-                  selectedTestRun?.name || "Test run name"
-                }
-              </Text>
+              <Box maxWidth="50vw">
+                <TooltipText 
+                  tooltip={selectedTestRun?.name} 
+                  text={selectedTestRun?.name || "Test run name"} 
+                  textProps={{variant:"headingLg"}}/>
+              </Box>
               {
                 selectedTestRun?.severity && 
                 selectedTestRun.severity
@@ -208,6 +227,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
                   </Text>
                 </Badge>
                 )}
+                <Tooltip content={"Re-run test"} hoverDelay={400}>
+                  <Button icon={ReplayMinor} plain onClick={() => {rerunTest(hexId)}}/>
+                </Tooltip>
             </HorizontalStack>
             <Text color="subdued" fontWeight="regular" variant="bodyMd">
               {
@@ -218,6 +240,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
             </Text>
           </VerticalStack>
     }
+    backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
       components={loading ?
         [<SpinnerCentered key={"loading"}/>]

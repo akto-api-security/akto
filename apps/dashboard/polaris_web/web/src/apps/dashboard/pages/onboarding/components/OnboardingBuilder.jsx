@@ -3,7 +3,6 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import OnboardingLayout from './OnboardingLayout'
 import CollectionSelection from './CollectionSelection'
 import OnboardingStore from '../OnboardingStore'
-import {ArrowRightMinor, PlayMajor} from "@shopify/polaris-icons"
 import Store from '../../../store'
 import TestSuites from './TestSuites'
 import func from '../../../../../util/func'
@@ -56,7 +55,7 @@ function OnboardingBuilder() {
             cardTitle: "API Collections",
             component: <CollectionSelection />,
             toast: "Please select a collection to go to next step.",
-            icon: ArrowRightMinor,
+            actionText: "Next",
         },
         {
             title: "Select Tests",
@@ -65,23 +64,23 @@ function OnboardingBuilder() {
             cardTitle: "Select test suites",
             component: <TestSuites />,
             toast: "Please select a test suite.",
-            icon: ArrowRightMinor,
+            actionText: "Next",
         },
         {
             title: "Set config",
             subtitle: "We have pre-filled token for you!",
             buttonText: "Run tests",
             cardTitle: "Attacker Token",
-            icon: PlayMajor,
             toast: "Please fill the above fields.",
-            component: <SetConfig />
+            component: <SetConfig />,
+            actionText: "Run Test",
         },
         {
             title: "Test results",
             subtitle: "Here are the results for the tests you recently ran",
             buttonText: "See all issues",
             component: <ResultsSummary />,
-            icon: ArrowRightMinor,
+            actionText: "See all issues",
         },
     ]
 

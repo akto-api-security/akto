@@ -932,7 +932,68 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
       }
 
     }
- }
+ },
+
+ dateRangeReducer(draft, action){
+  try {
+    switch(action.type){
+      case "update": {
+         if(action.period){
+          Object.assign(draft, action.period);
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+
+  } catch {
+    return draft
+  }
+ },
+
+ getDateValue(dateRange){
+  const dateStr = dateRange.title === "Custom"
+          ? dateRange.period.since.toDateString() + " - " + dateRange.period.until.toDateString()
+          : dateRange.title;
+  return dateStr
+ },
+
+ getSearchItemsArr(allRoutes,allCollections){
+  let combinedArr = []
+  allRoutes.forEach((item)=>{
+    if(!(item.path.includes(":") || !(item.path.includes("/dashboard")))){
+      combinedArr.push({content: item.content, url: item.path})
+    }
+  })
+
+  let initialStr = "/dashboard/observe/inventory/"
+
+  allCollections.forEach((item)=> {
+    combinedArr.push({content: item.displayName, url: initialStr + item.id})
+  })
+
+  return combinedArr
+ },
+
+ convertToDisambiguateLabel(value, convertFunc, maxAllowed){
+  if (value.length > maxAllowed) {
+      return `${value.slice(0, maxAllowed).map(val => convertFunc(val)).join(", ")} +${value.length - maxAllowed} more`;
+  } else {
+      return value.map(val => convertFunc(val)).join(", ");
+  }   
+},
+
+convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if (value.length > maxAllowed) {
+      return `${value.slice(0, maxAllowed)
+                     .map(val => convertObj ? convertObj[val] : val)
+                     .join(", ")} +${value.length - maxAllowed} more`;
+  } else {
+      return value.map(val => convertObj ? convertObj[val] : val).join(", ");
+  }   
+}
 }
 
 export default func

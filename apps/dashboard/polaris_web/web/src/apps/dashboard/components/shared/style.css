@@ -1,3 +1,7 @@
+.editor .codicon.codicon-light-bulb.lightbulb-glyph{
+    display: none;
+}
+
 .highlight{
     background-color:#FFE9E8;
     color: #D72B0C !important;
@@ -21,5 +25,11 @@
 }
 
 .active {
-    background: #47466a !important;
+    background: #00A47C;
+}
+
+.tooltipSpan {
+    overflow-x:hidden; 
+    text-overflow: ellipsis; 
+    white-space: nowrap;
 }

@@ -274,6 +274,7 @@ function Webhook() {
                     customWebhookFindId ? customWebhookFindId.webhookName : ''
                     : "Create custom webhook"}
                 divider
+                backUrl="/dashboard/settings/integrations/webhooks"
                 components={components}
             />
     )

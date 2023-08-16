@@ -34,6 +34,21 @@ const ranges = [
             until: yesterday,
         },
     },
+    {
+        title: "Last 2 months",
+        alias: "recencyPeriod",
+        period:{
+            since: new Date(
+                new Date(new Date().setDate(today.getDate() - 60)).setHours(
+                    0,
+                    0,
+                    0,
+                    0
+                )
+            ),
+            until: today,
+        }
+    }
 ];
 
 export default { today, yesterday, ranges };
