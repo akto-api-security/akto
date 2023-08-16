@@ -27,15 +27,21 @@ public class TeamAction extends UserAction {
     BasicDBList users;
 
     public String fetchTeamData() {
+        int accountId = Context.accountId.get();
         List<RBAC> allRoles = RBACDao.instance.findAll(Filters.or(
-                Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get()),
+                Filters.eq(RBAC.ACCOUNT_ID, accountId),
                 Filters.exists(RBAC.ACCOUNT_ID, false)
         ));
 
         Map<Integer, RBAC> userToRBAC = new HashMap<>();
         for(RBAC rbac: allRoles) {
-            userToRBAC.put(rbac.getUserId(), rbac);
-        }   
+            if (rbac.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
+                rbac.setAccountId(1_000_000);
+            }
+            if (rbac.getAccountId() == accountId) {
+                userToRBAC.put(rbac.getUserId(), rbac);
+            }
+        }
 
         users = UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get());
         for(Object obj: users) {
@@ -51,12 +57,17 @@ public class TeamAction extends UserAction {
         ));
 
         for(PendingInviteCode pendingInviteCode: pendingInviteCodes) {
-            users.add(
-                new BasicDBObject("id", pendingInviteCode.getIssuer())
-                .append("login", pendingInviteCode.getInviteeEmailId())
-                .append("name", "-")
-                .append("role", "Invitation sent")
-            );
+            if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
+                pendingInviteCode.setAccountId(1_000_000);
+            }
+            if (pendingInviteCode.getAccountId() == accountId) {
+                users.add(
+                        new BasicDBObject("id", pendingInviteCode.getIssuer())
+                                .append("login", pendingInviteCode.getInviteeEmailId())
+                                .append("name", "-")
+                                .append("role", "Invitation sent")
+                );
+            }
         }
 
         return SUCCESS.toUpperCase();
