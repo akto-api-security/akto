@@ -37,6 +37,8 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
             isError: false,
             message: "User invitation sent successfully"
         })
+
+        setInviteEmail("")
     }
 
     const handleCopyInvitation = () => {

@@ -61,9 +61,16 @@ function TokensLayout(props) {
         secondaryFooterActions={tokenList.length > 0 ? [{content: 'See how it works', onAction: seeWork}] : []}
         primaryFooterAction={tokenList.length > 0 ? {content: 'Generate token', onAction: generateNewToken} : null}
     >
-        {tokenList.length > 0 ? listComponent : emptyComponent}
-        <Divider />
-        <br/>
+        {tokenList.length > 0 ? 
+          (
+            <div>
+              {listComponent}
+              <Divider />
+              <br/>
+            </div>
+          )
+          : emptyComponent}
+      
     </LegacyCard>
   )
   return (
