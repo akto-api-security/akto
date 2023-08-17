@@ -9,12 +9,12 @@ function SuitesCard({cardObj}) {
     const selectedTest = OnboardingStore(state => state.selectedTestSuite)
 
     return (
-        <div onClick={() => setSelectedTest(cardObj.name)}>
+        <div onClick={() => setSelectedTest(cardObj._name)}>
             <Card>
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between">
                         <HorizontalStack gap="1">
-                            <RadioButton checked={selectedTest === cardObj.name} />
+                            <RadioButton checked={selectedTest === cardObj._name} />
                             <Text variant="bodyLg" fontWeight="semibold">{cardObj?.name}</Text>
                         </HorizontalStack>
                         <Tooltip content={cardObj?.description}>
