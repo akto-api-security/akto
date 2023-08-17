@@ -41,14 +41,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     async function fetchData() {
         setLoading(true)
 
-        const allMarketplaceSubcategoriesResponse = await observeApi.fetchAllMarketplaceSubcategories()
-        const testSourceConfigs = allMarketplaceSubcategoriesResponse.testSourceConfigs
-
         const allSubCategoriesResponse = await testingApi.fetchAllSubCategories()
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
-
-        const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(testSourceConfigs, businessLogicSubcategories)
+        const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
 
         // Store all tests
         const processMapCategoryToSubcategory = {}
@@ -97,21 +93,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     const toggleRunTest = () => setActive(prev => !prev)
 
-    function populateMapCategoryToSubcategory(testSourceConfigs, businessLogicSubcategories, selectedCategory) {
+    function populateMapCategoryToSubcategory(businessLogicSubcategories) {
         let ret = {}
-        testSourceConfigs.forEach(x => {
-            if (!ret[x.category]) {
-                ret[x.category] = { selected: [], all: [] }
-            }
-
-            let obj = {
-                label: x.id.substring(x.id.lastIndexOf("/") + 1, x.id.lastIndexOf(".")),
-                value: x.id,
-                icon: "$fab_github"
-            }
-            ret[x.category].all.push(obj);
-        })
-
         businessLogicSubcategories.forEach(x => {
             if (!ret[x.superCategory.name]) {
                 ret[x.superCategory.name] = { selected: [], all: [] }
@@ -446,7 +429,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                 <TextField
                                     placeholder="Override test app host"
                                     value={testRun.overriddenTestAppUrl}
-                                    onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                    onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
                                 />
                             }
                         </ButtonGroup>
