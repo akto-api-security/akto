@@ -55,8 +55,9 @@ public class RateLimitFilter implements Filter {
             refill = Refill.intervally(1000, Duration.ofHours(1));
             limit = Bandwidth.classic(1000, refill);
         } else {
-            refill = Refill.intervally(10, Duration.ofHours(1));
-            limit = Bandwidth.classic(10, refill);
+            //todo
+            refill = Refill.intervally(1000, Duration.ofHours(1));
+            limit = Bandwidth.classic(1000, refill);
         }
 
         return Bucket.builder().addLimit(limit).build();
