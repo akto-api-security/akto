@@ -27,9 +27,9 @@ function GithubCell(props){
                     <Box padding="05">
                         {data.iconTooltip ? 
                             <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
-                                <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "primary"} />
+                                <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
                             </Tooltip>
-                            :<Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "primary"} />
+                            :<Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
                         }
                     </Box>
                 </div>

@@ -48,6 +48,7 @@ const Users = () => {
 
     const handleRemoveUser = async (login) => {
         await settingRequests.removeUser(login)
+        func.setToast(true, false, "User removed successfully")
     }
 
     return (
@@ -85,7 +86,7 @@ const Users = () => {
                             const { id, login, role } = item;
 
                             const initials = func.initials(login)
-                            const media = <Avatar user size="medium" name={login} initials={initials} />;
+                            const media = <Avatar user size="medium" name={login} initials={initials} />
                             const shortcutActions = username !== login && isAdmin  ? 
                                 [
                                     {
