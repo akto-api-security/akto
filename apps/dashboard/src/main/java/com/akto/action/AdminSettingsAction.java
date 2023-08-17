@@ -7,6 +7,8 @@ import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 
 import java.util.Map;
@@ -149,9 +151,11 @@ public class AdminSettingsAction extends UserAction {
 
     private String regex;
     private String newName;
+    private String headerName = "host";
+    
     public String addApiCollectionNameMapper() {
         String hashStr = regex.hashCode()+"";
-        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName));
+        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName, headerName));
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), update
@@ -209,6 +213,10 @@ public class AdminSettingsAction extends UserAction {
         this.newName = newName;
     }
     
+    public void setHeaderName(String headerName) {
+        this.headerName = headerName;
+    }    
+
     public int getGlobalRateLimit() {
         return globalRateLimit;
     }

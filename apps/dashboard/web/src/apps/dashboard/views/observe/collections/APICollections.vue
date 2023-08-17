@@ -105,6 +105,10 @@ export default {
                 {
                     text: "Discovered",
                     value: "detected"
+                },
+                {
+                    text: "Test status",
+                    value: "lastTestedAt"
                 }
             ],
             actions: [ 
@@ -233,6 +237,12 @@ export default {
         async startTest({recurringDaily, startTimestamp}) {
             await this.$store.dispatch('testing/scheduleTestForCollection', {apiCollectionId: this.scheduleTestCollectionId, startTimestamp, recurringDaily})
             this.showScheduleTestBox = false
+        },
+        getTestStatus(lastTestedAt, state){
+            if(state === 'Running' || state === 'Scheduled'){
+                return state;
+            }
+            return func.prettifyEpochWithNull(lastTestedAt, "Never tested")
         }
     },
     computed: {
@@ -245,7 +255,8 @@ export default {
                     color: "var(--white)",
                     width: '0px',
                     endpoints: c["urlsCount"] || 0,
-                    detected: func.prettifyEpoch(c.startTs)
+                    detected: func.prettifyEpoch(c.startTs),
+                    lastTestedAt: this.getTestStatus(c.lastTestedAt, c.state)
                 }
             })
         }
