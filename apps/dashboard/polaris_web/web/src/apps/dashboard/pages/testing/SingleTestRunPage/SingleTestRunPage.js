@@ -208,7 +208,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
           <VerticalStack gap="3">
             <HorizontalStack gap="2" align="start">
               { selectedTestRun?.icon && <Box>
-                <Icon color="primary" source={selectedTestRun.icon }></Icon>
+                <Icon color="base" source={selectedTestRun.icon }></Icon>
               </Box>
               }
               <Box maxWidth="50vw">
