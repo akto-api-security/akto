@@ -3,7 +3,7 @@
 }
 
 .aktoButton {
-    z-index: 600;
+    z-index: 518;
     position: fixed;
     right: 9vw;
     top: 11px;
@@ -26,4 +26,19 @@
 }
 .Polaris-TopBar{
     border-bottom: 1px solid #E1E3E5;
+}
+
+:root {
+    --akto-primary: #6200EA;
+
+    --p-color-bg-primary: var(--akto-primary) !important;
+    --p-color-bg-primary-hover: #5400CB !important;
+    --p-color-bg-primary-active: #4700AE !important;
+    --p-color-bg-primary-subdued-hover: #ECEBFF !important;
+
+    --p-color-text-primary: var(--akto-primary) !important;
+    --p-color-text-success: var(--akto-primary) !important;
+    --p-color-text-primary-hover: var(--akto-primary) !important;
+
+    --p-color-icon-primary: var(--akto-primary) !important;
 }
