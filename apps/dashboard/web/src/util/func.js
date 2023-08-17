@@ -166,6 +166,12 @@ export default {
     prettifyShort(num) {
         return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
     },
+    prettifyEpochWithNull(epoch, textToShowIfNull){
+        if(epoch === -1){
+            return textToShowIfNull;
+        }
+        return this.prettifyEpoch(epoch)
+    },
     prettifyEpoch(epoch) {
         var diffSeconds = (+Date.now())/1000 - epoch
         if (diffSeconds < 120) {
