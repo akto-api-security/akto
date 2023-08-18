@@ -26,11 +26,12 @@ public class TestSampleMessageStore extends MongoBasedTest {
         SampleData sampleData4 = new SampleData(new Key(1, "url1", URLMethods.Method.GET,0,0,0), Arrays.asList("m3", "m4", "m5"));
         SampleDataDao.instance.insertMany(Arrays.asList(sampleData1, sampleData2, sampleData3, sampleData4));
 
+        SampleMessageStore sample =  SampleMessageStore.create();
         Set<Integer> apiCollectionIds = new HashSet<>();
         apiCollectionIds.add(0);
         apiCollectionIds.add(1);
-
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap =  SampleMessageStore.fetchSampleMessages(apiCollectionIds);
+        sample.fetchSampleMessages(apiCollectionIds);
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap =  sample.getSampleDataMap();
 
         assertEquals(sampleDataMap.size(), 3);
         List<String> messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET));
@@ -42,8 +43,8 @@ public class TestSampleMessageStore extends MongoBasedTest {
         SampleDataDao.instance.getMCollection().drop();
         sampleData2 = new SampleData(new Key(0, "url2", URLMethods.Method.GET,0,0,0), Arrays.asList("m1", "m2", "m3"));
         SampleDataDao.instance.insertMany(Arrays.asList(sampleData1, sampleData2));
-
-        sampleDataMap =  SampleMessageStore.fetchSampleMessages(apiCollectionIds);
+        sample.fetchSampleMessages(apiCollectionIds);
+        sampleDataMap =  sample.getSampleDataMap();
         assertEquals(sampleDataMap.size(), 1);
         messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET));
         assertEquals(messages.size(), 3);

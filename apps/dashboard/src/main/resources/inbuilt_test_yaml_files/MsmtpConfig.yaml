@@ -1,0 +1,45 @@
+id: MSMTP_CONFIG
+info:
+  name: Msmtp - Config Exposure
+  description: "Msmtp configuration was discovered."
+  details: >
+              "The Msmtp Config Exposure vulnerability occurs when Msmtp configuration files (.msmtprc) are accessible to unauthorized users. These files store email account settings, including the email host, credentials, and TLS configurations. If exposed, attackers can gain access to email accounts, potentially leading to unauthorized email sending and compromising sensitive information. It is essential to secure these configuration files to prevent unauthorized access and protect email account integrity."
+  impact: "Exposure of Msmtp configuration files can lead to unauthorized access and compromise of email accounts."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: MSMTP_CONFIG
+  severity: HIGH
+  references:
+    - https://wiki.archlinux.org/title/Msmtp
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/.msmtprc
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'account'
+      - 'host'
+      - 'from'
+      - 'auth'
+      - 'tls'
+  response_headers:
+    for_one:
+      value:
+        contains_either:
+          - 'text/plain'
+          - 'octet-stream'

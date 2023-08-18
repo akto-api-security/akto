@@ -4,6 +4,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
@@ -97,9 +98,8 @@ public class TestInitializerListener extends MongoBasedTest {
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey1.url));
         assertNotNull(testingRunIssues);
 
-        InitializerListener initializerListener = new InitializerListener();
         BackwardCompatibility backwardCompatibility = new BackwardCompatibility();
-        initializerListener.deleteNullSubCategoryIssues(backwardCompatibility);
+        InitializerListener.deleteNullSubCategoryIssues(backwardCompatibility);
 
         testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey1.url));
         assertNull(testingRunIssues);
@@ -107,6 +107,18 @@ public class TestInitializerListener extends MongoBasedTest {
         testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey2.url));
         assertNotNull(testingRunIssues);
 
+    }
+    
+    @Test
+    public void testSaveTestEditorYaml() {
+        YamlTemplateDao.instance.getMCollection().drop();
+        long count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
+        assertFalse(count > 0);
+
+        InitializerListener.saveTestEditorYaml();
+
+        count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
+        assertTrue(count > 0);
     }
 
 }

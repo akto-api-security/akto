@@ -3,10 +3,8 @@ name: Testsigma
 on:
   workflow_dispatch:
     inputs:
-        executionId:
-          default: "208"
-        environmentId:
-          default: "8" 
+        testPlanId:
+          default: "361"
       
 jobs:
   build:
@@ -15,6 +13,5 @@ jobs:
     steps:
       - name: Trigger Testsigma Test
         run: |
-          curl -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
-                https://app.testsigma.com/api/v1/execution_results -d "{\"executionId\": \"${{ github.event.inputs.executionId }}\", \
-                \"environmentId\": \"${{ github.event.inputs.environmentId }}\"}"
+          curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ vars.TESTSIGMA_API_KEY }}" \
+                ${{vars.TS_DASHBOARD_URL}}/api/v1/test_plan_results -d "{\"testPlanId\": \"${{ github.event.inputs.testPlanId }}\"}"

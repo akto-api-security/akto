@@ -2,10 +2,15 @@ package com.akto.action;
 
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.Config;
+import com.akto.dto.SignupInfo;
 import com.akto.dto.User;
+import com.akto.utils.Auth0;
+import com.akto.utils.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 
@@ -14,11 +19,17 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Map;
 
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 public class LogoutAction extends UserAction implements ServletRequestAware,ServletResponseAware {
+
+    private String logoutUrl;
+    private String redirectUrl;
     @Override
     public String execute() throws Exception {
         User user = getSUser();
@@ -32,6 +43,9 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
         HttpSession session = servletRequest.getSession();
         if (session != null) {
             session.setAttribute("logout", Context.now());
+        }
+        if(DashboardMode.isSaasDeployment()){
+            return auth0Logout();
         }
         try {
             servletResponse.sendRedirect(LOGIN_URI);
@@ -52,5 +66,55 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
     @Override
     public void setServletRequest(HttpServletRequest request) {
         this.servletRequest = request;
+    }
+
+    public String getRedirectUrl() {
+        return redirectUrl;
+    }
+
+    public void setRedirectUrl(String redirectUrl) {
+        this.redirectUrl = redirectUrl;
+    }
+
+    public String auth0Logout() throws UnsupportedEncodingException {
+        if (servletRequest.getSession() != null) {
+            servletRequest.getSession().invalidate();
+        }
+        String returnUrl = "";
+        returnUrl = String.format("%s://%s", servletRequest.getScheme(), servletRequest.getServerName());
+
+        if ((servletRequest.getScheme().equals("http") && servletRequest.getServerPort() != 80)
+                || (servletRequest.getScheme().equals("https") && servletRequest.getServerPort() != 443)) {
+            returnUrl += ":" + servletRequest.getServerPort();
+        }
+        if(redirectUrl != null) {
+            returnUrl += redirectUrl;
+        } else {
+            returnUrl += "/";
+        }
+
+        String encoded = URLEncoder.encode(returnUrl, "UTF-8")
+                .replaceAll("\\+", "%20")
+                .replaceAll("\\%21", "!")
+                .replaceAll("\\%27", "'")
+                .replaceAll("\\%28", "(")
+                .replaceAll("\\%29", ")")
+                .replaceAll("\\%7E", "~");
+
+        logoutUrl = String.format(
+                "https://%s/v2/logout?client_id=%s&returnTo=%s",
+                Auth0.getDomain(),
+                Auth0.getClientId(),
+                encoded);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String getLogoutUrl() {
+        return logoutUrl;
+    }
+
+    public void setLogoutUrl(String logoutUrl) {
+        this.logoutUrl = logoutUrl;
     }
 }

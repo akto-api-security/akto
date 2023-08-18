@@ -176,7 +176,7 @@ public final class FilterAction {
     }
 
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
-        String url = filterActionRequest.getApiInfoKey().getUrl();
+        String url = filterActionRequest.getRawApi().getRequest().getUrl();
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
             return;

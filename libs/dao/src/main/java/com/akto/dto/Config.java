@@ -4,6 +4,9 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
+
+    public static final String CONFIG_SALT = "-ankush";
+
     public ConfigType getConfigType() {
         return configType;
     }
@@ -23,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0;
     }
 
     ConfigType configType;
@@ -64,6 +67,21 @@ public abstract class Config {
             this.configType = ConfigType.SLACK;
             this.id = configType.name()+"-ankush";
         }
+    }
+
+    @BsonDiscriminator
+    public static class SendgridConfig extends Config {
+        String sendgridSecretKey;
+        public static final String CONFIG_ID = ConfigType.SENDGRID.name() + CONFIG_SALT;
+
+        public SendgridConfig() {
+            this.configType = ConfigType.SENDGRID;
+            this.id = CONFIG_ID;
+        }
+
+        public String getSendgridSecretKey() {return this.sendgridSecretKey;}
+
+        public void setSendgridSecretKey(String sendgridSecretKey) {this.sendgridSecretKey = sendgridSecretKey;}
     }
 
     @BsonDiscriminator
@@ -211,6 +229,71 @@ public abstract class Config {
 
         public void setResponse_type(String response_type) {
             this.response_type = response_type;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class Auth0Config extends Config {
+
+        String clientId;
+        String redirectUrl;
+        String clientSecret;
+        String domain;
+
+        String apiToken;
+
+        public Auth0Config() {
+            this.configType = ConfigType.AUTH0;
+            this.id = configType.name();
+        }
+
+        public Auth0Config(String clientId, String clientSecret, String domain, String redirectUrl) {
+            this.configType = ConfigType.AUTH0;
+            this.id = configType.name();
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+            this.domain = domain;
+            this.redirectUrl = redirectUrl;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getRedirectUrl() {
+            return redirectUrl;
+        }
+
+        public void setRedirectUrl(String redirectUrl) {
+            this.redirectUrl = redirectUrl;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
+        }
+
+        public String getApiToken() {
+            return apiToken;
+        }
+
+        public void setApiToken(String apiToken) {
+            this.apiToken = apiToken;
         }
     }
 }

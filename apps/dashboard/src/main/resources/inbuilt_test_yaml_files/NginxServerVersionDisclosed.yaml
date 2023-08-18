@@ -1,0 +1,45 @@
+id: NGINX_SERVER_VERSION_DISCLOSED
+info:
+  name: Nginx Server Version Disclosed 
+  description: Detection of Nginx server version disclosure misconfiguration, potentially aiding attackers in identifying vulnerable versions.
+  details: >
+       The Nginx Server Version Disclosed test identifies a security misconfiguration where the Nginx server 
+       version is disclosed in the response headers. The test checks if the response headers contain a version 
+       string matching the regular expression "nginx/[0-9.]+". Disclosing the server version can aid attackers in 
+       identifying potentially vulnerable versions and targeting specific exploits. This misconfiguration falls 
+       under the Security Misconfiguration category with a low severity level. Concealing the server version in the
+       response headers enhances security by reducing the exposure of potentially sensitive information.
+  impact: Disclosing Nginx server version exposes potentially vulnerable versions, aiding attackers in identifying exploits and targeting specific vulnerabilities.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - NGINX
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_code:
+    eq: 200
+  response_headers:
+      regex: nginx/[0-9.]+
+        

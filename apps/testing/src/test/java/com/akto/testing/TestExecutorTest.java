@@ -1,12 +1,21 @@
 package com.akto.testing;
 
+import com.akto.MongoBasedTest;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.store.AuthMechanismStore;
+import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
+import org.checkerframework.checker.units.qual.K;
 import org.junit.Test;
 
 import java.net.URISyntaxException;
@@ -14,7 +23,7 @@ import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 
-public class TestExecutorTest {
+public class TestExecutorTest extends MongoBasedTest {
 
     private TestResult generateTestResult(boolean bigPayload) {
         String message = bigPayload ? StringUtils.repeat("A", 3_000_000) : "something small";
@@ -44,12 +53,21 @@ public class TestExecutorTest {
 
     private void testFindHostUtil(String url, String answer, String hostName) throws URISyntaxException {
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(0, url, URLMethods.Method.GET);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = new HashMap<>();
         String message = String.format("{\"path\": \"%s\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\": \\\"%s\\\", \\\"Authorization\\\": \\\"Basic somerandom=\\\", \\\"X-Killbill-ApiSecret\\\": \\\"something\\\", \\\"Accept\\\": \\\"application/json\\\", \\\"X-MPL-COUNTRYCODE\\\": \\\"IN\\\", \\\"X-Killbill-CreatedBy\\\": \\\"test-payment\\\", \\\"Content-type\\\": \\\"application/json\\\"}\", \"requestPayload\": \"{}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"Date\\\": \\\"Mon, 18 Apr 2022 13:05:16 GMT\\\", \\\"Content-Type\\\": \\\"application/json\\\", \\\"Transfer-Encoding\\\": \\\"chunked\\\", \\\"Connection\\\": \\\"keep-alive\\\", \\\"Server\\\": \\\"Apache-Coyote/1.1\\\", \\\"Access-Control-Allow-Origin\\\": \\\"*\\\", \\\"Access-Control-Allow-Methods\\\": \\\"GET, POST, DELETE, PUT, OPTIONS\\\", \\\"Access-Control-Allow-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Expose-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Allow-Credentials\\\": \\\"true\\\"}\", \"status\": \"OK\", \"responsePayload\": \"aaaaa\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"OTHER\"}", url, hostName);
         List<String> messages = Collections.singletonList(message);
-        sampleMessages.put(apiInfoKey, messages);
+        SampleData data = new SampleData();
+        data.setSamples(messages);
+        Key key = new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), 200, Context.now(),Context.now());
+        data.setId(key);
+        SampleDataDao.instance.insertOne(data);
+        SampleMessageStore messageStore = SampleMessageStore.create();
+        Set<Integer> apiCollectionSet = new HashSet<>();
+        apiCollectionSet.add(0);
+        messageStore.fetchSampleMessages(apiCollectionSet);
+        AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+        TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "");
 
-        String host = TestExecutor.findHost(apiInfoKey, sampleMessages);
+        String host = TestExecutor.findHost(apiInfoKey, testingUtil.getSampleMessages(), messageStore);
         assertEquals(answer,host);
     }
 

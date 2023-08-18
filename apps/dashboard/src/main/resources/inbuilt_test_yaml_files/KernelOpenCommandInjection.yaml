@@ -1,0 +1,49 @@
+id: KERNEL_OPEN_COMMAND_INJECTION
+info:
+  name: "Kernel open command injection in Ruby"
+  description: "Replacing request parameters with bash commands in a Ruby on Rails app test can lead to command injection due to the use of 'Kernel#open' and the presence of shell injection vulnerability." 
+  details: >
+            "During the testing of a Ruby on Rails app, if a request parameter containing a URL is processed using 'Kernel#open' by the developers, it introduces a vulnerability to command injection.
+            This allows an attacker to exploit the design flaw by sending a pipe character followed by a shell command. The impact of successful command injection includes unauthorized access, data leakage, system compromise, and potential disruption of services,
+            making it a critical security concern that needs immediate attention."
+  impact: "Command injection allows an attacker to execute arbitrary commands on a vulnerable system, leading to unauthorized access, data theft, system compromise, and potential disruption of services, making it a severe security risk."
+  category:
+    name: COMMAND_INJECTION
+    shortName: Command Injection
+    displayName: Command Injection
+  subCategory: KERNEL_OPEN_COMMAND_INJECTION
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+api_selection_filters:
+  or:
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - http
+          key:
+            extract: url_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - http
+          key:
+            extract: url_key
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_query_param:
+            url_key: "| echo 'hello world'"
+        - modify_body_param:
+            url_key: "| echo 'hello world'"
+
+validate:
+  response_payload:
+    contains_either:
+      - "hello world"
