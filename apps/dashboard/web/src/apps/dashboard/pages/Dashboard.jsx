@@ -11,6 +11,7 @@ import dashboardFunc from "./transform"
 import AktoGptLayout from "../components/aktoGpt/AktoGptLayout";
 import api from "./observe/api";
 import func from "@/util/func"
+import { useFlags } from "launchdarkly-react-client-sdk";
 
 function Dashboard() {
 
@@ -24,6 +25,8 @@ function Dashboard() {
     const sampleData = ObserveStore(state => state.samples)
     const selectedUrl = ObserveStore(state => state.selectedUrl)
 
+    const {settings} = useFlags()
+
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         setAllCollections(apiCollections)
@@ -36,6 +39,7 @@ function Dashboard() {
 
     useEffect(() => {
         fetchAllCollections()
+        console.log(settings)
     }, [])
 
     const checkGptActive = async(path) => {

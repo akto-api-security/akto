@@ -43,6 +43,7 @@ function ResultsSummary() {
         })
     }
     useEffect(()=> {
+        console.log(selectedTestSuite)
         runTest()
     },[])
 

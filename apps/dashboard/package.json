@@ -20,6 +20,7 @@
     "highcharts-react-official": "^3.2.0",
     "html-react-parser": "^4.0.0",
     "immer": "^10.0.2",
+    "launchdarkly-react-client-sdk": "^3.0.8",
     "monaco-editor": "^0.40.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
