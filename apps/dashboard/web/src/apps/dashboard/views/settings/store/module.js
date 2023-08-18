@@ -83,6 +83,9 @@ const team = {
         },
         SET_USER_INFO(state, resp) {
             state.lastLoginTs = resp.lastLoginTs
+        },
+        SET_FILTER_HEADER_VALUE_MAP(state, resp) {
+            state.filterHeaderValueMap = resp.filterHeaderValueMap
         }
     },
     actions: {
@@ -153,10 +156,9 @@ const team = {
                 return resp
             })
         },
-        addFilterHeaderValueMap({commit, dispatch}, {filterHeaderValueMapKey, filterHeaderValueMapValue}) {
-            let filterHeaderValueMap = {};
-            filterHeaderValueMap[filterHeaderValueMapKey] = filterHeaderValueMapValue
-            return api.addFilterHeaderValueMap(filterHeaderValueMap).then(resp => {
+        addFilterHeaderValueMap({commit, dispatch}, updatedMap) {
+            return api.addFilterHeaderValueMap(updatedMap).then(resp => {
+                commit('SET_FILTER_HEADER_VALUE_MAP', resp)
                 return resp
             })
         },

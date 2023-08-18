@@ -101,35 +101,47 @@
 
         <div class="toggle-redact-feature">
             <div class="entry-text">Traffic filters</div>
-            <div class="d-flex traffic-filter-div">
-                <div class="input-value-key">
-                    <v-text-field v-model="newKey" style="width: 200px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Header key
-                                <help-tooltip :size="12"
-                                    text="Please enter the name of header key" />
-                            </div>
-                        </template>
-                    </v-text-field>
+            <div>
 
-                </div>
-                <div class="input-value-value">
-                    <v-text-field v-model="newVal" style="width: 500px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Header value
-                                <help-tooltip :size="12" text="Please enter the name of header value" />
+                <div v-if="filterHeaderValueMap">
+                    <div v-for="(val, key) in filterHeaderValueMap" :key="key">
+                            <div>
+                                <span class="fs-14 fw-500">{{key}}</span>
+                                <span class="ml-4 fs-14">{{val}}</span>
+                                <v-btn icon @click="() => removeFilterHeaderValueMap(key)">
+                                    <v-icon size="12">$fas_trash</v-icon>
+                                </v-btn>
                             </div>
-                        </template>
-
-                    </v-text-field>
+                    </div>
                 </div>
 
-                <div class="filter-save-btn">
-                    <v-btn primary dark color="var(--hexColor9)" @click="addFilterHeaderValueMap" v-if="filterHeaderValueMapChanged">
-                        Save
-                    </v-btn>
+                <div class="d-flex traffic-filter-div">
+                    <div class="input-value-key">
+                        <v-text-field v-model="newKey" style="width: 200px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Header key
+                                    <help-tooltip :size="12"
+                                        text="Please enter the name of header key" />
+                                </div>
+                            </template>
+                        </v-text-field>
+                    </div>
+                    <div class="input-value-value">
+                        <v-text-field v-model="newVal" style="width: 500px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Header value
+                                    <help-tooltip :size="12" text="Please enter the name of header value" />
+                                </div>
+                            </template>
+                        </v-text-field>
+                    </div>
+                    <div class="filter-save-btn">
+                        <v-btn primary dark color="var(--hexColor9)" @click="addFilterHeaderValueMap" v-if="filterHeaderValueMapChanged">
+                            Save
+                        </v-btn>
+                    </div>
                 </div>
             </div>
         </div>
@@ -228,7 +240,15 @@ import {mapState} from 'vuex'
                 return func.epochToDateTime(timestamp)
             },
             addFilterHeaderValueMap() {
-                this.$store.dispatch('team/addFilterHeaderValueMap', {"filterHeaderValueMapKey" : this.newKey, "filterHeaderValueMapValue": this.newVal})
+                this.filterHeaderValueMap[this.newKey] = this.newVal
+                this.$store.dispatch('team/addFilterHeaderValueMap', this.filterHeaderValueMap)
+                this.newKey = null
+                this.newVal = null
+            },
+            removeFilterHeaderValueMap(key){
+                delete this.filterHeaderValueMap[key]
+                console.log('Updated map', this.filterHeaderValueMap)
+                this.$store.dispatch('team/addFilterHeaderValueMap', this.filterHeaderValueMap)
             },
             async addApiCollectionNameMapper() {
                 await this.$store.dispatch('team/addApiCollectionNameMapper', {"regex" : this.newApiCollectionNameMapperKey, "newName": this.newApiCollectionNameMapperValue, headerName: this.newApiCollectionNameMapperHeaderName})
@@ -304,13 +324,6 @@ import {mapState} from 'vuex'
             },
             apiCollectionNameMapperChanged() {
                 return this.newApiCollectionNameMapperKey && this.newApiCollectionNameMapperValue
-            }
-        },
-        watch: {
-            filterHeaderValueMap(a) {
-                if (!a) return
-                this.newKey = Object.keys(a)[0] 
-                this.newVal = Object.values(a)[0]
             }
         }
     }

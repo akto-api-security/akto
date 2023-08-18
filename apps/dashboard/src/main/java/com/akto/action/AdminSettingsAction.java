@@ -206,6 +206,10 @@ public class AdminSettingsAction extends UserAction {
         this.filterHeaderValueMap = filterHeaderValueMap;
     }
 
+    public Map<String, String> getFilterHeaderValueMap() {
+        return filterHeaderValueMap;
+    }
+
     public void setRegex(String regex) {
         this.regex = regex;
     }
