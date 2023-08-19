@@ -30,7 +30,7 @@ export default {
     }
     .key{
         font-weight: 500;
-        max-width: 100px;
+        max-width: 125px;
     }
     .value{
         max-width: 400px;
