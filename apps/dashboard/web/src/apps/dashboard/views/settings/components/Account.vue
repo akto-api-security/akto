@@ -106,8 +106,8 @@
                     <div v-for="(val, key) in filterHeaderValueMap" :key="key">
                             <div class="d-flex jc-sb">
                                 <div class="values-div">
-                                    <span class="fs-14 fw-500 headerKey overflow">{{key}}</span>
-                                    <span class="ml-4 fs-14 overflow headerValue">{{val}}</span>
+                                    <tooltip-text type="key" :text="key" />
+                                    <tooltip-text :text="val" />
                                 </div>
                                 <v-btn icon @click="() => removeFilterHeaderValueMap(key)">
                                     <v-icon size="12">$fas_trash</v-icon>
@@ -156,8 +156,10 @@
                     <div v-for="({newName, regex, headerName}) in Object.values(apiCollectionNameMapper)">
                             <div class="d-flex jc-sb">
                                 <div class="values-div">
-                                    <span class="fs-14 fw-500 overflow headerKey">{{headerName ? headerName: "host"}}={{regex}}</span>
-                                    <span class="ml-4 fs-14 overflow headerValue">{{newName}}</span>
+                                    <tooltip-text type="key" :text="(headerName ? headerName : 'host')" />
+                                    =
+                                    <tooltip-text type="key" :text="regex"/>
+                                    <tooltip-text :text="newName"/>
                                 </div>
                                 <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
                                     <v-icon size="12">$fas_trash</v-icon>
@@ -219,12 +221,14 @@
 <script>
 import func from "@/util/func";
 import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
+import TooltipText from "@/apps/dashboard/shared/components/TooltipText.vue";
 
 import {mapState} from 'vuex'
     export default {
         name: "Account",
         components: { 
-            HelpTooltip
+            HelpTooltip,
+            TooltipText
         },
         data () {
             return {
@@ -367,19 +371,10 @@ import {mapState} from 'vuex'
     max-height: 200px
     overflow: scroll
     padding-top: 8px
-
-.overflow 
-    text-overflow: ellipsis
-    word-break: break-all
-    white-space: nowrap
-    overflow: hidden
 .values-div
     display: flex
     align-items: center
-.headerKey
-    max-width: 100px
-.headerValue
-    max-width: 450px
+    width: 540px
 </style>
 
 <style scoped>
