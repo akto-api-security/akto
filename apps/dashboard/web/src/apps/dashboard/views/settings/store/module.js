@@ -77,7 +77,7 @@ const team = {
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
                 state.privateCidrList = resp.accountSettings.privateCidrList
                 state.enableDebugLogs = resp.accountSettings.enableDebugLogs
-                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap
+                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap ? resp.accountSettings.filterHeaderValueMap : {}
                 state.apiCollectionNameMapper = resp.accountSettings.apiCollectionNameMapper
             }
         },
