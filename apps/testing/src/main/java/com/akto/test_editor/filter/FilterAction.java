@@ -8,10 +8,13 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dto.OriginalHttpResponse;
+
+import org.apache.kafka.common.protocol.types.Field.Bool;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
+import com.akto.dao.test_editor.TestEditorEnums.CollectionOperands;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
@@ -285,27 +288,41 @@ public final class FilterAction {
         List<String> matchingValueKeySet = new ArrayList<>();
         Boolean res = false;
 
+        boolean allShouldSatisfy = false;
+        boolean doAllSatisfy = true;
+        if (filterActionRequest.getConcernedProperty() != null && filterActionRequest.getConcernedProperty().equalsIgnoreCase(CollectionOperands.FOR_ALL.toString())) {
+            allShouldSatisfy = true;
+        }
+
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
 
-            getMatchingKeysForPayload(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeySet);
+            // if concerned prop for_all, all keys should match else empty list
+            getMatchingKeysForPayload(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeySet, doAllSatisfy);
             for (String s: matchingKeySet) {
                 matchingKeys.add(s);
             }
             Boolean filterResp = matchingKeys.size() > 0;
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
-                int keyCount = getKeyCount(payloadObj, null);
-                filterResp = matchingKeySet.size() == keyCount;
+            if (allShouldSatisfy) {
+                filterResp = filterResp && doAllSatisfy;
             }
+            // if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
+            //     int keyCount = getKeyCount(payloadObj, null);
+            //     filterResp = matchingKeySet.size() == keyCount;
+            // }
             return new DataOperandsFilterResponse(filterResp, matchingKeys, null);
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
-            valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyValOperandSeen(), matchingValueKeySet);
+            // if concerned prop for_all, all values should satisfy
+            valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyValOperandSeen(), matchingValueKeySet, doAllSatisfy);
             Boolean filterResp = matchingValueKeySet.size() > 0;
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
-                int keyCount = getKeyCount(payloadObj, null);
-                filterResp = matchingKeySet.size() == keyCount;
+            if (allShouldSatisfy) {
+                filterResp = filterResp && doAllSatisfy;
             }
+            // if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
+            //     int keyCount = getKeyCount(payloadObj, null);
+            //     filterResp = matchingKeySet.size() == keyCount;
+            // }
             return new DataOperandsFilterResponse(filterResp, matchingValueKeySet, null);
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
             Object val = payload;
@@ -486,6 +503,15 @@ public final class FilterAction {
         Boolean result = false;
         Boolean res = false;
 
+        // result && res if concerned prop for_all
+        // remove not contains logic 
+
+        String operation = "or";
+        if (filterActionRequest.getConcernedProperty() != null && filterActionRequest.getConcernedProperty().equalsIgnoreCase(CollectionOperands.FOR_ALL.toString())) {
+            operation = "and";
+            result = headers.size() > 0;
+        }
+
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
             for (String key: headers.keySet()) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -493,8 +519,7 @@ public final class FilterAction {
                 if (res) {
                     newMatchingKeys.add(key);
                 }
-                result = result || res;
-
+                result = Utils.evaluateResult(operation, result, res);
             }
 
             if (headers.containsKey("cookie")) {
@@ -505,15 +530,17 @@ public final class FilterAction {
                     res = invokeFilter(dataOperandFilterRequest);
                     if (res) {
                         newMatchingKeys.add(cookieKey);
-                        result = result || res;
+                        result = Utils.evaluateResult(operation, result, res);
                         break;
                     }
                 }
             }
 
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
-                result = newMatchingKeys.size() == headers.size();
-            }
+            // if (!result) {
+            //     // some keys could match in case of for_all, so setting this empty again if all keys are not matching
+            //     newMatchingKeys = new ArrayList<>();
+            // }
+
             return new DataOperandsFilterResponse(result, newMatchingKeys, null);
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             
@@ -529,7 +556,7 @@ public final class FilterAction {
                         break;
                     }
                 }
-                result = result || res;
+                result = Utils.evaluateResult(operation, result, res);
             }
 
             if (headers.containsKey("cookie")) {
@@ -540,15 +567,20 @@ public final class FilterAction {
                     res = invokeFilter(dataOperandFilterRequest);
                     if (res) {
                         matchingValueKeySet.add(cookieKey);
-                        result = result || res;
+                        result = Utils.evaluateResult(operation, result, res);
                         break;
                     }
                 }
             }
 
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
-                result = matchingValueKeySet.size() == headers.size();
-            }
+            // if (!result) {
+            //     // some keys could match in case of for_all, so setting this empty again if all keys are not matching
+            //     matchingValueKeySet = new ArrayList<>();
+            // }
+
+            // if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
+            //     result = matchingValueKeySet.size() == headers.size();
+            // }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null);
         } else {
             String headerString = RedactSampleData.convertHeaders(headers);
@@ -570,17 +602,30 @@ public final class FilterAction {
 
         List<String> matchingKeys = new ArrayList<>();
         List<String> matchingValueKeySet = new ArrayList<>();
+        // init based on operation
+        // take care if obj set is empty
+        Boolean result = false;
         Boolean res = false;
+        String operation = "or";
+        if (filterActionRequest.getConcernedProperty() != null && filterActionRequest.getConcernedProperty().equalsIgnoreCase(CollectionOperands.FOR_ALL.toString())) {
+            operation = "and";
+            result = queryParamObj.size() > 0;
+        }
 
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
             for (String key: queryParamObj.keySet()) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                 res = invokeFilter(dataOperandFilterRequest);
+                result = Utils.evaluateResult(operation, result, res);
                 if (res) {
                     matchingKeys.add(key);
                 }
             }
-            return new DataOperandsFilterResponse(matchingKeys.size() > 0, matchingKeys, null);
+            // if (!result) {
+            //     // some keys could match in case of for_all, so setting this empty again if all keys are not matching
+            //     matchingKeys = new ArrayList<>();
+            // }
+            return new DataOperandsFilterResponse(result, matchingKeys, null);
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
             for (String key: queryParamObj.keySet()) {
@@ -589,12 +634,17 @@ public final class FilterAction {
                 }
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParamObj.getString(key), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                 res = invokeFilter(dataOperandFilterRequest);
+                result = Utils.evaluateResult(operation, result, res);
                 if (res) {
                     matchingValueKeySet.add(key);
                     break;
                 }
             }
-            return new DataOperandsFilterResponse(res, matchingValueKeySet, null);
+            // if (!result) {
+            //     // some keys could match in case of for_all, so setting this empty again if all keys are not matching
+            //     matchingValueKeySet = new ArrayList<>();
+            // }
+            return new DataOperandsFilterResponse(result, matchingValueKeySet, null);
         } else {
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParams, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
             res = invokeFilter(dataOperandFilterRequest);
@@ -695,7 +745,7 @@ public final class FilterAction {
         return listVal;
     }
 
-    public void getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys) {
+    public void getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys, boolean doAllSatisfy) {
         Boolean res = false;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -707,12 +757,12 @@ public final class FilterAction {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
-                getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys);
+                getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys, doAllSatisfy);
                 
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
-                getMatchingKeysForPayload(elem, parentKey, querySet, operand, matchingKeys);
+                getMatchingKeysForPayload(elem, parentKey, querySet, operand, matchingKeys, doAllSatisfy);
             }
         } else {
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(parentKey, querySet, operand);
@@ -720,10 +770,11 @@ public final class FilterAction {
             if (res) {
                 matchingKeys.add(parentKey);
             }
+            doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
         }
     }
 
-    public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValueKeySet) {
+    public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValueKeySet, boolean doAllSatisfy) {
         Boolean res = false;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -735,11 +786,11 @@ public final class FilterAction {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
-                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet);
+                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
-                valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet);
+                valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy);
             }
         } else {
             if (keyOperandSeen && matchingKeys != null && !matchingKeys.contains(parentKey)) {
@@ -750,6 +801,7 @@ public final class FilterAction {
             if (res) {
                 matchingValueKeySet.add(parentKey);
             }
+            doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
         }
 
         return;

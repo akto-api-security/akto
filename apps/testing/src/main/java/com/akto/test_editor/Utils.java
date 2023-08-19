@@ -177,4 +177,12 @@ public class Utils {
         }
     }
 
+    public static boolean evaluateResult(String operation, boolean currentRes, boolean newVal) {
+
+        if (operation == "and") {
+            return currentRes && newVal;
+        }
+        return currentRes || newVal;
+    }
+
 }

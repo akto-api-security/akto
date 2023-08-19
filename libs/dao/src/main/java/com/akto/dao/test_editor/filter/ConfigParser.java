@@ -31,14 +31,14 @@ public class ConfigParser {
             return null;
         }
         
-        FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null, null, null);
-        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null, null, null);
+        FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null, null, null, null);
+        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null, null, null, null);
 
         return configParserResult;
     }
 
     public ConfigParserResult validateAndTransform(Map<String, Object> filters, FilterNode curNode, FilterNode parentNode, Boolean termNodeExists, 
-        Boolean collectionNodeExists, String concernedProperty, String subConcernedProperty, String bodyOperand, String contextProperty) {
+        Boolean collectionNodeExists, String concernedProperty, String subConcernedProperty, String bodyOperand, String contextProperty, String collectionProperty) {
 
         Object values = curNode.getValues();
 
@@ -66,6 +66,7 @@ public class ConfigParser {
 
         if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Collection.toString())) {
             collectionNodeExists = true;
+            collectionProperty = curNode.getOperand();
         }
 
         if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Body.toString())) {
@@ -93,8 +94,8 @@ public class ConfigParser {
                     if (!(entry.getValue() instanceof List)) {
                         entry.setValue(Arrays.asList(entry.getValue()));
                     }
-                    FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty);
-                    ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty);
+                    FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
+                    ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
                     if (!configParserResult.getIsValid()) {
                         return configParserResult;
                     }
@@ -111,8 +112,8 @@ public class ConfigParser {
                 if (!(entry.getValue() instanceof List)) {
                     entry.setValue(Arrays.asList(entry.getValue()));
                 }
-                FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty);
-                ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty);
+                FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
+                ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
                 if (!configParserResult.getIsValid()) {
                     return configParserResult;
                 }
