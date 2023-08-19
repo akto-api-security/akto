@@ -16,7 +16,7 @@ export default {
     name: "TooltipText",
     props: {
         text: obj.strR,
-        type: obj.strR,
+        type: obj.strN,
     },
 }
 </script>
