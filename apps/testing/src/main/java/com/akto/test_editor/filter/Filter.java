@@ -46,7 +46,7 @@ public class Filter {
                 return new DataOperandsFilterResponse(false, null, null);
             }
             String operand = node.getOperand();
-            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty());
+            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
