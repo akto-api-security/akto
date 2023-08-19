@@ -22,7 +22,7 @@ const team = {
         lastLoginTs: null,
         privateCidrList: null,
         enableDebugLogs: null,
-        filterHeaderValueMap: null,
+        filterHeaderValueMap: {},
         apiCollectionNameMapper: null
     },
     getters: {
@@ -65,7 +65,7 @@ const team = {
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
                 state.enableDebugLogs = false
-                state.filterHeaderValueMap = null
+                state.filterHeaderValueMap = {}
                 state.apiCollectionNameMapper = null
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
