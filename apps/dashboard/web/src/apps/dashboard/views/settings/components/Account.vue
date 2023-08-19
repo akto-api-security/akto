@@ -97,23 +97,25 @@
 
       </div>
       <div>
-
-
         <div class="toggle-redact-feature">
             <div class="entry-text">Traffic filters</div>
             <div>
+            <div class="traffic-filters">
 
                 <div v-if="filterHeaderValueMap">
                     <div v-for="(val, key) in filterHeaderValueMap" :key="key">
-                            <div>
-                                <span class="fs-14 fw-500">{{key}}</span>
-                                <span class="ml-4 fs-14">{{val}}</span>
+                            <div class="d-flex jc-sb">
+                                <div class="values-div">
+                                    <span class="fs-14 fw-500 headerKey overflow">{{key}}</span>
+                                    <span class="ml-4 fs-14 overflow headerValue">{{val}}</span>
+                                </div>
                                 <v-btn icon @click="() => removeFilterHeaderValueMap(key)">
                                     <v-icon size="12">$fas_trash</v-icon>
                                 </v-btn>
                             </div>
                     </div>
                 </div>
+            </div>
 
                 <div class="d-flex traffic-filter-div">
                     <div class="input-value-key">
@@ -149,19 +151,21 @@
         <div class="toggle-redact-feature mt-8">
             <div class="entry-text">Replace collection</div>
             <div>
-
+            <div class="traffic-filters">
                 <div v-if="apiCollectionNameMapper">
                     <div v-for="({newName, regex, headerName}) in Object.values(apiCollectionNameMapper)">
-                            <div>
-                                <span class="fs-14 fw-500">{{headerName ? headerName: "host"}}={{regex}}</span>
-                                <span class="ml-4 fs-14">{{newName}}</span>
+                            <div class="d-flex jc-sb">
+                                <div class="values-div">
+                                    <span class="fs-14 fw-500 overflow headerKey">{{headerName ? headerName: "host"}}={{regex}}</span>
+                                    <span class="ml-4 fs-14 overflow headerValue">{{newName}}</span>
+                                </div>
                                 <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
                                     <v-icon size="12">$fas_trash</v-icon>
                                 </v-btn>
                             </div>
                     </div>
                 </div>
-
+            </div>
                 <div class="d-flex traffic-filter-div">
                     <div class="input-value-key">
                         <v-text-field v-model="newApiCollectionNameMapperHeaderName" style="width: 200px">
@@ -247,7 +251,6 @@ import {mapState} from 'vuex'
             },
             removeFilterHeaderValueMap(key){
                 delete this.filterHeaderValueMap[key]
-                console.log('Updated map', this.filterHeaderValueMap)
                 this.$store.dispatch('team/addFilterHeaderValueMap', this.filterHeaderValueMap)
             },
             async addApiCollectionNameMapper() {
@@ -345,7 +348,6 @@ import {mapState} from 'vuex'
 
 .toggle-redact-feature
     display: flex
-    height: 50px
     line-height: 50px
 
 .input-value-key
@@ -360,6 +362,24 @@ import {mapState} from 'vuex'
 .filter-save-btn
     display: flex
     align-items: center
+.traffic-filters
+    line-height: 20px
+    max-height: 200px
+    overflow: scroll
+    padding-top: 8px
+
+.overflow 
+    text-overflow: ellipsis
+    word-break: break-all
+    white-space: nowrap
+    overflow: hidden
+.values-div
+    display: flex
+    align-items: center
+.headerKey
+    max-width: 70px
+.headerValue
+    max-width: 280px
 </style>
 
 <style scoped>
