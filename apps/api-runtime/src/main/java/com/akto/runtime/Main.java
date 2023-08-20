@@ -400,7 +400,7 @@ public class Main {
 
                             shouldKeep = isPresentInReq || isPresentInRes;
 
-                            if (!shouldKeep) {
+                            if (shouldKeep) {
                                 break;
                             }
 
