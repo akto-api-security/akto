@@ -22,7 +22,7 @@ const team = {
         lastLoginTs: null,
         privateCidrList: null,
         enableDebugLogs: null,
-        filterHeaderValueMap: null,
+        filterHeaderValueMap: {},
         apiCollectionNameMapper: null
     },
     getters: {
@@ -65,7 +65,7 @@ const team = {
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
                 state.enableDebugLogs = false
-                state.filterHeaderValueMap = null
+                state.filterHeaderValueMap = {}
                 state.apiCollectionNameMapper = null
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
@@ -77,12 +77,15 @@ const team = {
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
                 state.privateCidrList = resp.accountSettings.privateCidrList
                 state.enableDebugLogs = resp.accountSettings.enableDebugLogs
-                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap
+                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap ? resp.accountSettings.filterHeaderValueMap : {}
                 state.apiCollectionNameMapper = resp.accountSettings.apiCollectionNameMapper
             }
         },
         SET_USER_INFO(state, resp) {
             state.lastLoginTs = resp.lastLoginTs
+        },
+        SET_FILTER_HEADER_VALUE_MAP(state, resp) {
+            state.filterHeaderValueMap = resp.filterHeaderValueMap
         }
     },
     actions: {
@@ -153,10 +156,9 @@ const team = {
                 return resp
             })
         },
-        addFilterHeaderValueMap({commit, dispatch}, {filterHeaderValueMapKey, filterHeaderValueMapValue}) {
-            let filterHeaderValueMap = {};
-            filterHeaderValueMap[filterHeaderValueMapKey] = filterHeaderValueMapValue
-            return api.addFilterHeaderValueMap(filterHeaderValueMap).then(resp => {
+        addFilterHeaderValueMap({commit, dispatch}, updatedMap) {
+            return api.addFilterHeaderValueMap(updatedMap).then(resp => {
+                commit('SET_FILTER_HEADER_VALUE_MAP', resp)
                 return resp
             })
         },
