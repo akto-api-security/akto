@@ -12,15 +12,18 @@ import java.util.Map;
 public class User {
     private String name;
     private String login;
+    public static final String LOGIN = "login";
     private int id;
     private List<String> refreshTokens;
     public static final String LAST_LOGIN_TS = "lastLoginTs";
     private int lastLoginTs;
 
     private Map<String, UserAccountEntry> accounts;
+    public static final String ACCOUNTS = "accounts";
 
     private Message.Mode preferredChannel;
     private Map<String, SignupInfo> signupInfoMap;
+    public static final String SIGNUP_INFO_MAP = "signupInfoMap";
 
     public User() {}
 
@@ -39,6 +42,16 @@ public class User {
         Map<String, SignupInfo> infoMap = new HashMap<>();
         infoMap.put(info.getKey(), info);
         return new User(name, login, accountEntryMap, infoMap, Message.Mode.EMAIL);
+    }
+
+    public String findAnyAccountId() {
+        if (this.accounts == null || this.accounts.isEmpty()) return null;
+
+        for (String acc: accounts.keySet()) {
+            return acc;
+        }
+
+        return null;
     }
 
     public static BasicDBObject convertUserToUserDetails(User user) {

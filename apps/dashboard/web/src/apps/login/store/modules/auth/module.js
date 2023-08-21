@@ -45,13 +45,13 @@ const auth = {
                     password
                 }
             }).then((resp, a, b, c) => {
-                var redirectLink = '/dashboard/testing'
+                var redirectLink = '/dashboard/observe/inventory'
                 if (resp.loginResult && resp.loginResult.redirect) {
                     redirectLink = resp.loginResult.redirect
                 } else {
-                    var redirectLink = new URLSearchParams(window.location.search).get('redirect_uri') || '/dashboard/testing'
+                    var redirectLink = new URLSearchParams(window.location.search).get('redirect_uri') || '/dashboard/observe/inventory'
                     if (!redirectLink.startsWith('/dashboard/')) {
-                        redirectLink = '/dashboard/testing'
+                        redirectLink = '/dashboard/observe/inventory'
                     }
                 }
                 window.location.href = redirectLink

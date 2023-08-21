@@ -1,6 +1,6 @@
 <template>
     <div class="pa-4">
-        <div v-if="isLocalDeploy">
+        <div v-if="isLocalDeploy && !isSaas">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
 
@@ -47,7 +47,7 @@
 
 
         <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
-            <div v-if="isAdmin && !isLocalDeploy" class="email-invite-container">
+            <div v-if="isAdmin && !(isLocalDeploy && !isSaas)" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
                     :items="[]"
@@ -168,6 +168,7 @@
                     }
                 ],
                 isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
+                isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
                 inviteCodes: {},
                 showInviteCodeDialog: false
             }
@@ -193,7 +194,7 @@
 
                 let _inviteNewMember = this.inviteNewMember
                 let countEmails = 0
-                this.allEmails ? this.allEmails : []
+                this.allEmails = this.allEmails ? this.allEmails : []
                 if (this.allEmails.length == 0) return
                 for (const email of this.allEmails) {
                     if (this.usernameRules[0](email)) {
@@ -215,11 +216,13 @@
 
                     } else {
 
+                    if(!this.isLocalDeploy){
                         window._AKTO.$emit('SHOW_SNACKBAR', {
                             show: true,
                             text: `${countEmails} invitation${plural} sent successfully!`,
                             color: 'green'
                         })
+                    }
                         this.$store.dispatch('team/getTeamData')
                         this.showInviteCodeDialog = true
                     }
@@ -239,7 +242,7 @@
             removedFailure (err, user) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
-                    text: `There was an error while removing ${user.email}!`,
+                    text: `There was an error while removing the user!`,
                     color: 'red'
                 })
             },

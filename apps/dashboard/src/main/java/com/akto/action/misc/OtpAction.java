@@ -31,8 +31,6 @@ public class OtpAction extends UserAction {
     private String text;
     @Override
     public String execute() {
-        Context.accountId.set(1_000_000);
-
         loggerMaker.infoAndAddToDb(text, LogDb.DASHBOARD);
         if (text == null || !text.contains("OTP")) {
             loggerMaker.infoAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
@@ -47,10 +45,8 @@ public class OtpAction extends UserAction {
 
     private String otp;
     public String fetchRecentOtp() {
-        Context.accountId.set(1_000_000);
         List<OTPMessage> OTPMessageList = OtpMessagesDao.instance.findAll(Filters.gte("timestamp", Context.now() - 90));
         if (OTPMessageList.isEmpty()) return Action.ERROR.toUpperCase();
-
         OTPMessage otpMessage = OTPMessageList.get(OTPMessageList.size()-1); // latest
 
         String val = extractOtp(otpMessage.getMessage());

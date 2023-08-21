@@ -218,4 +218,16 @@ public class Utils {
         return diff;
     }
 
+    public static BasicDBObject fetchJsonObjForString(Object val) {
+        if (!(val instanceof String)) {
+            return null;
+        }
+        try {
+            BasicDBObject obj = BasicDBObject.parse(val.toString());
+            return obj;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 }

@@ -1,6 +1,16 @@
 package com.akto.action;
 
 import com.akto.dao.PendingInviteCodesDao;
+import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.PendingInviteCode;
+import com.akto.dto.User;
+import com.akto.notifications.email.SendgridEmail;
+import com.akto.utils.DashboardMode;
+import com.akto.utils.JWT;
+import com.mongodb.client.model.Filters;
+import com.opensymphony.xwork2.Action;
+import com.sendgrid.helpers.mail.Mail;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dto.PendingInviteCode;
@@ -59,7 +69,7 @@ public class InviteUserAction extends UserAction{
     public String execute() {
         int user_id = getSUser().getId();
 
-        User admin = UsersDao.instance.getFirstUser();
+        User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         String code = validateEmail(this.inviteeEmail, admin.getLogin());
 
         if (code != null) {
@@ -87,27 +97,30 @@ public class InviteUserAction extends UserAction{
         }
 
         // to get expiry date
+
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
             PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime())
+                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get())
             );
+
+
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
         }
 
-        finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
+        String endpoint = DashboardMode.isSaasDeployment() ? "/addUserToAccount" : "/signup";
+        finalInviteCode = websiteHostName + endpoint + "?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
+
         String inviteFrom = getSUser().getName();
-        Mail email = SendgridEmail.buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
+        Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
         try {
-            SendgridEmail.send(email);
+            SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return ERROR.toUpperCase();
         }
-
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -1,0 +1,67 @@
+id: SERVER_PRIVATE_KEYS
+info:
+  name: Detect Private SSH, TLS, and JWT Keys
+  description: "Detects the presence of private SSH, TLS, and JWT keys on the server."
+  details: >
+              "Scans the specified URLs for files containing private keys commonly used for SSH, TLS, and JWT authentication. The presence of these keys could indicate a misconfiguration or insecure handling of sensitive cryptographic material."
+  impact: "Exposing private keys can lead to unauthorized access and compromise the security and integrity of the server and associated services."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: SERVER_PRIVATE_KEYS
+  severity: HIGH
+  references:
+    - https://www.acunetix.com/blog/articles/tls-vulnerabilities-attacks-final-part/
+    - https://venafi.com/blog/most-common-ssh-vulnerabilities-how-to-avoid-them/
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/localhost.key
+    - ${urlVar}/host.key
+    - ${urlVar}/www.key
+    - ${urlVar}/private-key
+    - ${urlVar}/privatekey.key
+    - ${urlVar}/server.key
+    - ${urlVar}/my.key
+    - ${urlVar}/key.pem
+    - ${urlVar}/ssl/localhost.key
+    - ${urlVar}/ssl/{{Hostname}}.key
+    - ${urlVar}/id_rsa
+    - ${urlVar}/id_dsa
+    - ${urlVar}/.ssh/id_rsa
+    - ${urlVar}/.ssh/id_dsa
+    - ${urlVar}/{{Hostname}}.key
+    - ${urlVar}/{{Hostname}}.pem
+    - ${urlVar}/config/jwt/private.pem
+    - ${urlVar}/jwt/private.pem
+    - ${urlVar}/var/jwt/private.pem
+    - ${urlVar}/private.pem
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - "BEGIN OPENSSH PRIVATE KEY"
+      - "BEGIN PRIVATE KEY"
+      - "BEGIN RSA PRIVATE KEY"
+      - "BEGIN DSA PRIVATE KEY"
+      - "BEGIN EC PRIVATE KEY"
+      - "BEGIN PGP PRIVATE KEY BLOCK"
+    not_contains:
+      - "<html"
+      - "<HTML"
