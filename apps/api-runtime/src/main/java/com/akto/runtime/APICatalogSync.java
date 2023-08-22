@@ -49,7 +49,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    public static boolean mergeAsyncOutside = false;
+    public static boolean mergeAsyncOutside = true;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -57,14 +57,6 @@ public class APICatalogSync {
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
-        try {
-            String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
-            if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
-                mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
-            }
-        } catch (Exception e) {
-
-        }
 
     }
 
@@ -1161,7 +1153,8 @@ public class APICatalogSync {
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
-        if (mergeAsyncOutside) {
+        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+        if (mergeAsyncOutside && instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType) ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
