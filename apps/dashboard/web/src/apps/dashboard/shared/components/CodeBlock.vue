@@ -35,12 +35,21 @@ export default {
                 }
             });
             if (info.length > 0 && this.onCopyBtnClickText.length > 0) {
-                this.copyToClipboard(info);
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: this.onCopyBtnClickText,
-                    color: 'green'
-                });
+                navigator.clipboard.writeText(text)
+                        .then(() => {
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                show: true,
+                                text: this.onCopyBtnClickText,
+                                color: 'green'
+                            })
+                        })
+                        .catch(err => console.error('Failed to copy text: ', err));
+                // this.copyToClipboard(info);
+                // window._AKTO.$emit('SHOW_SNACKBAR', {
+                //     show: true,
+                //     text: this.onCopyBtnClickText,
+                //     color: 'green'
+                // });
             }
         },
         copyToClipboard(text) {

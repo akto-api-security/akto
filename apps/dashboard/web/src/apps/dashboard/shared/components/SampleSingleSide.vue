@@ -167,12 +167,29 @@ export default {
         }
 
         if (copyString) {
-          this.copyToClipboard(copyString)
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-            show: true,
-            text: snackBarMessage,
-            color: 'green'
-          });
+
+          navigator.clipboard.writeText(copyString)
+                        .then(() => {
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                show: true,
+                                text: snackBarMessage,
+                                color: 'green'
+                            })
+                        })
+                        .catch(err => console.error('Failed to copy text: ', err));
+                // this.copyToClipboard(info);
+                // window._AKTO.$emit('SHOW_SNACKBAR', {
+                //     show: true,
+                //     text: this.onCopyBtnClickText,
+                //     color: 'green'
+                // });
+
+          // this.copyToClipboard(copyString)
+          // window._AKTO.$emit('SHOW_SNACKBAR', {
+          //   show: true,
+          //   text: snackBarMessage,
+          //   color: 'green'
+          // });
         }
       }
     },
