@@ -2,8 +2,6 @@ import {create} from "zustand"
 import {devtools} from "zustand/middleware"
 
 let store = (set)=>({
-    leftNavSelected: '',
-    setLeftNavSelected: (selected) =>  set({ leftNavSelected: selected }), 
     leftNavCollapsed: false,
     toggleLeftNavCollapsed: () => {
         set(state => ({ leftNavCollapsed: !state.leftNavCollapsed }))
@@ -32,6 +30,11 @@ let store = (set)=>({
     allRoutes: [],
     setAllRoutes:(allRoutes)=>{
         set({allRoutes: allRoutes})
+    },
+    
+    collectionsMap: {},
+    setCollectionsMap:(collectionsMap)=>{
+        set({collectionsMap: collectionsMap})
     },
 })
 

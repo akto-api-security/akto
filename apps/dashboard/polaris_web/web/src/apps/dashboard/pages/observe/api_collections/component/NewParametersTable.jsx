@@ -84,12 +84,26 @@ let filters = [
         label: 'Collection',
         title: 'Collection',
         choices: [],
+    },
+    {
+        key: 'method',
+        label: 'Method',
+        title: 'Method',
+        choices: [
+            { label: "GET",value: "GET"},
+            { label: "POST",value: "POST"},
+            { label: "PUT",value: "PUT"},
+            { label: "PATCH",value: "PATCH"},
+            { label: "DELETE",value: "DELETE"},
+            { label: "OPTIONS",value: "OPTIONS"},
+            { label: "HEAD",value: "HEAD"},
+        ]
     }
 ]
 
 function NewParametersTable(props) {
 
-    const { startTimestamp, endTimestamp } = props;
+    const { startTimestamp, endTimestamp, handleRowClick } = props;
     const [key, setKey] = useState(false);
 
     useEffect(() => {
@@ -132,6 +146,10 @@ function NewParametersTable(props) {
         return { value: ret, total: total };
     }
 
+    const handleRow = (data) => {
+        handleRowClick(data,headers)
+    }
+
     return (
         <GithubServerTable
             key={key}
@@ -141,6 +159,7 @@ function NewParametersTable(props) {
             sortOptions={sortOptions}
             disambiguateLabel={disambiguateLabel}
             loading={loading}
+            onRowClick={(data) => handleRow(data)}
             fetchData={fetchData}
             filters={filters}
             hideQueryField={true}

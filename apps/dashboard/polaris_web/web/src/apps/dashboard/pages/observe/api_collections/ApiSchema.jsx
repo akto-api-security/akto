@@ -32,6 +32,16 @@ function ApiSingleSchema(props) {
     const [open, setOpen] = useState(true);
     const handleToggle = useCallback(() => setOpen((open) => !open), []);
     const [isHeader, setIsHeader] = useState(true)
+    let headerCount = 0
+    let payloadCount = 0
+
+    data.forEach(element => {
+        if(element.isHeader){
+            headerCount++
+        }else{
+            payloadCount++
+        }
+    });
 
     return (
         <VerticalStack gap={"2"}>
@@ -53,8 +63,18 @@ function ApiSingleSchema(props) {
             >
                 <VerticalStack gap={"2"}>
                     <ButtonGroup segmented>
-                        <Button size="slim" primarySuccess={isHeader} onClick={() => setIsHeader(true)}> Header</Button>
-                        <Button size="slim" primarySuccess={!isHeader} onClick={() => setIsHeader(false)}>Payload</Button>
+                        <Button size="slim" primarySuccess={isHeader} onClick={() => setIsHeader(true)}> 
+                            <HorizontalStack gap="2">
+                                <Text variant="bodyMd">Header</Text>
+                                <Badge size="small">{headerCount.toString()}</Badge>
+                            </HorizontalStack>
+                        </Button>
+                        <Button size="slim" primarySuccess={!isHeader} onClick={() => setIsHeader(false)}>
+                            <HorizontalStack gap="2">
+                                <Text variant="bodyMd">Payload</Text>
+                                <Badge size="small">{payloadCount.toString()}</Badge>
+                            </HorizontalStack>
+                        </Button>
                     </ButtonGroup>
                     <Scrollable shadow style={{ height: '25vh' }} focusable>
                         <DataTable

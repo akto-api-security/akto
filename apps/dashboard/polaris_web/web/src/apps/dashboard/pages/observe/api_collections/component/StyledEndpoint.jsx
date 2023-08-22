@@ -15,13 +15,13 @@ const StyledEndpoint = (data) => {
 
     function getMethodColor(method) {
         switch (method) {
-            case "GET": return "text-info";
-            case "POST": return "text-primary";
-            case "PUT": return "text-interactive";
-            case "PATCH": return "text-magic";
-            case "DELETE": return "text-warning-strong";
-            case "OPTIONS": return "text-caution-strong";
-            case "HEAD": return "text-caution";
+            case "GET": return `var(--color-get)`;
+            case "POST": return `var(--color-post)`;
+            case "PUT": return `var(--color-put)`;
+            case "PATCH": return `var(--color-patch)`;
+            case "DELETE": return `var(--color-delete)`;
+            case "OPTIONS": return `var(--color-options)`;
+            case "HEAD": return `var(--color-head)`;
             default:
                 return "";
         }
@@ -37,11 +37,9 @@ const StyledEndpoint = (data) => {
 
     const endpoint = (
         <HorizontalStack gap={"1"} wrap={false}>
-                <Box color={getMethodColor(method)}>
-                    <Text as="span" variant="headingMd" >
-                        {method}
-                    </Text>
-                </Box>
+                <div style={{color: getMethodColor(method), fontSize: '16px', fontWeight: 600}}>
+                    {method}
+                </div>
                 <div className="styled-endpoint" ref={ref}>
                     {
                         arr?.map((item, index) => {

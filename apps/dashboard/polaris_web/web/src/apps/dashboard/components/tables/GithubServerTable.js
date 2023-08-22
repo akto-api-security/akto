@@ -17,6 +17,7 @@ import "./style.css"
 import func from '@/util/func';
 import { produce } from "immer"
 import values from "@/util/values"
+import transform from '../../pages/observe/transform';
 
 function GithubServerTable(props) {
 
@@ -29,6 +30,7 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
+  const [selectedIndex, setSelectedIndex] = useState(-1)
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -172,6 +174,8 @@ function GithubServerTable(props) {
           page={props.page || 0}
           getNextUrl={props?.getNextUrl}
           onRowClick={props.onRowClick}
+          selectedIndex={selectedIndex}
+          setSelectedIndex={setSelectedIndex}
         />
       ),
     );
@@ -197,19 +201,16 @@ function GithubServerTable(props) {
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Searching in ${total} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                queryPlaceholder={`Searching in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
                 onSort={setSortSelected}
-                //primaryAction={primaryAction}
                 cancelAction={{
                   disabled: false,
                   loading: false,
                 }}
-                tabs={props.tabs || []}
-                selected={props.selected}
-                onSelect={props.onSelect}
+                tabs={[]}
                 canCreateNewView={false}
                 filters={filters}
                 appliedFilters={appliedFilters}
@@ -246,7 +247,7 @@ function GithubServerTable(props) {
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
-                      `Showing ${page * pageLimit + Math.min(1, total)}-${Math.min((page + 1) * pageLimit, total)} of ${total}`
+                      `Showing ${transform.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${transform.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${transform.formatNumberWithCommas(total)}`
                   }
                   hasPrevious={page > 0}
                   previousKeys={[Key.LeftArrow]}

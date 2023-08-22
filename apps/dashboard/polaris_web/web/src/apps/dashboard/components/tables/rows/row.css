@@ -7,6 +7,17 @@
 }
 
 .Polaris-IndexTable__TableCell--first{
-    padding-top: 12px !important;
     vertical-align: top !important;
+}
+
+.Polaris-IndexTable__TableCell {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+.Polaris-IndexTable-Checkbox__TableCellContentContainer {
+    padding-top: 3px !important;
+}
+
+.Polaris-IndexTable {
+    border-radius: unset !important;
 }

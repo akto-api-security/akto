@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box } from "@shopify/polaris"
+import { Box, Button, Modal } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -7,15 +7,20 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
 import ObserveStore from "../observeStore"
+import dashboardFunc from "../../transform";
+import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
+import func from "@/util/func"
 
 function ApiDetails(props) {
 
-    const { showDetails, setShowDetails, apiDetail, headers, getStatus } = props
+    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
     const setSamples = ObserveStore(state => state.setSamples)
-    const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
+    const [selectedUrl,setSelectedUrl] = useState({})
+    const [prompts, setPrompts] = useState([])
+    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
 
     async function fetchData() {
         const { apiCollectionId, endpoint, method } = apiDetail
@@ -54,9 +59,27 @@ function ApiDetails(props) {
 
     }
 
+    const runTests = async(testsList) => {
+        setIsGptScreenActive(false)
+        const apiKeyInfo={
+            apiCollectionId: apiDetail.apiCollectionId,
+            url: selectedUrl.url,
+            method: selectedUrl.method
+        }
+        await api.scheduleTestForCustomEndpoints(apiKeyInfo,func.timNow(),false,testsList,"akto_gpt_test",-1,-1)
+        func.setToast(true,false,"Triggered tests successfully!")
+    }
+
     useEffect(() => {
         fetchData();
     }, [apiDetail])
+
+    function displayGPT(){
+        setIsGptScreenActive(true)
+        let requestObj = {key: "PARAMETER",jsonStr: sampleData[0]?.message,apiCollectionId: Number(apiDetail.apiCollectionId)}
+        const activePrompts = dashboardFunc.getPrompts(requestObj)
+        setPrompts(activePrompts)
+    }
 
 
     const SchemaTab = {
@@ -85,8 +108,8 @@ function ApiDetails(props) {
     const components = [
             <GithubCell
             key="heading"
-            width="30vw"
-            nameWidth="25vw"
+            width="35vw"
+            nameWidth="32vw"
             data={apiDetail}
             headers={headers}
             getStatus={getStatus}
@@ -98,13 +121,28 @@ function ApiDetails(props) {
         />
     ]
 
+    const aktoGptButton = (
+        <div className={"gpt-button-fixed"}>
+            <Button onClick={displayGPT}>Ask AktoGPT</Button> 
+        </div>
+    )
+
+    const currentComponents = isGptActive ? [...components, aktoGptButton] : components
+
     return (
-        <FlyLayout
-            title="API details"
-            show={showDetails}
-            setShow={setShowDetails}
-            components={components}
-        />
+        <div>
+            <FlyLayout
+                title="API details"
+                show={showDetails}
+                setShow={setShowDetails}
+                components={currentComponents}
+            />
+            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+                <Modal.Section flush>
+                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)} runCustomTests={(tests)=> runTests(tests)}/>
+                </Modal.Section>
+            </Modal>
+        </div>
     )
 }
 

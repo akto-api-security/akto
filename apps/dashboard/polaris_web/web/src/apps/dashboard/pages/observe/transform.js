@@ -93,7 +93,12 @@ const transform = {
             domain: func.prepareDomain(x),
             valuesString: func.prepareValuesTooltip(x)
         }
+    },
+    formatNumberWithCommas(number) {
+        const numberString = number.toString();
+        return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
+      
 }
 
 export default transform

@@ -11,8 +11,10 @@ function FlyLayout(props) {
     return (
         <div className={"flyLayout " + (show ? "show" : "")}>
             <div className="innerFlyLayout">
-            <Box borderColor="border-subdued" borderWidth="1" background="bg" padding={"4"} width="40vw" minHeight="100%">
-                <VerticalStack gap={"2"}>
+            {
+                show ?
+                <Box borderColor="border-subdued" borderWidth="1" background="bg" padding={"4"} width="50vw" minHeight="100%">
+                <VerticalStack gap={"5"}>
                     <HorizontalStack align="space-between">
                         <Text variant="headingMd">
                             {title}
@@ -21,11 +23,17 @@ function FlyLayout(props) {
                     </HorizontalStack>
                     <Box paddingBlockEnd={"28"}>
                     <VerticalStack gap="4">
-                        {components}
+                        {
+                        components.map((component) => {
+                            return component
+                        })
+                        }
                     </VerticalStack>
                     </Box>
                 </VerticalStack>
-            </Box>
+            </Box> :
+            <></>
+            }
             </div>
         </div>
     )

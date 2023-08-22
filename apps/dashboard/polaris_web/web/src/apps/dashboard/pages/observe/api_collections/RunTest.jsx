@@ -22,8 +22,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         hourlyLabel: "Now",
         testRunTime: -1,
         testRunTimeLabel: "Till complete",
-        maxConcurrentRequests: -1,
-        maxConcurrentRequestsLabel: "Default ",
+        maxConcurrentRequests: "Default",
         testName: "",
         authMechanismPresent: false
     }
@@ -217,7 +216,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         return abc
     }, [])
 
-    const maxConcurrentRequestsOptions = [{ label: "Default", value: "Default" }, ...maxRequests]
+    const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests]
 
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
@@ -351,7 +350,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                         </div>
 
                         <br />
-                        <div style={{ display: "grid", gridTemplateColumns: "50% 50%", paddingTop: "5px", border: "1px solid #C9CCCF" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
                             <div style={{ borderRight: "1px solid #C9CCCF" }}>
                                 <div style={{ padding: "15px", alignItems: "center" }}>
                                     <Text variant="headingMd">Test Categories</Text>
@@ -462,6 +461,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                 menuItems={maxConcurrentRequestsOptions}
                                 initial={testRun.maxConcurrentRequests}
                                 selected={(requests) => {
+                                    console.log(requests)
                                     let maxConcurrentRequests
                                     if (requests === "Default") maxConcurrentRequests = -1
                                     else maxConcurrentRequests = requests

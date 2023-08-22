@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Tooltip, Text, HorizontalStack, Button, ButtonGroup, Box, Popover, ActionList } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, ButtonGroup, Box, Popover, ActionList, Icon, Modal } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -12,8 +12,7 @@ import {
     CircleAlertMajor,
     GlobeMinor,
     HintMajor,
-    RedoMajor,
-    ImportMinor
+    ChevronDownMinor,
 } from '@shopify/polaris-icons';
 
 import "./api_inventory.css"
@@ -24,6 +23,10 @@ import ObserveStore from "../observeStore"
 import StyledEndpoint from "./component/StyledEndpoint"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
+import Store from "../../../store"
+import dashboardFunc from "../../transform"
+import settingsRequests from "../../settings/api"
 
 const headers = [
     {
@@ -94,6 +97,8 @@ const sortOptions = [
     { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
     { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
     { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type' },
+    { label: 'Last seen', value: 'added asc', directionLabel: 'Newest', sortKey: 'added' },
+    { label: 'Last seen', value: 'added desc', directionLabel: 'Oldest', sortKey: 'added' },
 ];
 
 function ApiEndpoints() {
@@ -103,6 +108,9 @@ function ApiEndpoints() {
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
+    const collectionsMap = Store(state => state.collectionsMap)
+
+    const pageTitle = collectionsMap[apiCollectionId]
 
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
@@ -117,6 +125,10 @@ function ApiEndpoints() {
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
+
+    const [prompts, setPrompts] = useState([])
+    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
+    const [isGptActive, setIsGptActive] = useState(false)
 
     async function fetchData() {
         setLoading(true)
@@ -161,8 +173,17 @@ function ApiEndpoints() {
         setLoading(false)
     }
 
+    const checkGptActive = async() => {
+        await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
+            if(resp.currentState[0].state === "ENABLED"){
+                setIsGptActive(true)
+            }
+        })
+    }
+
     useEffect(() => {
         fetchData()
+        checkGptActive()
     }, [])
 
     const resourceName = {
@@ -196,13 +217,18 @@ function ApiEndpoints() {
             component: <WorkflowTests
                 apiCollectionId={apiCollectionId}
                 endpointsList={loading ? [] : endpointData["All"]}
-            />
+            />,
+            hideQueryField: true
         },
     )
 
     const onSelect = (selectedIndex) => {
+        setLoading(true);
         setSelectedTab(tabStrings[selectedIndex])
         setSelected(selectedIndex)
+        setTimeout(() => {
+            setLoading(false);
+        }, 300);
     }
 
     function handleRowClick(data) {
@@ -331,14 +357,17 @@ function ApiEndpoints() {
         }
     }
 
+    function displayGPT(){
+        setIsGptScreenActive(true)
+        let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
+        const activePrompts = dashboardFunc.getPrompts(requestObj)
+        setPrompts(activePrompts)
+    }
+
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg' truncate>
-                    {
-                        "API Endpoints"
-                    }
-                </Text>
+                <Text variant='headingLg' truncate>{pageTitle}</Text>
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={
@@ -348,10 +377,14 @@ function ApiEndpoints() {
                         active={exportOpen}
                         activator={(
                             <Button
-                                disclosure="select"
                                 plain monochrome removeUnderline
                                 onClick={() => setExportOpen(true)}>
-                                Export
+                                <HorizontalStack gap="1">
+                                    <Text>Export</Text>
+                                    <Box>
+                                        <Icon source={ChevronDownMinor} />
+                                    </Box>
+                                </HorizontalStack>
                             </Button>
                         )}
                         autofocusTarget="first-node"
@@ -371,6 +404,8 @@ function ApiEndpoints() {
                         tooltipText="Upload traffic(.har)"
                         label="Upload traffic"
                         primary={false} />
+
+                    {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button> : null}
                     
                     <RunTest
                         apiCollectionId={apiCollectionId}
@@ -379,7 +414,6 @@ function ApiEndpoints() {
                         disabled={tabs[selected].component !== undefined}
                     />
                 </ButtonGroup>
-
             }
             components={
                 loading ? [<SpinnerCentered key="loading" />] :
@@ -401,6 +435,11 @@ function ApiEndpoints() {
                                 onRowClick={handleRowClick}
                                 getFilteredItems={getFilteredItems}
                             />
+                            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+                                <Modal.Section flush>
+                                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
+                                </Modal.Section>
+                            </Modal>
                         </div>,
                         <ApiDetails
                             key="details"
@@ -409,6 +448,7 @@ function ApiEndpoints() {
                             apiDetail={apiDetail}
                             headers={headers}
                             getStatus={() => { return "warning" }}
+                            isGptActive={isGptActive}
                         />
                     ]}
         />
