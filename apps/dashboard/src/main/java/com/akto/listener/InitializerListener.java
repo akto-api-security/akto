@@ -621,7 +621,7 @@ public class InitializerListener implements ServletContextListener {
                                     response = slack.send(webhookUrl, payload);
                                     loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
-                                } catch (IOException e) {
+                                } catch (Exception e) {
                                     e.printStackTrace();
                                     loggerMaker.errorAndAddToDb("Error while sending slack alert: " + e.getMessage(), LogDb.DASHBOARD);
                                 }
