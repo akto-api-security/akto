@@ -15,7 +15,7 @@ const headers = [
     },
     {
         text: 'Type',
-        value: 'type',
+        value: 'subType',
         icon: GlobeMinor,
         itemOrder: 3
     },
@@ -98,6 +98,22 @@ let filters = [
             { label: "OPTIONS",value: "OPTIONS"},
             { label: "HEAD",value: "HEAD"},
         ]
+    },
+    {
+        key: 'subType',
+        label: 'Type',
+        title: 'Type',
+        choices: []
+    },
+    {
+        key:'location',
+        label:'Location',
+        title:'Location',
+        choices:[
+            {label:"Header", value:"header"},
+            {label:"Payload", value:"payload"},
+            {label:"URL param", value:"urlParam"}
+        ],
     }
 ]
 
@@ -111,6 +127,7 @@ function NewParametersTable(props) {
     }, [startTimestamp, endTimestamp])
 
     const allCollections = Store(state => state.allCollections);
+    const dataTypeNames = Store(state => state.dataTypeNames);
     const apiCollectionMap = allCollections.reduce(
         (map, e) => { map[e.id] = e.displayName; return map }, {}
     )
@@ -131,6 +148,13 @@ function NewParametersTable(props) {
             value: Number(key)
         })
     });
+
+    filters[2].choices = dataTypeNames.map((x) => {
+        return {
+            label:x,
+            value:x
+        }
+    })
 
     const [loading, setLoading] = useState(true);
 

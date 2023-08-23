@@ -227,10 +227,10 @@ const func = {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        console.log('Text copied to clipboard successfully!');
+        this.setToast('Text copied to clipboard successfully!');
       })
       .catch((err) => {
-        console.error('Failed to copy text to clipboard:', err);
+        this.setToast('Failed to copy text to clipboard:', err);
       });
   },
   epochToDateTime(timestamp) {
@@ -734,7 +734,8 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
               endpoint: apiInfo.id.url, 
               method: apiInfo.id.method,
               lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
-              color: func.actionItemColors()["This week"]
+              color: func.actionItemColors()["This week"],
+
           })
       }
   })

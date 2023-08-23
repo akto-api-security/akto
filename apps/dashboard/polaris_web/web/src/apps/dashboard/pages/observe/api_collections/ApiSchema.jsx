@@ -76,7 +76,7 @@ function ApiSingleSchema(props) {
                             </HorizontalStack>
                         </Button>
                     </ButtonGroup>
-                    <Scrollable shadow style={{ height: '25vh' }} focusable>
+                    <Scrollable style={{ height: '25vh' }} focusable>
                         <DataTable
                             headings={[]}
                             columnContentTypes={[
