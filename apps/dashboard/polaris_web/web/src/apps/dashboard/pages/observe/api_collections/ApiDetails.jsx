@@ -21,8 +21,10 @@ function ApiDetails(props) {
     const [selectedUrl,setSelectedUrl] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
+    const [loading, setLoading] = useState(false)
 
-    async function fetchData() {
+    const fetchData = async() => {
+        setLoading(true)
         const { apiCollectionId, endpoint, method } = apiDetail
         setSelectedUrl({url: endpoint, method: method})
         await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
@@ -33,7 +35,9 @@ function ApiDetails(props) {
                 setSamples("")
             }
         })
-
+        setTimeout(()=>{
+            setLoading(false)
+        },100)
         await api.loadParamsOfEndpoint(apiCollectionId, endpoint, method).then(resp => {
             api.loadSensitiveParameters(apiCollectionId, endpoint, method).then(allSensitiveFields => {
                 allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
@@ -56,7 +60,6 @@ function ApiDetails(props) {
                 setParamList(resp.data.params)
             })
         })
-
     }
 
     const runTests = async(testsList) => {
@@ -122,20 +125,24 @@ function ApiDetails(props) {
     ]
 
     const aktoGptButton = (
-        <div className={"gpt-button-fixed"}>
+        <div 
+            className={"gpt-button-fixed"}
+            key="akto-gpt"
+        >
             <Button onClick={displayGPT}>Ask AktoGPT</Button> 
         </div>
     )
 
     const currentComponents = isGptActive ? [...components, aktoGptButton] : components
 
-    return (
+    return ( 
         <div>
             <FlyLayout
                 title="API details"
                 show={showDetails}
                 setShow={setShowDetails}
                 components={currentComponents}
+                loading={loading}
             />
             <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>

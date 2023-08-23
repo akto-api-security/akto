@@ -25,6 +25,10 @@ let store = (set)=>({
     setAllCollections:(allCollections)=>{
         set({allCollections: allCollections})
     },
+    dataTypeNames: [],
+    setDataTypeNames: (dataTypeNames) => {
+        set({dataTypeNames:dataTypeNames})  
+    },
     isLocalDeploy: window.DASHBOARD_MODE === "LOCAL_DEPLOY",
 
     allRoutes: [],

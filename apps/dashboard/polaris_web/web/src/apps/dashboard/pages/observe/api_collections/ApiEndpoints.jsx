@@ -162,6 +162,7 @@ function ApiEndpoints() {
         data['Unauthenticated'] = allEndpoints.filter(x => x.open)
         data['Undocumented'] = allEndpoints.filter(x => x.shadow)
         data['Deprecated'] = func.getDeprecatedEndpoints(apiInfoListInCollection, unusedEndpointsInCollection)
+        // console.log(data)
         setEndpointData(data)
         setSelectedTab("All")
         setSelected(0)
