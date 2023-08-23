@@ -12,9 +12,9 @@ info:
     solicitation of sensitive info to influencing critical decision making
     processes under the guise of normal operation”
   category:
-    name: BOLA
-    shortName: BOLA
-    displayName: Broken Object Level Authorization (BOLA)
+    name: LLM
+    shortName: LLM
+    displayName: LLM (Large Language Model) Prompt Injection
   subCategory: PROMPT_LEAK_INJECTION
   severity: HIGH
   tags:
