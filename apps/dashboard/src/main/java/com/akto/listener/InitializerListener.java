@@ -64,6 +64,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContextListener;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -446,7 +447,8 @@ public class InitializerListener implements ServletContextListener {
                                 String payload = dailyUpdate.toJSON();
                                 loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                                 try {
-                                    if (!HostDNSLookup.isRequestValid(webhookUrl)) {
+                                    URI uri = URI.create(webhookUrl);
+                                    if (!HostDNSLookup.isRequestValid(uri.getHost())) {
                                         throw new IllegalArgumentException("SSRF attack attempt");
                                     }
                                     WebhookResponse response = slack.send(webhookUrl, payload);
@@ -462,6 +464,7 @@ public class InitializerListener implements ServletContextListener {
 
                                 } catch (IOException e) {
                                     e.printStackTrace();
+                                    loggerMaker.errorAndAddToDb("Error while sending slack alert: " + e.getMessage(), LogDb.DASHBOARD);
                                 }
                             }
                         }
