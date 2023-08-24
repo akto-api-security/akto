@@ -1,7 +1,8 @@
 import {
   CircleCancelMinor,
   CalendarMinor,
-  ClockMinor
+  ClockMinor,
+  CircleTickMinor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -157,11 +158,21 @@ const func = {
     })
   },
   getTestingRunIcon(state) {
-    switch (state) {
+    switch (state._name) {
       case "RUNNING": return ClockMinor;
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMinor;
+      case "COMPLETED": return CircleTickMinor;
       default: return ClockMinor;
+    }
+  },
+  getTestingRunIconColor(state) {
+    switch (state._name) {
+      case "RUNNING": return "subdued";
+      case "SCHEDULED": return "warning";
+      case "STOPPED": return "critical";
+      case "COMPLETED": return "success";
+      default: return "base";
     }
   },
   getSeverity(countIssues) {
@@ -227,10 +238,10 @@ const func = {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        console.log('Text copied to clipboard successfully!');
+        this.setToast('Text copied to clipboard successfully!');
       })
       .catch((err) => {
-        console.error('Failed to copy text to clipboard:', err);
+        this.setToast('Failed to copy text to clipboard:', err);
       });
   },
   epochToDateTime(timestamp) {
@@ -671,7 +682,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? ("Seen " + this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
+              last_seen: apiInfoMap[key] ? ("Last seen " + this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
@@ -726,15 +737,17 @@ actionItemColors() {
   };
 },
 recencyPeriod: 60 * 24 * 60 * 60,
-getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
+getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   let ret = []
   apiInfoList.forEach(apiInfo => {
       if (apiInfo.lastSeen < (func.timeNow() - func.recencyPeriod)) {
           ret.push({
+              id: apiInfo.id.method+ " " + apiInfo.id.url + Math.random(),
               endpoint: apiInfo.id.url, 
               method: apiInfo.id.method,
-              lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
-              color: func.actionItemColors()["This week"]
+              apiCollectionId: apiInfo.id.apiCollectionId ? apiInfo.id.apiCollectionId : apiCollectionId,
+              last_seen: func.prettifyEpoch(apiInfo.lastSeen),
+              parameterisedEndpoint: apiInfo.id.method + " " + this.parameterizeUrl(apiInfo.id.url)
           })
       }
   })
@@ -745,10 +758,12 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints) {
           let arr = x.split(" ");
           if (arr.length < 2) return;
           ret.push({
+          id: arr[1] + " " + arr[0] + Math.random(),
           endpoint : arr[0],
           method : arr[1],
-          color: func.actionItemColors()["This week"],
-          lastSeen: 'in API spec file'
+          apiCollectionId: apiCollectionId,
+          last_seen: 'in API spec file',
+          parameterisedEndpoint: arr[1] + " " + this.parameterizeUrl(arr[0])
           })
       })
   } catch (e) {
@@ -993,6 +1008,15 @@ convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
   } else {
       return value.map(val => convertObj ? convertObj[val] : val).join(", ");
   }   
+},
+getSizeOfFile(bytes) {
+  if (bytes >= 1024 * 1024) {
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  } else if (bytes >= 1024) {
+    return (bytes / 1024).toFixed(2) + ' KB';
+  } else {
+    return bytes + ' B';
+  }
 }
 }
 

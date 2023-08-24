@@ -5,7 +5,7 @@ import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
-    ClockMinor,
+    SearchMajor,
     CircleTickMinor
   } from '@shopify/polaris-icons';
 
@@ -27,7 +27,7 @@ const headers = [
     {
         text: "Discovered",
         value: "detected",
-        icon: ClockMinor,
+        icon: SearchMajor,
         itemOrder: 3
     }
 ]
@@ -49,7 +49,7 @@ function convertToCollectionData(c) {
     return {
         ...c,
         endpoints: c["urlsCount"] || 0,
-        detected: func.prettifyEpoch(c.startTs),
+        detected: "Last seen " + func.prettifyEpoch(c.startTs),
         icon: CircleTickMinor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
     }    

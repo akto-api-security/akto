@@ -20,8 +20,7 @@ import func from "@/util/func"
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus } = props;
-
+    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, selectedIndex, setSelectedIndex } = props;
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
@@ -42,6 +41,7 @@ function GithubRow(props) {
     }
 
     function handleRowClick(data){
+        setSelectedIndex(index)
         if(onRowClick){
             onRowClick(data);
         } else {
@@ -65,7 +65,7 @@ function GithubRow(props) {
         <IndexTable.Row
             id={data.id}
             key={data.id}
-            selected={selectedResources.includes(data.id)}
+            selected={selectedResources.includes(data.id) || selectedIndex === index}
             position={index}
         >
             <IndexTable.Cell>

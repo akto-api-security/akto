@@ -1,5 +1,5 @@
-import {TopBar, Icon, Text, Tooltip, Button, ActionList} from '@shopify/polaris';
-import {NotificationMajor, CircleChevronRightMinor,CircleChevronLeftMinor} from '@shopify/polaris-icons';
+import {TopBar, Icon, Text, ActionList} from '@shopify/polaris';
+import {NotificationMajor} from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';

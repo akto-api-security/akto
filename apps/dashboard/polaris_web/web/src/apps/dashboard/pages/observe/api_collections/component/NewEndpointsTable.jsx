@@ -26,6 +26,7 @@ const headers = [
         value: 'apiCollectionName',
         itemOrder: 3,
         icon: FraudProtectMinor,
+        showFilter: true
     },
     {
         text: 'Method',
@@ -83,7 +84,10 @@ const sortOptions = [
 
 function NewEndpointsTable(props){
 
-    const {loading, newEndpoints} =props;
+    const {loading, newEndpoints,handleRowClick} =props;
+    const handleRow = (data) => {
+        handleRowClick(data,headers)
+    }
 
     return (
         <GithubSimpleTable
@@ -94,6 +98,7 @@ function NewEndpointsTable(props){
         sortOptions={sortOptions}
         filters={[]}
         disambiguateLabel={disambiguateLabel}
+        onRowClick={(data) => handleRow(data)}
         headers={headers}
         loading={loading}
         getStatus={() => { return "warning" }}

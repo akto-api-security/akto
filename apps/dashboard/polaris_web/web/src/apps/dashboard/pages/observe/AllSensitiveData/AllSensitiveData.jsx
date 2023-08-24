@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button } from "@shopify/polaris"
+import { Text, Button, Modal } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -10,6 +10,8 @@ import {
   } from '@shopify/polaris-icons';
 
 import { useNavigate } from "react-router-dom"
+import dashboardFunc from "../../transform"
+import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 
 const headers = [
     {
@@ -60,6 +62,8 @@ function AllSensitiveData() {
 
     const [data, setData] = useState([])
     const [mapData, setMapData] = useState({})
+    const [prompts, setPrompts] = useState([])
+    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const navigate = useNavigate()
 
     const getActions = (item) => {
@@ -98,7 +102,7 @@ function AllSensitiveData() {
                         id:type.name,
                         nextUrl:type.name,
                         icon: CircleTickMinor,
-                        iconColor: "primary",
+                        iconColor: "success",
                         iconTooltip: "Active",
                         sensitiveCount:0
                     })
@@ -113,7 +117,7 @@ function AllSensitiveData() {
                         id:type.name,
                         nextUrl:type.name,
                         icon: type.active ? CircleTickMinor : CircleCancelMinor,
-                        iconColor: type.active ? "primary" : "critical",
+                        iconColor: type.active ? "success" : "critical",
                         iconTooltip: type.active ? "Active" : "Inactive",
                         sensitiveCount:0
                     })
@@ -143,6 +147,13 @@ function AllSensitiveData() {
         }
         fetchData();
     }, [])
+
+    function displayGPT(){
+        setIsGptScreenActive(true)
+        let requestObj = {key: "DATA_TYPES"}
+        const activePrompts = dashboardFunc.getPrompts(requestObj)
+        setPrompts(activePrompts)
+    }
     
     return (
         <PageWithMultipleCards
@@ -154,6 +165,7 @@ function AllSensitiveData() {
         </Text>
             }
             primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+            secondaryActions={<Button onClick={displayGPT}>Ask AktoGPT</Button>}
             isFirstPage={true}
             components={[
                 <GithubSimpleTable
@@ -167,7 +179,12 @@ function AllSensitiveData() {
                 hasRowActions={true}
                 getActions={getActions}
                 getStatus={func.getTestResultStatus}
-                />
+                />,
+                <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+                    <Modal.Section flush>
+                        <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)} />
+                    </Modal.Section>
+                </Modal>
             ]}
         />
 

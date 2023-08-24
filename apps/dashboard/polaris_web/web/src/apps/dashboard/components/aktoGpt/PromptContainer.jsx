@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Icon, Tooltip } from '@shopify/polaris'
+import { Box, HorizontalStack, Icon, Text, Tooltip } from '@shopify/polaris'
 
 function PromptContainer({itemObj, activePrompt, setActivePrompt}) {
 
@@ -15,14 +15,18 @@ function PromptContainer({itemObj, activePrompt, setActivePrompt}) {
     }
 
     return (
-        <div style={{padding: '4px'}} onClick={()=> setActivePrompt(itemObj)}>
+        <div style={{padding: '2px', cursor: "pointer"}} onClick={()=> setActivePrompt(itemObj)}>
             <Tooltip content={changeLabel(itemObj.label)} dismissOnMouseOut preferredPosition='below'>
-                <div className={"nav-prompt " +  (activePrompt===itemObj.label ? "active-prompt": "")}>
-                    <Box>
-                        <Icon source={itemObj.icon} color="highlight"/>
-                    </Box>
-                    <span className="prompt-label">{(itemObj.label).split("${input}")[0]}</span>
-                </div>
+                <Box background={activePrompt === itemObj.label ? "bg-active" : ""} padding="2" borderRadius="2">
+                    <HorizontalStack gap={"2"}>
+                        <Box>
+                            <Icon source={itemObj.icon} color="subdued"/>
+                        </Box>
+                        <Box maxWidth="10vw">
+                            <Text truncate variant="bodyMd" fontWeight="semibold" color="subdued">{(itemObj.label).split("${input}")[0]}</Text>
+                        </Box>
+                    </HorizontalStack>
+                </Box>
             </Tooltip>
         </div>
     )

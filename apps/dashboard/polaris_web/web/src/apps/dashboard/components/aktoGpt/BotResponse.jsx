@@ -43,7 +43,7 @@ function BotResponse({response, chatLogRef,onComplete,isTitle}) {
                     </List.Item>
 
                     :
-                    <Text>
+                    <Text variant="bodyMd" fontWeight="medium">
                         {botResponse}
                         {botResponse === response ? "" : "|"}
                     </Text>
