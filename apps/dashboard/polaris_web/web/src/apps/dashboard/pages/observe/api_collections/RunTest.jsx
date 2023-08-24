@@ -51,7 +51,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
             .map(category => category[0])
     }
 
-    const convertToLowerCaseWithUnderscores = (inputString) => inputString?.toLowerCase()?.replace(/\s+/g, '_')
+    const convertToLowerCaseWithUnderscores = (inputString) => {
+        if(!inputString)
+            return ""
+        return inputString?.toLowerCase()?.replace(/\s+/g, '_')
+    }
     const apiCollectionName = collectionsMap[apiCollectionId]
 
     async function fetchData() {

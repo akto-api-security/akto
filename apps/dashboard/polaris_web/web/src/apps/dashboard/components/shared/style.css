@@ -33,3 +33,7 @@
     text-overflow: ellipsis; 
     white-space: nowrap;
 }
+
+.modified .line-numbers{
+    display: none !important;
+}

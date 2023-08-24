@@ -27,6 +27,7 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import Store from "../../../store"
 import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
+import OpenApiSpec from "../OpenApiSpec"
 
 const headers = [
     {
@@ -161,7 +162,7 @@ function ApiEndpoints() {
         data['Sensitive'] = allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         data['Unauthenticated'] = allEndpoints.filter(x => x.open)
         data['Undocumented'] = allEndpoints.filter(x => x.shadow)
-        data['Deprecated'] = func.getDeprecatedEndpoints(apiInfoListInCollection, unusedEndpointsInCollection)
+        data['Deprecated'] = func.getDeprecatedEndpoints(apiInfoListInCollection, unusedEndpointsInCollection, apiCollectionId)
         // console.log(data)
         setEndpointData(data)
         setSelectedTab("All")
@@ -222,6 +223,16 @@ function ApiEndpoints() {
             hideQueryField: true
         },
     )
+
+    let openApiSecObj = {
+        content: "Documented",
+        index: tabs.length,
+        id: `Tests-${tabs.length}`,
+        component: <OpenApiSpec apiCollectionId={apiCollectionId} />,
+        hideQueryField: true,
+    }
+    
+    tabs.push(openApiSecObj)
 
     const onSelect = (selectedIndex) => {
         setLoading(true);
