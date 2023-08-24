@@ -54,6 +54,7 @@ import obj from "@/util/obj"
 import api from "@/apps/dashboard/views/observe/inventory/api";
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import SimpleMenu from "@/apps/dashboard/shared/components/SimpleMenu"
+import func from "@/util/func"
 
 export default {
   name: "SampleSingleSide",
@@ -85,56 +86,6 @@ export default {
     }
   },
   methods: {
-    copyToClipboard(text, snackBarMessage) {
-      // main reason to use domElement like this instead of document.body is that execCommand works only if current
-      // component is not above normal document. For example in testing page, we show SampleSingleSide.vue in a v-dialog
-      // NOTE: Do not use navigator.clipboard because it only works for HTTPS sites
-      let domElement = this.$el;
-      if (window.isSecureContext && navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-            show: true,
-            text: snackBarMessage,
-            color: 'green'
-          })
-        }).catch(err => {
-          console.warn("error in copying to clipboard")
-        });
-      } else if (window.clipboardData && window.clipboardData.setData) {
-        // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
-        window.clipboardData.setData("Text", text);
-        window._AKTO.$emit('SHOW_SNACKBAR', {
-          show: true,
-          text: snackBarMessage,
-          color: 'green'
-        })
-
-      } else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
-        var textarea = document.createElement("textarea");
-        textarea.textContent = text;
-        textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
-        domElement.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        textarea.setSelectionRange(0, 99999);
-        try {
-          document.execCommand("copy");  // Security exception may be thrown by some browsers.
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-            show: true,
-            text: snackBarMessage,
-            color: 'green'
-          })
-        }
-        catch (ex) {
-          // console.warn("Copy to clipboard failed.", ex);
-          // return prompt("Copy to clipboard: Ctrl+C, Enter", text);
-        }
-        finally {
-          domElement.removeChild(textarea);
-        }
-      }
-    },
-
     async copyRequest(type) {
       let copyString = "";
       let snackBarMessage = ""
@@ -173,7 +124,7 @@ export default {
       }
 
       if (copyString) {
-        this.copyToClipboard(copyString, snackBarMessage)
+        func.copyToClipboard(copyString, snackBarMessage, this.$el)
       }
     }
   },

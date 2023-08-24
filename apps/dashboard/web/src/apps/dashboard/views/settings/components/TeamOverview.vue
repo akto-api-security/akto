@@ -17,7 +17,7 @@
 
                 <div style="padding: 8px 24px 0px 24px">
                     <div v-for="(inviteCode, email)  in inviteCodes" :key="email">
-                        <div class="invitation-text">
+                        <div class="invitation-text" id="inviteCodeId">
                             <v-text-field :label="email" dense readonly outlined :value="inviteCode">
                                 <template v-slot:append>
                                     <v-icon @click="copyInviteCode(inviteCode)">$fas_copy</v-icon>
@@ -94,6 +94,7 @@ import OwnerName from "@/apps/dashboard/shared/components/OwnerName"
 import api from "../api"
 import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
 import BannerVertical from "../../../shared/components/BannerVertical.vue"
+import func from "@/util/func"
 
 export default {
     name: "TeamOverview",
@@ -137,53 +138,10 @@ export default {
         this.$store.dispatch('team/getTeamData')
     },
     methods: {
+
         async copyInviteCode(inviteCode) {
-
-            // main reason to use domElement like this instead of document.body is that execCommand works only if current
-            // component is not above normal document. For example in testing page, we show SampleSingleSide.vue in a v-dialog
-            // NOTE: Do not use navigator.clipboard because it only works for HTTPS sites
-            let domElement = this.$el;
-            if (window.isSecureContext && navigator.clipboard) {
-                navigator.clipboard.writeText(inviteCode).then(() => {
-                    window._AKTO.$emit('SHOW_SNACKBAR', {
-                        show: true,
-                        text: 'copied to clipboard',
-                        color: 'green'
-                    })
-                });
-            } else if (window.clipboardData && window.clipboardData.setData) {
-                // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
-                window.clipboardData.setData("Text", inviteCode);
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: 'copied to clipboard',
-                    color: 'green'
-                })
-            } else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
-                var textarea = document.createElement("textarea");
-                textarea.textContent = inviteCode;
-                textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
-                domElement.appendChild(textarea);
-                textarea.focus();
-                textarea.select();
-                textarea.setSelectionRange(0, 99999);
-                try {
-                    document.execCommand("copy");  // Security exception may be thrown by some browsers.
-                    window._AKTO.$emit('SHOW_SNACKBAR', {
-                        show: true,
-                        text: 'copied to clipboard',
-                        color: 'green'
-                    })
-
-                }
-                catch (ex) {
-                    // console.warn("Copy to clipboard failed.", ex);
-                    // return prompt("Copy to clipboard: Ctrl+C, Enter", text);
-                }
-                finally {
-                    domElement.removeChild(textarea);
-                }
-            }
+            let domElement = document.getElementById("inviteCodeId")
+            func.copyToClipboard(inviteCode, 'copied to clipboard', domElement)
         },
         inviteNewMember(email) {
             let spec = {
