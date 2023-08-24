@@ -48,6 +48,5 @@ function About() {
     </Page>
   )
 }
-Card
 
 export default About

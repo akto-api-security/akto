@@ -6,7 +6,8 @@ import {
   CircleCancelMinor,
   CalendarMinor,
   ReplayMinor,
-  FraudProtectMinor,
+  FileMinor,
+  PlayCircleMajor,
   PlayMinor,
   ClockMinor
 } from '@shopify/polaris-icons';
@@ -56,13 +57,13 @@ let headers = [
     text: "Number of tests",
     value: "number_of_tests_str",
     itemOrder: 3,
-    icon: FraudProtectMinor,
+    icon: FileMinor,
   },
   {
     text: 'Run type',
     value: 'run_type',
     itemOrder: 3,
-    icon: PlayMinor
+    icon: PlayCircleMajor
   },
   {
     text: 'Run time',
@@ -200,12 +201,7 @@ useEffect(()=>{
 
   return (
     <PageWithMultipleCards
-    title={
-      <Text as="div" variant="headingLg">
-           Test results
-         </Text>
-    }
-    primaryAction={<Button primary>New test run</Button>}
+    title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
     isFirstPage={true}
     components={[
       <GithubSimpleTable 

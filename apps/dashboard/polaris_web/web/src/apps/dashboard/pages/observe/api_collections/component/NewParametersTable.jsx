@@ -15,7 +15,7 @@ const headers = [
     },
     {
         text: 'Type',
-        value: 'type',
+        value: 'subType',
         icon: GlobeMinor,
         itemOrder: 3
     },
@@ -84,12 +84,42 @@ let filters = [
         label: 'Collection',
         title: 'Collection',
         choices: [],
+    },
+    {
+        key: 'method',
+        label: 'Method',
+        title: 'Method',
+        choices: [
+            { label: "GET",value: "GET"},
+            { label: "POST",value: "POST"},
+            { label: "PUT",value: "PUT"},
+            { label: "PATCH",value: "PATCH"},
+            { label: "DELETE",value: "DELETE"},
+            { label: "OPTIONS",value: "OPTIONS"},
+            { label: "HEAD",value: "HEAD"},
+        ]
+    },
+    {
+        key: 'subType',
+        label: 'Type',
+        title: 'Type',
+        choices: []
+    },
+    {
+        key:'location',
+        label:'Location',
+        title:'Location',
+        choices:[
+            {label:"Header", value:"header"},
+            {label:"Payload", value:"payload"},
+            {label:"URL param", value:"urlParam"}
+        ],
     }
 ]
 
 function NewParametersTable(props) {
 
-    const { startTimestamp, endTimestamp } = props;
+    const { startTimestamp, endTimestamp, handleRowClick } = props;
     const [key, setKey] = useState(false);
 
     useEffect(() => {
@@ -97,6 +127,7 @@ function NewParametersTable(props) {
     }, [startTimestamp, endTimestamp])
 
     const allCollections = Store(state => state.allCollections);
+    const dataTypeNames = Store(state => state.dataTypeNames);
     const apiCollectionMap = allCollections.reduce(
         (map, e) => { map[e.id] = e.displayName; return map }, {}
     )
@@ -118,6 +149,13 @@ function NewParametersTable(props) {
         })
     });
 
+    filters[2].choices = dataTypeNames.map((x) => {
+        return {
+            label:x,
+            value:x
+        }
+    })
+
     const [loading, setLoading] = useState(true);
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
@@ -132,6 +170,10 @@ function NewParametersTable(props) {
         return { value: ret, total: total };
     }
 
+    const handleRow = (data) => {
+        handleRowClick(data,headers)
+    }
+
     return (
         <GithubServerTable
             key={key}
@@ -141,6 +183,7 @@ function NewParametersTable(props) {
             sortOptions={sortOptions}
             disambiguateLabel={disambiguateLabel}
             loading={loading}
+            onRowClick={(data) => handleRow(data)}
             fetchData={fetchData}
             filters={filters}
             hideQueryField={true}

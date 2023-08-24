@@ -11,6 +11,8 @@ import NewEndpointsTable from "./component/NewEndpointsTable";
 import NewParametersTable from "./component/NewParametersTable";
 import {produce} from "immer"
 import values from "@/util/values";
+import ObserveStore from "../observeStore";
+import ApiDetails from "./ApiDetails";
 
 
 function ApiChanges() {
@@ -21,6 +23,11 @@ function ApiChanges() {
     const [newParametersCount, setNewParametersCount] = useState("")
     const [sensitiveParams, setSensitiveParams] = useState([])
     const [loading, setLoading] = useState(true);
+    const [apiDetail, setApiDetail] = useState({})
+    const [tableHeaders,setTableHeaders] = useState([])
+
+    const showDetails = ObserveStore(state => state.inventoryFlyout)
+    const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
     const getTimeEpoch = (key) => {
@@ -29,6 +36,23 @@ function ApiChanges() {
 
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
+    function handleRowClick(data,headers) {
+        const sameRow = func.deepComparison(apiDetail, data);
+        let flag = !sameRow || !showDetails
+        setShowDetails(flag)
+        setTableHeaders((prev) => {
+            if(func.deepComparison(headers,tableHeaders)){
+                return prev
+            }
+            return headers
+        })
+        setApiDetail((prev) => {
+            if (sameRow) {
+                return prev;
+            }
+            return { ...data }
+        })
+    }
 
     useEffect(() => {
         async function fetchData() {
@@ -58,19 +82,21 @@ function ApiChanges() {
     const infoItems = [
         {
             title: "New endpoints",
-            data: newEndpoints.length
+            data: transform.formatNumberWithCommas(newEndpoints.length),
         },
         {
             title: "New sensitive endpoints",
-            data: newEndpoints.filter(x => x.sensitive && x.sensitive.size > 0).length
+            data: transform.formatNumberWithCommas(newEndpoints.filter(x => x.sensitive && x.sensitive.size > 0).length),
+            color: "critical",
         },
         {
             title: "New parameters",
-            data: newParametersCount
+            data: transform.formatNumberWithCommas(newParametersCount)
         },
         {
             title: "New sensitive parameters",
-            data: sensitiveParams.filter(x => x.timestamp > startTimestamp && x.timestamp < endTimestamp && func.isSubTypeSensitive(x)).length
+            data: transform.formatNumberWithCommas(sensitiveParams.filter(x => x.timestamp > startTimestamp && x.timestamp < endTimestamp && func.isSubTypeSensitive(x)).length),
+            color: "critical",
         }
     ]
 
@@ -82,7 +108,7 @@ function ApiChanges() {
                         <Text color="subdued" variant="bodyLg">
                             {item.title}
                         </Text>
-                        <Text>
+                        <Text variant="bodyMd" fontWeight="semibold" color={item?.color}>
                             {item.data}
                         </Text>
                     </VerticalStack>
@@ -94,13 +120,13 @@ function ApiChanges() {
     const endpointsTable = {
         id: 'newEndpoints',
         content: "New endpoints",
-        component: <NewEndpointsTable loading={loading} newEndpoints={newEndpoints} />
+        component: <NewEndpointsTable loading={loading} newEndpoints={newEndpoints} handleRowClick={handleRowClick}/>
     }
 
     const parameterTable = {
         id: 'newParameters',
         content: "New parameters",
-        component: <NewParametersTable startTimestamp={startTimestamp} endTimestamp={endTimestamp}/>
+        component: <NewParametersTable startTimestamp={startTimestamp} endTimestamp={endTimestamp} handleRowClick={handleRowClick}/>
     }
 
     const tabs = (
@@ -113,7 +139,18 @@ function ApiChanges() {
         </Card>
     )
 
-    const components = [infoCard, tabs]
+    const apiChanges = (
+        <ApiDetails
+            key="details"
+            showDetails={showDetails}
+            setShowDetails={setShowDetails}
+            apiDetail={apiDetail}
+            headers={tableHeaders}
+            getStatus={() => { return "warning" }}
+        />
+    )
+
+    const components = [infoCard, tabs, apiChanges]
 
     return (
         <PageWithMultipleCards
