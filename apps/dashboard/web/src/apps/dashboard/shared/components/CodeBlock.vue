@@ -4,7 +4,7 @@
         <div class="codeblock">
             <div class="mt-2  pt-1"></div>
             <div class="" v-for="line in lines">
-                <pre>{{ line }}</pre>
+                <pre>{{line}}</pre>
             </div>
             <div class="mb-2  pt-1"></div>
         </div>
@@ -21,7 +21,7 @@ export default {
             type: Array,
             required: true,
         },
-        'onCopyBtnClickText': {
+        'onCopyBtnClickText':{
             type: String,
             required: false,
         }

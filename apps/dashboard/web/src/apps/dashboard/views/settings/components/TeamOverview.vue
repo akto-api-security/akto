@@ -7,18 +7,24 @@
         <v-dialog v-model="showInviteCodeDialog" width="500" persistent>
             <v-card>
                 <v-card-title class="">
-                    Copy invite link
+                Copy invite link
                 </v-card-title>
 
                 <v-card-text style="font-size: 14px;">
-                    Your invitation emails have been successfully sent. Alternatively, you can copy the links provided and
-                    share them directly with your invitees.
+                    Your invitation emails have been successfully sent. Alternatively, you can copy the links provided and share them directly with your invitees.
                 </v-card-text>
 
                 <div style="padding: 8px 24px 0px 24px">
                     <div v-for="(inviteCode, email)  in inviteCodes" :key="email">
-                        <div class="invitation-text" id="inviteCodeId">
-                            <v-text-field :label="email" dense readonly outlined :value="inviteCode">
+                        <div class="invitation-text">
+                            <v-text-field
+                                :label="email"
+                                dense
+                                 id="inviteCodeId"
+                                readonly
+                                outlined
+                                :value="inviteCode"
+                            >
                                 <template v-slot:append>
                                     <v-icon @click="copyInviteCode(inviteCode)">$fas_copy</v-icon>
                                 </template>
@@ -29,7 +35,11 @@
 
                 <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn color="primary" text @click="showInviteCodeDialog = false">
+                    <v-btn
+                        color="primary"
+                        text
+                        @click="showInviteCodeDialog = false"
+                    >
                         Done
                     </v-btn>
                 </v-card-actions>
@@ -39,46 +49,77 @@
 
         <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
             <div v-if="isAdmin && !(isLocalDeploy && !isSaas)" class="email-invite-container">
-                <v-combobox v-model="allEmails" :items="[]" multiple chips class="email-input-field"
-                    label="Invite your team members" :placeholder="`name@${domainName}`">
+                <v-combobox
+                    v-model="allEmails"
+                    :items="[]"
+                    multiple
+                    chips
+                    class="email-input-field"
+                    label="Invite your team members"
+                    :placeholder="`name@${domainName}`"
+                >
                     <template v-slot:selection="{ attrs, item, parent, selected }">
-                        <v-chip v-bind="attrs"
+                        <v-chip
+                            v-bind="attrs"
                             :class="['chips-base', usernameRules[0](item) ? 'email-valid' : 'email-invalid']"
-                            :input-value="selected" label small>
+                            :input-value="selected"
+                            label
+                            small
+                        >
                             <span>
                                 {{ item }}
                             </span>
-                            <v-icon @click="parent.selectItem(item)"
-                                :class="usernameRules[0](item) ? 'email-valid' : 'email-invalid'">
+                            <v-icon
+                                @click="parent.selectItem(item)"
+                                :class="usernameRules[0](item) ? 'email-valid' : 'email-invalid'"
+                            >
                                 $fas_times
                             </v-icon>
                         </v-chip>
                     </template>
                 </v-combobox>
-                <v-btn @click="sendInvitationEmails" :disabled="!allEmails || allEmails.length == 0" dark :style="{
-                    'color': !allEmails || allEmails.length == 0 ? 'var(--rgbaColor21) !important' : 'var(--white) !important',
-                    'background-color': !allEmails || allEmails.length == 0 ? 'var(--white) !important' : 'var(--themeColor) !important',
-                }" class="invite-btn">
+                <v-btn
+                    @click="sendInvitationEmails"
+                    :disabled="!allEmails || allEmails.length == 0"
+                    dark
+                    :style="{
+                        'color': !allEmails || allEmails.length == 0 ? 'var(--rgbaColor21) !important' : 'var(--white) !important',
+                        'background-color': !allEmails || allEmails.length == 0 ? 'var(--white) !important' : 'var(--themeColor) !important',
+                    }"
+                    class="invite-btn"
+                >
                     Invite
                 </v-btn>
 
             </div>
             <div class="team-overview-card">
                 <template v-for="user in users">
-                    <v-hover v-slot="{ hover }" :key="user.email" class="user-details d-flex justify-space-between pa-4">
+                    <v-hover
+                        v-slot="{ hover }"
+                        :key="user.email"
+                        class="user-details d-flex justify-space-between pa-4"
+                    >
                         <div style="position: relative">
 
-                            <owner-name :owner-name="user.name" :owner-id="user.id" :show-name="false"
-                                class="user-details-avatar" />
+                            <owner-name
+                                    :owner-name="user.name"
+                                    :owner-id="user.id"
+                                    :show-name="false"
+                                    class="user-details-avatar"
+                            />
                             <div class="user-container">
-                                <div class="user-details-name">{{ user.name }}</div>
-                                <div class="user-details-login">{{ user.login }}</div>
+                                <div class="user-details-name">{{user.name}}</div>
+                                <div class="user-details-login">{{user.login}}</div>
                             </div>
                             <div class="user-details-type">
-                                {{ user.role || '-' }}
+                                {{user.role || '-'}}
                             </div>
-                            <actions-tray v-if="hover && isAdmin" class="table-row-actions" :actions="actions || []"
-                                :subject=user />
+                            <actions-tray
+                                v-if="hover && isAdmin"
+                                class="table-row-actions"
+                                :actions="actions || []"
+                                :subject=user
+                            />
                         </div>
                     </v-hover>
                 </template>
@@ -88,135 +129,134 @@
 </template>
 
 <script>
-import ACard from "@/apps/dashboard/shared/components/ACard"
-import { mapState } from "vuex"
-import OwnerName from "@/apps/dashboard/shared/components/OwnerName"
-import api from "../api"
-import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
-import BannerVertical from "../../../shared/components/BannerVertical.vue"
-import func from "@/util/func"
+    import ACard from "@/apps/dashboard/shared/components/ACard"
+    import {mapState} from "vuex"
+    import OwnerName from "@/apps/dashboard/shared/components/OwnerName"
+    import api from "../api"
+    import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
+    import BannerVertical from "../../../shared/components/BannerVertical.vue"
+    import func from "@/util/func"
 
-export default {
-    name: "TeamOverview",
-    components: {
-        ACard,
-        OwnerName,
-        ActionsTray,
-        BannerVertical
-    },
-    data() {
-        let domainName = window.USER_NAME.substr(window.USER_NAME.indexOf("@") + 1)
-        return {
-            showTeamField: false,
-            allEmails: [],
-            domainName: domainName,
-            usernameRules: [
-                (v) => {
-                    const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-                    var ret = pattern.test(v) && v.indexOf("@") != -1 && v.split("@")[1] === domainName
-                    this.disableButtons = !ret
-                    return ret
-                }
-            ],
-            actions: [
-                {
-                    isValid: item => item.login != window.USER_NAME,
-                    icon: item => '$fas_trash',
-                    text: item => 'Remove user',
-                    func: item => this.removeUser(item),
-                    success: (resp, item) => this.removedSuccess(resp, item),
-                    failure: (err, item) => this.removedFailure(err, item)
-                }
-            ],
-            isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
-            isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
-            inviteCodes: {},
-            showInviteCodeDialog: false
-        }
-    },
-    mounted() {
-        this.$store.dispatch('team/getTeamData')
-    },
-    methods: {
-
-        async copyInviteCode(inviteCode) {
-            let domElement = document.getElementById("inviteCodeId")
-            func.copyToClipboard(inviteCode, 'copied to clipboard', domElement)
+    export default {
+        name: "TeamOverview",
+        components: {
+            ACard,
+            OwnerName,
+            ActionsTray,
+            BannerVertical
         },
-        inviteNewMember(email) {
-            let spec = {
-                inviteeName: "there",
-                inviteeEmail: email,
-                websiteHostName: window.location.origin
+        data () {
+            let domainName = window.USER_NAME.substr(window.USER_NAME.indexOf("@")+1)
+            return {
+                showTeamField: false,
+                allEmails:[],
+                domainName: domainName,
+                usernameRules: [
+                    (v) => {
+                        const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+                        var ret = pattern.test(v) && v.indexOf("@") != -1 && v.split("@")[1]===domainName
+                        this.disableButtons = !ret
+                        return ret
+                    }
+                ],
+                actions: [
+                    {
+                        isValid: item => item.login != window.USER_NAME,
+                        icon: item => '$fas_trash',
+                        text: item => 'Remove user',
+                        func: item => this.removeUser(item),
+                        success: (resp, item) => this.removedSuccess(resp, item),
+                        failure: (err, item) => this.removedFailure(err, item)
+                    }
+                ],
+                isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
+                isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
+                inviteCodes: {},
+                showInviteCodeDialog: false
             }
-            return api.inviteUsers(spec)
         },
-        async sendInvitationEmails() {
-            this.inviteCodes = {}
-            this.showInviteCodeDialog = false
-
-            let _inviteNewMember = this.inviteNewMember
-            let countEmails = 0
-            this.allEmails = this.allEmails ? this.allEmails : []
-            if (this.allEmails.length == 0) return
-            for (const email of this.allEmails) {
-                if (this.usernameRules[0](email)) {
-                    let resp = await _inviteNewMember(email)
-                    console.log(resp.finalInviteCode);
-                    this.inviteCodes[email] = resp.finalInviteCode
-                    this.inviteCodes = { ...this.inviteCodes }
-                    countEmails++;
+        mounted() {
+            this.$store.dispatch('team/getTeamData')
+        },
+        methods: {
+            async copyInviteCode(inviteCode) {
+                let domElement = document.getElementById("inviteCodeId")
+                func.copyToClipboard(inviteCode, 'copied to clipboard', domElement)
+            },
+            inviteNewMember(email) {
+                let spec = {
+                    inviteeName: "there",
+                    inviteeEmail: email,
+                    websiteHostName: window.location.origin
                 }
+                return api.inviteUsers(spec)
+            },
+            async sendInvitationEmails () {
+                this.inviteCodes = {}
+                this.showInviteCodeDialog = false
 
-                let plural = countEmails > 1 ? "s" : ""
+                let _inviteNewMember = this.inviteNewMember
+                let countEmails = 0
+                this.allEmails = this.allEmails ? this.allEmails : []
+                if (this.allEmails.length == 0) return
+                for (const email of this.allEmails) {
+                    if (this.usernameRules[0](email)) {
+                        let resp = await _inviteNewMember(email)
+                        console.log(resp.finalInviteCode);
+                        this.inviteCodes[email] = resp.finalInviteCode
+                        this.inviteCodes = {...this.inviteCodes}
+                        countEmails++;
+                    }
 
-                if (countEmails == 0) {
-                    window._AKTO.$emit('SHOW_SNACKBAR', {
-                        show: true,
-                        text: `Please enter a valid email!`,
-                        color: 'red'
-                    })
+                    let plural = countEmails > 1 ? "s" : ""
 
-                } else {
+                    if (countEmails == 0) {
+                        window._AKTO.$emit('SHOW_SNACKBAR', {
+                            show: true,
+                            text: `Please enter a valid email!`,
+                            color: 'red'
+                        })
 
-                    if (!this.isLocalDeploy) {
+                    } else {
+
+                    if(!this.isLocalDeploy){
                         window._AKTO.$emit('SHOW_SNACKBAR', {
                             show: true,
                             text: `${countEmails} invitation${plural} sent successfully!`,
                             color: 'green'
                         })
                     }
-                    this.$store.dispatch('team/getTeamData')
-                    this.showInviteCodeDialog = true
+                        this.$store.dispatch('team/getTeamData')
+                        this.showInviteCodeDialog = true
+                    }
+                    this.allEmails = []
                 }
-                this.allEmails = []
+            },
+            removeUser (user) {
+                return this.$store.dispatch('team/removeUser', user)
+            },
+            removedSuccess (resp, user) {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `${user.login} removed successfully!`,
+                    color: 'green'
+                })
+            },
+            removedFailure (err, user) {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `There was an error while removing the user!`,
+                    color: 'red'
+                })
+            },
+        },
+        computed: {
+            ...mapState('team', ['users']),
+            isAdmin() {
+                return true
             }
-        },
-        removeUser(user) {
-            return this.$store.dispatch('team/removeUser', user)
-        },
-        removedSuccess(resp, user) {
-            window._AKTO.$emit('SHOW_SNACKBAR', {
-                show: true,
-                text: `${user.login} removed successfully!`,
-                color: 'green'
-            })
-        },
-        removedFailure(err, user) {
-            window._AKTO.$emit('SHOW_SNACKBAR', {
-                show: true,
-                text: `There was an error while removing the user!`,
-                color: 'red'
-            })
-        },
-    },
-    computed: {
-        ...mapState('team', ['users']),
-        isAdmin() {
-            return true
         }
     }
-}
 </script>
 
 <style scoped lang="sass">

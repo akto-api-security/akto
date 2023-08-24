@@ -203,7 +203,6 @@ export default {
                 domElement.appendChild(textarea);
                 textarea.focus();
                 textarea.select();
-                console.log ("selection : " + window.getSelection().toString())
                 textarea.setSelectionRange(0, 99999);        
                 try {
                     document.execCommand("copy");  // Security exception may be thrown by some browsers.
