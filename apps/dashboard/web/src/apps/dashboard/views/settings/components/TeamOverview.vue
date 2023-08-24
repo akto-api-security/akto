@@ -16,11 +16,10 @@
 
                 <div style="padding: 8px 24px 0px 24px">
                     <div v-for="(inviteCode, email)  in inviteCodes" :key="email">
-                        <div class="invitation-text">
+                        <div class="invitation-text" id="inviteCodeId">
                             <v-text-field
                                 :label="email"
                                 dense
-                                 id="inviteCodeId"
                                 readonly
                                 outlined
                                 :value="inviteCode"
