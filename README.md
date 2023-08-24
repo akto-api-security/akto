@@ -1,3 +1,8 @@
+<a href="https://www.akto.io/blog/akto-takes-center-stage-at-black-hat-2023-in-las-vegas" _target="blank">
+  <img src="https://img.shields.io/badge/Black_Hat_Arsenal-USA_2023-blue?style=flat-square"/>
+</a>  
+
+<br/> 
 <a href="https://github.com/akto-api-security/akto/commits/master" _target="blank">
   <img src="https://img.shields.io/github/commit-activity/m/akto-api-security/akto?label=commits&logo=github"/>
 </a>  
@@ -18,8 +23,13 @@
   <img src="https://img.shields.io/github/issues/akto-api-security/akto/hackfest?logo=github"/>
 </a>
 
-<a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
+<!--a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
   <img src="https://img.shields.io/docker/pulls/aktosecurity/akto-api-security-dashboard?logo=docker"/>
+</a-->
+
+
+<a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
+  <img src="https://img.shields.io/badge/Docker_pulls-10K+-blue?logo=docker"/>
 </a>
 
 
