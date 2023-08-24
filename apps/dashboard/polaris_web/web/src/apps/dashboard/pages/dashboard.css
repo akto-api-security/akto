@@ -47,6 +47,8 @@
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
     --p-color-text-primary-hover: var(--akto-primary) !important;
+    
+    --p-color-icon-primary: var(--akto-primary) !important;
 }
 
 .Polaris-Page{

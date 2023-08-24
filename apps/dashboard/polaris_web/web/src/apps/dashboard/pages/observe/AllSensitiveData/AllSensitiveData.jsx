@@ -102,7 +102,7 @@ function AllSensitiveData() {
                         id:type.name,
                         nextUrl:type.name,
                         icon: CircleTickMinor,
-                        iconColor: "primary",
+                        iconColor: "success",
                         iconTooltip: "Active",
                         sensitiveCount:0
                     })
@@ -117,7 +117,7 @@ function AllSensitiveData() {
                         id:type.name,
                         nextUrl:type.name,
                         icon: type.active ? CircleTickMinor : CircleCancelMinor,
-                        iconColor: type.active ? "primary" : "critical",
+                        iconColor: type.active ? "success" : "critical",
                         iconTooltip: type.active ? "Active" : "Inactive",
                         sensitiveCount:0
                     })
