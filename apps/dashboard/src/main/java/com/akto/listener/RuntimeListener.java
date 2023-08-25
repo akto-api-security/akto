@@ -15,6 +15,7 @@ import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
