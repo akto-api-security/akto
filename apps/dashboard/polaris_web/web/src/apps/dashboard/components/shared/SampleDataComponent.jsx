@@ -81,7 +81,6 @@ function SampleDataComponent(props) {
             if (type === "CURL") { 
                 snackBarMessage = "Curl request copied to clipboard"
                 let resp = await inventoryApi.convertSampleDataToCurl(JSON.stringify(completeData))
-                console.log(resp)
                 copyString = resp.curlString
             } else {
             snackBarMessage = "Burp request copied to clipboard"
@@ -89,13 +88,11 @@ function SampleDataComponent(props) {
             copyString = resp.burpRequest
             }
         }
-        console.log(copyString)
         return {copyString, snackBarMessage};
     }
 
     async function copyRequest(reqType, type, completeData) {
         let { copyString, snackBarMessage } = await copyContent(type, completeData)
-        console.log(copyString)
         if (copyString) {
             navigator.clipboard.writeText(copyString)
             func.setToast(true, false, snackBarMessage)
