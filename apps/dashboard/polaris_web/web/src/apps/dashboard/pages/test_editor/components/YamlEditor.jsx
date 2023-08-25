@@ -112,11 +112,6 @@ const YamlEditor = ({ fetchAllTests }) => {
 
     const copyTestName = () =>{
         func.copyToClipboard(editorInstance.getValue())
-        setToastConfig({
-            isActive: true,
-            isError: false,
-            message: "Test copied to clipboard"
-        })
     }
 
     return (

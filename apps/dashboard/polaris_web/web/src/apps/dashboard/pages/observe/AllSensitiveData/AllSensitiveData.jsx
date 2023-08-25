@@ -28,6 +28,7 @@ const headers = [
     {
         text: "Custom type",
         value: "isCustomType",
+        showFilter:true,
         itemOrder: 2,
     },
     {

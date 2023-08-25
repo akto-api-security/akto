@@ -238,10 +238,10 @@ const func = {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        this.setToast('Text copied to clipboard successfully!');
+        this.setToast(true,false,'Text copied to clipboard successfully!');
       })
       .catch((err) => {
-        this.setToast('Failed to copy text to clipboard:', err);
+        this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
       });
   },
   epochToDateTime(timestamp) {
