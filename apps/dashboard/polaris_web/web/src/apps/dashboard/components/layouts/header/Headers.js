@@ -59,10 +59,11 @@ export default function Header() {
         window.location.reload()
     }
 
+    
     const accountsItems = Object.keys(accounts).map(accountId => {
         return {
             id: accountId,
-            content: accounts[accountId],
+            content: (<div style={{ color: accountId === activeAccount.toString() ? "var(--akto-primary)" :  "var(--p-text)"  }}>{accounts[accountId]}</div>),
             onAction: () => api.goToAccount(accountId)
         }
     })
