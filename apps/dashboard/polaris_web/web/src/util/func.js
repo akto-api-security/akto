@@ -158,7 +158,7 @@ const func = {
     })
   },
   getTestingRunIcon(state) {
-    switch (state._name) {
+    switch (state?._name || state) {
       case "RUNNING": return ClockMinor;
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMinor;
@@ -167,7 +167,7 @@ const func = {
     }
   },
   getTestingRunIconColor(state) {
-    switch (state._name) {
+    switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
       case "STOPPED": return "critical";
@@ -238,10 +238,10 @@ const func = {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        this.setToast('Text copied to clipboard successfully!');
+        this.setToast(true,false,'Text copied to clipboard successfully!');
       })
       .catch((err) => {
-        this.setToast('Failed to copy text to clipboard:', err);
+        this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
       });
   },
   epochToDateTime(timestamp) {
