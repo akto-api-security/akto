@@ -36,4 +36,24 @@ export default {
             data: aktoUIMode
         })
     },
+    goToAccount: function (newAccountId) {
+        return request({
+            url: '/api/goToAccount',
+            method: 'post',
+            data: {
+                newAccountId
+            }
+        }).then(resp => {
+            window.location.href = '/dashboard/observe/inventory'
+        })
+    },
+    saveToAccount: function (newAccountName) {
+        return request({
+            url: '/api/createNewAccount',
+            method: 'post',
+            data: {
+                newAccountName
+            }
+        })
+    }
 }

@@ -9,6 +9,8 @@ let store = (set)=>({
         set(state => ({ leftNavCollapsed: !state.leftNavCollapsed }))
     },
     username: window.USER_NAME,
+    accounts: window.ACCOUNTS,
+    activeAccount: window.ACTIVE_ACCOUNT, 
     toastConfig: {
         isActive: false,
         isError: false,

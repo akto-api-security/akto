@@ -1,5 +1,5 @@
-import {TopBar, Icon, Text, Tooltip, Button, ActionList} from '@shopify/polaris';
-import {NotificationMajor, CircleChevronRightMinor,CircleChevronLeftMinor} from '@shopify/polaris-icons';
+import { TopBar, Icon, Text, Tooltip, Button, ActionList, Modal, TextField } from '@shopify/polaris';
+import { NotificationMajor, CircleChevronRightMinor, CircleChevronLeftMinor, StatusActiveMajor } from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -13,7 +13,9 @@ export default function Header() {
     const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const [searchValue, setSearchValue] = useState('');
-    
+    const [newAccount, setNewAccount] = useState('')
+    const [showCreateAccount, setShowCreateAccount] = useState(false)
+
     const navigate = useNavigate()
 
     const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
@@ -21,10 +23,12 @@ export default function Header() {
     const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
+    const accounts = Store(state => state.accounts)
+    const activeAccount = Store(state => state.activeAccount)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = Store((state) => state.allCollections)
-    const searchItemsArr = func.getSearchItemsArr(allRoutes,allCollections)
+    const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
     const handleLeftNavCollapse = () => {
         if (!leftNavCollapsed) {
@@ -37,8 +41,8 @@ export default function Header() {
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
-      );
-    
+    );
+
     const toggleIsSecondaryMenuOpen = useCallback(
         () => setIsSecondaryMenuOpen((isSecondaryMenuOpen) => !isSecondaryMenuOpen),
         [],
@@ -47,7 +51,7 @@ export default function Header() {
     const handleLogOut = async () => {
         storeAccessToken(null)
         await api.logout()
-        navigate("/login")  
+        navigate("/login")
     }
 
     const handleSwitchUI = async () => {
@@ -55,23 +59,44 @@ export default function Header() {
         window.location.reload()
     }
 
+    const accountsItems = Object.keys(accounts).map(accountId => {
+        return {
+            id: accountId,
+            content: accounts[accountId],
+            onAction: () => api.goToAccount(accountId)
+        }
+    })
+
+    function createNewAccount() {
+        api.saveToAccount(newAccount).then(resp => {
+          setShowCreateAccount(false)
+          setNewAccount('')
+
+          window.location.href="/dashboard/onboarding"
+        })
+    }      
+
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
                 {
+                    items: accountsItems
+                },
+                {
                     items: [
-                        {id: "manage", content: 'Manage Account'}, 
-                        {id: "log-out", content: 'Log out', onAction: handleLogOut}
+                        { id: "create_account", content: 'Create account', onAction: () => setShowCreateAccount(true)},
+                        { id: "manage", content: 'Manage account' },
+                        { id: "log-out", content: 'Log out', onAction: handleLogOut }
                     ],
                 },
                 {
                     items: [
-                        {id: "switch-ui", content: 'Switch to legacy', onAction: handleSwitchUI}, 
-                        {content: 'Documentation', onAction: ()=>{window.open("https://docs.akto.io/readme")}},
-                        {content: 'Tutorials', onAction: ()=>{window.open("https://www.youtube.com/@aktodotio")}},
-                        {content: 'Changelog', onAction: ()=>{window.open("https://app.getbeamer.com/akto/en")}},
-                        {content: 'Discord Support', onAction: ()=>{window.open("https://discord.com/invite/Wpc6xVME4s")}},
-                        {content: 'Star On Github', onAction: ()=>{window.open("https://github.com/akto-api-security/akto")}}
+                        { id: "switch-ui", content: 'Switch to legacy', onAction: handleSwitchUI },
+                        { content: 'Documentation', onAction: () => { window.open("https://docs.akto.io/readme") } },
+                        { content: 'Tutorials', onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
+                        { content: 'Changelog', onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
+                        { content: 'Discord Support', onAction: () => { window.open("https://discord.com/invite/Wpc6xVME4s") } },
+                        { content: 'Star On Github', onAction: () => { window.open("https://github.com/akto-api-security/akto") } }
                     ],
                 },
             ]}
@@ -91,15 +116,15 @@ export default function Header() {
         setIsSearchActive(value.length > 0);
     }, []);
 
-    const handleNavigateSearch = (url) =>{
+    const handleNavigateSearch = (url) => {
         navigate(url)
         handleSearchResultsDismiss()
     }
 
-    const searchItems = searchItemsArr.map((item)=>{
-        return{
+    const searchItems = searchItemsArr.map((item) => {
+        return {
             content: item.content,
-            onAction: ()=> handleNavigateSearch(item.url),
+            onAction: () => handleNavigateSearch(item.url),
         }
     })
 
@@ -119,13 +144,13 @@ export default function Header() {
     );
 
     const secondaryMenuMarkup = (
-        <TopBar.Menu 
+        <TopBar.Menu
             activatorContent={
                 <span>
-                <Icon source={NotificationMajor}/>
-                <Text as="span" visuallyHidden>
-                    Secondary menu
-                </Text>
+                    <Icon source={NotificationMajor} />
+                    <Text as="span" visuallyHidden>
+                        Secondary menu
+                    </Text>
                 </span>
             }
             open={isSecondaryMenuOpen}
@@ -134,7 +159,7 @@ export default function Header() {
             actions={[
                 {
                     items: [{
-                        prefix: <div style={{marginLeft: '14px'}} id='beamer-btn'>Updates</div>
+                        prefix: <div style={{ marginLeft: '14px' }} id='beamer-btn'>Updates</div>
                     }],
                 },
             ]}
@@ -152,6 +177,31 @@ export default function Header() {
                 searchResults={searchResultsMarkup}
                 onSearchResultsDismiss={handleSearchResultsDismiss}
             />
+            <Modal
+                open={showCreateAccount}
+                onClose={() => setShowCreateAccount(false)}
+                title="Create new account"
+                primaryAction={{
+                    content: 'Create',
+                    onAction: createNewAccount,
+                }}
+            >
+                <Modal.Section>
+
+                    <TextField
+                        label="Name"
+                        helpText="Enter name for new account"
+                        value={newAccount}
+                        onChange={(input) => setNewAccount(input)}
+                        autoComplete="off"
+                        maxLength="24"
+                       
+                        autoFocus
+                    />
+
+
+                </Modal.Section>
+            </Modal>
         </div>
     );
 
