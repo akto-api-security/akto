@@ -158,7 +158,7 @@ const func = {
     })
   },
   getTestingRunIcon(state) {
-    switch (state._name) {
+    switch (state?._name || state) {
       case "RUNNING": return ClockMinor;
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMinor;
@@ -167,7 +167,7 @@ const func = {
     }
   },
   getTestingRunIconColor(state) {
-    switch (state._name) {
+    switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
       case "STOPPED": return "critical";
