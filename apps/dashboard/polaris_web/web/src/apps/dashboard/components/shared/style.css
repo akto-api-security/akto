@@ -37,3 +37,7 @@
 .modified .line-numbers{
     display: none !important;
 }
+
+.editor .margin-view-overlays{
+    border-right: 1px solid #d3ded3;
+}

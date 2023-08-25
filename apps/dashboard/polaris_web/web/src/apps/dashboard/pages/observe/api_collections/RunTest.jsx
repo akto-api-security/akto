@@ -22,7 +22,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         hourlyLabel: "Now",
         testRunTime: -1,
         testRunTimeLabel: "Till complete",
-        maxConcurrentRequests: "Default",
+        maxConcurrentRequests: -1,
         testName: "",
         authMechanismPresent: false
     }
@@ -496,9 +496,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                     <Text>Max concurrent requests:</Text>
                                     <Dropdown
                                         menuItems={maxConcurrentRequestsOptions}
-                                        initial={testRun.maxConcurrentRequests}
+                                        initial={"Default"}
                                         selected={(requests) => {
                                             let maxConcurrentRequests
+                                            console.log(requests);
                                             if (requests === "Default") maxConcurrentRequests = -1
                                             else maxConcurrentRequests = requests
 

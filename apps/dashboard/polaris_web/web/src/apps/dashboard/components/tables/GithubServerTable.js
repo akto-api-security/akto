@@ -18,6 +18,7 @@ import func from '@/util/func';
 import { produce } from "immer"
 import values from "@/util/values"
 import transform from '../../pages/observe/transform';
+import SpinnerCentered from '../progress/SpinnerCentered';
 
 function GithubServerTable(props) {
 
@@ -188,10 +189,9 @@ function GithubServerTable(props) {
     setPage((page) => (page - 1));
   }
 
-
-
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
+      {props.loading ?  <SpinnerCentered key="loading"/> :
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -262,6 +262,7 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
+      }
     </div>
   );
 
