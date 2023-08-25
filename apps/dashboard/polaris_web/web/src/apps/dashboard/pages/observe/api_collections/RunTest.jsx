@@ -1,13 +1,13 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, FormLayout, Label, Link, Badge, Banner } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid } from "@shopify/polaris";
 import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
-import homeFunctions from "../../home/module";
 import { useNavigate } from "react-router-dom"
+import Store from "../../../store";
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
@@ -22,8 +22,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         hourlyLabel: "Now",
         testRunTime: -1,
         testRunTimeLabel: "Till complete",
-        maxConcurrentRequests: -1,
-        maxConcurrentRequestsLabel: "Default ",
+        maxConcurrentRequests: "Default",
         testName: "",
         authMechanismPresent: false
     }
@@ -33,10 +32,31 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     const [testRun, setTestRun] = useState({
         ...initialState
     })
+    const collectionsMap = Store(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
     const [active, setActive] = useState(false);
 
     const runTestRef = useRef(null);
+
+    function nameSuffixes(tests) {
+        return Object.entries(tests)
+            .filter(category => {
+                let selectedCount = 0
+                category[1].forEach(test => {
+                    if (test.selected) selectedCount += 1
+                })
+
+                return selectedCount > 0
+            })
+            .map(category => category[0])
+    }
+
+    const convertToLowerCaseWithUnderscores = (inputString) => {
+        if(!inputString)
+            return ""
+        return inputString?.toLowerCase()?.replace(/\s+/g, '_')
+    }
+    const apiCollectionName = collectionsMap[apiCollectionId]
 
     async function fetchData() {
         setLoading(true)
@@ -62,11 +82,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
             })
         })
 
-        const apiCollections = await homeFunctions.getAllCollections()
-        const apiCollection = apiCollections.find(collection => collection.id === parseInt(apiCollectionId))
-        const apiCollectionName = apiCollection ? apiCollection.displayName : ""
-
-        const convertToLowerCaseWithUnderscores = (inputString) => inputString.toLowerCase().replace(/\s+/g, '_')
         const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(processMapCategoryToSubcategory).join("_")
 
         //Auth Mechanism
@@ -89,7 +104,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     useEffect(() => {
         fetchData()
-    }, [])
+    }, [apiCollectionName])
 
     const toggleRunTest = () => setActive(prev => !prev)
 
@@ -154,25 +169,44 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
         })
 
+        const handleTestsSelected = (test) => {
+            let localCopy = JSON.parse(JSON.stringify(testRun.tests))
+            localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
+                curTest.label === test.label ?
+                {
+                    ...curTest,
+                    selected: !curTest.selected
+                } : curTest
+            ) 
+            const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
+            setTestRun(prev => ({
+                ...prev,
+                tests: {
+                    ...prev.tests,
+                    [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
+                        curTest.label === test.label ?
+                            {
+                                ...curTest,
+                                selected: !curTest.selected
+                            } : curTest)
+                },
+                testName:testName
+            }))
+        }
+
         testRows = testRun.tests[testRun.selectedCategory].map(test => {
+            const isCustom = test.label.includes("Custom") || test.value.includes("CUSTOM")
+            const label = (
+                <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
+                    <Text variant="bodyMd">{test.label}</Text>
+                    {isCustom ? <Box paddingBlockStart={"05"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
+                </span>
+            )
             return ([(
                 <Checkbox
-                    label={test.label}
+                    label={label}
                     checked={test.selected}
-                    onChange={() => {
-                        setTestRun(prev => ({
-                            ...prev,
-                            tests: {
-                                ...prev.tests,
-                                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
-                                    curTest.label === test.label ?
-                                        {
-                                            ...curTest,
-                                            selected: !curTest.selected
-                                        } : curTest)
-                            }
-                        }))
-                    }}
+                    onChange={() => handleTestsSelected(test)}
                 />
             )])
         })
@@ -217,7 +251,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         return abc
     }, [])
 
-    const maxConcurrentRequestsOptions = [{ label: "Default", value: "Default" }, ...maxRequests]
+    const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests]
 
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
@@ -242,22 +276,22 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                 tests[category] = tests[category].map(test => ({ ...test, selected: false }))
             })
 
-            return { ...prev, tests: tests }
+            return { ...prev, tests: tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) }
         })
         func.setToast(true, false, "All tests unselected")
     }
 
-    function nameSuffixes(tests) {
-        return Object.entries(tests)
-            .filter(category => {
-                let selectedCount = 0
-                category[1].forEach(test => {
-                    if (test.selected) selectedCount += 1
-                })
-
-                return selectedCount > 0
+    function checkRemoveAll(){
+        const tests = {...testRun.tests}
+        let totalTests = 0
+        Object.keys(tests).forEach(category =>{
+            tests[category].map((test) => {
+                if(test.selected){
+                    totalTests++
+                }
             })
-            .map(cateogory => cateogory[0])
+        })
+        return totalTests === 0;
     }
 
     async function handleRun() {
@@ -347,11 +381,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll}>Remove All</Button>
+                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}>Remove All</Button>
                         </div>
 
                         <br />
-                        <div style={{ display: "grid", gridTemplateColumns: "50% 50%", paddingTop: "5px", border: "1px solid #C9CCCF" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
                             <div style={{ borderRight: "1px solid #C9CCCF" }}>
                                 <div style={{ padding: "15px", alignItems: "center" }}>
                                     <Text variant="headingMd">Test Categories</Text>
@@ -390,93 +424,95 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
                         <br />
 
-                        <ButtonGroup>
-                            <Text>Select time:</Text>
-                            <Dropdown
-                                menuItems={hourlyTimes}
-                                initial={testRun.hourlyLabel}
-                                selected={(hour) => {
-                                    let startTimestamp
+                        <HorizontalGrid columns="2">
+                            <Box>
+                                <ButtonGroup>
+                                    <Text>Select time:</Text>
+                                    <Dropdown
+                                        menuItems={hourlyTimes}
+                                        initial={testRun.hourlyLabel}
+                                        selected={(hour) => {
+                                            let startTimestamp
 
-                                    if (hour === "Now") startTimestamp = func.timeNow()
-                                    else {
-                                        const dayStart = +func.dayStart(+new Date());
-                                        startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60
+                                            if (hour === "Now") startTimestamp = func.timeNow()
+                                            else {
+                                                const dayStart = +func.dayStart(+new Date());
+                                                startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60
+                                            }
+
+                                            const hourlyTime = getLabel(hourlyTimes, hour)
+                                            setTestRun(prev => ({
+                                                ...prev,
+                                                startTimestamp,
+                                                hourlyLabel: hourlyTime ? hourlyTime.label : ""
+                                            }))
+                                        }} />
+                                </ButtonGroup>
+                                <br />
+
+                                <ButtonGroup>
+                                    <Checkbox
+                                        label="Run daily"
+                                        checked={testRun.recurringDaily}
+                                        onChange={() => setTestRun(prev => ({ ...prev, recurringDaily: !prev.recurringDaily }))}
+                                    />
+                                    <Checkbox
+                                        label="Use different target for testing"
+                                        checked={testRun.hasOverriddenTestAppUrl}
+                                        onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                    />
+                                    {testRun.hasOverriddenTestAppUrl &&
+                                        <TextField
+                                            placeholder="Override test app host"
+                                            value={testRun.overriddenTestAppUrl}
+                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
+                                        />
                                     }
+                                </ButtonGroup>
+                                </Box>
+                            <Box>
+                                <ButtonGroup>
+                                    <Text>Test run time:</Text>
+                                    <Dropdown
+                                        menuItems={testRunTimeOptions}
+                                        initial={testRun.testRunTimeLabel}
+                                        selected={(timeInSeconds) => {
+                                            let testRunTime
+                                            if (timeInSeconds === "Till complete") testRunTime = -1
+                                            else testRunTime = timeInSeconds
 
-                                    const hourlyTime = getLabel(hourlyTimes, hour)
-                                    setTestRun(prev => ({
-                                        ...prev,
-                                        startTimestamp,
-                                        hourlyLabel: hourlyTime ? hourlyTime.label : ""
-                                    }))
-                                }} />
-                        </ButtonGroup>
-                        <br />
+                                            const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
 
-                        <ButtonGroup>
-                            <Checkbox
-                                label="Run daily"
-                                checked={testRun.recurringDaily}
-                                onChange={() => setTestRun(prev => ({ ...prev, recurringDaily: !prev.recurringDaily }))}
-                            />
-                            <Checkbox
-                                label="Use different target for testing"
-                                checked={testRun.hasOverriddenTestAppUrl}
-                                onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
-                            />
-                            {testRun.hasOverriddenTestAppUrl &&
-                                <TextField
-                                    placeholder="Override test app host"
-                                    value={testRun.overriddenTestAppUrl}
-                                    onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
-                                />
-                            }
-                        </ButtonGroup>
+                                            setTestRun(prev => ({
+                                                ...prev,
+                                                testRunTime: testRunTime,
+                                                testRunTimeLabel: testRunTimeOption.label
+                                            }))
+                                        }} />
+                                </ButtonGroup>
 
-                        <br />
-                        <ButtonGroup>
-                            <Text>Test run time:</Text>
-                            <Dropdown
-                                menuItems={testRunTimeOptions}
-                                initial={testRun.testRunTimeLabel}
-                                selected={(timeInSeconds) => {
-                                    let testRunTime
-                                    if (timeInSeconds === "Till complete") testRunTime = -1
-                                    else testRunTime = timeInSeconds
+                                <br />
+                                <ButtonGroup>
+                                    <Text>Max concurrent requests:</Text>
+                                    <Dropdown
+                                        menuItems={maxConcurrentRequestsOptions}
+                                        initial={testRun.maxConcurrentRequests}
+                                        selected={(requests) => {
+                                            let maxConcurrentRequests
+                                            if (requests === "Default") maxConcurrentRequests = -1
+                                            else maxConcurrentRequests = requests
 
-                                    const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
+                                            const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
 
-                                    setTestRun(prev => ({
-                                        ...prev,
-                                        testRunTime: testRunTime,
-                                        testRunTimeLabel: testRunTimeOption.label
-                                    }))
-                                }} />
-                        </ButtonGroup>
-
-                        <br />
-                        <ButtonGroup>
-                            <Text>Max concurrent requests:</Text>
-                            <Dropdown
-                                menuItems={maxConcurrentRequestsOptions}
-                                initial={testRun.maxConcurrentRequests}
-                                selected={(requests) => {
-                                    let maxConcurrentRequests
-                                    if (requests === "Default") maxConcurrentRequests = -1
-                                    else maxConcurrentRequests = requests
-
-                                    const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
-
-                                    setTestRun(prev => ({
-                                        ...prev,
-                                        maxConcurrentRequests: maxConcurrentRequests,
-                                        maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
-                                    }))
-                                }} />
-                        </ButtonGroup>
-
-
+                                            setTestRun(prev => ({
+                                                ...prev,
+                                                maxConcurrentRequests: maxConcurrentRequests,
+                                                maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
+                                            }))
+                                        }} />
+                                </ButtonGroup>
+                            </Box>
+                        </HorizontalGrid>
                     </Modal.Section>
                 }
             </Modal>

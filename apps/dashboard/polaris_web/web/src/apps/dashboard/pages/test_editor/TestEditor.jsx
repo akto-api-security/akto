@@ -10,7 +10,7 @@ import SampleApi from "./components/SampleApi"
 import SpinnerCentered from "../../components/progress/SpinnerCentered"
 
 import TestEditorStore from "./testEditorStore"
-
+import PersistStore from "../../../main/PersistStore"
 import testEditorRequests from "./api"
 
 import convertFunc from "./transform"
@@ -22,12 +22,14 @@ const TestEditor = () => {
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
+    const setLeftNavSelected = PersistStore(state => state.setLeftNavSelected)
 
     const [loading, setLoading] = useState(true)
 
 
     const handleExit = () => {
         navigate("/dashboard/testing")
+        setLeftNavSelected("testing")
     }
 
     const fetchAllTests = async () => {

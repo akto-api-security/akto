@@ -85,7 +85,7 @@ const transform = {
             method: x.method,
             added: func.prettifyEpoch(x.timestamp),
             location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
-            type: x.subType.name,
+            subType: x.subType.name,
             detectedTs: x.timestamp,
             apiCollectionId: x.apiCollectionId,
             apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
@@ -93,7 +93,12 @@ const transform = {
             domain: func.prepareDomain(x),
             valuesString: func.prepareValuesTooltip(x)
         }
+    },
+    formatNumberWithCommas(number) {
+        const numberString = number.toString();
+        return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
+      
 }
 
 export default transform

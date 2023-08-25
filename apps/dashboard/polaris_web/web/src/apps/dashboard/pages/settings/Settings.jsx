@@ -3,11 +3,14 @@ import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
+import PersistStore from "../../../main/PersistStore";
 
 function SettingsHeader() {
     const navigate = useNavigate();
+    const setLeftNavSelected = PersistStore(state => state.setLeftNavSelected)
     const handleSettingsClose = () => {
         navigate('/dashboard/testing')
+        setLeftNavSelected("testing")
     }
 
     const buttonComp = (

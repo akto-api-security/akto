@@ -5,7 +5,8 @@ import {
     Icon,
     Box, 
     Text,
-    Tooltip} from '@shopify/polaris';
+    Tooltip,
+    Button} from '@shopify/polaris';
 
 import './cell.css'
    
@@ -27,7 +28,9 @@ function GithubCell(props){
                     <Box padding="05">
                         {data.iconTooltip ? 
                             <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
-                                <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
+                                <div className='big-icon'>
+                                    <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
+                                </div>
                             </Tooltip>
                             :<Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
                         }
@@ -108,5 +111,4 @@ function GithubCell(props){
 </HorizontalStack>
 )
 }
-
 export default GithubCell

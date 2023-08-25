@@ -1,17 +1,18 @@
 import {Icon, Navigation, Tooltip} from "@shopify/polaris"
 import {HomeMinor,OrdersMinor, CustomersMinor,AnalyticsMinor,DiscountsMinor,ProductsMinor,SettingsMinor} from "@shopify/polaris-icons"
-import {useState} from "react"
-import {useNavigate} from "react-router-dom"
+import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
 import Store from "../../../store"
+import PersistStore from "../../../../main/PersistStore"
+import { useEffect } from "react"
 
 export default function LeftNav(){
 
   const navigate = useNavigate();
   
-  const leftNavSelected = Store((state) => state.leftNavSelected)
-  const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
+  const leftNavSelected = PersistStore((state) => state.leftNavSelected)
+  const setLeftNavSelected = PersistStore((state) => state.setLeftNavSelected)
   const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
   const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
 

@@ -8,6 +8,7 @@ import {
 } from '@shopify/polaris';
 import SampleData from './SampleData';
 import func from "@/util/func";
+import inventoryApi from "../../pages/observe/api"
 
 function formatData(data){
     let allKeys = [];
@@ -54,8 +55,44 @@ function SampleDataComponent(props) {
         })
       }, [sampleData])
 
+    const copyContent = async(type,completeData) => {
+        let copyString = "";
+        let snackBarMessage = ""
+        completeData = JSON.parse(completeData);
+        if (type=="RESPONSE") {
+            let responsePayload = {}
+            let responseHeaders = {}
+            let statusCode = 0
+
+            if (completeData) {
+            responsePayload = completeData["response"] ?  completeData["response"]["body"] : completeData["responsePayload"]
+            responseHeaders = completeData["response"] ?  completeData["response"]["headers"] : completeData["responseHeaders"]
+            statusCode = completeData["response"] ?  completeData["response"]["statusCode"] : completeData["statusCode"]
+            }
+            let b = {
+            "responsePayload": responsePayload,
+            "responseHeaders": responseHeaders,
+            "statusCode": statusCode
+            }
+
+            copyString = JSON.stringify(b)
+            snackBarMessage = "Response data copied to clipboard"
+        } else {
+            if (type === "CURL") { 
+                snackBarMessage = "Curl request copied to clipboard"
+                let resp = await inventoryApi.convertSampleDataToCurl(JSON.stringify(completeData))
+                copyString = resp.curlString
+            } else {
+            snackBarMessage = "Burp request copied to clipboard"
+            let resp = await inventoryApi.convertSampleDataToBurpRequest(JSON.stringify(completeData))
+            copyString = resp.burpRequest
+            }
+        }
+        return {copyString, snackBarMessage};
+    }
+
     async function copyRequest(reqType, type, completeData) {
-        let { copyString, snackBarMessage } = await func.copyRequest(type, completeData)
+        let { copyString, snackBarMessage } = await copyContent(type, completeData)
         if (copyString) {
             navigator.clipboard.writeText(copyString)
             func.setToast(true, false, snackBarMessage)

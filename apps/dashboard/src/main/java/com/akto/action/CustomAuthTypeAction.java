@@ -122,18 +122,15 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String resetAllCustomAuthTypes() {
         try {
-            AccountTask.instance.executeTask(task -> {
-                CustomAuthUtil.resetAllCustomAuthTypes();
-                int accountId = Context.accountId.get();
-                SingleTypeInfo.fetchCustomAuthTypes(accountId);
-                executorService.schedule( new Runnable() {
-                    public void run() {
-                        Context.accountId.set(accountId);
-                        CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
-                    }
-                }, 5 , TimeUnit.SECONDS);
-
-            },"reset-all-custom-auth-types");
+            CustomAuthUtil.resetAllCustomAuthTypes();
+            int accountId = Context.accountId.get();
+            SingleTypeInfo.fetchCustomAuthTypes(accountId);
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
+                }
+            }, 5 , TimeUnit.SECONDS);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage(), LoggerMaker.LogDb.DASHBOARD);

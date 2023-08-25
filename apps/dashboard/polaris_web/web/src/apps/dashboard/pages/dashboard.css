@@ -30,6 +30,14 @@
 
 :root {
     --akto-primary: #6200EA;
+   --color-post: #49cc90 ;
+   --color-get: #61affe ;
+   --color-put: #fca130 ;
+   --color-delete: #f93e3e ;
+   --color-head: #9012fe ;
+   --color-patch: #50e3c2 ;
+   --color-disabled: #ebebeb ;
+   --color-options: #0d5aa7 ;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;
@@ -39,6 +47,10 @@
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
     --p-color-text-primary-hover: var(--akto-primary) !important;
-
+    
     --p-color-icon-primary: var(--akto-primary) !important;
+}
+
+.Polaris-Page{
+    padding: 0 32px !important;
 }
