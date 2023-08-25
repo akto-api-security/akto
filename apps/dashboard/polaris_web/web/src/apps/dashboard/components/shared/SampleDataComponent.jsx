@@ -10,7 +10,32 @@ import SampleData from './SampleData';
 import func from "@/util/func";
 import inventoryApi from "../../pages/observe/api"
 
-function formatData(data){
+function formatData(data,style){
+    let localFirstLine = data?.firstLine
+    let finalData = ""
+    let payLoad = null
+    if(style === "http" && data && Object.keys(data).length > 0){
+        if(data.json){
+            Object.keys(data?.json).forEach((element)=> {
+                if(element.includes("query")){
+                    if(data.json[element]){
+                        Object.keys(data?.json[element]).forEach((param) => {
+                            localFirstLine = localFirstLine + '?' + param + '=' + encodeURI(data.json[element][param])
+                        })
+                    }
+                }else if(element.includes("Header")){
+                    if(data.json[element]){
+                        Object.keys(data?.json[element]).forEach((key) => {
+                            finalData = finalData + key + ': ' + data.json[element][key] + "\n"
+                        })
+                    }
+                }else{
+                    payLoad = data.json[element]
+                }
+            })
+        }
+        return (localFirstLine + "\n\n" + finalData + "\npayload:" + JSON.stringify(payLoad,null,2))
+    }
     let allKeys = [];
       let seen = {};
       JSON.stringify(data.json, function (key, value) {
@@ -50,8 +75,8 @@ function SampleDataComponent(props) {
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
   
         setSampleJsonData({ 
-          request: { message: formatData(requestJson), original: formatData(originalRequestJson), highlightPaths:requestJson?.highlightPaths }, 
-          response: { message: formatData(responseJson), original: formatData(originalResponseJson), highlightPaths:responseJson?.highlightPaths },
+          request: { message: formatData(requestJson,"http"), original: formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
+          response: { message: formatData(responseJson,"http"), original: formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
         })
       }, [sampleData])
 
@@ -165,7 +190,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} />
+                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} editorLanguage="custom_http"/>
             </LegacyCard.Section>
         </Box>
     )
