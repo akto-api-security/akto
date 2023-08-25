@@ -3,12 +3,12 @@ import {
   Text,
   VerticalStack,
   HorizontalStack, Box, LegacyCard, HorizontalGrid,
-  Pagination, Key} from '@shopify/polaris';
+  Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable} = props;
 
     const [page, setPage] = useState(0);
 
@@ -19,9 +19,12 @@ function SampleDataList(props) {
     return (
       <VerticalStack gap="3">
         <HorizontalStack align='space-between'>
-        <Text variant='headingMd'>
-          {heading}
-        </Text>
+          <HorizontalStack gap="2">
+            <Text variant='headingMd'>
+              {heading}
+            </Text>
+            {isVulnerable ? <Box paddingBlockStart={"05"}><Badge status="critical">Vulnerable</Badge></Box> : null}
+          </HorizontalStack>
         <Pagination
                 label={
                   sampleData?.length==0 ? 'No test runs found' :

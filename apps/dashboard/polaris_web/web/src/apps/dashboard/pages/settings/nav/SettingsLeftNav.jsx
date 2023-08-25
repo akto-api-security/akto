@@ -8,7 +8,6 @@ import { RichTextMinor,
     CustomersMinor,
     DiamondAlertMinor,
     MarketingMinor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 
 const SettingsLeftNav = () => {

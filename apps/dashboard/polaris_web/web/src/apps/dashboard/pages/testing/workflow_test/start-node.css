@@ -74,59 +74,59 @@
 }
 
 .GET {
-    color: var(--hexColor14) !important;
+    color: var(--color-get) !important;
 }
 
 .POST {
-    color: var(--hexColor11) !important;
+    color: var(--color-post) !important;
 }
 
 .PUT {
-    color: var(--hexColor36) !important;
+    color: var(--color-put) !important;
 }
 
 .DELETE {
-    color: var(--hexColor37) !important;
+    color: var(--color-delete) !important;
 }
 
 .PATCH {
-    color: var(--hexColor13) !important;
+    color: var(--color-patch) !important;
 }
 
 .HEAD {
-    color: var(--hexColor18) !important;
+    color: var(--color-head) !important;
 }
 
 .OPTIONS {
-    color: #0d5aa7 !important;
+    color:var(--color-options) !important;
 }
 
 [method="GET"] {
-    color: var(--hexColor14) !important;
+    color: var(--color-get) !important;
 }
 
 [method="POST"] {
-    color: var(--hexColor11) !important;
+    color: var(--color-post) !important;
 }
 
 [method="PUT"] {
-    color: var(--hexColor36) !important;
+    color: var(--color-put) !important;
 }
 
 [method="DELETE"] {
-    color: var(--hexColor37) !important;
+    color: var(--color-delete) !important;
 }
 
 [method="PATCH"] {
-    color: var(--hexColor13) !important;
+    color: var(--color-patch) !important;
 }
 
 [method="HEAD"] {
-    color: var(--hexColor18) !important;
+    color: var(--color-head) !important;
 }
 
 [method="OPTIONS"] {
-    color: #0d5aa7 !important;
+    color:var(--color-options) !important;
 }
 
 .react-flow__attribution a {

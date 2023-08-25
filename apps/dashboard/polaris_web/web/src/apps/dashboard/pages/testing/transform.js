@@ -91,6 +91,7 @@ const transform = {
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(data.state)
       obj['icon'] = func.getTestingRunIcon(data.state);
+      obj['iconColor'] = func.getTestingRunIconColor(data.state)
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
@@ -102,7 +103,7 @@ const transform = {
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
-      obj['nextUrl'] = "/dashboard/testing/"+data.hexId
+      obj['nextUrl'] = data.endTimestamp == -1 ? "" : "/dashboard/testing/"+data.hexId
       return obj;
     },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries) => {
