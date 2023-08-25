@@ -195,6 +195,7 @@ function TestRunResultPage(props) {
       showDiff={true}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
+      isVulnerable
     />,
       issueDetails.id &&
       <MoreInformationComponent
