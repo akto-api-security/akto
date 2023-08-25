@@ -119,7 +119,8 @@ function SingleTestRunPage() {
   const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = TestingStore(state => state.subCategoryMap);
   const params= useParams()
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [tempLoading , setTempLoading] = useState(false)
   const [workflowTest, setWorkflowTest ] = useState(false);
   const hexId = params.hexId;
 
@@ -141,7 +142,7 @@ function SingleTestRunPage() {
 
 useEffect(()=>{
   async function fetchData(){
-    setLoading(true);
+    setTempLoading(true);
     if (Object.keys(subCategoryMap) != 0 && 
     Object.keys(subCategoryFromSourceConfigMap) != 0 && 
     selectedTestRun.testingRunResultSummaryHexId) {
@@ -150,7 +151,7 @@ useEffect(()=>{
           setTestRunResults(testRunResults)
         })
     }
-    setLoading(false);
+    setTempLoading(false);
   }
   fetchData();
 },[selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
@@ -166,6 +167,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
 ]};
 
   const ResultTable = (
+    loading || tempLoading ? <SpinnerCentered /> :
     <GithubSimpleTable
       key="table"
       data={testRunResults}
@@ -176,7 +178,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       headers={headers}
       selectable={true}
       promotedBulkActions={promotedBulkActions}
-      loading={loading}
+      loading={loading || tempLoading}
       getStatus={func.getTestResultStatus}
     />
   )
@@ -192,7 +194,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     />
   )
 
-  const components = [!workflowTest ? ResultTable : workflowTestBuilder];
+  const components = [loading || tempLoading ? <SpinnerCentered key = "loading" /> : !workflowTest ? ResultTable : workflowTestBuilder];
 
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {
@@ -242,9 +244,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
     backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
-      components={loading ?
-        [<SpinnerCentered key={"loading"}/>]
-        : components}
+      components={components}
     />
   );
 }

@@ -18,6 +18,7 @@ import "monaco-editor/esm/vs/language/json/json.worker"
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 import "./style.css";
 import func from "@/util/func"
+import editorSetup from './customEditor';
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -93,6 +94,12 @@ function SampleData(props) {
             lightbulb: { enabled: false },
         }
         let instance = "";
+        if(editorLanguage.includes("custom")){
+          options['theme']= "customTheme"
+          editorSetup.registerLanguage()
+          editorSetup.setTokenizer()
+          editorSetup.setEditorTheme()
+        }
         if(showDiff){
           instance = editor.createDiffEditor(ref.current, options)
         } else {
@@ -104,8 +111,8 @@ function SampleData(props) {
     
     function showData(data){
       if (showDiff) {
-        let ogModel = editor.createModel(data?.original, "json")
-        let model = editor.createModel(data?.message, "json")
+        let ogModel = editor.createModel(data?.original, editorLanguage)
+        let model = editor.createModel(data?.message, editorLanguage)
         instance.setModel({
           original: ogModel,
           modified: model
