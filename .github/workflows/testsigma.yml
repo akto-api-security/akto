@@ -13,5 +13,5 @@ jobs:
     steps:
       - name: Trigger Testsigma Test
         run: |
-          curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ vars.TESTSIGMA_API_KEY }}" \
+          curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
                 ${{vars.TS_DASHBOARD_URL}}/api/v1/test_plan_results -d "{\"testPlanId\": \"${{ github.event.inputs.testPlanId }}\"}"
