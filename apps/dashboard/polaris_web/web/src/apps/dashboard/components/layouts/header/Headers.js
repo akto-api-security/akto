@@ -64,7 +64,11 @@ export default function Header() {
         return {
             id: accountId,
             content: (<div style={{ color: accountId === activeAccount.toString() ? "var(--akto-primary)" :  "var(--p-text)"  }}>{accounts[accountId]}</div>),
-            onAction: () => api.goToAccount(accountId)
+            onAction: async () => {
+                await api.goToAccount(accountId)
+                func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
+                window.location.href = '/dashboard/observe/inventory'
+            }
         }
     })
 
@@ -190,6 +194,7 @@ export default function Header() {
                 <Modal.Section>
 
                     <TextField
+                        id="create-account-name"
                         label="Name"
                         helpText="Enter name for new account"
                         value={newAccount}
