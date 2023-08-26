@@ -252,6 +252,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId());
+                return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
                 code = "Please ask admin to invite you!";
