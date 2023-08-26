@@ -223,7 +223,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         jwt = verifier.verify(idToken);
 
-        String body = new String(java.util.Base64.getDecoder().decode(base64EncodedBody));
+        String body = new String(java.util.Base64.getUrlDecoder().decode(base64EncodedBody));
         JSONObject jsonBody = new JSONObject(body);
         System.out.print(jsonBody);
         String email = jsonBody.getString("email");
