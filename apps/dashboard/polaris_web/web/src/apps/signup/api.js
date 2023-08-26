@@ -43,8 +43,6 @@ export default {
             data: {
                 newAccountId
             }
-        }).then(resp => {
-            window.location.href = '/dashboard/observe/inventory'
         })
     },
     saveToAccount: function (newAccountName) {
