@@ -321,15 +321,51 @@ public class InitializerListener implements ServletContextListener {
             try {
                 if (fileUrl.startsWith("http")) {
                     String tempFileUrl = "temp_" + id;
+
+                    String oldTempFileUrl = "temp_2_" + id;
+
+                    File tempFile = new File(tempFileUrl);
+                    File oldTempFile = new File(oldTempFileUrl);
+
                     if(downloadFileCheck(tempFileUrl)){
+                        if (downloadFileCheck(oldTempFileUrl) && tempFile.exists()) {
+                            FileUtils.copyFile(tempFile, oldTempFile);
+                        }
                         FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
                     }
+
+                    boolean isNotModified = false;
+                    try (
+                        BufferedReader tempFileReader = new BufferedReader(new FileReader(tempFileUrl));
+                        BufferedReader oldTempFileReader = new BufferedReader(new FileReader(oldTempFileUrl))
+                    ) {
+                        isNotModified = IOUtils.contentEqualsIgnoreEOL(
+                            tempFileReader, 
+                            oldTempFileReader
+                        );
+                    } catch (Exception e) {
+                        isNotModified = false;
+                    }
+
+                    if(isNotModified){
+                        continue;
+                    }
+                    
                     fileUrl = tempFileUrl;
                 }
                 String fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
                 BasicDBObject fileObj = BasicDBObject.parse(fileContent);
                 BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
                 Bson findQ = Filters.eq("_id", id);
+
+                List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+                Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
+                for(CustomDataType customDataType : customDataTypes){
+                    customDataTypesMap.put(customDataType.getName(), customDataType);
+                }
+                
+                List<Bson> piiUpdates = new ArrayList<>();
+                ArrayList<WriteModel<CustomDataType>> bulkUpdatesForCDT = new ArrayList<>();
 
                 for (Object dtObj : dataTypes) {
                     BasicDBObject dt = (BasicDBObject) dtObj;
@@ -340,39 +376,102 @@ public class InitializerListener implements ServletContextListener {
                             dt.getString("regexPattern"),
                             dt.getBoolean("onKey")
                     );
-
+                    
+                    CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
+                    CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
+                    
                     if (!dt.getBoolean("active", true)) {
-                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
-                        CustomDataType existingCDT = CustomDataTypeDao.instance.findOne("name", piiKey);
+                        if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
+                            piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
+                        }
                         if (existingCDT == null) {
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
+                            bulkUpdatesForCDT.add(new InsertOneModel<>(newCDT));
                             continue;
-                        } else {
-                            CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                        } else if(existingCDT.isActive()){
+                            bulkUpdatesForCDT.add(new UpdateOneModel<>(
+                                    Filters.eq(CustomDataType.NAME, piiKey),
+                                    Updates.combine(
+                                            Updates.set(CustomDataType.ACTIVE, false),
+                                            Updates.set(CustomDataType.TIMESTAMP, Context.now())),
+                                    new UpdateOptions().upsert(false)));
                         }
                     }
 
                     if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
                         continue;
                     } else {
-                        CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
+
                         if (!dt.getBoolean("active", true)) {
-                            PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
-
+                            if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
+                                piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
+                            }
                         } else {
-                            Bson updateQ = Updates.set("mapNameToPIIType." + piiKey, piiType);
-                            PIISourceDao.instance.updateOne(findQ, updateQ);
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, true));
+                            if (currTypes.getOrDefault(piiKey, null) != piiType || piiSource.getLastSynced() == 0) {
+                                piiUpdates.add(Updates.set(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey, piiType));
+                            }
+                            newCDT.setActive(true);
                         }
-
+                        if (existingCDT == null) {
+                            bulkUpdatesForCDT.add(new InsertOneModel<>(newCDT));
+                        } else {
+                            List<Bson> updates = getCustomDataTypeUpdates(existingCDT, newCDT);
+                            if (!updates.isEmpty()) {
+                                bulkUpdatesForCDT.add(new UpdateOneModel<>(
+                                        Filters.eq(CustomDataType.NAME, piiKey),
+                                        Updates.combine(updates),
+                                        new UpdateOptions().upsert(false)));
+                            }
+                        }
                     }
+                }
+
+                if(!piiUpdates.isEmpty()){
+                    piiUpdates.add(Updates.set(PIISource.LAST_SYNCED, Context.now()));
+                    PIISourceDao.instance.updateOne(findQ, Updates.combine(piiUpdates));
+                }
+
+                if (!bulkUpdatesForCDT.isEmpty()) {
+                    CustomDataTypeDao.instance.getMCollection().bulkWrite(bulkUpdatesForCDT, 
+                        new BulkWriteOptions().ordered(true));
                 }
 
             } catch (IOException e) {
                 loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
             }
         }
+    }
+
+    private static List<Bson> getCustomDataTypeUpdates(CustomDataType existingCDT, CustomDataType newCDT){
+        
+        List<Bson> ret = new ArrayList<>();
+
+        if(existingCDT.isSensitiveAlways()!=newCDT.isSensitiveAlways()){
+            ret.add(Updates.set(CustomDataType.SENSITIVE_ALWAYS, newCDT.isSensitiveAlways()));
+        }
+        if(existingCDT.getSensitivePosition()!=newCDT.getSensitivePosition()){
+            ret.add(Updates.set(CustomDataType.SENSITIVE_POSITION, newCDT.getSensitivePosition()));
+        }
+        if(existingCDT.isActive()!=newCDT.isActive()){
+            ret.add(Updates.set(CustomDataType.ACTIVE, newCDT.isActive()));
+        }
+        if(existingCDT.getKeyConditions()!=newCDT.getKeyConditions()){
+            ret.add(Updates.set(CustomDataType.KEY_CONDITIONS, existingCDT.getKeyConditions()));
+        }
+        if(existingCDT.getValueConditions()!=newCDT.getValueConditions()){
+            ret.add(Updates.set(CustomDataType.VALUE_CONDITIONS, newCDT.getValueConditions()));
+        }
+        if(existingCDT.getOperator()!=newCDT.getOperator()){
+            ret.add(Updates.set(CustomDataType.OPERATOR, newCDT.getOperator()));
+        }
+        if(existingCDT.getIgnoreData()!=newCDT.getIgnoreData()){
+            ret.add(Updates.set(CustomDataType.IGNORE_DATA, newCDT.getIgnoreData()));
+        }
+
+        if (!ret.isEmpty()) {
+            ret.add(Updates.set(CustomDataType.TIMESTAMP, Context.now()));
+        }
+
+        return ret;
     }
 
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
@@ -382,7 +481,7 @@ public class InitializerListener implements ServletContextListener {
         Conditions conditions = new Conditions(predicates, Operator.OR);
         predicates.add(new RegexPredicate(piiType.getRegexPattern()));
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-        CustomDataType ret = new CustomDataType(
+        return new CustomDataType(
                 piiKey,
                 piiType.getIsSensitive(),
                 Collections.emptyList(),
@@ -393,8 +492,6 @@ public class InitializerListener implements ServletContextListener {
                 Operator.OR,
                 ignoreData
         );
-
-        return ret;
     }
 
     private void setUpDailyScheduler() {

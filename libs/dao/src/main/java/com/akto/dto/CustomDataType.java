@@ -17,6 +17,7 @@ public class CustomDataType {
     private boolean sensitiveAlways;
     public static final String SENSITIVE_POSITION = "sensitivePosition";
     private List<SingleTypeInfo.Position> sensitivePosition;
+    public static final String CREATOR_ID = "creatorId";
     private int creatorId;
     public static final String TIMESTAMP = "timestamp";
     private int timestamp;

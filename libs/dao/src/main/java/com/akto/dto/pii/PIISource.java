@@ -10,10 +10,12 @@ public class PIISource {
     
     private String fileUrl;
     private int lastSynced;
+    public static final String LAST_SYNCED = "lastSynced";
     private int addedByUser;
     private int startTs;
     private boolean active;
     private Map<String, PIIType> mapNameToPIIType;
+    public static final String MAP_NAME_TO_PII_TYPE = "mapNameToPIIType";
 
     public PIISource() {
     }
