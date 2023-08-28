@@ -108,7 +108,24 @@ export default{
             url: '/api/downloadBurpPluginJar',
             method: 'post',
             data: {},
-            responseType: 'blob'
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchBurpPluginDownloadLink() {
+        return request({
+            url: '/api/fetchBurpPluginDownloadLink',
+            method: 'post',
+            data: {},
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchBurpCredentials() {
+        return request({
+            url: '/api/fetchBurpCredentials',
+            method: 'post',
+            data: {},
         }).then((resp) => {
             return resp
         })

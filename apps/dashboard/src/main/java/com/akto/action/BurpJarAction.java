@@ -9,11 +9,17 @@ import com.akto.dto.ApiToken.Utility;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 import kotlin.text.Charsets;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 
@@ -36,11 +42,55 @@ import java.util.jar.JarOutputStream;
 public class BurpJarAction extends UserAction implements ServletResponseAware, ServletRequestAware {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(BurpJarAction.class);
+
+    private ApiToken apiToken;
+    private String host;
+
     @Override
     public String execute() {
-        String host = servletRequest.getHeader("Origin");
+        BurpPluginInfoDao.instance.updateLastDownloadedTimestamp(getSUser().getLogin());
+        return SUCCESS.toUpperCase();
+    }
 
-        ApiToken apiToken = ApiTokensDao.instance.findOne(
+    private String burpGithubLink = null;
+    public String fetchBurpPluginDownloadLink() {
+        String repoGithubLink = "https://api.github.com/repos/akto-api-security/akto/releases/latest";
+        String json;
+        CloseableHttpClient httpClient = null;
+        try {
+            httpClient = HttpClientBuilder.create().build();
+            HttpGet request = new HttpGet(repoGithubLink);
+            request.addHeader("Accept", "application/vnd.github+json");
+            HttpResponse result = httpClient.execute(request);
+            json = EntityUtils.toString(result.getEntity(), "UTF-8");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while getting burp jar download link: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        } finally {
+            if (httpClient != null) {
+                try {
+                    httpClient.close();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Failure while closing httpClient" + e.getMessage(), LogDb.DASHBOARD);
+                }
+            }
+        }
+
+        try {
+            BasicDBObject payload = BasicDBObject.parse(json);
+            burpGithubLink = payload.getString("zipball_url");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while parsing github response: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchBurpCredentials() {
+        host = servletRequest.getHeader("Origin");
+
+        apiToken = ApiTokensDao.instance.findOne(
                 Filters.and(
                         Filters.eq(ApiToken.USER_NAME, getSUser().getLogin()),
                         Filters.eq(ApiToken.UTILITY, ApiToken.Utility.BURP)
@@ -61,105 +111,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
             apiToken = apiTokenList.get(0);
         }
 
-        String token = apiToken.getKey();
-        String collectionName = "Burp";
-        int version = InitializerListener.burpPluginVersion;
-
-        File tmpJarFile;
-        try {
-            tmpJarFile = File.createTempFile("temp", "jar");
-        } catch (IOException e) {
-            addActionError("Failed creating temp file");
-            return ERROR.toUpperCase();
-        }
-
-        URL url = this.getClass().getResource("/Akto.jar");
-        if (url == null) {
-            addActionError("Akto plugin not found!");
-            return ERROR.toUpperCase();
-        }
-
-        JarFile jarFile;
-        try {
-            jarFile = new JarFile(url.getPath());
-        } catch (IOException e) {
-            addActionError("Failed creating JAR file");
-            return ERROR.toUpperCase();
-        }
-
-        File credFile;
-        try {
-            credFile = File.createTempFile("creds", "txt"); // todo: remove
-            FileUtils.writeStringToFile(credFile,host + "\n" + token + "\n" + collectionName + "\n" + version, Charsets.UTF_8);
-        } catch (Exception e) {
-            addActionError("Failed adding credentials");
-            return ERROR.toUpperCase();
-        }
-
-        try {
-            try (JarOutputStream tempJarOutputStream = new JarOutputStream(Files.newOutputStream(tmpJarFile.toPath()))) {
-                Enumeration<JarEntry> jarEntries = jarFile.entries();
-                Set<String> done = new HashSet<>();
-
-                // copy existing elements
-                while (jarEntries.hasMoreElements()) {
-                    JarEntry entry = jarEntries.nextElement();
-                    if (done.contains(entry.getName())) continue;
-                    done.add(entry.getName());
-
-                    InputStream entryInputStream = jarFile.getInputStream(entry);
-                    tempJarOutputStream.putNextEntry(entry);
-
-                    byte[] buffer = new byte[1024];
-                    int bytesRead = 0;
-                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
-                        tempJarOutputStream.write(buffer, 0, bytesRead);
-                    }
-                }
-
-                JarEntry entryNew = new JarEntry("credentials.txt");
-                InputStream entryInputStream = new FileInputStream(credFile);
-                tempJarOutputStream.putNextEntry(entryNew);
-
-                byte[] buffer = new byte[1024];
-                int bytesRead = 0;
-                while ((bytesRead = entryInputStream.read(buffer)) != -1) {
-                    tempJarOutputStream.write(buffer, 0, bytesRead);
-                }
-
-            } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(ex.toString(), LogDb.DASHBOARD);
-            }
-
-        } finally {
-            if (jarFile != null) {
-                try {
-                    jarFile.close();
-                } catch (Exception ignored) {
-
-                }
-            }
-        }
-
-        servletResponse.setContentType("application/octet-stream");
-        servletResponse.setHeader("Content-Disposition", "filename=\"Akto.jar\"");
-        loggerMaker.infoAndAddToDb("set header done", LogDb.DASHBOARD);
-        File srcFile = new File(tmpJarFile.getPath());
-        try {
-            FileUtils.copyFile(srcFile, servletResponse.getOutputStream());
-        } catch (IOException e) {
-            addActionError("Failed sending jar file");
-            return ERROR.toUpperCase();
-        }
-
-        loggerMaker.infoAndAddToDb("done", LogDb.DASHBOARD);
-
-        credFile.delete();
-        tmpJarFile.delete();
-
-        BurpPluginInfoDao.instance.updateLastDownloadedTimestamp(getSUser().getLogin());
-
-        return null;
+        return SUCCESS.toUpperCase();
     }
 
     private BurpPluginInfo burpPluginInfo;
@@ -216,5 +168,17 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
     public int getLatestVersion() {
         return latestVersion;
+    }
+
+    public ApiToken getApiToken() {
+        return apiToken;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public String getBurpGithubLink() {
+        return burpGithubLink;
     }
 }

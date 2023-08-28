@@ -1055,24 +1055,7 @@ public class InitializerListener implements ServletContextListener {
     public static int burpPluginVersion = -1;
 
     public void readAndSaveBurpPluginVersion() {
-        URL url = this.getClass().getResource("/Akto.jar");
-        if (url == null) return;
-
-        try (JarFile jarFile = new JarFile(url.getPath())) {
-            Enumeration<JarEntry> jarEntries = jarFile.entries();
-
-            while (jarEntries.hasMoreElements()) {
-                JarEntry entry = jarEntries.nextElement();
-                if (entry.getName().contains("AktoVersion.txt")) {
-                    InputStream inputStream = jarFile.getInputStream(entry);
-                    String result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
-                    burpPluginVersion = Integer.parseInt(result.trim());
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        // todo get latest version from github
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
