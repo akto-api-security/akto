@@ -130,7 +130,6 @@ function SingleTestRunPage() {
         await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
           if(testingRun.testIdConfig == 1){
             setWorkflowTest(workflowTest);
-            setLoading(false);
           }
           let localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
             setSelectedTestRun(localSelectedTestRun);
