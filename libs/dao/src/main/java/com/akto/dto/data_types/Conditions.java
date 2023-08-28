@@ -61,4 +61,14 @@ public class Conditions {
             ", operator='" + getOperator() + "'" +
             "}";
     }
+
+    public static boolean areEqual(Conditions a, Conditions b) {
+        boolean ret = false;
+
+        ret = ((a == null && b == null) ||
+                (a != null && b != null &&
+                        a.toString().equals(b.toString())));
+
+        return ret;
+    }
 }
