@@ -274,14 +274,14 @@ export default {
           label: "Settings",
           click: () => this.$router.push('/dashboard/settings')
         },
-        {
-          label: "Switch to new UI",
-          click: () => {
-            api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
-              window.location.reload()
-            })
-          }
-        },
+        // {
+        //   label: "Switch to new UI",
+        //   click: () => {
+        //     api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
+        //       window.location.reload()
+        //     })
+        //   }
+        // },
         {
           label: "Terms and Policies",
           click: () => window.open("https://www.akto.io/terms-and-policies", "_blank")
