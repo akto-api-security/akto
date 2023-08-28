@@ -25,7 +25,7 @@ on:
         options:
           - prod
           - staging
-        default: staging  
+        default: staging
       Deploy:
         description: 'Deploy to flash staging'
         required: false
@@ -38,7 +38,6 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -52,10 +51,31 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
+      - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
+        id: docker_tag
+        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && npm run build
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
+        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      - name: Prepare Dashboard polaris UI
+        working-directory: ./apps/dashboard/polaris_web
+        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      - name: Configure AWS Credentials
+        if: ${{ github.event.inputs.Environment == 'prod' }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
+
+      - name: Deploy static site to S3 bucket
+        if: ${{ github.event.inputs.Environment == 'prod' }}
+        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      - name: Deploy polaris site to S3 bucket
+        if: ${{ github.event.inputs.Environment == 'prod' }}
+        run: aws s3 sync ./apps/dashboard/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
         env:
@@ -63,16 +83,13 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
-      - name: Convert github branch name to be compatible with docker tag name convention
-        id: docker_tag
-        run: echo "TAG_SUFFIX=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
       - name: Build, tag, and push the image to DockerHub
         if: ${{ github.event.inputs.Environment == 'prod' }}
         id: build-image-dockerhub
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
           IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
         run: |

@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static com.akto.dto.AccountSettings.DASHBOARD_VERSION;
 import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
@@ -226,6 +227,11 @@ public class AccountAction extends UserAction {
         RBAC.Role role = isNew ? RBAC.Role.ADMIN : RBAC.Role.MEMBER;
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
+        try {
+            AccountSettingsDao.instance.updateVersion(DASHBOARD_VERSION);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while updating account version", LogDb.DASHBOARD);
+        }
         if (isNew) intializeCollectionsForTheAccount(newAccountId);
         return user;
     }
