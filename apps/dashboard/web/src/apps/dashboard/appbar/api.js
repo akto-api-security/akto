@@ -31,4 +31,11 @@ export default {
             return resp
         })
     },
+    updateAktoUIMode(aktoUIMode) {
+        return request({
+            url: 'api/updateAktoUIMode',
+            method: 'post',
+            data: aktoUIMode
+        })
+    },
 }

@@ -87,7 +87,7 @@ public class InitializerListener implements ServletContextListener {
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-
+    public static String aktoVersion;
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
@@ -923,7 +923,6 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         logger.info("MONGO URI " + mongoURI);
 
-
         executorService.schedule(new Runnable() {
             public void run() {
                 boolean calledOnce = false;
@@ -945,6 +944,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        updateGlobalAktoVersion();
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -965,6 +965,19 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
+    }
+
+    private void updateGlobalAktoVersion() throws Exception{
+        try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
+            if (in != null) {
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+                bufferedReader.readLine();
+                bufferedReader.readLine();
+                InitializerListener.aktoVersion = bufferedReader.readLine();
+            } else  {
+                throw new Exception("Input stream null");
+            }
+        }
     }
 
     public static void insertPiiSources(){
