@@ -1,4 +1,5 @@
-name: Staging
+name: Release only dashboard UI
+#name: Staging
 
 # Controls when the workflow will run
 on:
