@@ -1,19 +1,25 @@
 <template>
     <div class="testing-run-results-container" ref="detailsDialog">
         <div class="d-flex justify-space-between">
-            <div class="testing-run-header pt-2">
-                <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
-                <span>({{endpoints}})</span> | 
-                <span>{{getScheduleStr()}}</span> | 
-                <span>{{collectionName}}</span>
+            <div class="testing-run-header pt-2" style="display: flex; flex-direction: column;">
+                <v-tooltip bottom>
+                    <template v-slot:activator='{ on, attrs }'>
+                        <span v-bind="attrs" v-on="on" class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
+                    </template>
+                    <span>{{(testingRun && testingRun.name) || "Tests"}}x</span>
+                </v-tooltip>
+                <div>
+                    <span>({{endpoints}})</span> |
+                    <span>{{getScheduleStr()}}</span> |
+                    <span>{{collectionName}}</span>
+                </div>
             </div>
-
             <div  v-if="this.currentTest.state === 'COMPLETED'" class="mr-5">
                 <v-tooltip bottom>
                     <template v-slot:activator='{on, attrs}'>
-                        <v-btn 
-                            icon 
-                            color="var(--themeColorDark)" 
+                        <v-btn
+                            icon
+                            color="var(--themeColorDark)"
                             @click="rerunTest"
                             v-on="on"
                             v-bind="attrs"
@@ -61,7 +67,7 @@
                         <span>{{selectedDateStr()}}</span>
                     </div>
                     <div v-if="this.currentTest.state === 'COMPLETED'">
-                        <span>Time taken: </span>    
+                        <span>Time taken: </span>
                         <span>{{getTimeTakenByTest()}}</span>
                     </div>
                     <div style="display: flex; text-transform: capitalize;">
@@ -91,7 +97,7 @@
                 >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
-                            :sensitiveTags="item.severity ? [item.severity] : []" 
+                            :sensitiveTags="(item.severity || item.severity !== 0) ? getItemSeverity(item.severity) : []"
                             :chipColor="getColor(item.severity)"
                             :hideTag="true"
                             class="z-80"
@@ -218,11 +224,17 @@ export default {
     methods: {
         getColor(severity) {
             switch (severity) {
-                case "HIGH": return "var(--hexColor33)"
-                case "MEDIUM":  return "var(--hexColor34)"
-                case "LOW": return "var(--hexColor35)"
+                case 3: return "var(--hexColor33)"
+                case 2:  return "var(--hexColor34)"
+                case 1: return "var(--hexColor35)"
             }
-            
+        },
+        getItemSeverity(severity){
+            switch (severity) {
+                case 3: return ["HIGH"]
+                case 2:  return ["MEDIUM"]
+                case 1: return ["LOW"]
+            }
         },
         selectedDateStr() {
             return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
@@ -308,7 +320,7 @@ export default {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
-                severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : null,
+                severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : 0,
                 testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
                 testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
             }
@@ -445,6 +457,10 @@ export default {
     
 .testing-run-title
     font-weight: 500 
+    max-width: 650px
+    text-overflow: ellipsis
+    overflow : hidden
+    white-space: nowrap
 
 .testing-run-header       
     font-size: 14px

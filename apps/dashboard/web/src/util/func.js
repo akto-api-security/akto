@@ -817,10 +817,22 @@ export default {
     getRunResultSeverity(runResult, subCategoryMap) {
         let testSubType = subCategoryMap[runResult.testSubType]
         if (!testSubType) {
-            return "HIGH"
+            return 3
         } else {
             let a = testSubType.superCategory["severity"]["_name"]
-            return a
+            switch(a){
+                case "HIGH": 
+                    return 3
+
+                case "MEDIUM": 
+                    return 2
+
+                case "LOW": 
+                    return 1
+
+                default:
+                    return 3    
+            }
         }
     }
 }
