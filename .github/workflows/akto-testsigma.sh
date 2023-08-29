@@ -223,7 +223,7 @@ echo "************ Testsigma: Start executing automated tests ************"
 populateJsonPayload
  
 # store the whole response with the status at the end
-HTTP_RESPONSE=$(curl -H "Authorization:Bearer $TESTSIGMA_API_KEY" \
+HTTP_RESPONSE=$(curl --insecure -H "Authorization:Bearer $TESTSIGMA_API_KEY" \
   -H "Accept: application/json" \
   -H "content-type:application/json" \
   --silent --write-out "HTTPSTATUS:%{http_code}" \
