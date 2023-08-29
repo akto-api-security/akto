@@ -21,4 +21,6 @@ jobs:
       #run: |
       #  curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
       #        ${{vars.TS_DASHBOARD_URL}}/api/v1/test_plan_results -d "{\"testPlanId\": \"${{ github.event.inputs.testPlanId }}\"}"
-      run: bash ./.github/workflows/akto-testsigma.sh
+      run: |
+        bash ./.github/workflows/akto-testsigma.sh
+        echo "### Hello world! :rocket:" >> $GITHUB_STEP_SUMMARY
