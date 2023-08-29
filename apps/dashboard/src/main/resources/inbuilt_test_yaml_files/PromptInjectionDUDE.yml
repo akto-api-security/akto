@@ -1,7 +1,7 @@
 id: PROMPT_INJECTION_DUDE
 info:
   name: “Prompt Injection with DAN DUDE Test on LLMs”
-  description: >-
+  description: >
     “Testing LLM for a specific prompt input to guide the output to display a string and
     trigger a vulnerability”
   details: >
