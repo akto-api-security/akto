@@ -216,6 +216,19 @@ function setExitCode(){
   fi
   echo "exit Code:$EXITCODE"
 }
+
+function setTestSummary() {
+    RESULT=$(echo $RUN_BODY | getJsonValue result)
+    TOTAL_COUNT=$(echo $RUN_BODY | getJsonValue total_count)
+    PASSED_COUNT=$(echo $RUN_BODY | getJsonValue passed_count)
+    FAILED_COUNT=$(echo $RUN_BODY | getJsonValue failed_count)
+    echo $RESULT $TOTAL_COUNT $PASSED_COUNT $FAILED_COUNT
+    echo "### Testsigma summary" >> $GITHUB_STEP_SUMMARY
+    echo "[Results]($TS_DASHBOARD_URL/ui/td/runs/$RUN_ID)" >> $GITHUB_STEP_SUMMARY
+    echo "Passed: $PASSED_COUNT/$TOTAL_COUNT" >> $GITHUB_STEP_SUMMARY
+    echo "Failed: $FAILED_COUNT/$TOTAL_COUNT" >> $GITHUB_STEP_SUMMARY
+    echo "Status: $RESULT"  >> $GITHUB_STEP_SUMMARY
+}
 #******************************************************
  
 echo "************ Testsigma: Start executing automated tests ************"
@@ -258,6 +271,7 @@ else
   checkTestPlanRunStatus
   saveFinalResponseToJUnitFile
   saveFinalResponseToJSONFile
+  setTestSummary
   setExitCode
 fi
  
