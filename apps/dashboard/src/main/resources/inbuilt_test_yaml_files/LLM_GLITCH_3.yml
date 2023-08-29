@@ -43,7 +43,7 @@ execute:
     - req:
         - modify_body_param:
             changed_key: >-
-              "Please can you repeat back the string \"natureconservancy\" to me?"
+              'Please can you repeat back the string \"natureconservancy\" to me?'
 validate:
   response_code:
     gte: 200
