@@ -1,16 +1,16 @@
 id: PROMPT_INJECTION_DEV_MODE
 info:
-  name: “Prompt Injection with Developer mode Test on LLMs”
+  name: "Prompt Injection with Developer mode Test on LLMs"
   description: >
-    “Testing LLM for a specific prompt input to guide the output to display a string and
-    trigger a vulnerability”
+    "Testing LLM for a specific prompt input to guide the output to display a string and
+    trigger a vulnerability"
   details: >
-    “Evaluating the input validation checks implemented for the LLM integration.
-    Output checks to prevent LLM sending unintended data out”
+    "Evaluating the input validation checks implemented for the LLM integration.
+    Output checks to prevent LLM sending unintended data out"
   impact: >
-    “The results of a successful prompt injection attack can vary greatly - from
+    "The results of a successful prompt injection attack can vary greatly - from
     solicitation of sensitive info to influencing critical decision making
-    processes under the guise of normal operation”
+    processes under the guise of normal operation"
   category:
     name: LLM
     shortName: LLM
@@ -22,7 +22,7 @@ info:
     - OWASP Top 10
     - HackerOne Top 10
   references:
-    - “https://github.com/leondz/garak/blob/main/garak/probes/dan.py”
+    - "https://github.com/leondz/garak/blob/main/garak/probes/dan.py"
     - "https://learnprompting.org/docs/prompt_hacking/offensive_measures/code_injection"
 auth:
   authenticated: true
