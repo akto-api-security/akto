@@ -50,4 +50,4 @@ validate:
     lt: 300
   response_payload:
     not_contains_either:
-      - " petertodd"
+      - ' petertodd'
