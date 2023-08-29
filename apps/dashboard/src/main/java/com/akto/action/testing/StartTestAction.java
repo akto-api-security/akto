@@ -130,6 +130,12 @@ public class StartTestAction extends UserAction {
     private List<String> selectedTests;
 
     public String startTest() {
+
+        if(this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
+            addActionError("Cannot schedule a test run in the past.");
+            return ERROR.toUpperCase();
+        }
+
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
         handleCallFromAktoGpt();
 
