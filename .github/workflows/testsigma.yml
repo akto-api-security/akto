@@ -11,7 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+     - name: Checkout code
+        uses: actions/checkout@v2
+        
       - name: Trigger Testsigma Test
-        run: |
-          curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
-                ${{vars.TS_DASHBOARD_URL}}/api/v1/test_plan_results -d "{\"testPlanId\": \"${{ github.event.inputs.testPlanId }}\"}"
+        env:
+          TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+          TESTSIGMA_TEST_PLAN_ID: ${{ github.event.inputs.testPlanId }}
+          TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+        #run: |
+        #  curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
+        #        ${{vars.TS_DASHBOARD_URL}}/api/v1/test_plan_results -d "{\"testPlanId\": \"${{ github.event.inputs.testPlanId }}\"}"
+        run: bash ./.github/workflows/akto-testsigma.sh
