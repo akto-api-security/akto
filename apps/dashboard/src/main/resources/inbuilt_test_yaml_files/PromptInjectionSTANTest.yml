@@ -1,13 +1,13 @@
 id: PROMPT_INJECTION_STAN
 info:
   name: “Prompt Injection with STAN Test on LLMs”
-  description: >-
+  description: >
     “Testing LLM for a specific prompt input to guide the output to display a string and
     trigger a vulnerability”
   details: >
     “Evaluating the input validation checks implemented for the LLM integration.
     Output checks to prevent LLM sending unintended data out”
-  impact: >-
+  impact: >
     “The results of a successful prompt injection attack can vary greatly - from
     solicitation of sensitive info to influencing critical decision making
     processes under the guise of normal operation”
@@ -22,9 +22,8 @@ info:
     - OWASP Top 10
     - HackerOne Top 10
   references:
-    - >-
-      “https://github.com/leondz/garak/blob/main/garak/probes/dan.py”
-    - 'https://learnprompting.org/docs/prompt_hacking/offensive_measures/code_injection'
+    - “https://github.com/leondz/garak/blob/main/garak/probes/dan.py”
+    - "https://learnprompting.org/docs/prompt_hacking/offensive_measures/code_injection"
 auth:
   authenticated: true
 api_selection_filters:
