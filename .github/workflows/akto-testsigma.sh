@@ -87,7 +87,7 @@ get_status(){
   # Old method
   # RUN_RESPONSE=$(curl -u $TESTSIGMA_USER_NAME:$TESTSIGMA_PASSWORD --silent --write-out "HTTPSTATUS:%{http_code}" -X GET $TESTSIGMA_TEST_PLAN_RUN_URL/$HTTP_BODY/status)
  
-  RUN_RESPONSE=$(curl -H "Authorization:Bearer $TESTSIGMA_API_KEY"\
+  RUN_RESPONSE=$(curl --insecure -H "Authorization:Bearer $TESTSIGMA_API_KEY"\
     --silent --write-out "HTTPSTATUS:%{http_code}" \
     -X GET $TESTSIGMA_TEST_PLAN_REST_URL/$RUN_ID)
   
@@ -145,7 +145,7 @@ function saveFinalResponseToJUnitFile(){
   echo ""
   echo "Downloading the Junit report..."
  
-  curl --progress-bar -H "Authorization:Bearer $TESTSIGMA_API_KEY" \
+  curl --insecure --progress-bar -H "Authorization:Bearer $TESTSIGMA_API_KEY" \
     -H "Accept: application/xml" \
     -H "content-type:application/json" \
     -X GET $TESTSIGMA_JUNIT_REPORT_URL/$RUN_ID --output $JUNIT_REPORT_FILE_PATH
