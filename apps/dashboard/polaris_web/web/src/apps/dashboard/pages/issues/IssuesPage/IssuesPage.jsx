@@ -10,6 +10,7 @@ import func from "@/util/func";
 import {
     SearchMinor,
     FraudProtectMinor  } from '@shopify/polaris-icons';
+import PersistStore from "../../../../main/PersistStore";
 
 const headers = [
     {
@@ -137,10 +138,8 @@ function IssuesPage(){
 
     const [loading, setLoading] = useState(true);
     const allCollections = Store(state => state.allCollections);
-    const subCategoryMap = TestingStore(state => state.subCategoryMap);
-    const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
-    const setSubCategoryMap = TestingStore(state => state.setSubCategoryMap);
-    const setSubCategoryFromSourceConfigMap = TestingStore(state => state.setSubCategoryFromSourceConfigMap);
+    const subCategoryMap = PersistStore(state => state.subCategoryMap);
+    const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
     const [issueStatus, setIssueStatus] = useState([]);
     const [key, setKey] = useState(false);
     const apiCollectionMap = allCollections.reduce(
@@ -250,25 +249,6 @@ function IssuesPage(){
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
 
-        let c={subCategoryMap:subCategoryMap, subCategoryFromSourceConfigMap:subCategoryFromSourceConfigMap};
-        
-        if(Object.keys(subCategoryMap) == 0 || Object.keys(subCategoryFromSourceConfigMap) == 0 ){
-            let subCategoryMap = {}
-            let subCategoryFromSourceConfigMap = {}
-            await testingApi.fetchAllSubCategories().then((resp) => {
-                resp.subCategories.forEach((x) => {
-                    subCategoryMap[x.name] = x
-                })
-                resp.testSourceConfigs.forEach((x) => {
-                    subCategoryFromSourceConfigMap[x.id] = x
-                })
-            })
-            await setSubCategoryMap(subCategoryMap)
-            await setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
-            c.subCategoryMap=subCategoryMap;
-            c.subCategoryFromSourceConfigMap=subCategoryFromSourceConfigMap
-        }
-
         let total =0;
         let ret = []
         let filterCollectionsId = filters.apiCollectionId;
@@ -283,7 +263,7 @@ function IssuesPage(){
 
         await api.fetchIssues(skip, limit,filterStatus,filterCollectionsId,filterSeverity,filterSubCategory,startTimestamp).then((res) => {
             total = res.totalIssuesCount;
-            ret = transform.prepareIssues(res, c.subCategoryMap, c.subCategoryFromSourceConfigMap, apiCollectionMap);
+            ret = transform.prepareIssues(res, subCategoryMap, subCategoryFromSourceConfigMap, apiCollectionMap);
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
