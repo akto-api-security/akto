@@ -67,7 +67,7 @@ function GithubSimpleTable(props) {
     
 
     return <GithubServerTable
-        key={props.data} // passing any value as a "key" re-renders the component when the value is changed.
+        key={JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
         pageLimit={props.pageLimit}
         fetchData={fetchDataSync}
         sortOptions={props.sortOptions} 

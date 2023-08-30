@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Frame, Toast } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
+import transform from "./testing/transform";
 
 function Dashboard() {
 
@@ -25,6 +26,7 @@ function Dashboard() {
 
     useEffect(() => {
         fetchAllCollections()
+        transform.setTestMetadata();
     }, [])
 
     const toastConfig = Store(state => state.toastConfig)
