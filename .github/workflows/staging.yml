@@ -82,7 +82,7 @@ jobs:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       - name: Build, tag, and push the image to DockerHub
         if: ${{ github.event.inputs.Environment == 'prod' }}
         id: build-image-dockerhub
@@ -100,7 +100,7 @@ jobs:
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
       - name: Update flash staging
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
         run: |
