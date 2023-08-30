@@ -22,6 +22,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import SampleDataList from '../../../components/shared/SampleDataList';
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+import PersistStore from '../../../../main/PersistStore';
 
 const headerDetails = [
   {
@@ -124,9 +125,9 @@ function TestRunResultPage(props) {
 
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
-  const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
+  const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
-  const subCategoryMap = TestingStore(state => state.subCategoryMap);
+  const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
@@ -195,7 +196,7 @@ function TestRunResultPage(props) {
       showDiff={true}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
-      isVulnerable
+      isVulnerable={selectedTestRunResult.vulnerable}
     />,
       issueDetails.id &&
       <MoreInformationComponent
