@@ -58,7 +58,7 @@ jobs:
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/polaris_web
+        working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Configure AWS Credentials
         if: ${{ github.event.inputs.Environment == 'prod' }}

@@ -45,7 +45,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     public String execute() {
 
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
-        servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
+        if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
+            servletRequest.setAttribute("AktoVersionGlobal", "akto-release-version");
+        }
         System.out.println("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
         if(DashboardMode.isSaasDeployment()){
             //Use Auth0
