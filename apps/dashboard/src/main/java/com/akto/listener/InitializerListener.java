@@ -920,6 +920,12 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         logger.info("MONGO URI " + mongoURI);
 
+        try {
+            readAndSaveBurpPluginVersion();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
 
         executorService.schedule(new Runnable() {
             public void run() {
@@ -1044,11 +1050,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
-        try {
-            readAndSaveBurpPluginVersion();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
 
@@ -1056,6 +1057,7 @@ public class InitializerListener implements ServletContextListener {
 
     public void readAndSaveBurpPluginVersion() {
         // todo get latest version from github
+        burpPluginVersion = 5;
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {

@@ -131,8 +131,8 @@ export default {
 
 <style lang="sass" scoped>
 
-.di-flex-bottom 
-    display: flex
+.di-flex-bottom
+  display: flex
     gap: 8px
     padding-top: 20px
     padding-bottom: 11px
