@@ -113,7 +113,14 @@
 
                     // since release_version is not available till a user login, 
                     // the user will always see the old login screen
-                    if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
+                    script.type = "text/javascript"
+                    if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
+                        if (window.AKTO_UI_MODE == 'VERSION_2') {
+                            script.src = "/polaris_web/web/dist/main.js";
+                        } else {
+                            script.src = "/dist/main.js";
+                        }
+                    } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
                         script.src = "https://d3as5gx79fwfqr.cloudfront.net/web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
                     } else {
                         if (window.AKTO_UI_MODE == 'VERSION_2') {
