@@ -30,8 +30,22 @@ jobs:
           node-version: '17'
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && npm run build
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s")
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+      - name: Prepare Dashboard polaris UI
+        working-directory: ./apps/dashboard/web/polaris_web
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
+
+      - name: Deploy static site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/web/${{github.event.inputs.release_version}}/dist --delete
+      - name: Deploy polaris site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{github.event.inputs.release_version}}/dist --delete
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}

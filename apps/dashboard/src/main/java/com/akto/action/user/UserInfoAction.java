@@ -3,6 +3,7 @@ package com.akto.action.user;
 import com.akto.action.UserAction;
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -12,6 +13,7 @@ import com.opensymphony.xwork2.Action;
 public class UserInfoAction extends UserAction {
 
     private String aktoUIMode;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UserInfoAction.class);
 
     @Override
     public String execute() throws Exception {
@@ -35,6 +37,7 @@ public class UserInfoAction extends UserAction {
             UsersDao.instance.updateOne(Filters.eq("_id", user.getId()),
                     Updates.set(User.AKTO_UI_MODE, mode.name()));
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e.toString(), LoggerMaker.LogDb.DASHBOARD);
         }
         return Action.SUCCESS.toUpperCase();
     }
