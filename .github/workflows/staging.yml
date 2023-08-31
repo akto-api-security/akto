@@ -113,6 +113,7 @@ jobs:
         shell: bash
 
       - name: Run testsigma end to end tests
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
         env:
           TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
           #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
@@ -121,6 +122,7 @@ jobs:
         run: bash ./.github/workflows/akto-testsigma.sh
 
       # - name: Run Akto CI/CD tests
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
       #   uses: akto-api-security/run-scan@v1.0.3
       #   with:
       #     AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
@@ -128,6 +130,7 @@ jobs:
       #     AKTO_TEST_ID: ${{vars.AKTO_TEST_ID}}
 
       # - name: Check for Akto test completion
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
       #   env:
       #     AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
       #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
