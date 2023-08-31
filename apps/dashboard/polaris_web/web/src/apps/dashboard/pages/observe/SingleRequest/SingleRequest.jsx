@@ -40,17 +40,13 @@ function SingleRequest(){
     function togglePopoverActive() {
         setPopoverActive(!popoverActive);
     }
-
-    const allCollections = Store(state => state.allCollections);
-    const apiCollectionMap = allCollections.reduce(
-        (map, e) => {map[e.id] = e.displayName; return map}, {}
-    )
+    const collectionsMap = Store(state => state.collectionsMap)
     const [endpointData, setEndpointData]=useState({})
 
     useEffect(() => {
         async function fetchData(){
             await api.loadSensitiveParameters(apiCollectionId, url, method, subType).then((res) => {
-                setEndpointData(transform.prepareEndpointData(apiCollectionMap, res));
+                setEndpointData(transform.prepareEndpointData(collectionsMap, res));
             })
             await api.fetchSensitiveSampleData(url, apiCollectionId, method).then((res) => {
                 setSampleData(transform.prepareSampleData(res, subType))
