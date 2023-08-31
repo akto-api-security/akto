@@ -38,8 +38,8 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
                 BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
                 String imageTag = bufferedReader.readLine();
                 String buildTime = bufferedReader.readLine();
-
-                String version = imageTag + " - " + buildTime;
+                String aktoVersion = bufferedReader.readLine();
+                String version = imageTag + " - " + buildTime + " - " + aktoVersion;
                 AccountSettingsDao.instance.updateOne(
                         AccountSettingsDao.generateFilter(),
                         Updates.set(fieldName, version)
