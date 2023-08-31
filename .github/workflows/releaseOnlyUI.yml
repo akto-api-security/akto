@@ -32,7 +32,7 @@ jobs:
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/polaris_web
+        working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -44,4 +44,4 @@ jobs:
       - name: Deploy static site to S3 bucket
         run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/web/${{github.event.inputs.release_version}}/dist --delete
       - name: Deploy polaris site to S3 bucket
-        run: aws s3 sync ./apps/dashboard/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{github.event.inputs.release_version}}/dist --delete
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{github.event.inputs.release_version}}/dist --delete
