@@ -54,36 +54,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
     private String burpGithubLink = null;
     public String fetchBurpPluginDownloadLink() {
-        String repoGithubLink = "https://api.github.com/repos/akto-api-security/akto/releases/latest";
-        String json;
-        CloseableHttpClient httpClient = null;
-        try {
-            httpClient = HttpClientBuilder.create().build();
-            HttpGet request = new HttpGet(repoGithubLink);
-            request.addHeader("Accept", "application/vnd.github+json");
-            HttpResponse result = httpClient.execute(request);
-            json = EntityUtils.toString(result.getEntity(), "UTF-8");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while getting burp jar download link: " + e.getMessage(), LogDb.DASHBOARD);
-            return ERROR.toUpperCase();
-        } finally {
-            if (httpClient != null) {
-                try {
-                    httpClient.close();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Failure while closing httpClient" + e.getMessage(), LogDb.DASHBOARD);
-                }
-            }
-        }
-
-        try {
-            BasicDBObject payload = BasicDBObject.parse(json);
-            burpGithubLink = payload.getString("zipball_url");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while parsing github response: " + e.getMessage(), LogDb.DASHBOARD);
-            return ERROR.toUpperCase();
-        }
-
+        burpGithubLink = "https://raw.githubusercontent.com/akto-api-security/akto-burp-extension/master/Akto.jar";
         return SUCCESS.toUpperCase();
     }
 
