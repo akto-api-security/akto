@@ -38,9 +38,9 @@
                     </div>
                     <div style="margin-left: 4px">
                         Copy AKTO_IP: 
-                        <span style="color: red">{{ aktoIp }}</span>
+                        <span style="color: var(--themeColor)">{{ aktoIp }}</span>
                         and AKTO_TOKEN:
-                        <span style="color: red">{{ aktoToken }}</span>
+                        <span style="color: var(--themeColor)">{{ aktoToken }}</span>
                         and paste in the options tab
                     </div>
             </div>
