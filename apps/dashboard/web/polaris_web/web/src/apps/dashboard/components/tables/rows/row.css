@@ -1,0 +1,23 @@
+.linkClass > .Polaris-Link--removeUnderline:hover {
+    text-decoration: none !important;
+}
+
+.linkClass > .Polaris-Link:focus:not(:active){
+    outline: none !important;
+}
+
+.Polaris-IndexTable__TableCell--first{
+    vertical-align: top !important;
+}
+
+.Polaris-IndexTable__TableCell {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+.Polaris-IndexTable-Checkbox__TableCellContentContainer {
+    padding-top: 3px !important;
+}
+
+.Polaris-IndexTable {
+    border-radius: unset !important;
+}

@@ -64,6 +64,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContextListener;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -86,7 +87,7 @@ public class InitializerListener implements ServletContextListener {
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-
+    public static String aktoVersion;
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
@@ -446,7 +447,8 @@ public class InitializerListener implements ServletContextListener {
                                 String payload = dailyUpdate.toJSON();
                                 loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                                 try {
-                                    if (!HostDNSLookup.isRequestValid(webhookUrl)) {
+                                    URI uri = URI.create(webhookUrl);
+                                    if (!HostDNSLookup.isRequestValid(uri.getHost())) {
                                         throw new IllegalArgumentException("SSRF attack attempt");
                                     }
                                     WebhookResponse response = slack.send(webhookUrl, payload);
@@ -460,8 +462,9 @@ public class InitializerListener implements ServletContextListener {
                                     response = slack.send(webhookUrl, payload);
                                     loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
-                                } catch (IOException e) {
+                                } catch (Exception e) {
                                     e.printStackTrace();
+                                    loggerMaker.errorAndAddToDb("Error while sending slack alert: " + e.getMessage(), LogDb.DASHBOARD);
                                 }
                             }
                         }
@@ -948,6 +951,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        updateGlobalAktoVersion();
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -968,6 +972,19 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
+    }
+
+    private void updateGlobalAktoVersion() throws Exception{
+        try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
+            if (in != null) {
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+                bufferedReader.readLine();
+                bufferedReader.readLine();
+                InitializerListener.aktoVersion = bufferedReader.readLine();
+            } else  {
+                throw new Exception("Input stream null");
+            }
+        }
     }
 
     public static void insertPiiSources(){

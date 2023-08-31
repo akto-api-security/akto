@@ -57,6 +57,9 @@
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
                     window.ACCOUNT_NAME = '${requestScope.accountName}';
+                    window.RELEASE_VERSION = '${requestScope.releaseVersion}';
+                    window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
+                    window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
 
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
@@ -93,6 +96,8 @@
 
 
                 </script>
+                 <!-- needed for react -->
+                <div id="root"></div>
                 <script>
                     var beamer_config = {
                         product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
@@ -103,8 +108,29 @@
                     };
                 </script>
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
+                <script>
+                    var script = document.createElement('script');
 
-                <script src="/dist/main.js"></script>
+                    // since release_version is not available till a user login, 
+                    // the user will always see the old login screen
+                    script.type = "text/javascript"
+                    if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
+                        if (window.AKTO_UI_MODE == 'VERSION_2') {
+                            script.src = "/polaris_web/web/dist/main.js";
+                        } else {
+                            script.src = "/dist/main.js";
+                        }
+                    } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
+                    } else {
+                        if (window.AKTO_UI_MODE == 'VERSION_2') {
+                            script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
+                        } else {
+                            script.src = "https://d1hvi6xs55woen.cloudfront.net/web/" + window.RELEASE_VERSION + "/dist/main.js";
+                        }
+                    }
+                    document.body.appendChild(script);
+                </script>
             </body>
 
             </html>
