@@ -308,8 +308,11 @@ public class StartTestAction extends UserAction {
 
         testingRunFilters.addAll(prepareFilters());
 
-        testingRuns = TestingRunDao.instance.findAll(Filters.and(testingRunFilters), skip,
-                Math.min(limit == 0 ? 50 : limit, 10_000), prepareSort());
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
+
+        testingRuns = TestingRunDao.instance.findAll(
+                Filters.and(testingRunFilters), skip, pageLimit,
+                prepareSort());
 
         testingRunsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(testingRunFilters));
 
