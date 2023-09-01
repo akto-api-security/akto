@@ -39,6 +39,10 @@ while true; do
 
   echo $response
   echo $state
+  echo $start_timestamp
+  echo $end_timestamp
+  echo $AKTO_TEST_ID
+  echo "$AKTO_DASHBOARD_URL/api/fetchTestingRunResultSummaries"
 
   if [[ "$state" == "COMPLETED" ]]; then
     count=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues // empty')
