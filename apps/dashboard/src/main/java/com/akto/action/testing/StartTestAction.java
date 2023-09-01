@@ -37,6 +37,7 @@ import org.bson.types.ObjectId;
 
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -218,6 +219,68 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private String sortKey;
+    private int sortOrder;
+    private int limit;
+    private int skip;
+    private Map<String, List> filters;
+    private Map<String, String> filterOperators;
+    private long testingRunsCount;
+
+    private ArrayList<Bson> prepareFilters() {
+        ArrayList<Bson> filterList = new ArrayList<>();
+
+        if(filters==null){
+            return filterList;
+        }
+
+        try {
+            for (Map.Entry<String, List> entry : filters.entrySet()) {
+                String key = entry.getKey();
+                List value = entry.getValue();
+
+                if (value.size() == 0)
+                    continue;
+                String operator = filterOperators.getOrDefault(key, "OR");
+
+                switch (key) {
+                    case "color":
+                        continue;
+                    case "endTimestamp":
+                        List<Long> ll = value;
+                        filterList.add(Filters.gte(key, ll.get(0)));
+                        filterList.add(Filters.lte(key, ll.get(1)));
+                        break;
+                    default:
+                        switch (operator) {
+                            case "OR":
+                            case "AND":
+                                filterList.add(Filters.in(key, value));
+                                break;
+
+                            case "NOT":
+                                filterList.add(Filters.nin(key, value));
+                                break;
+                        }
+                }
+            }
+        } catch (Exception e) {
+            return filterList;
+        }
+
+        return filterList;
+    }
+
+    private Bson prepareSort() {
+        List<String> sortFields = new ArrayList<>();
+        if(sortKey==null || "".equals(sortKey)){
+            sortKey = TestingRun.SCHEDULE_TIMESTAMP;
+        }
+        sortFields.add(sortKey);
+
+        return sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
+    }
+
     public String retrieveAllCollectionTests() {
         if (this.startTimestamp == 0) {
             this.startTimestamp = Context.now();
@@ -229,18 +292,26 @@ public class StartTestAction extends UserAction {
 
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
+        ArrayList<Bson> testingRunFilters = new ArrayList<>();
+
         if(fetchCicd){
-            testingRuns = TestingRunDao.instance.findAll(Filters.in(Constants.ID, getCicdTests()));
+            testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
         } else {
-            Bson filterQ = Filters.and(
+            Collections.addAll(testingRunFilters, 
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
                 Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
                 Filters.nin(Constants.ID,getCicdTests()),
                 Filters.ne("triggeredBy", "test_editor")
             );
-            testingRuns = TestingRunDao.instance.findAll(filterQ);
         }
-        testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
+
+        testingRunFilters.addAll(prepareFilters());
+
+        testingRuns = TestingRunDao.instance.findAll(Filters.and(testingRunFilters), skip,
+                Math.min(limit == 0 ? 50 : limit, 10_000), prepareSort());
+
+        testingRunsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(testingRunFilters));
+
         return SUCCESS.toUpperCase();
     }
 
@@ -536,6 +607,62 @@ public class StartTestAction extends UserAction {
 
     public String getOverriddenTestAppUrl() {
         return overriddenTestAppUrl;
+    }
+
+    public String getSortKey() {
+        return sortKey;
+    }
+
+    public void setSortKey(String sortKey) {
+        this.sortKey = sortKey;
+    }
+
+    public int getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public int getSkip() {
+        return skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
+    public Map<String, List> getFilters() {
+        return filters;
+    }
+
+    public void setFilters(Map<String, List> filters) {
+        this.filters = filters;
+    }
+    public Map<String, String> getFilterOperators() {
+        return filterOperators;
+    }
+
+    public void setFilterOperators(Map<String, String> filterOperators) {
+        this.filterOperators = filterOperators;
+    }
+
+
+    public long getTestingRunsCount() {
+        return testingRunsCount;
+    }
+
+    public void setTestingRunsCount(long testingRunsCount) {
+        this.testingRunsCount = testingRunsCount;
     }
 
     public enum CallSource{
