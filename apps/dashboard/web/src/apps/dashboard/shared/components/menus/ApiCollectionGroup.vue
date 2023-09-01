@@ -78,7 +78,7 @@ export default {
     &:before
         border-radius: 0px !important
 
-.menu-item-active
+.menu-item-active:not(.no-style)
     background: var(--themeColorDark5) !important
     color: var(--white) !important
 
