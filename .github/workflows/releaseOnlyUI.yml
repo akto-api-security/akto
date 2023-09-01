@@ -1,0 +1,47 @@
+name: Release only dashboard UI
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      release_version:
+        required: true
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '8'
+          architecture: x64
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '17'
+      - name: Prepare Dashboard UI
+        working-directory: ./apps/dashboard/
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+      - name: Prepare Dashboard polaris UI
+        working-directory: ./apps/dashboard/web/polaris_web
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
+
+      - name: Deploy static site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{github.event.inputs.release_version}}/dist --delete
+      - name: Deploy polaris site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{github.event.inputs.release_version}}/dist --delete

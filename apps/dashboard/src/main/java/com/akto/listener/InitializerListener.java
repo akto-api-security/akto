@@ -87,7 +87,7 @@ public class InitializerListener implements ServletContextListener {
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-
+    public static String aktoVersion;
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
@@ -923,6 +923,12 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         logger.info("MONGO URI " + mongoURI);
 
+        try {
+            readAndSaveBurpPluginVersion();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
 
         executorService.schedule(new Runnable() {
             public void run() {
@@ -945,6 +951,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        updateGlobalAktoVersion();
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -965,6 +972,19 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
+    }
+
+    private void updateGlobalAktoVersion() throws Exception{
+        try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
+            if (in != null) {
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+                bufferedReader.readLine();
+                bufferedReader.readLine();
+                InitializerListener.aktoVersion = bufferedReader.readLine();
+            } else  {
+                throw new Exception("Input stream null");
+            }
+        }
     }
 
     public static void insertPiiSources(){
@@ -1047,35 +1067,14 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
-        try {
-            readAndSaveBurpPluginVersion();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
 
     public static int burpPluginVersion = -1;
 
     public void readAndSaveBurpPluginVersion() {
-        URL url = this.getClass().getResource("/Akto.jar");
-        if (url == null) return;
-
-        try (JarFile jarFile = new JarFile(url.getPath())) {
-            Enumeration<JarEntry> jarEntries = jarFile.entries();
-
-            while (jarEntries.hasMoreElements()) {
-                JarEntry entry = jarEntries.nextElement();
-                if (entry.getName().contains("AktoVersion.txt")) {
-                    InputStream inputStream = jarFile.getInputStream(entry);
-                    String result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
-                    burpPluginVersion = Integer.parseInt(result.trim());
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        // todo get latest version from github
+        burpPluginVersion = 5;
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
