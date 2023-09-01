@@ -37,6 +37,9 @@ while true; do
 
   state=$(echo "$response" | jq -r '.testingRunResultSummaries[0].state // empty')
 
+  echo $response
+  echo $state
+
   if [[ "$state" == "COMPLETED" ]]; then
     count=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues // empty')
     high=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.HIGH // empty')
