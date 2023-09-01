@@ -43,7 +43,7 @@ while true; do
     medium=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.MEDIUM // empty')
     low=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.LOW // empty')
 
-    echo "[Results]($AKTO_DASHBOARD_URL/dashboard/testing/$AKTO_TEST_ID/results)"
+    echo "[Results]($AKTO_DASHBOARD_URL/dashboard/testing/$AKTO_TEST_ID/results)" >> $GITHUB_STEP_SUMMARY
     echo "HIGH: $high" >> $GITHUB_STEP_SUMMARY
     echo "MEDIUM: $medium" >> $GITHUB_STEP_SUMMARY
     echo "LOW: $low"  >> $GITHUB_STEP_SUMMARY
