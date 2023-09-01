@@ -42,97 +42,97 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
-        with:
-          distribution: 'adopt'
-          java-version: '8'
-          architecture: x64
+      # - uses: actions/setup-java@v2
+      #   with:
+      #     distribution: 'adopt'
+      #     java-version: '8'
+      #     architecture: x64
 
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '17'
-      - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
-        id: docker_tag
-        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
-      - name: Prepare Dashboard UI
-        working-directory: ./apps/dashboard/
-        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
-      - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/web/polaris_web
-        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
-      - name: Configure AWS Credentials
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
-          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-          aws-region: ap-south-1
+      # - uses: actions/setup-node@v2
+      #   with:
+      #     node-version: '17'
+      # - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
+      #   id: docker_tag
+      #   run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
+      # - name: Prepare Dashboard UI
+      #   working-directory: ./apps/dashboard/
+      #   run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      # - name: Prepare Dashboard polaris UI
+      #   working-directory: ./apps/dashboard/web/polaris_web
+      #   run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      # - name: Configure AWS Credentials
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+      #     aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+      #     aws-region: ap-south-1
 
-      - name: Deploy static site to S3 bucket
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
-      - name: Deploy polaris site to S3 bucket
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      # - name: Deploy static site to S3 bucket
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      # - name: Deploy polaris site to S3 bucket
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
 
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
-      - name: DockerHub login
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        env:
-          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Build, tag, and push the image to DockerHub
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        id: build-image-dockerhub
-        env:
-          ECR_REGISTRY: aktosecurity
-          ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-          IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
-          IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
-        run: |
-          docker buildx create --use
-          # Build a docker container and push it to DockerHub 
-          cd apps/dashboard
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
-          cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
-      - name: Set up JDK 11
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-      - name: Cache Maven packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+      # - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      # - name: DockerHub login
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   env:
+      #     DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+      #     DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+      #   run: |
+      #     docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      # - name: Build, tag, and push the image to DockerHub
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   id: build-image-dockerhub
+      #   env:
+      #     ECR_REGISTRY: aktosecurity
+      #     ECR_REPOSITORY: akto-api-security
+      #     IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+      #     IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
+      #     IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
+      #   run: |
+      #     docker buildx create --use
+      #     # Build a docker container and push it to DockerHub 
+      #     cd apps/dashboard
+      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
+      #     echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
+      #     cd ../testing
+      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
+      #     echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
+      # - name: Set up JDK 11
+      #   uses: actions/setup-java@v1
+      #   with:
+      #     java-version: 11
+      # - name: Cache SonarCloud packages
+      #   uses: actions/cache@v1
+      #   with:
+      #     path: ~/.sonar/cache
+      #     key: ${{ runner.os }}-sonar
+      #     restore-keys: ${{ runner.os }}-sonar
+      # - name: Cache Maven packages
+      #   uses: actions/cache@v1
+      #   with:
+      #     path: ~/.m2
+      #     key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+      #     restore-keys: ${{ runner.os }}-m2
       
-      # Run QA tests
+      # # Run QA tests
 
-      # Wait for staging environment to be setup 
-      - name: Sleep for 3 minutes
-        run: sleep 3m
-        shell: bash
+      # # Wait for staging environment to be setup 
+      # - name: Sleep for 3 minutes
+      #   run: sleep 3m
+      #   shell: bash
 
-      - name: Run testsigma end to end tests
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-        env:
-          TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-          #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
-          TESTSIGMA_TEST_PLAN_ID: 763
-          TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-        run: bash ./.github/workflows/akto-testsigma.sh
+      # - name: Run testsigma end to end tests
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+      #   env:
+      #     TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+      #     #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
+      #     TESTSIGMA_TEST_PLAN_ID: 763
+      #     TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+      #   run: bash ./.github/workflows/akto-testsigma.sh
 
       - name: Run Akto CI/CD tests
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
