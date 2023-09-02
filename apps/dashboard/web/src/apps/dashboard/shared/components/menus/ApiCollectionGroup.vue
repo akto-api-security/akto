@@ -82,4 +82,7 @@ export default {
     background: var(--themeColorDark5) !important
     color: var(--white) !important
 
+.no-style
+    background: var(--themeColorDark15) !important
+
 </style>
