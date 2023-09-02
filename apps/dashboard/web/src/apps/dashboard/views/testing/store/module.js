@@ -18,7 +18,7 @@ function addMoreItem(arr, size, link){
     if (size > 50) {
         arr.push({
             id: "More button",
-            title: `See ${size-arr.length} more`,
+            title: `See all`,
             link: link,
             class: "no-style",
             active: true
