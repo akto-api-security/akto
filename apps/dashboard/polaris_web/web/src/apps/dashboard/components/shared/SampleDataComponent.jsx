@@ -9,6 +9,7 @@ import {
 import SampleData from './SampleData';
 import func from "@/util/func";
 import inventoryApi from "../../pages/observe/api"
+import transform from './customDiffEditor';
 
 function formatData(data,style){
     let localFirstLine = data?.firstLine
@@ -34,24 +35,15 @@ function formatData(data,style){
                 }
             })
         }
-        return (localFirstLine + "\n\n" + finalData + "\npayload:" + JSON.stringify(payLoad,null,2))
+        finalData = finalData.split("\n").sort().join("\n");
+        return (localFirstLine + "\n\n" + finalData + "\n\n" + transform.formatJson(payLoad))
     }
-    let allKeys = [];
-      let seen = {};
-      JSON.stringify(data.json, function (key, value) {
-          if (!(key in seen)) {
-              allKeys.push(key);
-              seen[key] = null;
-          }
-          return value;
-      });
-      allKeys.sort();
-    return (data?.firstLine ? data?.firstLine + "\n\n" : "") + (data?.json ? JSON.stringify(data.json, allKeys, 2) : "");
+    return (data?.firstLine ? data?.firstLine + "\n\n" : "") + (data?.json ? transform.formatJson(data.json) : "");
   }
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
 
@@ -73,11 +65,30 @@ function SampleDataComponent(props) {
         }
         let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths)
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
-  
-        setSampleJsonData({ 
-          request: { message: formatData(requestJson,"http"), original: formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-          response: { message: formatData(responseJson,"http"), original: formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
-        })
+
+        if(isNewDiff){
+            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine,originalRequestJson?.json?.queryParams,requestJson?.json?.queryParams)
+            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine,originalResponseJson?.json?.queryParams,responseJson?.json?.queryParams)
+
+            let requestHeaderObj = transform.compareJsonKeys(originalRequestJson.json.requestHeaders,requestJson.json.requestHeaders)
+            let responseHeaderObj = transform.compareJsonKeys(originalResponseJson.json.responseHeaders,responseJson.json.responseHeaders)
+            
+            let requestPayloadObj = transform.getPayloadData(originalRequestJson.json.requestPayload,requestJson.json.requestPayload)
+            let responsePayloadObj = transform.getPayloadData(originalResponseJson.json.responsePayload,responseJson.json.responsePayload)
+            
+            const requestData = transform.mergeDataObjs(lineReqObj, requestHeaderObj, requestPayloadObj)
+            const responseData = transform.mergeDataObjs(lineResObj, responseHeaderObj, responsePayloadObj)
+
+            setSampleJsonData({
+                request: requestData,
+                response: responseData
+            })
+        }else{
+            setSampleJsonData({ 
+                request: { message: formatData(requestJson,"http"), original: formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
+                response: { message: formatData(responseJson,"http"), original: formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
+            })
+        }
       }, [sampleData])
 
     const copyContent = async(type,completeData) => {
