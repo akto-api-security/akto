@@ -236,9 +236,9 @@ function App() {
     self.MonacoEnvironment = {
       getWorkerUrl: function (moduleId, label) {
           if (label === 'json') {
-              return '/dist/json.worker.js';
+              return '/dist1/dist/json.worker.js';
           }
-          return '/dist/editor.worker.js';
+          return '/dist1/dist/editor.worker.js';
       }
       };
     `);
