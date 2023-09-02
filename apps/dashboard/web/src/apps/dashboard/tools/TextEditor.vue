@@ -5,7 +5,7 @@
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
                         <layout-with-left-pane>
-                            <search class="py-2 pr-2" placeholder="Search Tests" @changed="setSearchText" />
+                            <search class="py-2 pr-2" placeholder="Search Tests" @onKeystroke="setSearchText" />
                             <div class="tests-container">
                                 <div class="main-list-title" @click="toggleListDisplay('custom')">
                                     <v-icon size=18
@@ -204,7 +204,7 @@
 
 <script>
 
-import { editor, languages, MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api"
+import { editor, KeyCode, KeyMod, languages, MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api"
 import Search from '../shared/components/inputs/Search.vue';
 import LayoutWithLeftPane from '../layouts/LayoutWithLeftPane.vue';
 import SampleData from '../shared/components/SampleData.vue';
@@ -530,7 +530,31 @@ export default {
             editorSetup.setEditorTheme()
             editorSetup.setAutoComplete(this.keywords)
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
-            // editorSetup.findErrors(this.textEditor,this.keywords)
+            this.textEditor.addAction({
+                id: "giveTypingEffect",
+                label: "Give typing effect",
+                keybindings: [KeyMod.Shift | KeyCode.KeyB],
+                run: () => {
+                    this.giveTypingEffect(false, true);
+                },
+            });
+
+        },
+        giveTypingEffect() {
+            let str = this.textEditor.getValue()
+            let prevStr = "";
+            this.textEditor.setValue(prevStr)
+            let i = 0;
+            let intI = setInterval(() => {
+                prevStr += str[i]
+                i++;
+                
+                this.textEditor.setValue(prevStr + "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                if (i == str.length) {
+                    clearInterval(intI)
+                }
+            }, 10);
+
         },
         findSuffixForNewTest(testId) {
             let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            

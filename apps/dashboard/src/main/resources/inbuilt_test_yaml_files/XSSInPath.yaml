@@ -1,0 +1,49 @@
+id: XSS_IN_PATH
+info:
+  name: "XSS by changing path"
+  description: "Testing vulnerability by injecting malicious scripts in filenames to bypass security measures and execute unauthorized code." 
+  details: >
+            "Security test that aims to identify vulnerabilities in web applications. By injecting malicious scripts into url paths, attackers can bypass security measures and execute unauthorized code on the victim's browser."
+            "This test helps developers uncover and address potential XSS (Cross-Site Scripting) vulnerabilities, ensuring robust protection against malicious attacks."
+  impact: "An XSS vulnerability can have significant impacts, including the potential for data theft, unauthorized access, session hijacking, defacement of web pages, and the injection of malicious content."
+  category:
+    name: XSS
+    shortName: XXS
+    displayName: Cross-site scripting (XSS)
+  subCategory: XSS_IN_PATH
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-community/attacks/xss/"
+    - "https://www.codegrazer.com/blog/7-reflected-xss.html"
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+
+  response_payload:
+    contains_either:
+      - <!doctype html>
+
+  url:
+    extract: urlVar
+
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+          regex_replace:
+            regex: \/$
+            replace_with: ''
+      - modify_url: ${urlVar}/%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E
+
+validate:
+  response_payload:
+    contains_either: "<script>alert(document.domain)</script>"
+  response_payload:
+    contains_either: <!doctype html>

@@ -15,6 +15,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.slf4j.Logger;
@@ -58,9 +60,9 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             return Action.ERROR.toUpperCase();
         }
 
-        User user = UsersDao.instance.findOne(Filters.eq("login", username));
+        User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
 
-        if (user != null) {
+        if (user != null && user.getSignupInfoMap()!=null && user.getSignupInfoMap().containsKey(Config.ConfigType.PASSWORD + Config.CONFIG_SALT)){
             SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
             String salt = signupInfo.getSalt();
             String passHash = Integer.toString((salt + password).hashCode());
@@ -89,12 +91,15 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
-        decideFirstPage(loginResult);
+        //For the case when no account exists, the user will get access to 1_000_000 account
+        String accountIdStr = user.getAccounts().keySet().isEmpty() ? "1000000" : user.getAccounts().keySet().iterator().next();
+        int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
+        decideFirstPage(loginResult, accountId);
         return result;
     }
 
-    private void decideFirstPage(BasicDBObject loginResult){
-        Context.accountId.set(1_000_000);
+    private void decideFirstPage(BasicDBObject loginResult, int accountId){
+        Context.accountId.set(accountId);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
             logger.info("New user, showing quick start page");

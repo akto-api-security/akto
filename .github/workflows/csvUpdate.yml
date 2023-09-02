@@ -40,7 +40,7 @@ jobs:
 
           REPOSITORY_OWNER = 'akto-api-security'
           REPOSITORY_NAME = 'akto'
-          BRANCH_NAME = 'master'
+          BRANCH_NAME = '${{ github.ref_name }}'
           FOLDER_PATH = 'apps/dashboard/src/main/resources/inbuilt_test_yaml_files'
           FILE_EXTENSION = '.yaml'
 
@@ -59,9 +59,12 @@ jobs:
               repository = g.get_repo(f"{REPOSITORY_OWNER}/{REPOSITORY_NAME}")
 
               try:
-                  content_of_file = repository.get_contents(file_path)
-                  data = content_of_file.decoded_content.decode("utf-8")
+                  print("trying to download: ", yaml_url)
+                  rr = requests.get(yaml_url, allow_redirects=True)
+                  data = rr.content
+                  print("received: ", data)
                   yaml_data = yaml.safe_load(data)
+                  
                   print(f"Successfully fetched the template: {repository_parts[-1]}")
                   return yaml_data, data
               except Exception as e:
@@ -79,17 +82,53 @@ jobs:
               column.append(yaml_data['info']['impact'])
               column.append(yaml_data['info']['category']['displayName'])
               column.append(yaml_data['info']['severity'])
-
+              print("column: ", column)
+              references = []
+  
               if 'references' in yaml_data['info']:
                   column.append(yaml_data['info']['references'])
+                  references = yaml_data['info']['references']
+                  if references is None:
+                    references = []
+                  
               else:
                   column.append("")
 
+              print("references: ", references)
               column.append(yaml_content)
 
               url_path = ''
               column.append(url_path)
+              column.append(yaml_data['id'])
+              
+              rlink1 = "" 
+              
+              if len(references) >= 1:
+                  rlink1 = references[0]
+              
+              print("rlink1", rlink1)
 
+
+              rlink2 = "" 
+              
+              if len(references) >= 2:
+                  rlink2 = references[1]
+              
+              print("rlink2", rlink2)
+
+
+              rlink3 = "" 
+              
+              if len(references) >= 3:
+                  rlink3 = references[2]
+              
+              print("rlink3", rlink3)
+
+
+              column.append(rlink1)
+              column.append(rlink2)
+              column.append(rlink3)
+              
               csv_writer.writerow(column)
 
 
@@ -112,10 +151,10 @@ jobs:
               if yaml_files:
                   with open(csv_file_path, 'w', newline='') as csv_file:
                       writer = csv.writer(csv_file)
-                      writer.writerow(['Name', 'Slug', 'Description', 'Details', 'Impact', 'OWASP Category', 'Severity', 'References', 'Content', 'URL Path'])
+                      writer.writerow(['Name', 'Slug', 'Description', 'Details', 'Impact', 'OWASP Category', 'Severity', 'References', 'Content', 'URL Path', 'Test_ID', 'RLink1', 'RLink2', 'RLink3'])
 
                       for yaml_file in yaml_files:
-                          yaml_url = yaml_file['html_url']
+                          yaml_url = yaml_file['download_url']
                           yaml_data, yaml_content = fetch_yaml_data(access_token, yaml_url)
                           if yaml_data:
                               write_to_csv(writer, yaml_data, yaml_content)

@@ -1,0 +1,40 @@
+id: SFTP_CONFIG_EXPOSURE
+info:
+  name: SFTP Config File Disclosure
+  description: " Detects the exposure of SFTP configuration files."
+  details: >
+              "Searches for the presence of SFTP configuration files, typically stored in "sftp-config.json". These files may contain sensitive information such as host, username, password, and remote paths."
+  impact: "Exposing SFTP configuration files can compromise the security of file transfer operations, leading to unauthorized access and potential data breaches."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: SFTP_CONFIG_EXPOSURE
+  severity: HIGH
+  references:
+    - https://blog.sucuri.net/2012/11/psa-sftpftp-password-exposure-via-sftp-config-json.html
+    - https://www.acunetix.com/vulnerabilities/web/sftp-ftp-credentials-exposure/
+    - https://codexns.io/products/sftp_for_sublime/settings
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/sftp-config.json
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'host'
+      - 'user'
+      - 'password'
+      - 'remote_path'

@@ -1,0 +1,42 @@
+id: ESMTPRC_CONFIG
+info:
+  name: eSMTP - Config Discovery
+  description: "eSMTP configuration was discovered."
+  details: >
+              "eSMTP - Config Discovery refers to the vulnerability where the eSMTP configuration file, .esmtprc, is discovered due to misconfiguration. This file contains sensitive information like the hostname, username, and password, which can be exploited by attackers for unauthorized access, email impersonation, and spam/phishing campaigns. Promptly addressing this vulnerability is critical to protect the integrity and confidentiality of email communications."
+  impact: "Discovering the eSMTP configuration file exposes sensitive information, allowing attackers to impersonate users, send spam/phishing emails, and gain unauthorized access to email accounts."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: ESMTPRC_CONFIG
+  severity: HIGH
+  references:
+    - https://linux.die.net/man/5/esmtprc
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/.esmtprc
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - "hostname"
+      - "username"
+      - "password"
+  response_headers:
+    for_one:
+      value:
+        contains_all:
+          - text/html
