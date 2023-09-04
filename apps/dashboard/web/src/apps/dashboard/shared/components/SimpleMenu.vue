@@ -1,5 +1,5 @@
 <template>
-    <v-menu offset-y min-width="150" max-height="300px" v-model="showMenu" content-class="no-shadow">
+    <v-menu offset-y min-width="180" max-height="300px" v-model="showMenu" content-class="no-shadow" :attach="attach ? getString: undefined">
         <template v-slot:activator="{on, attrs}">
             <div v-on="on" v-bind="attrs">
                 <slot name="activator2"/>
@@ -39,7 +39,8 @@ export default {
         items: obj.arrR,
         tooltipTriangle: obj.strN,
         showMenuOnDraw: obj.boolN,
-        extraArrowClasses: obj.arrN
+        extraArrowClasses: obj.arrN,
+        attach: obj.strN,
     },
     data() {
       return {
@@ -47,6 +48,9 @@ export default {
       }
     },
     computed: {
+      getString(){
+        return '#' + this.attach
+      },
       arrowClasses() {
         let ret = ["arrow-"+this.tooltipTriangle]
         if (this.extraArrowClasses) {
