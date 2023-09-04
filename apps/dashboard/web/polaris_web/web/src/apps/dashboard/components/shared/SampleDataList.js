@@ -8,7 +8,7 @@ import SampleDataComponent from './SampleDataComponent';
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff} = props;
 
     const [page, setPage] = useState(0);
 
@@ -49,6 +49,7 @@ function SampleDataList(props) {
                       sampleData={sampleData[Math.min(page, sampleData.length-1)]}
                       minHeight={minHeight}
                       showDiff={showDiff}
+                      isNewDiff={isNewDiff}
                     />
                   </LegacyCard>
                 </Box>
