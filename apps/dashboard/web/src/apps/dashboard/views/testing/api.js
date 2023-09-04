@@ -1,12 +1,12 @@
 import request from '@/util/request'
 
 export default {
-    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters, filterOperators}) {
+    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters}) {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd , sortKey, sortOrder, skip, limit, filters, filterOperators
+                startTimestamp, endTimestamp, fetchCicd , sortKey, sortOrder, skip, limit, filters
             }
         }).then((resp) => {
             return resp

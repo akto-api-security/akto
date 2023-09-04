@@ -224,7 +224,6 @@ public class StartTestAction extends UserAction {
     private int limit;
     private int skip;
     private Map<String, List> filters;
-    private Map<String, String> filterOperators;
     private long testingRunsCount;
 
     private ArrayList<Bson> prepareFilters() {
@@ -241,27 +240,11 @@ public class StartTestAction extends UserAction {
 
                 if (value.size() == 0)
                     continue;
-                String operator = filterOperators.getOrDefault(key, "OR");
 
-                switch (key) {
-                    case "color":
-                        continue;
-                    case "endTimestamp":
-                        List<Long> ll = value;
+                if("endTimestamp".equals(key)){
+                    List<Long> ll = value;
                         filterList.add(Filters.gte(key, ll.get(0)));
                         filterList.add(Filters.lte(key, ll.get(1)));
-                        break;
-                    default:
-                        switch (operator) {
-                            case "OR":
-                            case "AND":
-                                filterList.add(Filters.in(key, value));
-                                break;
-
-                            case "NOT":
-                                filterList.add(Filters.nin(key, value));
-                                break;
-                        }
                 }
             }
         } catch (Exception e) {
@@ -651,14 +634,6 @@ public class StartTestAction extends UserAction {
     public void setFilters(Map<String, List> filters) {
         this.filters = filters;
     }
-    public Map<String, String> getFilterOperators() {
-        return filterOperators;
-    }
-
-    public void setFilterOperators(Map<String, String> filterOperators) {
-        this.filterOperators = filterOperators;
-    }
-
 
     public long getTestingRunsCount() {
         return testingRunsCount;
