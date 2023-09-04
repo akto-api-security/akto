@@ -54,6 +54,24 @@
     border: 2px solid #B98900 !important;
 }
 
+.new-diff .active-line{
+    margin-left: -62px;
+    width: 550px !important;
+    border-radius: 2px;
+    animation: colorChange 0.8s ease forwards
+}
+@keyframes colorChange {
+    0% {
+      background-color: unset; /* Start with the original color */
+    }
+    50% {
+      background-color: rgba(98,0,234,0.4); /* Change to the new color at 50% of the animation */
+    }
+    100% {
+      background-color: unset; /* Revert to the original color at the end of the animation */
+    }
+  }
+
 .Polaris-DropZone{
     min-height: 0 !important;
 }

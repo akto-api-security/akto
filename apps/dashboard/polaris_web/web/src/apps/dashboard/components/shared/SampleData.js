@@ -25,7 +25,7 @@ function highlightPaths(highlightPathMap, ref){
     })
 }
 
-function highlightHeaders(data, ref){
+function highlightHeaders(data, ref, getLineNumbers){
   const diffRange = []
   const headerKeysMap = data.headersMap
 
@@ -51,15 +51,14 @@ function highlightHeaders(data, ref){
   }
 
   // add classname for content only
+  let changesArr = []
   headerKeysMap && Object.keys(headerKeysMap).forEach((key) => {
     const header = key
     let matchRanges = ref.getModel().findMatches(header, false, false, true, null, true)
+    changesArr = [ ...changesArr, ...matchRanges]
     matchRanges.forEach((obj) => {
       let matchRange = obj.range
-      let startCol = headerKeysMap[key].className.includes("update") ? matchRange.endColumn + 1 : 1
-      if(headerKeysMap[key].data){
-        startCol = matchRange.startColumn
-      }
+      let startCol = headerKeysMap[key].className.includes("update") ? (matchRange.startColumn + headerKeysMap[key]?.keyLength + 2) : 1
       if(!headerKeysMap[key].className.includes("update")){
         diffRange.push({range: matchRange.startLineNumber, key: headerKeysMap[key].className})
       }else{
@@ -84,6 +83,12 @@ function highlightHeaders(data, ref){
     })
     
   })
+  changesArr = changesArr.map((item) => item.range.startLineNumber)
+  if(data.isUpdatedFirstLine){
+    changesArr.push(1)
+  }
+  changesArr.sort((a,b) => a - b)
+  getLineNumbers(changesArr)
   // add classname to whole block to make a box
   diffRange.sort((a,b) => a.range - b.range)
   let currentRange = null
@@ -116,7 +121,7 @@ function highlightHeaders(data, ref){
 
 function SampleData(props) {
 
-    let {showDiff, data, minHeight, editorLanguage} = props;
+    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers} = props;
 
     const ref = useRef(null);
     const [instance, setInstance] = useState(undefined);
@@ -143,13 +148,29 @@ function SampleData(props) {
         }
           return data;
       })
-    }, [data])
+    }, [data, currLine])
 
     useEffect(() => {
       if(instance!==undefined && editorData!==undefined){
         showData(editorData);
       }
     }, [instance, editorData])
+
+    useEffect(()=>{
+      instance && instance.revealLineInCenter(currLine)
+      let a = instance && instance.createDecorationsCollection([{
+        range: new monaco.Range(currLine, 1, currLine, 2),
+        options: {
+          blockClassName: "active-line"
+        }
+      }])
+      if(a?._decorationIds){
+        setTimeout(() => {
+          instance && instance.removeDecorations(a?._decorationIds)
+        }, 2000)
+      }
+
+    },[currLine])
 
     function createInstance(){
         const options = {
@@ -194,7 +215,7 @@ function SampleData(props) {
         instance.setValue(data?.message)
         highlightPaths(data?.highlightPaths, instance);
         if(data.headersMap){
-          highlightHeaders(data, instance)
+          highlightHeaders(data, instance,getLineNumbers)
         }
       }
     }

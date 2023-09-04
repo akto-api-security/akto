@@ -124,8 +124,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const formattedJson = func.convertPolicyLines(policyLines)
 
     const copyRequest = () => {
-        let jsonString  = JSON.stringify(formattedJson, null, 2)
-        navigator.clipboard.writeText(jsonString)
+        navigator.clipboard.writeText(formattedJson)
         setToast(true, false, "Policy copied to clipboard.")
     }
     
