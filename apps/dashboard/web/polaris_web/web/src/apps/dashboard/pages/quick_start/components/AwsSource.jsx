@@ -125,8 +125,7 @@ function AwsSource() {
     }
 
     const copyRequest = () => {
-      let jsonString  = JSON.stringify(formattedJson, null, 2)
-      navigator.clipboard.writeText(jsonString)
+      navigator.clipboard.writeText(formattedJson)
       setToast(true, false, "Policy copied to clipboard.")
     }
 

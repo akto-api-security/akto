@@ -23,7 +23,7 @@ const editorSetup = {
                 root: [
                     [/#.*$/, 'comment'],
                     [/HTTP\/[0-9.]+/, 'keyword'],
-                    [/GET|POST|PUT|DELETE|PATCH/, 'keyword'],
+                    [/GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD/, 'keyword'],
                     [/"[^"]+":/, 'key'], // Match any string in double quotes followed by a colon as JSON key
                     [/".*?"(?=[:,\s}\]])/, 'string'], // Match values enclosed in double quotes
                     [/\btrue\b|\bfalse\b|\bnull\b/, 'keyword'], // Match JSON keywords (true, false, null)

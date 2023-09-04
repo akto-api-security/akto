@@ -1,21 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { editor, Range } from "monaco-editor/esm/vs/editor/editor.api"
-import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
-import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
-import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
-import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
-import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
-import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
-import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
-import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
-import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
-// import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
-import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
-import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
-import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
-import "monaco-editor/esm/vs/language/json/monaco.contribution"
-import "monaco-editor/esm/vs/language/json/json.worker"
-import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
+import * as monaco from "monaco-editor"
 import "./style.css";
 import func from "@/util/func"
 import editorSetup from './customEditor';
@@ -29,7 +13,7 @@ function highlightPaths(highlightPathMap, ref){
         matches.forEach((match) => {
           ref.createDecorationsCollection([
               {
-                range: new Range(match.range.startLineNumber, match.range.endColumn +3 , match.range.endLineNumber + 1, 0),
+                range: new monaco.Range(match.range.startLineNumber, match.range.endColumn + 3 , match.range.endLineNumber + 1, 1),
                 options: {
                   inlineClassName: highlightPathMap[key].other ? "highlightOther" : "highlight",
                 },
@@ -41,9 +25,103 @@ function highlightPaths(highlightPathMap, ref){
     })
 }
 
+function highlightHeaders(data, ref, getLineNumbers){
+  const diffRange = []
+  const headerKeysMap = data.headersMap
+
+  // add classname for first line only
+  if(data.isUpdatedFirstLine){
+    let strArr = data?.firstLine.split("->")
+    ref.createDecorationsCollection([{
+      range: new monaco.Range(1, 1, 2, 1),
+      options:{
+        inlineClassName: "updated-content",
+        hoverMessage: [
+          {
+            supportHtml: true,
+            value: `**<span style="color:#916A00;">MODIFIED</span>**`
+          },
+          {
+            supportHtml: true,
+            value: `**<span>${strArr[0]} -></span> <span style="color:#916A00;">${strArr[1]}</span>**`,
+          }
+        ]
+      }
+    }])
+  }
+
+  // add classname for content only
+  let changesArr = []
+  headerKeysMap && Object.keys(headerKeysMap).forEach((key) => {
+    const header = key
+    let matchRanges = ref.getModel().findMatches(header, false, false, true, null, true)
+    changesArr = [ ...changesArr, ...matchRanges]
+    matchRanges.forEach((obj) => {
+      let matchRange = obj.range
+      let startCol = headerKeysMap[key].className.includes("update") ? (matchRange.startColumn + headerKeysMap[key]?.keyLength + 2) : 1
+      if(!headerKeysMap[key].className.includes("update")){
+        diffRange.push({range: matchRange.startLineNumber, key: headerKeysMap[key].className})
+      }else{
+        let strArr = headerKeysMap[key].data.split("->")
+        ref.createDecorationsCollection([{
+          range: new monaco.Range(matchRange.startLineNumber, startCol, matchRange.endLineNumber + 1, 1),
+          options:{
+            inlineClassName: headerKeysMap[key].className,
+            hoverMessage: [
+              {
+                supportHtml: true,
+                value: `**<span style="color:#916A00;">MODIFIED</span>**`
+              },
+              {
+                supportHtml: true,
+                value: `**<span>${strArr[0]} -></span> <span style="color:#916A00;">${strArr[1]}</span>**`
+              }
+            ]
+          }
+        }])
+      }
+    })
+    
+  })
+  changesArr = changesArr.map((item) => item.range.startLineNumber)
+  if(data.isUpdatedFirstLine){
+    changesArr.push(1)
+  }
+  changesArr.sort((a,b) => a - b)
+  getLineNumbers(changesArr)
+  // add classname to whole block to make a box
+  diffRange.sort((a,b) => a.range - b.range)
+  let currentRange = null
+  let result = []
+
+  for (const obj of diffRange) {
+    if (!currentRange) {
+      currentRange = { start: obj.range, end: obj.range, key: obj.key };
+    } else if (obj.range === currentRange.end + 1 && obj.key === currentRange.key) {
+      currentRange.end = obj.range;
+    } else {
+      result.push(currentRange);
+      currentRange = { start: obj.range, end: obj.range, key: obj.key };
+    }
+  }
+  if (currentRange) {
+    result.push(currentRange);
+  }
+
+  result.forEach((obj)=>{
+    let className = obj.key.includes("added") ? "added-block" : "deleted-block"
+    ref.createDecorationsCollection([{
+      range: new monaco.Range(obj.start, 1, obj.end, 100),
+      options: {
+        blockClassName: className
+      }
+    }])
+  })
+}
+
 function SampleData(props) {
 
-    let {showDiff, data, minHeight, editorLanguage} = props;
+    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers} = props;
 
     const ref = useRef(null);
     const [instance, setInstance] = useState(undefined);
@@ -70,13 +148,29 @@ function SampleData(props) {
         }
           return data;
       })
-    }, [data])
+    }, [data, currLine])
 
     useEffect(() => {
       if(instance!==undefined && editorData!==undefined){
         showData(editorData);
       }
     }, [instance, editorData])
+
+    useEffect(()=>{
+      instance && instance.revealLineInCenter(currLine)
+      let a = instance && instance.createDecorationsCollection([{
+        range: new monaco.Range(currLine, 1, currLine, 2),
+        options: {
+          blockClassName: "active-line"
+        }
+      }])
+      if(a?._decorationIds){
+        setTimeout(() => {
+          instance && instance.removeDecorations(a?._decorationIds)
+        }, 2000)
+      }
+
+    },[currLine])
 
     function createInstance(){
         const options = {
@@ -101,9 +195,9 @@ function SampleData(props) {
           editorSetup.setEditorTheme()
         }
         if(showDiff){
-          instance = editor.createDiffEditor(ref.current, options)
+          instance = monaco.editor.createDiffEditor(ref.current, options)
         } else {
-          instance = editor.create(ref.current, options) 
+          instance = monaco.editor.create(ref.current, options) 
         }
         setInstance(instance)
 
@@ -111,8 +205,8 @@ function SampleData(props) {
     
     function showData(data){
       if (showDiff) {
-        let ogModel = editor.createModel(data?.original, editorLanguage)
-        let model = editor.createModel(data?.message, editorLanguage)
+        let ogModel = monaco.editor.createModel(data?.original, editorLanguage)
+        let model = monaco.editor.createModel(data?.message, editorLanguage)
         instance.setModel({
           original: ogModel,
           modified: model
@@ -120,11 +214,14 @@ function SampleData(props) {
       } else {
         instance.setValue(data?.message)
         highlightPaths(data?.highlightPaths, instance);
+        if(data.headersMap){
+          highlightHeaders(data, instance,getLineNumbers)
+        }
       }
     }
 
     return (
-      <div ref={ref} style={{height:minHeight}} className='editor'/>
+      <div ref={ref} style={{height:minHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
     )
 }
 
