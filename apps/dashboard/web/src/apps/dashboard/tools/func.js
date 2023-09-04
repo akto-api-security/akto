@@ -1,5 +1,34 @@
 import { editor, languages, MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api"
 import leven from "leven"
+import * as yamlConf from "monaco-editor/esm/vs/basic-languages/yaml/yaml" 
+import snippets from "./snippets"
+
+let { conf,language } = yamlConf;
+
+function getLanguage() {
+
+    let keywordCondition = [
+        /.+?(?=(\s+#|$))/,
+        {
+            cases: {
+                "@keywords": "keyword",
+                "@default": "rawString"
+            }
+        }
+    ] 
+    // autocomplete doesn't work for strings.
+    // so this essentially fools the engine to think that the unquoted strings are not strings.
+    language.tokenizer.root.pop();
+    language.tokenizer.array.pop();
+    language.tokenizer.object.pop();
+    language.tokenizer.root.push(keywordCondition);
+    keywordCondition[0] = /[^\],]+/
+    language.tokenizer.array.push(keywordCondition);
+    keywordCondition[0] = /[^\},]+/
+    language.tokenizer.object.push(keywordCondition);
+
+    return language;
+}
 
 const editorSetup = {
 
@@ -7,42 +36,9 @@ const editorSetup = {
         languages.register({id: 'custom_yaml'})
     },
 
-    setTokenizer: function(keywords,symbols){
-        languages.setMonarchTokensProvider("custom_yaml", {
-            keywords: keywords,
-            symbols: symbols,
-            tokenizer: {
-                root: [
-                    [/[a-z_$][\w$]*/, { cases: { 
-                                '@keywords': 'keyword',
-                                '@default': 'identifier' } }
-                    ],
-                    [/[A-Z][\w\$]*/, 'type.identifier' ],
-                    // [/\$\{[a-zA-Z0-9]\}\$]*/, 'variable' ],
-                    { include: '@whitespace' },
-                    [/[{}()\[\]]/, '@brackets'],
-                    [/[<>](?!@symbols)/, '@brackets'],
-                    [/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation', log: 'annotation token: $0' }],
-                    [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
-                    [/0[xX][0-9a-fA-F]+/, 'number.hex'],
-                    [/\d+/, 'number'],
-                    [/[;,.]/, 'delimiter'],
-                    [/"([^"\\]|\\.)*$/, 'string.invalid' ],
-                    [/"/,  { token: 'string.quote', bracket: '@open', next: '@string' } ],
-                    [/'[^\\']'/, 'string'],
-                    [/'/, 'string.invalid'],
-                    [/^\s*#.*/, 'comment']
-                ],
-                whitespace: [
-                    [/[ \t\r\n]+/, 'white'],
-                ],
-                string: [
-                    [/[^\\"]+/,  'string'],
-                    [/\\./,      'string.escape.invalid'],
-                    [/"/,        { token: 'string.quote', bracket: '@close', next: '@pop' } ]
-                ],
-            },
-        });
+    setTokenizer: function(){
+        languages.setMonarchTokensProvider("custom_yaml", getLanguage());
+        languages.setLanguageConfiguration("custom_yaml", conf);
     },
 
     setEditorTheme: function(){
@@ -50,12 +46,13 @@ const editorSetup = {
             base: "vs",
             inherit: false,
             rules: [
-                { token: "keyword", foreground: "#008080", fontStyle: "bold" },
+                { token: "keyword", foreground: "#0000ff" },
+                { token: "type", foreground: "#008080" },
                 { token: "comment", foreground: "#008000" },
                 { token: "string", foreground: "#0451a5" },
+                { token: "rawString", foreground: "#0451a5" },
                 { token: "identifier", foreground: "#0451a5" },
-                { token: "number", foreground: "#6200ea"},
-                { token: "variable", foreground: "#bada55"}
+                { token: "number", foreground: "#098658"}
             ],
                 colors: {
                     'editorLineNumber.foreground': '#999999',
@@ -69,12 +66,25 @@ const editorSetup = {
         languages.registerCompletionItemProvider('custom_yaml', {
             provideCompletionItems: (model,position) => {
                 const word = model.getWordUntilPosition(position);
-                const range = {
+                let range = {
                     startLineNumber: position.lineNumber,
                     endLineNumber: position.lineNumber,
-                    startColumn: word.startColumn,
+                    startColumn: 1,
                     endColumn: word.endColumn,
                 };
+                const currentLine = model.getValueInRange(range);
+                if (currentLine.includes(":")) {
+                    return {
+                        suggestions: [
+                            {
+                                label: "",
+                                kind: languages.CompletionItemKind.Keyword,
+                                insertText: ""
+                            }
+                        ]
+                    }
+                }
+
                 const suggestions = [
                     ...keywords.map(word=>{
                         return{
@@ -83,22 +93,18 @@ const editorSetup = {
                             insertText: word,
                         }
                     }),
-                    {
-                        label: "ifelse",
-                        kind: languages.CompletionItemKind.Snippet,
-                        insertText: [
-                            "if (${1:condition}) {",
-                            "\t$0",
-                            "} else {",
-                            "\t",
-                            "}",
-                        ].join("\n"),
-                        insertTextRules:
-                            languages.CompletionItemInsertTextRule
-                                .InsertAsSnippet,
-                        documentation: "If-Else Statement",
-                        range: range,
-                    },
+                    ...snippets.map(snippet => {
+                        return {
+                            label: snippet.label,
+                            kind: languages.CompletionItemKind.Snippet,
+                            insertText: snippet.text.join("\n"),
+                            insertTextRules:
+                                languages.CompletionItemInsertTextRule
+                                    .InsertAsSnippet,
+                            documentation: snippet.desc,
+                            range: range,
+                        }
+                    })
                 ];
                 return {suggestions : suggestions}
             }
@@ -106,14 +112,19 @@ const editorSetup = {
     },
 
     findErrors: function(Editor,keywords){
+        let keyRegex = /(?<=^\s*-?\s*)(\w+)(?=:)(?= |$)/
         Editor.onDidChangeModelContent(() => {
             const model = Editor.getModel();
             const markers = model.getValue().split('\n').flatMap((line, index) => {
-                const words = line.split(/\s+/); // Split the line into words
+                let match = keyRegex.exec(line);
+                const words = [];
+                if(match!=null){
+                    words.push(match[0]);
+                }
                 const errors = words.flatMap((word, wordIndex) => {
                     const matchingKeywords = keywords.filter(keyword => {
                         const distance = leven(keyword, word);
-                        return distance > 0 && distance < 2 && word.length >= 4;
+                        return distance > 0 && distance < 4 && word.length >= 2 && !keywords.includes(word);
                     }); // Adjust the distance threshold as needed
                     return matchingKeywords.map(keyword => ({
                         severity: MarkerSeverity.Error,
