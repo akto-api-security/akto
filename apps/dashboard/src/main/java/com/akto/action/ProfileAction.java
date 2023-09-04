@@ -95,7 +95,7 @@ public class ProfileAction extends UserAction {
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
-        if (versions.length == 3) {
+        if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");
             } else {
