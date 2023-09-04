@@ -58,7 +58,7 @@ jobs:
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/polaris_web
+        working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Configure AWS Credentials
         if: ${{ github.event.inputs.Environment == 'prod' }}
@@ -73,7 +73,7 @@ jobs:
         run: aws s3 sync ./apps/dashboard/web/dist s3://my-cdn-test-bucket/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
       - name: Deploy polaris site to S3 bucket
         if: ${{ github.event.inputs.Environment == 'prod' }}
-        run: aws s3 sync ./apps/dashboard/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://my-cdn-test-bucket/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
 
       - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
       - name: DockerHub login
@@ -82,7 +82,7 @@ jobs:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       - name: Build, tag, and push the image to DockerHub
         if: ${{ github.event.inputs.Environment == 'prod' }}
         id: build-image-dockerhub
@@ -100,7 +100,7 @@ jobs:
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
       - name: Update flash staging
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
         run: |
