@@ -25,7 +25,7 @@ const transform = {
                 deletedKeys.push({header: key + ":", className: 'deleted-content'})
                 finalData = finalData + key + ': ' + original[key] + "\n"
             }else if (original[key] !== current[key]){
-                changedKeys.push({header: key + ":", className: 'updated-content', data: original[key] + "->" + current[key]})
+                changedKeys.push({header: key + ":", className: 'updated-content', data: original[key] + "->" + current[key], keyLength: key.length})
                 finalData = finalData + key + ': ' + current[key] + "\n"
             }else{
                 finalData = finalData + key + ': ' + current[key] + "\n"
@@ -40,7 +40,7 @@ const transform = {
         }
     
         const mergedObject = [...deletedKeys, ...insertedKeys, ...changedKeys].reduce((result, item) => {
-            result[item.header] = {className:item.className, data: item?.data};
+            result[item.header] = {className:item.className, data: item?.data, keyLength: item.keyLength};
             return result;
         }, {});
     
@@ -85,7 +85,7 @@ const transform = {
                 finalUnflatObj[key] = ogFlat[key]
             }else if(!func.deepComparison(ogFlat[key],currFlat[key])){
                 let searchKey = typeof(ogFlat[key]) === "string" ? mainKey + '"' + currFlat[key] + '"' : mainKey + currFlat[key]
-                changedKeys.push({header:searchKey, className: 'updated-content', data: ogFlat[key] + "->" + currFlat[key]})
+                changedKeys.push({header:searchKey, className: 'updated-content', data: ogFlat[key] + "->" + currFlat[key], keyLength: key.split(".")?.pop().length + 2})
                 finalUnflatObj[key] = currFlat[key]
             }else{
                 finalUnflatObj[key] = ogFlat[key]
@@ -101,7 +101,7 @@ const transform = {
         }
 
         const mergedObject = [...deletedKeys, ...insertedKeys, ...changedKeys].reduce((result, item) => {
-            result[item.header] = {className:item.className, data: item?.data};
+            result[item.header] = {className:item.className, data: item?.data, keyLength: item.keyLength};
             return result;
         }, {});
 

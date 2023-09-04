@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import {
-    ClipboardMinor
+    ClipboardMinor,ArrowDownMinor, ArrowUpMinor
 } from '@shopify/polaris-icons';
 import {
     HorizontalStack, Box, LegacyCard,
-    Button, Popover, ActionList
+    Button, Popover, ActionList, Icon, Text, Tooltip
 } from '@shopify/polaris';
 import SampleData from './SampleData';
 import func from "@/util/func";
@@ -46,6 +46,8 @@ function SampleDataComponent(props) {
     const { type, sampleData, minHeight, showDiff, isNewDiff } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
+    const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
+    const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
 
     useEffect(()=>{
         let parsed;
@@ -178,6 +180,35 @@ function SampleDataComponent(props) {
         return items;
     }
 
+    const getLineNumbers = (linesArr) =>{
+        setLineNumbers((prev)=>{
+            // prev[type] = linesArr.slice();
+            // console.log(prev[type].length, type);
+            return {...prev, [type]: linesArr.slice()}
+        })
+    }
+
+    const checkButtonActive = (buttonType) => {
+        if(buttonType === 'next'){
+            return currentIndex[type] < (lineNumbers[type]?.length - 1)
+        }else{
+            return currentIndex[type] > 0
+        }
+    }
+
+    const changeIndex = (buttonType) => {
+        if(buttonType === 'next'){
+            setCurrentIndex((prev)=>{
+                return {...prev, [type]: prev[type] + 1}
+            })
+        }else{
+            setCurrentIndex((prev)=>{
+                return {...prev, [type]: prev[type] - 1}
+            })
+        }
+    }
+
+    let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
     return (
 
         <Box>
@@ -185,23 +216,45 @@ function SampleDataComponent(props) {
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
                         {func.toSentenceCase(type)}
-                        <Popover
-                            zIndexOverride={"600"}
-                            active={popoverActive[type]}
-                            activator={<Button icon={ClipboardMinor} plain onClick={() => 
-                                setPopoverActive({ [type]: !popoverActive[type] })} />}
-                            onClose={() => setPopoverActive(false)}
-                        >
-                            <ActionList
-                                actionRole="menuitem"
-                                items={getItems(type, sampleData)}
-                            />
-                        </Popover>
+                        <HorizontalStack gap={2}>
+                        {isNewDiff ? <HorizontalStack gap="2">
+                                <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
+                                    <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
+                                </Box>
+                                <HorizontalStack gap="1">
+                                    <Button plain monochrome disabled={!checkButtonActive("prev")} onClick={() => changeIndex("prev")}>
+                                        <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
+                                            <Icon source={ArrowUpMinor} />
+                                        </Box>
+                                    </Button>
+                                    <Button plain monochrome disabled={!checkButtonActive("next")} onClick={() => changeIndex("next")}>
+                                        <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
+                                            <Icon source={ArrowDownMinor} />
+                                        </Box>
+                                    </Button>
+                                </HorizontalStack>
+                            </HorizontalStack> 
+                            : null}
+                            <Tooltip content={`Copy ${type}`}>
+                            <Popover
+                                zIndexOverride={"600"}
+                                active={popoverActive[type]}
+                                activator={<Button icon={ClipboardMinor} plain onClick={() => 
+                                    setPopoverActive({ [type]: !popoverActive[type] })} />}
+                                onClose={() => setPopoverActive(false)}
+                            >
+                                <ActionList
+                                    actionRole="menuitem"
+                                    items={getItems(type, sampleData)}
+                                />
+                            </Popover>
+                            </Tooltip>
+                        </HorizontalStack>
                     </HorizontalStack>
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} editorLanguage="custom_http"/>
+                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
             </LegacyCard.Section>
         </Box>
     )
