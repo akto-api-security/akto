@@ -234,6 +234,7 @@ import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 
+import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 
 export default {
     name: "TextEditor",
@@ -301,10 +302,17 @@ export default {
                 theme: "customTheme"
             },
             keywords: [
-                "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", "regex", "eq", "neq", "gt", "gte", "lt", "lte", "not_contains", "not_contains_either", "contains_jwt", "contains_all", "contains_either", "for_one", "or", "and", "add_body_param", "modify_body_param", "delete_body_param", "add_query_param", "modify_query_param", "delete_query_param", "modify_url", "modify_method", "replace_body", "add_header", "modify_header", "delete_header", "remove_auth_header", "follow_redirect"
-
+                "id", "info", 
+                "name", "description", "details", "impact", "category", "shortName", "displayName", "subCategory", "severity", "tags", "references",
+                "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", 
+                "regex", "eq", "neq", "gt", "gte", "lt", "lte", 
+                "key", "value", "requests", "req", "res",
+                "not_contains", "not_contains_either", "contains_jwt", "contains_all", "contains_either",
+                "for_one", "or", "and", "extract", 
+                "add_body_param", "modify_body_param", "delete_body_param", "add_query_param", "modify_query_param", "delete_query_param", 
+                "modify_url", "modify_method", "replace_body", "add_header", "modify_header", "delete_header", "remove_auth_header", "follow_redirect",
+                "api_selection_filters", "execute", "type", "auth", "validate", "authenticated", 
             ],
-            symbols:  /[=><!~?:&|+\-*\/\^%]+/,
             textEditor: null,
             testCategories: [],
             testsObj: {},
@@ -526,7 +534,7 @@ export default {
         },
         createEditor() {
             editorSetup.registerLanguage()
-            editorSetup.setTokenizer(this.keywords,this.symbols)
+            editorSetup.setTokenizer()
             editorSetup.setEditorTheme()
             editorSetup.setAutoComplete(this.keywords)
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
@@ -538,7 +546,7 @@ export default {
                     this.giveTypingEffect(false, true);
                 },
             });
-            // editorSetup.findErrors(this.textEditor,this.keywords)
+            editorSetup.findErrors(this.textEditor, this.keywords)
         },
         giveTypingEffect() {
             let str = this.textEditor.getValue()
