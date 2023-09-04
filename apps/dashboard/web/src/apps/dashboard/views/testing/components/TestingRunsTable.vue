@@ -126,17 +126,17 @@ export default {
             switch (this.type) {
                 case func.testingType().cicd:
                     res = await api.fetchTestingDetails({
-                        startTimestamp: 0, endTimestamp: 0, fetchCicd: true, sortKey, sortOrder, skip, limit, filters, filterOperators
+                        startTimestamp: 0, endTimestamp: 0, fetchCicd: true, sortKey, sortOrder, skip, limit, filters
                     });
                     break;
                 case func.testingType().active:
                     res = await api.fetchTestingDetails({
-                        startTimestamp: 0, endTimestamp: 0, fetchCicd: false, sortKey, sortOrder, skip, limit, filters, filterOperators
+                        startTimestamp: 0, endTimestamp: 0, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
                     });
                     break;
                 case func.testingType().inactive:
                     res = await api.fetchTestingDetails({
-                        startTimestamp: now - func.recencyPeriod, endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters, filterOperators
+                        startTimestamp: now - func.recencyPeriod, endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
                     });
                     break;
             }
