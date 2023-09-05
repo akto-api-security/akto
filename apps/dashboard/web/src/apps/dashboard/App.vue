@@ -278,7 +278,21 @@ export default {
           label: "Switch to new UI",
           click: () => {
             api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
-              window.location.reload()
+              let currPath = window.location.pathname
+              if(currPath.includes("inventory")){
+                let paths = currPath.split("/");
+                if(paths.length > 5){
+                  let path = ""
+                  for(var i = 0 ; i < 5 ; i++){
+                    path = path + paths[i] + '/' ;
+                  }
+                  window.location.pathname = path
+                }else{
+                  window.location.reload() ;
+                }
+              }else{
+                window.location.reload()
+              }
             })
           }
         },

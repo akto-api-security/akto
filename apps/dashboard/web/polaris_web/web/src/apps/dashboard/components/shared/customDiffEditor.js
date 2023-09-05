@@ -21,7 +21,7 @@ const transform = {
         let finalData = ""
     
         for(const key in original){
-            if(!current.hasOwnProperty(key)){
+            if(!current?.hasOwnProperty(key)){
                 deletedKeys.push({header: key + ":", className: 'deleted-content'})
                 finalData = finalData + key + ': ' + original[key] + "\n"
             }else if (original[key] !== current[key]){
@@ -33,7 +33,7 @@ const transform = {
         }
     
         for(const key in current){
-            if(!original.hasOwnProperty(key)){
+            if(!original?.hasOwnProperty(key)){
                 insertedKeys.push({header: key + ":", className: 'added-content'})
                 finalData = finalData + key + ': ' + current[key] + "\n"
             }
@@ -80,7 +80,7 @@ const transform = {
 
         for(const key in ogFlat){
             let mainKey = '"' + key.split(".")?.pop() + '": ' 
-            if(!currFlat.hasOwnProperty(key)){
+            if(!currFlat?.hasOwnProperty(key)){
                 deletedKeys.push({header: mainKey + '"' + ogFlat[key] + '"', className: 'deleted-content'})
                 finalUnflatObj[key] = ogFlat[key]
             }else if(!func.deepComparison(ogFlat[key],currFlat[key])){

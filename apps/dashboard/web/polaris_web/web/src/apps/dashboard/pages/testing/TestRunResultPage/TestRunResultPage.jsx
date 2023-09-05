@@ -137,7 +137,26 @@ function TestRunResultPage(props) {
   
   function getDescriptionText(fullDescription){
     let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
-    return fullDescription ? str : str[0] + " "
+    let finalStr = ""
+
+    if(typeof(str) !== 'string'){
+      str?.forEach((element) =>{
+        if(typeof(element) === 'object'){
+          if(element?.props?.children !== null){
+            finalStr = finalStr + element.props.children
+          }
+        }else{
+          finalStr = finalStr + element
+        }
+      })
+      finalStr = finalStr.replace(/"/g, '');
+      let firstLine = finalStr.split('.')[0]
+      return fullDescription ? finalStr : firstLine + ". "
+    }
+    str = str.replace(/"/g, '');
+    let firstLine = str.split('.')[0]
+    return fullDescription ? str : firstLine + ". "
+    
   }
 
   async function setData(testingRunResult, runIssues) {
@@ -193,7 +212,7 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.map((result) => {
         return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
       })}
-      isNewDiff={true}
+      isNewDiff={selectedTestRunResult?.vulnerable}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
       isVulnerable={selectedTestRunResult.vulnerable}
@@ -220,8 +239,8 @@ function TestRunResultPage(props) {
     divider= {true}
     backUrl = {props?.source == "editor" ? undefined : (hexId=="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
     isFirstPage = {props?.source == "editor"}
-    primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
-    secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
+    // primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
+    // secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {components}
     />
   )

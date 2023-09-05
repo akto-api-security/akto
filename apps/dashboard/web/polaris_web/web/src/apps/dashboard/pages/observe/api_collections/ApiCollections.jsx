@@ -11,6 +11,7 @@ import {
 
 import { useNavigate } from "react-router-dom"
 import ObserveStore from "../observeStore"
+import Store from "../../../store"
 
 const headers = [
     {
@@ -81,6 +82,9 @@ function ApiCollections() {
         setActive(true)
     }
 
+    const setAllCollections = Store(state => state.setAllCollections)
+    const setCollectionsMap = Store(state => state.setCollectionsMap)
+
     const createNewCollection = async () => {
         let newColl = await api.createCollection(newCollectionName)
         setNewCollectionName('')
@@ -94,6 +98,8 @@ function ApiCollections() {
         let apiCollectionsResp = await api.getAllCollections()
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        setAllCollections(apiCollectionsResp.apiCollections || [])
+        setCollectionsMap(func.mapCollectionIdToName(tmp))
         setData(tmp)
     }
 
