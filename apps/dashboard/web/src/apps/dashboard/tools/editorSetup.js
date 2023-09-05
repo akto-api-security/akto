@@ -112,7 +112,10 @@ const editorSetup = {
     },
 
     findErrors: function(Editor,keywords){
-        let keyRegex = /(?<=^\s*-?\s*)(\w+)(?=:)(?= |$)/
+        // a key may start with spaces and may have a "-" before starting
+        // it will end with ":" and may have spaces at the end.
+        let keyRegex = /(?<=^\s*-?\s*)(\w+)(?=:( *)$)/
+
         Editor.onDidChangeModelContent(() => {
             const model = Editor.getModel();
             const markers = model.getValue().split('\n').flatMap((line, index) => {
@@ -124,8 +127,8 @@ const editorSetup = {
                 const errors = words.flatMap((word, wordIndex) => {
                     const matchingKeywords = keywords.filter(keyword => {
                         const distance = leven(keyword, word);
-                        return distance > 0 && distance < 4 && word.length >= 2 && !keywords.includes(word);
-                    }); // Adjust the distance threshold as needed
+                        return distance > 0 && distance < 3 && word.length >= 2 && !keywords.includes(word);
+                    });
                     return matchingKeywords.map(keyword => ({
                         severity: MarkerSeverity.Error,
                         message: `Invalid keyword: ${word}. Did you mean: ${keyword}?`,
