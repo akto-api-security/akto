@@ -342,6 +342,9 @@ export default {
                             active: true
                         },
                         ...(this.testingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
@@ -365,6 +368,9 @@ export default {
                             active: true
                         },
                         ...(this.cicdTestingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
@@ -389,6 +395,9 @@ export default {
                             active: true
                         },
                         ...(this.pastTestingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
