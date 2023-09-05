@@ -131,9 +131,10 @@ public class VariableResolver {
 
                 expression = valMap.keySet().iterator().next();
                 
+            } else {
+                return false;                
             }
 
-            return false;
         } else {
             expression = val.toString();
         }
