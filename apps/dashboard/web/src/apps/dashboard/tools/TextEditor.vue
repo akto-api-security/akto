@@ -218,7 +218,7 @@ import testingApi from "../views/testing/api"
 
 import func from "@/util/func"
 import obj from "@/util/obj"
-import editorSetup from "./func"
+import editorSetup from "./editorSetup"
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
