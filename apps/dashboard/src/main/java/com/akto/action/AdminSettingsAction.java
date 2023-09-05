@@ -2,11 +2,14 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.User;
 import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 
 import java.util.Map;
@@ -74,7 +77,7 @@ public class AdminSettingsAction extends UserAction {
     public String toggleRedactFeature() {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
-        boolean isAdmin = RBACDao.instance.isAdmin(user.getId());
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
         if (!isAdmin) return ERROR.toUpperCase();
 
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -131,7 +134,7 @@ public class AdminSettingsAction extends UserAction {
 
 
     private Map<String, String> filterHeaderValueMap;
-    
+
     public String addFilterHeaderValueMap() {
         Bson update;
         if (this.filterHeaderValueMap == null) {
@@ -149,9 +152,11 @@ public class AdminSettingsAction extends UserAction {
 
     private String regex;
     private String newName;
+    private String headerName = "host";
+
     public String addApiCollectionNameMapper() {
         String hashStr = regex.hashCode()+"";
-        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName));
+        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName, headerName));
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), update
@@ -161,7 +166,7 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public String deleteApiCollectionNameMapper() {
-        
+
         String hashStr = regex.hashCode()+"";
 
         Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr);
@@ -200,7 +205,11 @@ public class AdminSettingsAction extends UserAction {
     public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
         this.filterHeaderValueMap = filterHeaderValueMap;
     }
-    
+
+    public Map<String, String> getFilterHeaderValueMap() {
+        return filterHeaderValueMap;
+    }
+
     public void setRegex(String regex) {
         this.regex = regex;
     }
@@ -208,7 +217,11 @@ public class AdminSettingsAction extends UserAction {
     public void setNewName(String newName) {
         this.newName = newName;
     }
-    
+
+    public void setHeaderName(String headerName) {
+        this.headerName = headerName;
+    }
+
     public int getGlobalRateLimit() {
         return globalRateLimit;
     }

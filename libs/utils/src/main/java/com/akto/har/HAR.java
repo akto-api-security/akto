@@ -21,7 +21,7 @@ public class HAR {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Har.class);
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
-    public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
+    public List<String> getMessages(String harString, int collection_id, int accountId) throws HarReaderException {
         HarReader harReader = new HarReader();
         Har har = harReader.readFromString(harString, HarReaderMode.LAX);
 
@@ -33,7 +33,7 @@ public class HAR {
         for (HarEntry entry: entries) {
             idx += 1;
             try {
-                Map<String,String> result = getResultMap(entry);
+                Map<String,String> result = getResultMap(entry, accountId);
                 if (result != null) {
                     result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
@@ -48,7 +48,7 @@ public class HAR {
         return entriesList;
     }
 
-    public static Map<String,String> getResultMap(HarEntry entry) throws Exception {
+    public static Map<String,String> getResultMap(HarEntry entry, int accountId) throws Exception {
         HarRequest request = entry.getRequest();
         HarResponse response = entry.getResponse();
         Date dateTime = entry.getStartedDateTime();
@@ -64,7 +64,7 @@ public class HAR {
         String requestPayload = request.getPostData().getText();
         if (requestPayload == null) requestPayload = "";
 
-        String akto_account_id = 1_000_000 + ""; // TODO:
+        String akto_account_id = accountId + "";
         String path = getPath(request);
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);

@@ -1,0 +1,43 @@
+id: SSH_AUTHORIZED_KEYS
+info:
+  name: SSH Authorized Keys
+  description: "Exposed SSH Authorized Keys"
+  details: >
+              "searches for publicly accessible SSH authorized_keys files, which contain SSH public keys used for authentication. Unauthorized access to these keys can lead to unauthorized SSH access to the system."
+  impact: "Exposing SSH authorized keys increases the risk of unauthorized SSH access, potentially leading to unauthorized system access and compromised security."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: SSH_AUTHORIZED_KEYS
+  severity: LOW
+  references:
+    - https://www.ssh.com/academy/ssh/authorized-key
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.ssh/authorized_keys
+    - ${urlVar}/_/.ssh/authorized_keys
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - "ssh-dss"
+      - "ssh-ed25519"
+      - "ssh-rsa"
+      - "ecdsa-sha2-nistp256"

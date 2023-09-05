@@ -66,9 +66,9 @@ public class APICatalogSync {
                 mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
             }
         } catch (Exception e) {
-            
+
         }
-        
+
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;

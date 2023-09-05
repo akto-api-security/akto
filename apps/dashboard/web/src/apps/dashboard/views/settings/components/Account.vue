@@ -97,66 +97,97 @@
 
       </div>
       <div>
-
-
         <div class="toggle-redact-feature">
             <div class="entry-text">Traffic filters</div>
-            <div class="d-flex traffic-filter-div">
-                <div class="input-value-key">
-                    <v-text-field v-model="newKey" style="width: 200px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Header key
-                                <help-tooltip :size="12"
-                                    text="Please enter the name of header key" />
+            <div>
+            <div class="traffic-filters">
+
+                <div v-if="filterHeaderValueMap">
+                    <div v-for="(val, key) in filterHeaderValueMap" :key="key">
+                            <div class="d-flex jc-sb">
+                                <div class="values-div">
+                                    <tooltip-text type="key" :text="key" />
+                                    <tooltip-text :text="val" />
+                                </div>
+                                <v-btn icon @click="() => removeFilterHeaderValueMap(key)">
+                                    <v-icon size="12">$fas_trash</v-icon>
+                                </v-btn>
                             </div>
-                        </template>
-                    </v-text-field>
-
+                    </div>
                 </div>
-                <div class="input-value-value">
-                    <v-text-field v-model="newVal" style="width: 500px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Header value
-                                <help-tooltip :size="12" text="Please enter the name of header value" />
-                            </div>
-                        </template>
+            </div>
 
-                    </v-text-field>
+                <div class="d-flex traffic-filter-div">
+                    <div class="input-value-key">
+                        <v-text-field v-model="newKey" style="width: 200px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Header key
+                                    <help-tooltip :size="12"
+                                        text="Please enter the name of header key" />
+                                </div>
+                            </template>
+                        </v-text-field>
+                    </div>
+                    <div class="input-value-value">
+                        <v-text-field v-model="newVal" style="width: 500px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Header value
+                                    <help-tooltip :size="12" text="Please enter the name of header value" />
+                                </div>
+                            </template>
+                        </v-text-field>
+                    </div>
+                    <div class="filter-save-btn">
+                        <v-btn primary dark color="var(--hexColor9)" @click="addFilterHeaderValueMap" v-if="filterHeaderValueMapChanged">
+                            Save
+                        </v-btn>
+                    </div>
                 </div>
-
-                <div class="filter-save-btn">
-                    <v-btn primary dark color="var(--hexColor9)" @click="addFilterHeaderValueMap" v-if="filterHeaderValueMapChanged">
-                        Save
-                    </v-btn>
-                </div>
-
             </div>
         </div>
 
         <div class="toggle-redact-feature mt-8">
             <div class="entry-text">Replace collection</div>
             <div>
-
-                <div v-for="({newName, regex}) in apiCollectionNameMapper">
-                    <div>
-                        <span class="fs-14 fw-500">{{regex}}</span>
-                        <span class="fs-14">{{newName}}</span>
-                        <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
-                            <v-icon size="12">$fas_trash</v-icon>
-                        </v-btn>
+            <div class="traffic-filters">
+                <div v-if="apiCollectionNameMapper">
+                    <div v-for="({newName, regex, headerName}) in Object.values(apiCollectionNameMapper)">
+                            <div class="d-flex jc-sb">
+                                <div class="values-div">
+                                    <tooltip-text type="key" :text="(headerName ? headerName : 'host')" />
+                                    =
+                                    <tooltip-text type="key" :text="regex"/>
+                                    <tooltip-text :text="newName"/>
+                                </div>
+                                <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
+                                    <v-icon size="12">$fas_trash</v-icon>
+                                </v-btn>
+                            </div>
                     </div>
                 </div>
-
+            </div>
                 <div class="d-flex traffic-filter-div">
+                    <div class="input-value-key">
+                        <v-text-field v-model="newApiCollectionNameMapperHeaderName" style="width: 200px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Header key
+                                    <help-tooltip :size="12"
+                                        text="Please enter the header name eg host" />
+                                </div>
+                            </template>
+                        </v-text-field>
+
+                    </div>
                     <div class="input-value-key">
                         <v-text-field v-model="newApiCollectionNameMapperKey" style="width: 200px">
                             <template slot="label">
                                 <div class="d-flex">
-                                    Host
+                                    Regex to match header value
                                     <help-tooltip :size="12"
-                                        text="Please enter the regex to match host" />
+                                        text="Please enter the regex to match " />
                                 </div>
                             </template>
                         </v-text-field>
@@ -190,18 +221,21 @@
 <script>
 import func from "@/util/func";
 import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
+import TooltipText from "@/apps/dashboard/shared/components/TooltipText.vue";
 
 import {mapState} from 'vuex'
     export default {
         name: "Account",
         components: { 
-            HelpTooltip
+            HelpTooltip,
+            TooltipText
         },
         data () {
             return {
                 setup_types: ["STAGING", "PROD", "QA", "DEV"],
                 newKey: null,
                 newVal: null,
+                newApiCollectionNameMapperHeaderName: null,
                 newApiCollectionNameMapperKey: null,
                 newApiCollectionNameMapperValue: null
             }
@@ -214,10 +248,18 @@ import {mapState} from 'vuex'
                 return func.epochToDateTime(timestamp)
             },
             addFilterHeaderValueMap() {
-                this.$store.dispatch('team/addFilterHeaderValueMap', {"filterHeaderValueMapKey" : this.newKey, "filterHeaderValueMapValue": this.newVal})
+                this.filterHeaderValueMap[this.newKey] = this.newVal
+                this.$store.dispatch('team/addFilterHeaderValueMap', this.filterHeaderValueMap)
+                this.newKey = null
+                this.newVal = null
+            },
+            removeFilterHeaderValueMap(key){
+                delete this.filterHeaderValueMap[key]
+                this.$store.dispatch('team/addFilterHeaderValueMap', this.filterHeaderValueMap)
             },
             async addApiCollectionNameMapper() {
-                await this.$store.dispatch('team/addApiCollectionNameMapper', {"regex" : this.newApiCollectionNameMapperKey, "newName": this.newApiCollectionNameMapperValue})
+                await this.$store.dispatch('team/addApiCollectionNameMapper', {"regex" : this.newApiCollectionNameMapperKey, "newName": this.newApiCollectionNameMapperValue, headerName: this.newApiCollectionNameMapperHeaderName})
+                this.newApiCollectionNameMapperHeaderName = null
                 this.newApiCollectionNameMapperKey = null
                 this.newApiCollectionNameMapperValue = null
             },
@@ -290,13 +332,6 @@ import {mapState} from 'vuex'
             apiCollectionNameMapperChanged() {
                 return this.newApiCollectionNameMapperKey && this.newApiCollectionNameMapperValue
             }
-        },
-        watch: {
-            filterHeaderValueMap(a) {
-                if (!a) return
-                this.newKey = Object.keys(a)[0] 
-                this.newVal = Object.values(a)[0]
-            }
         }
     }
 </script>
@@ -317,7 +352,6 @@ import {mapState} from 'vuex'
 
 .toggle-redact-feature
     display: flex
-    height: 50px
     line-height: 50px
 
 .input-value-key
@@ -332,6 +366,15 @@ import {mapState} from 'vuex'
 .filter-save-btn
     display: flex
     align-items: center
+.traffic-filters
+    line-height: 20px
+    max-height: 200px
+    overflow: scroll
+    padding-top: 8px
+.values-div
+    display: flex
+    align-items: center
+    width: 540px
 </style>
 
 <style scoped>

@@ -1,0 +1,37 @@
+id: SONARQUBE_PUBLIC_PROJECTS
+info:
+  name: Sonarqube with public projects
+  description: "Detects publicly accessible SonarQube projects."
+  details: >
+              "Checks for SonarQube instances where project suggestions are publicly available. It looks for API endpoints like "/api/components/suggestions?recentlyBrowsed=" that reveal project-related information."
+  impact: "Publicly accessible SonarQube projects expose sensitive code quality and security information, increasing the risk of unauthorized access and targeted attacks."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: SONARQUBE_PUBLIC_PROJECTS
+  severity: LOW
+  references:
+    - https://next.sonarqube.com/sonarqube/web_api/api/components/suggestions?internal=true
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/api/components/suggestions?recentlyBrowsed=
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - 'results'
+      - 'items'
+      - 'more'
