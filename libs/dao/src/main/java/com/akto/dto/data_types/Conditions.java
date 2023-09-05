@@ -1,7 +1,7 @@
 package com.akto.dto.data_types;
 
 import java.util.List;
-
+import java.util.Objects;
 
 public class Conditions {
     List<Predicate> predicates;
@@ -62,12 +62,54 @@ public class Conditions {
             "}";
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(predicates, operator);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this)
+            return true;
+        if (!(o instanceof Conditions)) {
+            return false;
+        }
+        Conditions conditions = (Conditions) o;
+
+        boolean ret = true;
+
+        if((conditions.operator==null && this.operator!=null) || !conditions.operator.equals(this.operator)){
+            ret = false;
+        }
+
+        if(conditions.predicates!=null && this.predicates!=null){
+
+            for(Predicate p1 : conditions.predicates){
+                boolean found = false;
+                for(Predicate p2 : this.predicates){
+                    if(p2.toString().equals(p1.toString())){
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found){
+                    ret= false;
+                    break;
+                }
+            }
+
+        } else if(!(conditions.predicates==null && this.predicates==null)){
+            ret = false;
+        }
+
+        return ret;
+    }
+
     public static boolean areEqual(Conditions a, Conditions b) {
         boolean ret = false;
 
         ret = ((a == null && b == null) ||
-                (a != null && b != null &&
-                        a.toString().equals(b.toString())));
+                (a != null && b != null && a.equals(b)));
 
         return ret;
     }
