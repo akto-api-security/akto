@@ -130,7 +130,11 @@ public class CustomDataTypeAction extends UserAction{
 
         ret &= Conditions.areEqual(existingCDT.getKeyConditions(), newCDT.getKeyConditions());
         ret &= Conditions.areEqual(existingCDT.getValueConditions(), newCDT.getValueConditions());
-        ret &= existingCDT.getOperator() == newCDT.getOperator();
+        
+        // check for operator change only if both key and value conditions are being used.
+        if(ret && (newCDT.getKeyConditions()!=null && newCDT.getValueConditions()!=null)){
+            ret &= existingCDT.getOperator() == newCDT.getOperator();
+        }
 
         // false if all of them are true and true if any of them is false
         return !ret;
