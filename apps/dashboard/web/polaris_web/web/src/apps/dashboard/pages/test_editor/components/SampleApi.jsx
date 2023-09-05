@@ -265,12 +265,14 @@ const SampleApi = () => {
                 large
             >
                 <Frame >
+                <Box paddingBlockEnd={"8"}>
                 <TestRunResultPage
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
                     testId={selectedTest.value}
                     source="editor"
                 />
+                </Box>
                 </Frame>
             </Modal>
             <Modal

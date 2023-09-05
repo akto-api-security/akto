@@ -102,7 +102,7 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
-      obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
       obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
