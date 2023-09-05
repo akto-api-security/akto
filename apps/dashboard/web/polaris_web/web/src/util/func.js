@@ -127,7 +127,7 @@ const func = {
     saveAs(blob, (selectedTestRun.name || "file") + ".csv");
   },
   flattenObject(obj, prefix = '') {
-    return Object.keys(obj).reduce((acc, k) => {
+    return obj && Object.keys(obj).reduce((acc, k) => {
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&

@@ -145,7 +145,7 @@ const router =  new Router({
                             })
                         },
                         {
-                            path: ':testingRunHexId/results',
+                            path: ':testingRunHexId',
                             name: 'testResults',
                             component: TestingRunResults,
                             props: route => ({
