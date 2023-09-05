@@ -172,9 +172,9 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                     </Box>
                                     <Text variant="headingMd" as="h5" color="subdued">Custom</Text>
                                 </HorizontalStack>
-                                <Box onClick={(e) => addCustomTest(e)}>
+                                {/* <Box onClick={(e) => addCustomTest(e)}>
                                     <Icon source={CirclePlusMinor} />
-                                </Box>
+                                </Box> */}
                             </HorizontalStack>
                         </Button>
                         {showCustom ? <Navigation.Section items={getItems(customItems)} /> : null}

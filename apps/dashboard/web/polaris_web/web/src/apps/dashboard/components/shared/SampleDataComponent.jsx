@@ -72,11 +72,11 @@ function SampleDataComponent(props) {
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine,originalRequestJson?.json?.queryParams,requestJson?.json?.queryParams)
             let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine,originalResponseJson?.json?.queryParams,responseJson?.json?.queryParams)
 
-            let requestHeaderObj = transform.compareJsonKeys(originalRequestJson.json.requestHeaders,requestJson.json.requestHeaders)
-            let responseHeaderObj = transform.compareJsonKeys(originalResponseJson.json.responseHeaders,responseJson.json.responseHeaders)
+            let requestHeaderObj = transform.compareJsonKeys(originalRequestJson?.json?.requestHeaders,requestJson?.json?.requestHeaders)
+            let responseHeaderObj = transform.compareJsonKeys(originalResponseJson?.json?.responseHeaders,responseJson?.json?.responseHeaders)
             
-            let requestPayloadObj = transform.getPayloadData(originalRequestJson.json.requestPayload,requestJson.json.requestPayload)
-            let responsePayloadObj = transform.getPayloadData(originalResponseJson.json.responsePayload,responseJson.json.responsePayload)
+            let requestPayloadObj = transform.getPayloadData(originalRequestJson?.json?.requestPayload,requestJson?.json?.requestPayload)
+            let responsePayloadObj = transform.getPayloadData(originalResponseJson?.json?.responsePayload,responseJson?.json?.responsePayload)
             
             const requestData = transform.mergeDataObjs(lineReqObj, requestHeaderObj, requestPayloadObj)
             const responseData = transform.mergeDataObjs(lineResObj, responseHeaderObj, responsePayloadObj)

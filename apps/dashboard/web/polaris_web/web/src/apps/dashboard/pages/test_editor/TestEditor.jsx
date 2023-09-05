@@ -71,7 +71,7 @@ const TestEditor = () => {
                 </HorizontalStack>
             </HorizontalStack>
 
-            <Button onClick={addCustomTest}>Create custom test</Button>
+            {/* <Button onClick={addCustomTest}>Create custom test</Button> */}
         </div>
     )
     const headerEditor = (

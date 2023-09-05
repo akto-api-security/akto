@@ -13,6 +13,7 @@ function Dashboard() {
     const location = useLocation();
     history.location = location
     history.navigate = useNavigate();
+    const navigate = useNavigate()
 
     const setAllCollections = Store(state => state.setAllCollections)
     const setCollectionsMap = Store(state => state.setCollectionsMap)
@@ -27,6 +28,16 @@ function Dashboard() {
     useEffect(() => {
         fetchAllCollections()
         transform.setTestMetadata();
+        if(location.hash?.length > 0){
+            let newPath = location.pathname
+            if(location.hash.includes("Data")){
+                newPath = '/dashboard/observe/sensitive'
+            }
+            else if(newPath.includes("settings")){
+                newPath = newPath + "/" + location.hash.split("#")[1]
+            }
+            navigate(newPath)
+        }
     }, [])
 
     const toastConfig = Store(state => state.toastConfig)

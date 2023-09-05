@@ -102,6 +102,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
                     setPolicyLines(policyLinesCopy)
                 }
                 setHasRequiredAccess(resp.dashboardHasNecessaryRole)
+                // setHasRequiredAccess(true)
                 setAktoDashboardRoleName(resp.aktoDashboardRoleName); 
                 setLoading(false)
                 checkStackState()
