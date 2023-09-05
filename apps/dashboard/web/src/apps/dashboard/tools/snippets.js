@@ -18,7 +18,7 @@ const snippets = [
         label: "filter-success-response",
         desc: "API filter for success response code",
         text: [
-            "api_selection_filter:",
+            "api_selection_filters:",
             ...successResponseCode
         ]
     },
