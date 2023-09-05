@@ -212,7 +212,8 @@ function SampleData(props) {
           modified: model
         })
       } else {
-        instance.setValue(data?.message)
+        let message = data.original ? data.original : data?.message 
+        instance.setValue(message)
         highlightPaths(data?.highlightPaths, instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)

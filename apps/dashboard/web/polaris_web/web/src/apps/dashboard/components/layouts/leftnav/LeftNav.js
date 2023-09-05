@@ -42,23 +42,23 @@ export default function LeftNav(){
                   selected: leftNavSelected === 'quick_start',
                   key: '1',
                 },
-                {
-                  label: leftNavCollapsed ? (
-                    <Tooltip content="Dashboard" preferredPosition="bottom" dismissOnMouseOut>
-                      <Icon source={OrdersMinor} />
-                    </Tooltip>
-                  ) : 'Dashboard',
-                  icon: leftNavCollapsed ? '' : OrdersMinor,
-                  onClick: ()=>{
-                    if (leftNavCollapsed) {
-                      toggleLeftNavCollapsed()
-                    } 
-                    handleSelect("dashboard")
-                    navigate("/dashboard")
-                  },
-                  selected: leftNavSelected === 'dashboard',
-                  key: '2',
-                },
+                // {
+                //   label: leftNavCollapsed ? (
+                //     <Tooltip content="Dashboard" preferredPosition="bottom" dismissOnMouseOut>
+                //       <Icon source={OrdersMinor} />
+                //     </Tooltip>
+                //   ) : 'Dashboard',
+                //   icon: leftNavCollapsed ? '' : OrdersMinor,
+                //   onClick: ()=>{
+                //     if (leftNavCollapsed) {
+                //       toggleLeftNavCollapsed()
+                //     } 
+                //     handleSelect("dashboard")
+                //     navigate("/dashboard")
+                //   },
+                //   selected: leftNavSelected === 'dashboard',
+                //   key: '2',
+                // },
                 {   
                   url: '#',
                   label: leftNavCollapsed? (
