@@ -168,7 +168,7 @@ public class CustomDataTypeAction extends UserAction{
             CustomDataTypeDao.instance.insertOne(customDataType);
         } else {
 
-            if (customDataTypeFromDb.getCreatorId() == 1638571050 &&
+            if (customDataTypeFromDb!=null && customDataTypeFromDb.getCreatorId() == 1638571050 &&
                     checkConditionUpdate(customDataTypeFromDb, customDataType)) {
                 addActionError("Cannot update data type conditions for akto data types. Please create a new data type.");
                 return ERROR.toUpperCase();
