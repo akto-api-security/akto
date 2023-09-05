@@ -8,7 +8,7 @@ const successResponseCode = [
 const snippets = [
     {
         label: "auth-block",
-        desc: "makes sure that only authenticated api's get considered for a test",
+        desc: "Makes sure that only authenticated APIs get considered for a test",
         text: [
             "auth:",
             "\tauthenticated: true"
