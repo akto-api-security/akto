@@ -452,7 +452,7 @@ public class Executor {
 
                 if (VariableResolver.isAuthContext(key)) {
                     // resolve context for auth mechanism keys
-                    authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), authHeader);
+                    authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
                     if (authVal != null) {
                         ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal);
                         modifiedAtLeastOne = modifiedAtLeastOne || authMechanismContextResult.getSuccess();
