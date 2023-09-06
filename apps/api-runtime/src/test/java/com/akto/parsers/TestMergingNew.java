@@ -819,12 +819,12 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1);
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2);
 
-        mergeUrlsAndSave(1, true);
+        mergeUrlsAndSave(1, true, false);
 
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1.copy());
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2.copy());
 
-        mergeUrlsAndSave(1, true);
+        mergeUrlsAndSave(1, true, false);
 
         long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
         assertEquals(2, estimatedDocumentCount);
@@ -862,7 +862,7 @@ public class TestMergingNew extends MongoBasedTest {
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
 
-        mergeUrlsAndSave(apiCollection.getId(),true);
+        mergeUrlsAndSave(apiCollection.getId(),true, false);
 
         count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
@@ -873,5 +873,45 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfo sti2 = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfoHost2));
         assertNotNull(sti2);
     }
+
+    @Test
+    public void testMultipleParamMerge() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        ApiCollection apiCollection = new ApiCollection(1, "akto", 0, new HashSet<>(), "akto", 1);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+
+
+        SingleTypeInfo.ParamId paramIdHost1 = new SingleTypeInfo.ParamId(
+                "/v1/payments/pay_M4aF0T32RMlJGY/callback/885cfaf9b074af2a38888a0a054a6d5aa323fb10", "GET", -1, true, "host", SingleTypeInfo.GENERIC, apiCollection.getId(), false
+        );
+        SingleTypeInfo singleTypeInfoHost1 = new SingleTypeInfo(
+                paramIdHost1, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0,10
+        );
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost1);
+
+        SingleTypeInfo singleTypeInfoHost2 = singleTypeInfoHost1.copy();
+        singleTypeInfoHost2.setUrl("/v1/payments/pay_M4aAEM4AD4cLB0/callback/c04a604d75ad8693e66eab9a4ef7b00388a4e9e7");
+        singleTypeInfoHost2.setId(new ObjectId());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost2);
+
+        long count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        mergeUrlsAndSave(apiCollection.getId(),true,true);
+
+        count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(3, count); // 1 host + 2 url params
+
+        count = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+        assertEquals(count,2);
+
+        SingleTypeInfo  singleTypeInfo = SingleTypeInfoDao.instance.findOne(Filters.eq(SingleTypeInfo._PARAM, "host"));
+        assertNotNull(singleTypeInfo);
+        assertEquals(singleTypeInfo.getUrl(), "v1/payments/STRING/callback/STRING");
+    }
+
+
 
 }
