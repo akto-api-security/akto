@@ -760,16 +760,16 @@ export default {
             let a = testSubType.superCategory["severity"]["_name"]
             switch(a){
                 case "HIGH": 
-                    return 3
+                    return {title: a, value: 3}
 
                 case "MEDIUM": 
-                    return 2
+                    return {title: a, value: 2}
 
                 case "LOW": 
-                    return 1
+                    return {title: a, value: 1}
 
                 default:
-                    return 3    
+                    return {title: a, value: 3}
             }
         }
     }

@@ -75,8 +75,8 @@
                 >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
-                            :sensitiveTags="(item.severity || item.severity !== 0) ? getItemSeverity(item.severity) : []"
-                            :chipColor="getColor(item.severity)"
+                            :sensitiveTags="(item.severity || item.severity.value !== 0) ? getItemSeverity(item.severity.value) : []"
+                            :chipColor="getColor(item.severity.value)"
                             :hideTag="true"
                             class="z-80"
                         />
@@ -212,6 +212,7 @@ export default {
                 case 3: return ["HIGH"]
                 case 2:  return ["MEDIUM"]
                 case 1: return ["LOW"]
+                default: return []
             }
         },
         selectedDateStr() {
@@ -277,7 +278,7 @@ export default {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
-                severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : 0,
+                severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : {title: "NONE", value: 0},
                 testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
                 testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
             }

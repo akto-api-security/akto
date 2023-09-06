@@ -196,16 +196,27 @@ export default {
 
                 }
             } else {
+                let filterValue = (itemValue.value || itemValue.value === 0) ? itemValue.value : itemValue
                 switch (filterOperators[header]) {
                     case "OR": 
                     case "AND":
-                        return selectedValues.has(itemValue)
+                        return selectedValues.has(filterValue)
                     case "NOT":
-                        return !selectedValues.has(itemValue)
+                        return !selectedValues.has(filterValue)
                 }
             }
         },
-        
+        getDistinctItems(array) {
+            const seen = new Set();
+            return array.filter(item => {
+                const key = typeof item === 'object' ? JSON.stringify(item) : item;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    return true;
+                }
+                return false;
+            });
+        }
     },
     mounted() {
         window.addEventListener('keydown',this.moveRowsOnKeys,null)
@@ -232,8 +243,8 @@ export default {
                         }
                     )
 
-                    let distinctItems = [...new Set(allItemValues.sort())]
-                    m[h.value] = distinctItems.map(x => {return {title: x, subtitle: '', value: x}})
+                    let distinctItems = this.getDistinctItems(allItemValues)
+                    m[h.value] = distinctItems.map(x => {return {title: x.title ? x.title : x, subtitle: '', value: (x.value || x.value === 0) ? x.value : x}})
                     return m
                 }, {})
             }
