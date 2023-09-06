@@ -14,7 +14,6 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -328,7 +327,6 @@ public class Utils {
 
             info.getHttpCallParser().syncFunction(responses, true, false);
             info.getPolicy().main(responses, true, false);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId,true);
         }
     }
 
