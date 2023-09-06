@@ -244,7 +244,7 @@ export default {
                     )
 
                     let distinctItems = this.getDistinctItems(allItemValues)
-                    m[h.value] = distinctItems.map(x => {return {title: x.title ? x.title : x, subtitle: '', value: (x.value || x.value === 0) ? x.value : x}})
+                    m[h.value] = distinctItems.map(x => {return {title: x?.title ? x?.title : x, subtitle: '', value: (x?.value || x?.value === 0) ? x?.value : x}})
                     return m
                 }, {})
             }
