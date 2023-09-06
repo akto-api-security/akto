@@ -16,7 +16,6 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -338,7 +337,6 @@ public class Utils {
                 info.getResourceAnalyser().analyse(responseParams);
             }
             info.getResourceAnalyser().syncWithDb();
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId,true);
         }
     }
 
