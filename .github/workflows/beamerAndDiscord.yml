@@ -30,31 +30,7 @@ jobs:
           description_lines = description.split('\n') if description else []
           description_lines = [line.strip() for line in description_lines if line.strip()]
 
-          slack_message_body = json.dumps({
-            'blocks': [
-              {
-                'type': 'header',
-                'text': {
-                  'type': 'plain_text',
-                  'text': repo_name,
-                },
-              },
-              {
-                'type': 'section',
-                'text': {
-                  'type': 'mrkdwn',
-                  'text': tag_name,
-                },
-              },
-              {
-                'type': 'section',
-                'text': {
-                  'type': 'mrkdwn',
-                  'text': '```'+description+'```',
-                },
-              },
-            ],
-          });
+          slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': "+repo_name+" } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': "+tag_name+" } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '```"+description+"```' } } ] }";
 
           
           print(f"::set-output name=tag_name::{tag_name}")
