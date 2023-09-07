@@ -351,7 +351,7 @@ export default {
                             }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })
@@ -377,7 +377,7 @@ export default {
                             }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true,
                                 cicd: true
                             }
@@ -404,7 +404,7 @@ export default {
                             }
                             return {
                                 title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })

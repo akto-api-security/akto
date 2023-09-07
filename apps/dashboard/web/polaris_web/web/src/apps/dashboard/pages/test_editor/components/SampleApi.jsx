@@ -256,7 +256,7 @@ const SampleApi = () => {
 
             <Divider />
 
-            <Box ref={jsonEditorRef} minHeight="80vh"/>
+            <Box ref={jsonEditorRef} minHeight="80.3vh"/>
             {resultComponent}
             <Modal
                 open={showTestResult}
@@ -265,12 +265,14 @@ const SampleApi = () => {
                 large
             >
                 <Frame >
+                <Box paddingBlockEnd={"8"}>
                 <TestRunResultPage
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
                     testId={selectedTest.value}
                     source="editor"
                 />
+                </Box>
                 </Frame>
             </Modal>
             <Modal

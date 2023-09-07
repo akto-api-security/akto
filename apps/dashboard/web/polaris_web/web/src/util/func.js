@@ -127,7 +127,7 @@ const func = {
     saveAs(blob, (selectedTestRun.name || "file") + ".csv");
   },
   flattenObject(obj, prefix = '') {
-    return Object.keys(obj).reduce((acc, k) => {
+    return obj && Object.keys(obj).reduce((acc, k) => {
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&
@@ -148,6 +148,33 @@ const func = {
         flattenedObject[key]?.toString().toLowerCase().includes(query);
     })
     return ret;
+  },
+  unflattenObject(flatObj) {
+    const result = {};
+  
+    for (const key in flatObj) {
+      const keys = key.split('.');
+      let nestedObj = result;
+  
+      for (let i = 0; i < keys.length - 1; i++) {
+        const currentKey = keys[i];
+        if (/\d+/.test(keys[i + 1])) {
+          nestedObj[currentKey] = nestedObj[currentKey] || [];
+        } else {
+          nestedObj[currentKey] = nestedObj[currentKey] || {};
+        }
+        nestedObj = nestedObj[currentKey];
+      }
+  
+      const lastKey = keys[keys.length - 1];
+      if (/\d+/.test(lastKey)) {
+        const index = parseInt(lastKey, 10);
+        nestedObj[index] = flatObj[key];
+      } else {
+        nestedObj[lastKey] = flatObj[key];
+      }
+    }
+    return result;
   },
   getSeverityStatus(countIssues) {
     if(countIssues==null){
