@@ -7,9 +7,6 @@ jobs:
   push-release-notes:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
       - name: Get Latest Release
         id: get_latest_release
         run: |
