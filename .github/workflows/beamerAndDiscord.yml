@@ -52,16 +52,5 @@ jobs:
         run: |
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
           echo "Description: ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}"
+          curl -X POST -H "Content-Type: application/json" -d '${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}' ${{ secrets.SLACK_WEBHOOK_URL }}
           
-
-      - name: Send Github release notification to Slack
-        id: slack
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: 
-             "${{env.SLACK_BODY}}"
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          SLACK_BODY: "${{toJSON(steps.get_latest_release.outputs.slack_message_body)}}"
-
