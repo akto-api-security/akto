@@ -43,6 +43,7 @@ jobs:
           
           print(f"::set-output name=tag_name::{tag_name}")
           print(f"::set-output name=slack_message_body::{slack_message_body}")
+          EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
