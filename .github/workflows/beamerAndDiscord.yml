@@ -31,12 +31,12 @@ jobs:
           description_lines = description.split('\n') if description else []
           description_lines = [line.strip() for line in description_lines if line.strip()]
 
-          slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': "
+          slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': '"
           slack_message_body += repo_name
-          slack_message_body += " } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': "
+          slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
           slack_message_body += tag_name
-          slack_message_body += " } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
-          slack_message_body += ('%0A'.join(description_lines))
+          slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
+          slack_message_body += ('%0A'.join(description_lines))[:2000]
           slack_message_body += "' } } ] }"
           slack_message_body = slack_message_body.replace("'", "\"")
 
@@ -52,4 +52,4 @@ jobs:
         run: |
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
           payload=`echo ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}`
-          curl -X POST -H "Content-Type: application/json" -d "${payload}" https://eo75m8xey7ghrd9.m.pipedream.net
+          curl -X POST -H "Content-Type: application/json" -d "${payload}" ${{secrets.SLACK_WEBHOOK_URL}}
