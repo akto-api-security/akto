@@ -51,5 +51,5 @@ jobs:
       - name: Print Tag Name and Description
         run: |
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
-          payload=`echo "${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}"`
+          payload=`echo ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}`
           curl -X POST -H "Content-Type: application/json" -d $payload ${{ secrets.SLACK_WEBHOOK_URL }}
