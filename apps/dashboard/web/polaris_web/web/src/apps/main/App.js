@@ -47,6 +47,7 @@ import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
+import CICD from "../dashboard/pages/settings/integrations/CICD";
 
 const router = createBrowserRouter([
   {
@@ -61,10 +62,12 @@ const router = createBrowserRouter([
             path: "testing",
             element: <PageTesting />,
             children:[
-              {
-                path: "",
-                element: <TestRunsPage />
-              },
+              ...(["", "active", "cicd", "inactive"].map((i) => {
+                return {
+                  path: i,
+                  element: <TestRunsPage />
+                }
+              })),
               {
                 path: ":hexId",
                 element: <SingleTestRunPage />
@@ -156,6 +159,10 @@ const router = createBrowserRouter([
             element: <BurpSuite />,
           },
           {
+            path: "integrations/ci-cd",
+            element: <CICD />,
+          },
+          {
             path: "integrations/postman",
             element: <Postman />,
           },
@@ -222,7 +229,7 @@ const router = createBrowserRouter([
 {
   path: "/",
     element: <Navigate to="/login" />,
-  }
+  },
 ])
 
 function App() {

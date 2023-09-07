@@ -23,7 +23,7 @@ function TooltipText(props) {
     )
 
     return (
-        isTruncated ? <Tooltip content={tooltip} hoverDelay={400}>
+        isTruncated ? <Tooltip content={tooltip} hoverDelay={400} width="wide">
             {TextContent}
         </Tooltip> :
             TextContent
