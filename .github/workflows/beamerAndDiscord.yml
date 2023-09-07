@@ -52,14 +52,16 @@ jobs:
         run: |
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
           echo "Description: ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}"
+          
 
       - name: Send Github release notification to Slack
         id: slack
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: 
-             "${{toJSON(steps.get_latest_release.outputs.slack_message_body)}}"
+             "${{env.SLACK_BODY}}"
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          SLACK_BODY: "${{toJSON(steps.get_latest_release.outputs.slack_message_body)}}"
 
