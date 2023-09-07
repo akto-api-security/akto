@@ -38,7 +38,7 @@ jobs:
           slack_message_body += " } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
           slack_message_body += ('%0A'.join(description_lines))
           slack_message_body += "' } } ] }"
-          slack_message_body = slack_message_body
+          slack_message_body = slack_message_body.replace("'", "\"")
 
           print("slack_message_body", slack_message_body)
           
@@ -52,4 +52,4 @@ jobs:
         run: |
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
           payload=`echo ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}`
-          curl -X POST -H "Content-Type: application/json" -d $payload ${{ secrets.SLACK_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d '$payload' ${{ secrets.SLACK_WEBHOOK_URL }}
