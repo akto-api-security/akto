@@ -15,7 +15,10 @@ let persistStore = (set) => ({
     subCategoryMap: {},
     setSubCategoryMap: (subCategoryMap) => set({subCategoryMap: subCategoryMap}),
     subCategoryFromSourceConfigMap: {},
-    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({subCategoryFromSourceConfigMap: subCategoryFromSourceConfigMap})
+    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({subCategoryFromSourceConfigMap: subCategoryFromSourceConfigMap}),
+
+    active: '',
+    setActive: (selected) =>  set({ active: selected }), 
 })
 
 persistStore = devtools(persistStore)
