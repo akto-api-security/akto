@@ -38,6 +38,7 @@ jobs:
           slack_message_body += " } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
           slack_message_body += ('\\n'.join(description_lines))
           slack_message_body += "' } } ] }"
+          slack_message_body = slack_message_body.replace("\n", "\\n")
 
           print("slack_message_body", slack_message_body)
           
