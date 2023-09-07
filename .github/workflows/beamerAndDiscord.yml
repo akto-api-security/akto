@@ -28,9 +28,17 @@ jobs:
           tag_name = data.get('tag_name')
           description = data.get('body').replace("'", "")
           print("description", description)
-          description_lines = description.split('\n') if description else []
-          description_lines = [line.strip() for line in description_lines if line.strip()]
-
+          description_lines = []
+          if description:
+              description_lines = description.split('\n')
+              for i in range(len(description_lines)):
+                  if 'by' in description_lines[i]:
+                      description_lines[i] = description_lines[i].split('by', 1)[0].strip() + '.'
+                  if "'" in description_lines[i]:
+                      description_lines[i] = description_lines[i].replace("'", "")
+              # Remove the last line from the description
+              description_lines = description_lines[:-1]
+          
           slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': '"
           slack_message_body += repo_name
           slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
