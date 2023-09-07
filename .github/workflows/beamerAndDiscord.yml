@@ -50,7 +50,7 @@ jobs:
                 'type': 'section',
                 'text': {
                   'type': 'mrkdwn',
-                  'text': '```'+description_lines+'```',
+                  'text': '```'+description+'```',
                 },
               },
             ],
@@ -67,7 +67,13 @@ jobs:
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
           echo "Description: ${{ steps.get_latest_release.outputs.slack_message_body }}"
 
-      - name: Send release message to Slack
-        run: |
-          curl -X POST -H "Content-Type: application/json" -d '${{ steps.get_latest_release.outputs.slack_message_body }}' ${{ secrets.SLACK_WEBHOOK_URL }}     
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            ${{steps.get_latest_release.outputs.slack_message_body}}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
