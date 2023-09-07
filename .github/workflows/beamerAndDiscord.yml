@@ -51,7 +51,7 @@ jobs:
       - name: Print Tag Name and Description
         run: |
           echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
-          echo "Description: ${{ steps.get_latest_release.outputs.slack_message_body }}"
+          echo "Description: ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}"
 
       - name: Send Github release notification to Slack
         id: slack
