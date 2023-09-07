@@ -57,8 +57,8 @@ jobs:
         id: slack
         uses: slackapi/slack-github-action@v1.23.0
         with:
-          payload: |
-            ${{steps.get_latest_release.outputs.slack_message_body.replace("\n", "\\n")}}
+          payload: >
+            ${{steps.get_latest_release.outputs.slack_message_body}}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
