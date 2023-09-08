@@ -119,6 +119,7 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
   deploy:
+    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
     needs: build
     runs-on: ubuntu-latest
     environment: Dev
@@ -133,18 +134,17 @@ jobs:
         role-session-name: GitHub-Action-Role
         aws-region: ${{ vars.AWS_REGION }}
     - name: Deploy to flash
-      if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
       run: |
         echo "Deploying branch ${{ env.GITHUB_REF }} to ${{ github.event.inputs.environment }}"
         commit_hash=`git rev-parse HEAD`
         aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
 
   test:
+    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
     needs: deploy
     runs-on: ubuntu-latest
     steps:
       - name: Run CI/CD tests
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
         uses: akto-api-security/run-scan@v1.0.3
         with:
           AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
