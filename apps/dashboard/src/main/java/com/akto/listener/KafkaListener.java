@@ -15,7 +15,7 @@ public class KafkaListener implements ServletContextListener {
     private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaListener.class);
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
-        String brokerIP = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        String brokerIP = "127.0.0.1:29092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         if (brokerIP != null) {
             try {
                 kafka = new Kafka(brokerIP,  1000, BATCH_SIZE_CONFIG);
