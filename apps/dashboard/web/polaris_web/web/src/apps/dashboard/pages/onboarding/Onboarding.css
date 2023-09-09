@@ -1,0 +1,36 @@
+.onboarding .Polaris-TopBar__SecondaryMenu {
+    width: 50vw;
+    padding: 0 8vw;
+}
+
+.onboarding .Polaris-Avatar--sizeExtraSmall {
+    height: 20px !important;
+}
+
+.main-card-onboarding {
+    margin: auto;
+    width: 38vw;
+    margin-top: 2vw;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5vw;
+}
+
+.titleContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 0;
+}
+
+.suite-card{
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.header-active{
+    padding: 2px 12px;
+    border: 1px solid;
+    border-radius: 8px;
+    background: #47466a26;
+}

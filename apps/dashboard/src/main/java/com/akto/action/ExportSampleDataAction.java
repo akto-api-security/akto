@@ -17,9 +17,12 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.sun.jndi.toolkit.url.Uri;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 public class ExportSampleDataAction extends UserAction {
@@ -111,6 +114,16 @@ public class ExportSampleDataAction extends UserAction {
             } catch (Exception e) {
 
             }
+        } else {
+            if (!originalHttpRequest.getHeaders().containsKey("host")) {
+                // this is because Cloudfront requires host header else gives 4xx
+                try {
+                    URI uri = new URI(url);
+                    String host = uri.getHost();
+                    originalHttpRequest.getHeaders().put("host", Collections.singletonList(host));
+                } catch (URISyntaxException e) {
+                }
+            }
         }
 
         StringBuilder builderWithUrl = buildRequest(originalHttpRequest, url);
@@ -129,9 +142,16 @@ public class ExportSampleDataAction extends UserAction {
         StringBuilder builder = new StringBuilder("");
 
         // METHOD and PATH
-        builder.append(originalHttpRequest.getMethod()).append(" ")
-                .append(url).append(" ")
-                .append(originalHttpRequest.getType())
+        builder.append(originalHttpRequest.getMethod())
+                .append(" ")
+                .append(url);
+        
+        String queryParams = originalHttpRequest.getQueryParams();
+        if (queryParams != null && queryParams.trim().length() > 0) {
+            builder.append("?").append(queryParams);
+        }
+
+        builder.append(" ").append(originalHttpRequest.getType())
                 .append("\n");
 
         // HEADERS
@@ -169,6 +189,7 @@ public class ExportSampleDataAction extends UserAction {
 
     private  void addHeadersBurp(Map<String, List<String>> headers, StringBuilder builder) {
         for (String headerName: headers.keySet()) {
+            if (headerName.startsWith(":")) continue; // pseudo-headers need to be removed before sending to burp
             List<String> values = headers.get(headerName);
             if (values == null || values.isEmpty() || headerName.length()<1) continue;
             String prettyHeaderName = headerName.substring(0, 1).toUpperCase() + headerName.substring(1);
@@ -214,9 +235,11 @@ public class ExportSampleDataAction extends UserAction {
         }
 
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
-
         StringBuilder builder = new StringBuilder("curl -v ");
 
+        Map<String, List<String>> headers = httpRequestParams.getHeaders();
+        List<String> values = headers.get("x-forwarded-proto");
+        String protocol = values != null && values.size() != 0 ? values.get(0) : "https";
         // Method
         builder.append("-X ").append(httpRequestParams.getMethod()).append(" \\\n  ");
 
@@ -241,8 +264,11 @@ public class ExportSampleDataAction extends UserAction {
             urlString = path;
         }
 
-        StringBuilder url = new StringBuilder(urlString);
+        if (!urlString.startsWith("http")) {
+            urlString = protocol + "://" + urlString;
+        }
 
+        StringBuilder url = new StringBuilder(urlString);
         // Body
         try {
             String payload = httpRequestParams.getPayload();

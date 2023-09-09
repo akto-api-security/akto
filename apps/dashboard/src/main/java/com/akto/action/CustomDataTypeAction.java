@@ -175,7 +175,7 @@ public class CustomDataTypeAction extends UserAction{
             }
         }
 
-        SingleTypeInfo.fetchCustomDataTypes();
+        SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
 
         return Action.SUCCESS.toUpperCase();
@@ -217,7 +217,7 @@ public class CustomDataTypeAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        SingleTypeInfo.fetchCustomDataTypes();
+        SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
         return Action.SUCCESS.toUpperCase();
     }

@@ -1,0 +1,45 @@
+id: ABUSING_CRLF_IN_HEADERS
+info:
+  name: "HTTP Header Abuse using CRLF Injection"
+  description: "This test examines the vulnerability of CRLF injection in HTTP headers, specifically focusing on the manipulation of query parameters through the abuse of line breaks."
+  details: >
+    "In a CRLF injection attack, the attacker inserts the carriage return and linefeed characters into user input to trick the server, the web application, or the user into thinking that an object has terminated and another one has started
+    By exploiting a CRLF injection, an attacker can also insert HTTP headers which could be used to defeat security mechanisms such as a browser’s XSS filter or the same-origin-policy. This allows malicious actors to obtain sensitive information like CSRF tokens.
+    Attackers can also set cookies which could be exploited by logging the victim into the attacker’s account or used to exploit otherwise unexploitable cross-site scripting vulnerabilities."
+  impact: "The impact of CRLF injections varies depending on the attack context, but will typically cover all the consequences of cross-site scripting and information disclosure that the injection allowed.
+          The technique can also be used to deactivate certain security restrictions like XSS filters and same-origin policy in the victim’s browser, paving the way for other malicious attacks."
+  category:
+    name: CRLF
+    shortName: CRLF Injection
+    displayName: CRLF Injection
+  subCategory: ABUSING_CRLF_IN_HEADERS
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.invicti.com/blog/web-security/crlf-http-header/"
+api_selection_filters:
+  query_param:
+    for_one:
+      key:
+        regex: .*
+        extract: query_key
+      value:
+        extract: query_value
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_query_param:
+            query_key: ${query_value}%0Aakto-header%3aakto-value
+
+validate:
+  response_headers:
+    for_one:
+      key:
+        eq: akto-header
+      value:
+        eq: akto-value

@@ -1,6 +1,6 @@
 id: SSRF_ON_LOCALHOST_DNS_PINNING
 info:
-  name: "Sensitive localhost details exposed via replacing URI param redirecting to localhost/admin"
+  name: "Sensitive localhost details exposed via replacing URI param redirecting to localhost/admin due to SSRF"
   description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with localhost/admin. The make-127-0-0-1-rr.1u.ms/admin which redirects to localhost/admin." 
   details: >
             "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with localhost/admin. The make-127-0-0-1-rr.1u.ms/admin which redirects to localhost/admin.

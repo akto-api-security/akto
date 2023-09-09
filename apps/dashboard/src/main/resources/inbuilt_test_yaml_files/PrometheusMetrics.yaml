@@ -1,0 +1,39 @@
+id: PROMETHEUS_METRICS
+info:
+  name: Exposed Prometheus metrics
+  description: "Exposed Prometheus metrics endpoint found."
+  details: >
+              "The Prometheus metrics endpoint is publicly accessible, allowing anyone to access and view detailed system and application metrics, potentially revealing sensitive information."
+  impact: "Exposing Prometheus metrics can provide insights into the system, potentially aiding attackers in identifying vulnerabilities and exploiting them."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: PROMETHEUS_METRICS
+  severity: LOW
+  references:
+    - https://github.com/prometheus/prometheus
+    - https://hackerone.com/reports/1026196
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/metrics
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - 'cpu_seconds_total'
+      - 'http_request_duration_seconds'
+      - 'process_virtual_memory_bytes'
+      - 'process_start_time_seconds'

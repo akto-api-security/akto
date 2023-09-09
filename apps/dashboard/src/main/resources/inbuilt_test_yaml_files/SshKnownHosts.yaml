@@ -1,0 +1,43 @@
+id: SSH_KNOWN_HOSTS
+info:
+  name: SSH Known Hosts
+  description: "Exposed SSH Known Hosts"
+  details: >
+              "Identifies publicly accessible SSH known_hosts files, which store fingerprints of SSH servers. Unintentionally exposing these files can disclose information about previously accessed SSH servers."
+  impact: "Exposing SSH known_hosts files enables attackers to gather information about previously accessed SSH servers, increasing the risk of unauthorized access and potential compromise."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: SSH_KNOWN_HOSTS
+  severity: LOW
+  references:
+    - https://datacadamia.com/ssh/known_hosts
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.ssh/known_hosts
+    - ${urlVar}/.ssh/known_hosts.old
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - "ssh-dss"
+      - "ssh-ed25519"
+      - "ssh-rsa"
+      - "ecdsa-sha2-nistp256"
