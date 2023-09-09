@@ -95,9 +95,15 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 
 </details>  
   
+## API Security testing tutorials
+
+| Title | Link |
+| ------------- | ------------- |
+| Introduction | https://www.youtube.com/watch?v=oFt4OVmfE2s |
+| **Tutorial 1:** SSRF Port Scanning (OWASP API7:2023) | https://www.youtube.com/watch?v=WjNNh6asAD0 |
 
 
-# Develop and contribute
+## Develop and contribute
 
 <details>
   <summary><h3>Quicksetup using VSCode Devcontainers</h3></summary>

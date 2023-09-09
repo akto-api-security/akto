@@ -9,10 +9,13 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.listener.InitializerListener;
+import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -80,7 +83,9 @@ public class ProfileAction extends UserAction {
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
-
+        String dashboardVersion = accountSettings.getDashboardVersion();
+        String[] versions = dashboardVersion.split(" - ");
+        User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -88,7 +93,16 @@ public class ProfileAction extends UserAction {
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
-                .append("accountName", accountName);;
+                .append("accountName", accountName)
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+        if (versions.length > 2) {
+            if (versions[2].contains("akto-release-version")) {
+                userDetails.append("releaseVersion", "akto-release-version");
+            } else {
+                userDetails.append("releaseVersion", versions[2]);
+            }
+        }
+
 
         for (String k: userDetails.keySet()) {
             request.setAttribute(k, userDetails.get(k));
