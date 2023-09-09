@@ -9,7 +9,7 @@ info:
   impact: "This behavior can be leveraged to facilitate phishing attacks against users of the application."
   category:
     name: SM
-    shortName: Misconfiguration
+    shortName: Security Misconfiguration
     displayName: Security Misconfiguration (SM)
   subCategory: OPEN_REDIRECT
   severity: HIGH

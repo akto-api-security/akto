@@ -1,0 +1,51 @@
+id: SPRING_BOOT_THREAD_DUMP_ACTUATOR_EXPOSED
+info:
+  name: Spring Boot Thread Dump Actuator Exposed 
+  description: Spring Boot Thread Dump Actuator Exposed Misconfiguration
+  details: >
+        The Spring Boot Thread Dump Actuator Exposed misconfiguration occurs when the Actuator endpoint
+        responsible for providing thread dump information is accessible to unauthorized users. This 
+        misconfiguration can lead to security risks as sensitive information about running threads, 
+        including thread names, stack traces, and thread states, can be exposed. Attackers can 
+        potentially use this information to gather insights into the application's execution environment
+        and exploit vulnerabilities. It falls under the Security Misconfiguration category with a low 
+        severity level. Proper access control and secure configuration of the Actuator endpoints are
+        necessary to prevent unauthorized access to thread dump information.
+  impact: Exposing Spring Boot Thread Dump Actuator can disclose sensitive information about running threads, aiding attackers in understanding the application's execution environment.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Spring Boot
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/actuator/threaddump
+
+validate:
+  response_code: 
+    eq: 200
+  response_payload:
+    contains_all:
+      - threads
+      - threadName
+
+        

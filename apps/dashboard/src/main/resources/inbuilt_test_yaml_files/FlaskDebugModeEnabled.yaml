@@ -1,0 +1,48 @@
+id: FLASK_DEBUG_MODE_ENABLED
+info:
+  name: Flask Debug Mode Enabled 
+  description: Flask Debug Mode Enabled Misconfiguration.
+  details: >
+         The Flask Debug Mode Enabled misconfiguration occurs when the debug mode is enabled in a Flask
+          application. Debug mode is a development feature that provides detailed error messages, 
+          interactive consoles, and other debugging capabilities. However, enabling debug mode in a 
+          production environment can expose sensitive information and introduce security risks. 
+          Attackers can exploit debug mode to gain unauthorized access, execute arbitrary code, or 
+          obtain sensitive configuration details. This misconfiguration has a low severity level and 
+          falls under the Security Misconfiguration category.
+  impact: Enabling Flask debug mode in a production environment exposes sensitive information and introduces security vulnerabilities to potential unauthorized access and code execution.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Flask
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://flask.palletsprojects.com/en/2.3.x/debugging/"
+    - "http://ghostlulz.com/flask-rce-debug-mode/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/console
+
+validate:
+  response_code: 
+    eq: 200
+  response_payload:
+    contains_all: 
+      - "Interactive Console"

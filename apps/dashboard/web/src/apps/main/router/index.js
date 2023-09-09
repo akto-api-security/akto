@@ -4,7 +4,6 @@ import func from "@/util/func";
 const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
-const PageMarketplace  = () => import( "@/apps/dashboard/views/marketplace/PageMarketplace")
 const PageQuickStart  = () => import( "@/apps/dashboard/views/quickstart/PageQuickStart")
 const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
 const PageIssues  = () => import( "@/apps/dashboard/views/issues/PageIssues")
@@ -13,6 +12,8 @@ const TestingRunResults  = () => import( "@/apps/dashboard/views/testing/compone
 const CreateTestingRun  = () => import( "@/apps/dashboard/views/testing/components/CreateTestingRun")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
+const PageCheckInbox = () => import("@/apps/signup/PageCheckInbox")
+const PageBusinessEmail = () => import("@/apps/signup/PageBusinessEmail")
 const PageSettings = () => import("@/apps/dashboard/views/settings/PageSettings")
 const Observe = () => import( "@/apps/dashboard/views/observe/inventory/Observe")
 const Inventory = () => import("@/apps/dashboard/views/observe/inventory/Inventory")
@@ -22,7 +23,6 @@ const APICollections = () => import("@/apps/dashboard/views/observe/collections/
 const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/SensitiveData")
 const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
-const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
 const TestEditorForWebsite = () => import("@/apps/dashboard/tools/TestEditorForWebsite.vue")
@@ -40,7 +40,7 @@ const router =  new Router({
     routes: [
         {
             path: '/',
-            redirect: 'login',
+            redirect:  window.IS_SAAS && window.IS_SAAS === "true" ? '/dashboard/observe/inventory' : 'login',
             component: PageLogin
         },
         {
@@ -48,10 +48,21 @@ const router =  new Router({
             name: 'login',
             component: PageLogin
         },
+       
         {
             path: '/signup',
             name: 'signup',
             component: PageSignup
+        },
+        {
+            path: '/check-inbox',
+            name: 'check-inbox',
+            component: PageCheckInbox
+        },
+        {
+            path: '/business-email',
+            name: 'business-email',
+            component: PageBusinessEmail
         },
         {
             path: '/tools/test-editor',
@@ -78,7 +89,7 @@ const router =  new Router({
             path: '/dashboard',
             name: 'dashboard',
             component: PageDashboard,
-            redirect: '/dashboard/testing',
+            redirect: '/dashboard/observe/inventory',
             beforeEnter (to, from, next) {
                 store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
             },
@@ -224,33 +235,6 @@ const router =  new Router({
                             component: ParamState,
                         }
                     ]
-                },
-                {
-                    path: 'library',
-                    name: 'library',
-                    components: {
-                        default: PageMarketplace
-                    },
-                    children: [
-                        {
-                            path: 'custom/:category_id',
-                            name: 'customCategory',
-                            component: MPTestCategory,
-                            props: route => ({
-                                categoryType: "custom",
-                                categoryId: route.params.category_id
-                            })
-                        },
-                        {
-                            path: 'default/:category_id',
-                            name: 'defaultCategory',
-                            component: MPTestCategory,
-                            props: route => ({
-                                categoryType: "default",
-                                categoryId: route.params.category_id
-                            })
-                        }
-                    ]                    
                 },
                 {
                     path: 'test-editor',

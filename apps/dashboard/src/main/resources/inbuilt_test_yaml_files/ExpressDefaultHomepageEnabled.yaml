@@ -1,0 +1,44 @@
+id: EXPRESS_DEFAULT_HOMEPAGE_ENABLED
+info:
+  name: Express Default Homepage Enabled 
+  description:  Express Default Homepage Enabled Misconfiguration
+  details: >
+      The Express Default Homepage Enabled misconfiguration occurs when the default homepage is enabled in a production 
+      environment. The default homepage typically displays a welcome message and may reveal information about the Express 
+      framework being used. This can provide valuable insights to potential attackers, helping them identify vulnerabilities 
+      or weaknesses in the system. To reduce the risk of exposing sensitive details and to enhance security, it is recommended
+      to disable or customize the default homepage in production environments.
+  impact: Enabling the Express default homepage exposes information about the framework, increasing the risk of targeted attacks and potential exploitation.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - ExpressJS
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_payload:
+    contains_all:
+      - "<title>Express</title>"
+      - "Welcome to Express"
+        

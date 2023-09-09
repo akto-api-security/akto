@@ -2,7 +2,7 @@ import request from '@/util/request'
 import util from '../util'
 
 export default {
-    saveToAccount: function (newAccountName, obj) {
+    saveToAccount: function (newAccountName) {
         return request({
             url: '/api/createNewAccount',
             method: 'post',
@@ -19,7 +19,7 @@ export default {
                 newAccountId
             }
         }).then(resp => {
-            window.location.href = '/dashboard/testing'
+            window.location.href = '/dashboard/observe/inventory'
         })
     },
     logout() {
@@ -29,6 +29,13 @@ export default {
             data: {}
         }).then((resp) => {
             return resp
+        })
+    },
+    updateAktoUIMode(aktoUIMode) {
+        return request({
+            url: 'api/updateAktoUIMode',
+            method: 'post',
+            data: aktoUIMode
         })
     },
 }

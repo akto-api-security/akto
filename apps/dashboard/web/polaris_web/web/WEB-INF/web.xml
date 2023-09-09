@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://java.sun.com/xml/ns/javaee"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+         version="3.0">
+    <display-name>dashboard</display-name>
+
+    <session-config>
+        <session-timeout>60</session-timeout>
+        <cookie-config>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
+    <error-page>
+        <location>/pages/error.jsp</location>
+    </error-page>
+
+    <filter>
+        <filter-name>GzipFilter</filter-name>
+        <filter-class>org.eclipse.jetty.servlets.GzipFilter</filter-class>
+        <init-param>
+            <param-name>mimeTypes</param-name>
+            <param-value>text/html,text/plain,text/xml,application/xhtml+xml,text/css,application/javascript,image/svg+xml</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>GzipFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>MongoConnectCheckFilter</filter-name>
+        <filter-class>com.akto.filter.MongoConnectCheckFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>MongoConnectCheckFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>HttpMethodFilter</filter-name>
+        <filter-class>com.akto.filter.HttpMethodFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>HttpMethodFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>SecurityHeadersFilter</filter-name>
+        <filter-class>com.akto.filter.SecurityHeadersFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>SecurityHeadersFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>RateLimitFilter</filter-name>
+        <filter-class>com.akto.filter.RateLimitFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>RateLimitFilter</filter-name>
+        <url-pattern>/auth/login</url-pattern>
+        <url-pattern>/api/inviteUsers</url-pattern>
+        <url-pattern>/tools/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>GrowthToolsFilter</filter-name>
+        <filter-class>com.akto.filter.GrowthToolsFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>GrowthToolsFilter</filter-name>
+        <url-pattern>/tools/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>UserDetailsFilter</filter-name>
+        <filter-class>com.akto.filter.UserDetailsFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>UserDetailsFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+        <url-pattern>/dashboard/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>AuthorizationFilter</filter-name>
+        <filter-class>com.akto.filter.AuthorizationFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>AuthorizationFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <filter-class>com.akto.filter.InfraMetricsFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>struts2</filter-name>
+        <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>struts2</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <listener>
+        <listener-class>com.akto.listener.InitializerListener</listener-class>
+    </listener>
+    <listener>
+        <listener-class>com.akto.listener.RuntimeListener</listener-class>
+    </listener>
+    <listener>
+        <listener-class>com.akto.listener.KafkaListener</listener-class>
+    </listener>
+    <listener>
+        <listener-class>com.akto.listener.InfraMetricsListener</listener-class>
+    </listener>
+</web-app>

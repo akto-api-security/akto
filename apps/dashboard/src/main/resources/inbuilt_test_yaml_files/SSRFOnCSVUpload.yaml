@@ -1,6 +1,6 @@
 id: SSRF_ON_CSV_UPLOAD
 info:
-  name: "Sensitive AWS details exposed via replacing CSV param"
+  name: "Sensitive AWS details exposed via replacing CSV param due to SSRF"
   description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing CSV upload parameter with url that redirects to AWS IMDS endpoint. The application responded with 2XX success code and also gave out sensitive AWS information in response."
   details: >
     "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing CSV upload parameter with url that redirects to AWS IMDS endpoint. The application responded with 2XX success code and also gave out sensitive AWS information in response. Server-Side Request Forgery (SSRF) flaws occur whenever an API is fetching a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or a VPN.\n

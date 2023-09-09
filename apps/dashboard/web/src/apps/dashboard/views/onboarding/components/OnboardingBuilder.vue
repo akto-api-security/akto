@@ -106,12 +106,13 @@ export default {
                     "showStepBuilder": false
                 },
             ],
-            loading: false
+            loading: false,
         }
     },
     methods: {
         next() {
             if (this.currentStep === 3) {
+                this.$store.commit("onboarding/UPDATE_RUN_TEST_LOADING",true)
                 this.$store.dispatch("onboarding/runTestOnboarding")
             } else if (this.currentStep === 4) {
                 this.$router.push('/dashboard/testing/' + this.testingRunHexId + '/results')

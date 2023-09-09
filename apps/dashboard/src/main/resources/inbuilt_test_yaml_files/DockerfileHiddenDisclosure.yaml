@@ -1,0 +1,43 @@
+id: DOCKERFILE_HIDDEN_DISCLOSURE
+info:
+  name: Dockerfile Hidden Disclosure
+  description: "Attacker can get unauthorized access of hidden Dockerfile(s)."
+  details: >
+              "Dockerfile Hidden Disclosure refers to the vulnerability where hidden Dockerfile(s), such as .dockerfile and .Dockerfile, are exposed due to misconfiguration. Unauthorized access to these files can reveal sensitive information about the application's image build process, including build instructions, environment variables, and exposed ports. Attackers can exploit this exposure to identify vulnerabilities, gain insights into the application's inner workings, or launch targeted attacks. Promptly addressing this vulnerability is essential to prevent unauthorized access, protect sensitive data, and maintain the security of the application."
+  impact: "Exposing hidden Dockerfile(s) reveals sensitive information about the application's image build process, enabling attackers to identify vulnerabilities and launch targeted attacks."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: DOCKERFILE_HIDDEN_DISCLOSURE
+  severity: MEDIUM
+  references:
+    - https://github.com/detectify/ugly-duckling/blob/master/modules/crowdsourced/dockerfile-hidden-disclosure.json
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/.dockerfile
+    - ${urlVar}/.Dockerfile
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
+  response_headers:
+    for_one:
+      value:
+        not_contains: text/html

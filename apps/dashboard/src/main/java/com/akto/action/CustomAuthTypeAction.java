@@ -1,9 +1,6 @@
 package com.akto.action;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +11,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -56,12 +54,14 @@ public class CustomAuthTypeAction extends UserAction{
             CustomAuthTypeDao.instance.insertOne(customAuthType);
         }
         fetchCustomAuthTypes();
-        SingleTypeInfo.fetchCustomAuthTypes();
+
         int accountId = Context.accountId.get();
+        SingleTypeInfo.fetchCustomAuthTypes(accountId);
         executorService.schedule( new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
+                List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
+                CustomAuthUtil.customAuthTypeUtil(customAuthTypes);
             }
         }, 5 , TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
@@ -86,13 +86,13 @@ public class CustomAuthTypeAction extends UserAction{
                         Updates.set("timestamp", Context.now())));
         }
         fetchCustomAuthTypes();
-        SingleTypeInfo.fetchCustomAuthTypes();
-        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         int accountId = Context.accountId.get();
+        SingleTypeInfo.fetchCustomAuthTypes(accountId);
+        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         executorService.schedule( new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
+                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
             }
         }, 5 , TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
@@ -113,8 +113,9 @@ public class CustomAuthTypeAction extends UserAction{
                         Updates.set(CustomAuthType.ACTIVE, active),
                         Updates.set("timestamp",Context.now())));
         }
+        int accountId = Context.accountId.get();
         fetchCustomAuthTypes();
-        SingleTypeInfo.fetchCustomAuthTypes();
+        SingleTypeInfo.fetchCustomAuthTypes(accountId);
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         return Action.SUCCESS.toUpperCase();
     }
@@ -122,15 +123,14 @@ public class CustomAuthTypeAction extends UserAction{
     public String resetAllCustomAuthTypes() {
         try {
             CustomAuthUtil.resetAllCustomAuthTypes();
-            SingleTypeInfo.fetchCustomAuthTypes();
             int accountId = Context.accountId.get();
+            SingleTypeInfo.fetchCustomAuthTypes(accountId);
             executorService.schedule( new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
-                    CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
+                    CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
                 }
             }, 5 , TimeUnit.SECONDS);
-
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage(), LoggerMaker.LogDb.DASHBOARD);

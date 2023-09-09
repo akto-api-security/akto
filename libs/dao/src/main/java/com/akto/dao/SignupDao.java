@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Updates.set;
 
 public class SignupDao extends CommonContextDao<SignupUserInfo> {
@@ -25,10 +26,10 @@ public class SignupDao extends CommonContextDao<SignupUserInfo> {
         return SignupUserInfo.class;
     }
 
-    public SignupUserInfo insertSignUp(String email, String name, SignupInfo info) {
+    public SignupUserInfo insertSignUp(String email, String name, SignupInfo info,  int invitationToAccount) {
         SignupUserInfo user = findOne("user.login", email);
         if (user == null) {
-            insertOne(new SignupUserInfo(User.create(name, email, info, new HashMap<>()), null, null, null, new ArrayList<>()));
+            insertOne(new SignupUserInfo(User.create(name, email, info, new HashMap<>()), null, null, null, new ArrayList<>(), invitationToAccount));
         } else {
             Map<String, SignupInfo> infoMap = user.getUser().getSignupInfoMap();
             if (infoMap == null) {

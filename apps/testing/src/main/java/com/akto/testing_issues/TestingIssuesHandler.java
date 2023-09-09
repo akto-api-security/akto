@@ -9,6 +9,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.TestExecutor;
 import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.bulk.BulkWriteResult;
@@ -68,8 +69,9 @@ public class TestingIssuesHandler {
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY, config.getSeverity());
             } else {//TestSubCategory case
+                String severity = TestExecutor.getSeverityFromTestingRunResult(runResult).toString();
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
-                        "HIGH"); // todo: take value from yaml
+                    severity); // todo: take value from yaml
             }
 
             Bson updateFields = Updates.combine(
@@ -118,8 +120,9 @@ public class TestingIssuesHandler {
                             config.getSeverity(),
                             TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
                 }else {
+                    Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
-                            GlobalEnums.Severity.HIGH,
+                            severity,
                             TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId()))); // todo: take value from yaml
                 }
                 loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);

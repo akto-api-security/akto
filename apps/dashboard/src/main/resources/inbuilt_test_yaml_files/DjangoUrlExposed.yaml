@@ -1,6 +1,6 @@
 id: DJANGO_URL_EXPOSED
 info:
-  name: Django url exposed
+  name: Django url exposed due to debug mode enable
   description: "The error response contains information related to urls which may help in more sophisticated attacks"
   details: >
             "The endpoint appears to be give out information related to endpoints existing in the application, on trying an invalid request, possibly due to DJANGO DEBUG mode being enabled. The original request
@@ -10,7 +10,7 @@ info:
   impact: "This information can be used to facilitate more sophisticated attacks on your application"
   category:
     name: VEM
-    shortName: VEM
+    shortName: Verbose Error Messages
     displayName: Verbose Error Messages (VEM)
   subCategory: DJANGO_URL_EXPOSED
   severity: LOW

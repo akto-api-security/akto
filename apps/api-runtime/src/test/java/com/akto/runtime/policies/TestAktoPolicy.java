@@ -38,6 +38,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         hrp.requestParams.setHeaders(new HashMap<>());
         hrp.requestParams.getHeaders().put("content-type", Collections.singletonList("application/json"));
         hrp.setOrig("BBB");
+        hrp.accountId = "0";
 
         // authType
         for (ApiInfo.AuthType authType: authTypes) {
