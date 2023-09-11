@@ -32,58 +32,22 @@ jobs:
           node-version: '17'
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
-        run: npm install && npm run build
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s")
-      - name: Configure AWS credentials
-        if: ${{ github.event.inputs.Environment == 'staging' }}
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+      - name: Prepare Dashboard polaris UI
+        working-directory: ./apps/dashboard/web/polaris_web
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Login to Amazon ECR
-        if: ${{ github.event.inputs.Environment == 'staging'}}
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Build, tag, and push the image to Amazon ECR
-        if: ${{ github.event.inputs.Environment == 'staging' }}
-        id: build-image-awsecr
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: staging
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          # Build a docker container and push it to ECR 
-          cd apps/dashboard
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"
-          cd ../api-runtime
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG"
-          cd ../testing
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG"
-          cd ../api-analyser
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG"
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
 
-      - name: Deploy to AWS CloudFormation
-        if: ${{ github.event.inputs.Environment == 'staging'}}
-        uses: aws-actions/aws-cloudformation-github-deploy@v1
-        with:
-          name: instance-${{ github.sha }}
-          template: https://cf-templates-3jie41lht0xk-us-east-1.s3.amazonaws.com/templates/akto-instance-template.json
-          no-fail-on-empty-changeset: "1"
-          parameter-overrides: "VPC=vpc-004dbe2e7c81a2256,SubnetId=subnet-0d3ff2356d5470899"
-
+      - name: Deploy static site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{github.event.inputs.release_version}}/dist --delete
+      - name: Deploy polaris site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{github.event.inputs.release_version}}/dist --delete
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
@@ -99,7 +63,6 @@ jobs:
           IMAGE_TAG: latest
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_latest
         run: |
-          docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
