@@ -180,6 +180,7 @@ function AllSensitiveData() {
                 hasRowActions={true}
                 getActions={getActions}
                 getStatus={func.getTestResultStatus}
+                increasedHeight={true}
                 />,
                 <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
                     <Modal.Section flush>

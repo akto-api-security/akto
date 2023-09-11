@@ -48,7 +48,7 @@ export default function LeftNav(){
                 // },
                 {   
                   url: '#',
-                  label: <Text variant="bodyMd" fontWeight="medium">API Inventory</Text>,
+                  label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("inventory") ? (active === 'active' ? "subdued" : ""): ""}>API Inventory</Text>,
                   icon: ProductsMinor,
                   onClick: ()=>{
                     handleSelect("inventory")
@@ -88,7 +88,7 @@ export default function LeftNav(){
                 },
                 {
                   url: '#',
-                  label: <Text variant="bodyMd" fontWeight="medium">Testing</Text>,
+                  label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
                   icon: CustomersMinor,
                   onClick: ()=>{
                       handleSelect('testing')
