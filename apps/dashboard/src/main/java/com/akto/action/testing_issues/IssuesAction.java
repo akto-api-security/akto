@@ -10,6 +10,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
@@ -160,6 +161,7 @@ public class IssuesAction extends UserAction {
         severity.put("_name",info.getSeverity());
         superCategory.put("severity", severity);
         infoObj.put("superCategory", superCategory);
+        infoObj.put(YamlTemplate.INACTIVE, testConfig.getInactive());
         return infoObj;
     }
 
