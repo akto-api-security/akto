@@ -33,17 +33,17 @@ const SettingsLeftNav = () => {
                         selected: page === "users",
                         onClick: () => navigate("/dashboard/settings/users")
                     },
-                    {
-                        label: 'Alerts',
-                        icon: DiamondAlertMinor,
-                        selected: page === "alerts",
-                        onClick: () => navigate("/dashboard/settings")
-                    },
+                    // {
+                    //     label: 'Alerts',
+                    //     icon: DiamondAlertMinor,
+                    //     selected: page === "alerts",
+                    //     onClick: () => navigate("/dashboard/settings")
+                    // },
                     {
                         label: 'CI/CD',
                         icon: MarketingMinor,
                         selected: page === "cicd",
-                        onClick: () => navigate("/dashboard/settings")
+                        onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
                     },
                     {
                         label: 'Integrations',

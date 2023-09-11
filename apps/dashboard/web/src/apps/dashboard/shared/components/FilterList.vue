@@ -110,9 +110,9 @@ export default {
         }
     },
     mounted() {
-        let inputEl = this.$refs.searchTextInput.$el.querySelector('.search-text-input input')
+        let inputEl = this.$refs?.searchTextInput?.$el.querySelector('.search-text-input input')
         setTimeout(()=>{
-            inputEl.focus()
+            inputEl?.focus()
         },200)
 
     },

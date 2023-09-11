@@ -5,12 +5,17 @@ import {
   Text,
   HorizontalStack, Badge, Link, List
   } from '@shopify/polaris';
-  import TestingStore from "./testingStore";
+  import PersistStore from "../../../main/PersistStore";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
+function getStatus(state){
+  return state._name ? state._name : ( state.name ? state.name : state )
+}
+
 function getOrderPriority(state){
-    switch(state._name){
+  let status = getStatus(state);
+    switch(status){
         case "RUNNING": return 1;
         case "SCHEDULED": return 2;
         case "STOPPED": return 4;
@@ -46,11 +51,12 @@ function getTotalSeverityTestRunResult(severity){
 }
 
 function getRuntime(scheduleTimestamp ,endTimestamp, state){
-    if(state._name=='RUNNING'){
+  let status = getStatus(state);
+    if(status==='RUNNING'){
         return "Currently running";
     }
     const currTime = Date.now();
-    if(endTimestamp == -1){
+    if(endTimestamp === -1){
       if(currTime > scheduleTimestamp){
         return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
     } else {
@@ -61,7 +67,8 @@ return 'Last run ' + func.prettifyEpoch(endTimestamp);
 }
 
 function getAlternateTestsInfo(state){
-    switch(state._name){
+  let status = getStatus(state);
+    switch(status){
         case "RUNNING": return "Tests are still running";
         case "SCHEDULED": return "Tests have been scheduled";
         case "STOPPED": return "Tests have been stopper";
@@ -95,7 +102,7 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
-      obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
       obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
@@ -103,7 +110,7 @@ const transform = {
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
-      obj['nextUrl'] = data.endTimestamp == -1 ? "" : "/dashboard/testing/"+data.hexId
+      obj['nextUrl'] = "/dashboard/testing/"+data.hexId
       return obj;
     },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries) => {
@@ -120,10 +127,10 @@ const transform = {
       let obj = {};
       obj['id'] = data.hexId;
       obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
-      obj['detected_time'] = "Detected " + func.prettifyEpoch(data.endTimestamp)
+      obj['detected_time'] = (data['vulnerable'] ? "Detected " : "Tried ") + func.prettifyEpoch(data.endTimestamp)
       obj["endTimestamp"] = data.endTimestamp
       obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
-      obj['url'] = "Detected in " + (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
+      obj['url'] = (data['vulnerable'] ? "Detected in " : "Tried in ") + (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
       obj['severity'] = data.vulnerable ? [func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))] : []
       obj['total_severity'] = getTotalSeverityTestRunResult(obj['severity'])
       obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0]] : []
@@ -308,8 +315,8 @@ setTestMetadata () {
     resp.testSourceConfigs.forEach((x) => {
       subCategoryFromSourceConfigMap[x.id] = x
     })
-    TestingStore.getState().setSubCategoryMap(subCategoryMap)
-    TestingStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
+    PersistStore.getState().setSubCategoryMap(subCategoryMap)
+    PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
 })
 }
 
