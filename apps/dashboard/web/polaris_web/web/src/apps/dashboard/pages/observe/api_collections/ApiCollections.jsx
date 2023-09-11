@@ -184,6 +184,7 @@ function ApiCollections() {
                 headers={headers}
                 selectable={true}
                 promotedBulkActions={promotedBulkActions}
+                increasedHeight={true}
                 />)
             ]}
         />
