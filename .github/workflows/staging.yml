@@ -128,7 +128,7 @@ jobs:
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
         run: |
           npm install
-          node ./.github/workflows/vulnerable_checker.js
+          node ./vulnerable_checker.js
         
       # Wait for staging environment to be setup 
       # - name: Sleep for 3 minutes
