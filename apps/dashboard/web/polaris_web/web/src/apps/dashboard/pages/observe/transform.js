@@ -1,6 +1,29 @@
 import func from "@/util/func";
 import Store from "../../store";
 
+const standardHeaders = [
+    'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
+    'cache-control', 'clear-site-data', 'connection', 'content-disposition', 'content-dpr', 'content-encoding', 'content-language', 'content-length', 'content-location', 'content-range', 'content-security-policy', 'content-security-policy-report-only', 'content-type', 'cookie', 'critical-ch', 'cross-origin-embedder-policy', 'cross-origin-opener-policy', 'cross-origin-resource-policy',
+    'date', 'device-memory', 'digest', 'dnt', 'downlink', 'dpr',
+    'early-data', 'ect', 'etag', 'expect', 'expect-ct', 'expires',
+    'forwarded', 'from',
+    'host',
+    'if-match', 'if-modified-since', 'if-none-match', 'if-range', 'if-unmodified-since',
+    'keep-alive',
+    'large-allocation', 'last-modified', 'link', 'location',
+    'max-forwards',
+    'nel',
+    'origin',
+    'permissions-policy', 'pragma', 'proxy-authenticate', 'proxy-authorization',
+    'range', 'referer', 'referrer-policy', 'retry-after', 'rtt',
+    'save-data', 'sec-ch-prefers-color-scheme', 'sec-ch-prefers-reduced-motion', 'sec-ch-prefers-reduced-transparency', 'sec-ch-ua', 'sec-ch-ua-arch', 'sec-ch-ua-bitness', 'sec-ch-ua-full-version', 'sec-ch-ua-full-version-list', 'sec-ch-ua-mobile', 'sec-ch-ua-model', 'sec-ch-ua-platform', 'sec-ch-ua-platform-version', 'sec-fetch-dest', 'sec-fetch-mode', 'sec-fetch-site', 'sec-fetch-user', 'sec-gpc', 'sec-purpose', 'sec-websocket-accept', 'server', 'server-timing', 'service-worker-navigation-preload', 'set-cookie', 'sourcemap', 'strict-transport-security',
+    'te', 'timing-allow-origin', 'tk', 'trailer', 'transfer-encoding',
+    'upgrade', 'upgrade-insecure-requests', 'user-agent',
+    'vary', 'via', 'viewport-width',
+    'want-digest', 'warning', 'width', 'www-authenticate',
+    'x-content-type-options', 'x-dns-prefetch-control', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-frame-options', 'x-xss-protection'
+];
+
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
         let apiCollection = apiCollectionMap[res?.data?.endpoints[0]?.apiCollectionId];
@@ -97,6 +120,28 @@ const transform = {
     formatNumberWithCommas(number) {
         const numberString = number.toString();
         return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    },
+    getStandardHeaderList(){
+        return standardHeaders
+    },
+    getCommonSamples(nonSensitiveData, sensitiveData){
+        let sensitiveSamples = this.prepareSampleData(sensitiveData, '')
+        const samples = new Set()
+        const highlightPathsObj ={}
+        sensitiveSamples.forEach((x) => {
+            samples.add(JSON.parse(x.message))
+            highlightPathsObj[JSON.parse(x.message)] = x.highlightPaths
+        })
+
+        let uniqueNonSensitive = []
+        nonSensitiveData.forEach((x) => {
+            let parsed = JSON.parse(x)
+            if(!samples.has(parsed)){
+                uniqueNonSensitive.push({message: x, highlightPaths: []})
+            }
+        })
+        const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
+        return finalArr
     }
       
 }

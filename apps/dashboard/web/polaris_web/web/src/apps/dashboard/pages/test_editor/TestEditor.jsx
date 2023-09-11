@@ -23,13 +23,15 @@ const TestEditor = () => {
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
     const setLeftNavSelected = PersistStore(state => state.setLeftNavSelected)
+    const setActive = PersistStore(state => state.setActive)
 
     const [loading, setLoading] = useState(true)
 
 
     const handleExit = () => {
         navigate("/dashboard/testing")
-        setLeftNavSelected("testing")
+        setLeftNavSelected("testing-results")
+        setActive('active')
     }
 
     const fetchAllTests = async () => {

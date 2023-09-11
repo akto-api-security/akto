@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, ButtonGroup, Box, Popover, ActionList, Icon, Modal } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Box, Popover, ActionList, Icon, Modal } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -383,21 +383,27 @@ function ApiEndpoints() {
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={
-                <ButtonGroup spacing="loose">
-                    <Button onClick={handleRefresh} plain monochrome removeUnderline>Refresh</Button>
+                <HorizontalStack gap="2">
+                    <Box paddingInlineEnd="3" paddingInlineStart="3">
+                        <Button onClick={handleRefresh} plain monochrome removeUnderline>
+                            <Text fontWeight="medium" variant="bodyMd">Refresh</Text>
+                        </Button>
+                    </Box>
                     <Popover
                         active={exportOpen}
                         activator={(
+                            <Box paddingInlineEnd="1" paddingInlineStart="3">
                             <Button
                                 plain monochrome removeUnderline
                                 onClick={() => setExportOpen(true)}>
                                 <HorizontalStack gap="1">
-                                    <Text>Export</Text>
+                                <Text fontWeight="medium" variant="bodyMd">Export</Text>
                                     <Box>
                                         <Icon source={ChevronDownMinor} />
                                     </Box>
                                 </HorizontalStack>
                             </Button>
+                            </Box>
                         )}
                         autofocusTarget="first-node"
                         onClose={() => { setExportOpen(false) }}
@@ -414,10 +420,10 @@ function ApiEndpoints() {
                         fileFormat=".har"
                         fileChanged={file => handleFileChange(file)}
                         tooltipText="Upload traffic(.har)"
-                        label="Upload traffic"
+                        label={(<Box paddingInlineEnd="3" paddingInlineStart="3"><Text fontWeight="medium" variant="bodyMd">Upload traffic</Text></Box>)}
                         primary={false} />
 
-                    {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button> : null}
+                    {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
                     
                     <RunTest
                         apiCollectionId={apiCollectionId}
@@ -425,7 +431,7 @@ function ApiEndpoints() {
                         filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
                         disabled={tabs[selected].component !== undefined}
                     />
-                </ButtonGroup>
+                </HorizontalStack>
             }
             components={
                 loading ? [<SpinnerCentered key="loading" />] :

@@ -14,7 +14,7 @@ import TooltipText from '../../shared/TooltipText';
 
 function GithubCell(props){
 
-    const {data, headers, getStatus, width, nameWidth} = props
+    const {data, headers, getStatus, width, nameWidth, isBadgeClickable, badgeClicked} = props
     return (
     <HorizontalStack gap="1">
     {
@@ -75,11 +75,21 @@ function GithubCell(props){
                 }).map((header) => {
                     return data?.[header?.value]
                     ?.map((item) =>
-                    <Badge key={item} status={getStatus(item)}>
+                    isBadgeClickable ? 
+                        <Button key={item} onClick={() =>badgeClicked()} plain monochrome>
+                            <Badge status={getStatus(item)}>
+                                <Text {...header.dataProps}>
+                                    {item}
+                                </Text>
+                            </Badge>
+                        </Button>
+                        
+                    : <Badge key={item} status={getStatus(item)}>
                         <Text {...header.dataProps}>
                             {item}
                         </Text>
                     </Badge>
+                    
                 )}) 
             }
         </HorizontalStack>
