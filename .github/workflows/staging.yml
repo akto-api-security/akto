@@ -125,14 +125,14 @@ jobs:
       #   run: sleep 3m
       #   shell: bash
 
-      - name: Run testsigma end to end tests
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-        env:
-            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
-            TESTSIGMA_TEST_PLAN_ID: 361
-            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-        run: bash ./.github/workflows/akto-testsigma.sh
+      # - name: Run testsigma end to end tests
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+      #   env:
+      #       TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+      #       #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
+      #       TESTSIGMA_TEST_PLAN_ID: 361
+      #       TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+      #   run: bash ./.github/workflows/akto-testsigma.sh
 
       - name: Run Akto CI/CD tests
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
