@@ -8,7 +8,9 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
+import com.akto.log.LoggerMaker;
 import com.akto.notifications.slack.DailyUpdate;
+import com.akto.runtime.Main;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -25,9 +27,14 @@ public class TrafficUpdates {
     private final String webhookUrl;
     private final String metricsUrl;
 
-    public TrafficUpdates(String webhookUrl, String metricsUrl) {
+    private final int thresholdSeconds;
+
+    public static final int LOOK_BACK_PERIOD = 3;
+
+    public TrafficUpdates(String webhookUrl, String metricsUrl, int thresholdSeconds) {
         this.webhookUrl = webhookUrl;
         this.metricsUrl = metricsUrl;
+        this.thresholdSeconds = thresholdSeconds;
     }
 
     enum AlertType {
@@ -35,15 +42,28 @@ public class TrafficUpdates {
         FILTERED_REQUESTS_RUNTIME
     }
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficUpdates.class);
+
     public void run() {
+        loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
         populateTrafficDetails(AlertType.OUTGOING_REQUESTS_MIRRORING);
+        loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
+
+        loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
         populateTrafficDetails(AlertType.FILTERED_REQUESTS_RUNTIME);
+        loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
 
         List<TrafficMetricsAlert> trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(new BasicDBObject());
         List<TrafficMetricsAlert> filteredTrafficMetricsAlertsList = filterTrafficMetricsAlertsList(trafficMetricsAlertList);
+        loggerMaker.infoAndAddToDb("filteredTrafficMetricsAlertsList: " + filteredTrafficMetricsAlertsList.size(), LoggerMaker.LogDb.DASHBOARD);
 
-        sendAlerts(60,AlertType.OUTGOING_REQUESTS_MIRRORING, filteredTrafficMetricsAlertsList);
-        sendAlerts(60, AlertType.FILTERED_REQUESTS_RUNTIME, filteredTrafficMetricsAlertsList);
+        loggerMaker.infoAndAddToDb("Starting sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
+        sendAlerts(thresholdSeconds,AlertType.OUTGOING_REQUESTS_MIRRORING, filteredTrafficMetricsAlertsList);
+        loggerMaker.infoAndAddToDb("Finished sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
+
+        loggerMaker.infoAndAddToDb("Starting sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
+        sendAlerts(thresholdSeconds, AlertType.FILTERED_REQUESTS_RUNTIME, filteredTrafficMetricsAlertsList);
+        loggerMaker.infoAndAddToDb("Finished sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
     }
 
     public List<TrafficMetricsAlert> filterTrafficMetricsAlertsList(List<TrafficMetricsAlert> trafficMetricsAlertList) {
@@ -85,8 +105,16 @@ public class TrafficUpdates {
         // db script to get all <unique host: last_ts> map
         List<Bson> pipeline = new ArrayList<>();
 
+        // we want to bring only last 3 days data to find traffic alerts. More efficient than getting all traffic.
+        int time = (Context.now() - 60*60*24*LOOK_BACK_PERIOD) / (60*60*24);
+
+        Bson filter = Filters.and(
+                Filters.eq("_id." + TrafficMetrics.Key.NAME, name.toString()),
+                Filters.gte("_id."+TrafficMetrics.Key.BUCKET_START_EPOCH, time)
+        );
+
         Document idExpression = new Document("host", "$_id.host");
-        pipeline.add(Aggregates.match(Filters.eq("_id.name", name.toString())));
+        pipeline.add(Aggregates.match(filter));
         pipeline.add(Aggregates.project(Document.parse("{'countMap': { '$objectToArray': \"$countMap\" }}")));
         pipeline.add(Aggregates.unwind("$countMap"));
         pipeline.add(Aggregates.group(
@@ -100,7 +128,7 @@ public class TrafficUpdates {
 
         while(endpointsCursor.hasNext()) {
             BasicDBObject a = endpointsCursor.next();
-            Integer ts = Integer.parseInt(a.getString("maxTimestamp"));
+            Integer ts = Integer.parseInt(a.getString("maxTimestamp")) * (60 * 60); // converting hours to seconds
             String host = ((BasicDBObject) a.get("_id")).getString("host");
 
             Bson update;
@@ -118,10 +146,7 @@ public class TrafficUpdates {
 
             updates.add(
                     new UpdateManyModel<TrafficMetricsAlert>(
-                            Filters.and(
-                                    Filters.eq(TrafficMetricsAlert.HOST, host),
-                                    Filters.eq(TrafficMetricsAlert.FILTER_TYPE, TrafficMetricsAlert.FilterType.HOST)
-                            ),
+                            Filters.eq(TrafficMetricsAlert.HOST, host),
                             update,
                             new UpdateOptions().upsert(true)
                     )
@@ -134,11 +159,9 @@ public class TrafficUpdates {
         }
     }
 
-    public void sendRedAlert(TrafficMetricsAlert alert, AlertType alertType) {
-        if (!alert.getFilterType().equals(TrafficMetricsAlert.FilterType.HOST)) return;
-
+    public void sendRedAlert(Set<String> hosts, AlertType alertType) {
         Slack slack = Slack.getInstance();
-        String payload = generateRedAlertPayload(alert, alertType, this.metricsUrl);
+        String payload = generateRedAlertPayload(hosts, alertType, this.metricsUrl);
         if (payload == null) return;
 
         try {
@@ -147,27 +170,17 @@ public class TrafficUpdates {
             e.printStackTrace();
         }
 
-        updateTsFieldHostWise(alert.getHost(), TrafficMetricsAlert.LAST_RED_ALERT_SENT_TS, Context.now());
+        updateTsFieldHostWise(hosts, alertType, Context.now(), true);
     }
 
-    public static String generateRedAlertPayload(TrafficMetricsAlert alert, AlertType alertType, String metricsUrl) {
-        int lastOutgoingTrafficTsHours = alert.getLastOutgoingTrafficTs();
+    public static String generateRedAlertPayload(Set<String> hosts, AlertType alertType, String metricsUrl) {
         String text;
-        switch (alert.getFilterType()) {
-            case HOST:
-                String host = alert.getHost();
-                switch (alertType) {
-                    case OUTGOING_REQUESTS_MIRRORING:
-                        int lastOutgoingTrafficTs = lastOutgoingTrafficTsHours * 60 * 60;
-                        text = ":warning: *Alert*: Collection <" + metricsUrl + " | " + host +"> " + "last received traffic " + DateUtils.prettifyDelta(lastOutgoingTrafficTs);
-                        break;
-                    case FILTERED_REQUESTS_RUNTIME:
-                        int lastDbUpdateTs = alert.getLastDbUpdateTs();
-                        text = ":warning: *Alert*: Collection " + "<" + metricsUrl + " | " + host +"> " + "last processed traffic " + DateUtils.prettifyDelta(lastDbUpdateTs);
-                        break;
-                    default:
-                        return null;
-                }
+        switch (alertType) {
+            case OUTGOING_REQUESTS_MIRRORING:
+                text = ":warning: Stopped receiving traffic for hosts " + prettifyHosts(hosts, 3) + ". <" + metricsUrl + " | Open Dashboard.>";
+                break;
+            case FILTERED_REQUESTS_RUNTIME:
+                text = ":warning: Stopped processing traffic for hosts " + prettifyHosts(hosts, 3) + ". <" + metricsUrl + " | Open Dashboard.>";
                 break;
             default:
                 return null;
@@ -179,36 +192,50 @@ public class TrafficUpdates {
         return ret.toJson();
     }
 
-    public void sendGreenAlert(TrafficMetricsAlert alert, AlertType alertType) {
-        if (!alert.getFilterType().equals(TrafficMetricsAlert.FilterType.HOST)) return;
+    public static String prettifyHosts(Set<String> hosts, int limit)  {
+        StringBuilder result = new StringBuilder();
+        int count = 0;
 
+        for (String host : hosts) {
+            if (count < limit) {
+                if (count > 0) {
+                    result.append(", ");
+                }
+                result.append(host);
+                count++;
+            } else {
+                break;
+            }
+        }
+
+        if (count < hosts.size()) {
+            result.append(" and ").append(hosts.size() - count).append(" more");
+        }
+
+        return result.toString();
+    }
+
+    public void sendGreenAlert(Set<String> hosts, AlertType alertType) {
         Slack slack = Slack.getInstance();
-        String payload = generateGreenAlertPayload(alert, alertType, this.metricsUrl);
+        String payload = generateGreenAlertPayload(hosts, alertType, this.metricsUrl);
         try {
             slack.send(this.webhookUrl, payload);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        updateTsFieldHostWise( alert.getHost(), TrafficMetricsAlert.LAST_GREEN_ALERT_SENT_TS, Context.now());
+        updateTsFieldHostWise(hosts, alertType, Context.now(), false);
     }
 
-    public static String generateGreenAlertPayload(TrafficMetricsAlert alert, AlertType alertType, String metricsUrl) {
+    public static String generateGreenAlertPayload(Set<String> hosts, AlertType alertType, String metricsUrl) {
         String text;
 
-        switch (alert.getFilterType()) {
-            case HOST:
-                String host = alert.getHost();
-                switch (alertType) {
-                    case OUTGOING_REQUESTS_MIRRORING:
-                        text = ":white_check_mark: *Resolved: * Collection <" + metricsUrl + " | " + host +"> has successfully resumed receiving traffic.";
-                        break;
-                    case FILTERED_REQUESTS_RUNTIME:
-                        text = ":white_check_mark: *Resolved: * Collection <" + metricsUrl + " | " + host +"> has successfully resumed processing traffic.";
-                        break;
-                    default:
-                        return null;
-                }
+        switch (alertType) {
+            case OUTGOING_REQUESTS_MIRRORING:
+                text = ":white_check_mark: Resumed receiving traffic for hosts " + prettifyHosts(hosts, 3) + ". <" + metricsUrl + " | Open Dashboard.>";
+                break;
+            case FILTERED_REQUESTS_RUNTIME:
+                text = ":white_check_mark: Resumed processing traffic for hosts " + prettifyHosts(hosts, 3) + ". <" + metricsUrl + " | Open Dashboard.>";
                 break;
             default:
                 return null;
@@ -221,39 +248,70 @@ public class TrafficUpdates {
         return ret.toJson();
     }
 
-    public static void updateTsFieldHostWise(String host, String fieldName, int ts) {
-        TrafficMetricsAlertsDao.instance.updateOne(
-                Filters.and(
-                        Filters.eq(TrafficMetricsAlert.HOST, host),
-                        Filters.eq(TrafficMetricsAlert.FILTER_TYPE, TrafficMetricsAlert.FilterType.HOST)
-                ),
+    public static void updateTsFieldHostWise(Set<String> hosts, AlertType alertType, int ts, boolean isRed) {
+
+        String fieldName;
+        switch (alertType) {
+            case OUTGOING_REQUESTS_MIRRORING:
+                fieldName = isRed ? TrafficMetricsAlert.LAST_OUTGOING_TRAFFIC_RED_ALERT_SENT_TS : TrafficMetricsAlert.LAST_OUTGOING_TRAFFIC_GREEN_ALERT_SENT_TS;
+                break;
+            case FILTERED_REQUESTS_RUNTIME:
+                fieldName = isRed ? TrafficMetricsAlert.LAST_DB_UPDATE_RED_ALERT_SENT_TS : TrafficMetricsAlert.LAST_DB_UPDATE_GREEN_ALERT_SENT_TS;
+                break;
+            default:
+                return;
+        }
+
+        TrafficMetricsAlertsDao.instance.updateMany(
+                Filters.in(TrafficMetricsAlert.HOST, hosts),
                 Updates.set(fieldName, ts)
         );
     }
 
+    public static class AlertResult {
+        Set<String> redAlertHosts = new HashSet<>();
+        Set<String> greenAlertHosts = new HashSet<>();
 
-    public void sendAlerts(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList) {
+        public AlertResult(Set<String> redAlertHosts, Set<String> greenAlertHosts) {
+            this.redAlertHosts = redAlertHosts;
+            this.greenAlertHosts = greenAlertHosts;
+        }
+    }
+
+    public static AlertResult generateAlertResult(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList) {
+        Set<String> redAlertHosts = new HashSet<>();
+        Set<String> greenAlertHosts = new HashSet<>();
 
         for (TrafficMetricsAlert alert : trafficMetricsAlertList) {
-            int lastOutgoingTrafficTs = alert.getLastOutgoingTrafficTs();
-            int lastRedAlertSentTs = alert.getLastRedAlertSentTs();
-            int lastGreenAlertSentTs = alert.getLastGreenAlertSentTs();
+            int lastOutgoingTrafficTs =  alertType.equals(AlertType.OUTGOING_REQUESTS_MIRRORING) ? alert.getLastOutgoingTrafficTs() : alert.getLastDbUpdateTs();
+            int lastRedAlertSentTs = alertType.equals(AlertType.OUTGOING_REQUESTS_MIRRORING) ? alert.getLastOutgoingTrafficRedAlertSentTs() : alert.getLastDbUpdateRedAlertSentTs();
+            int lastGreenAlertSentTs = alertType.equals(AlertType.OUTGOING_REQUESTS_MIRRORING) ? alert.getLastOutgoingTrafficGreenAlertSentTs() : alert.getLastDbUpdateGreenAlertSentTs();
             int currentTs = Context.now();
+
 
             // didn't receive traffic in last thresholdSeconds
             if (currentTs - lastOutgoingTrafficTs > thresholdSeconds) {
                 // green alert was sent after red alert
                 if (lastGreenAlertSentTs >= lastRedAlertSentTs) {
-                    sendRedAlert(alert, alertType);
+                    redAlertHosts.add(alert.getHost());
                 }
             } else {
                 // received traffic in last thresholdSeconds
                 if (lastGreenAlertSentTs < lastRedAlertSentTs) {
                     // no green alerts were sent after red alert
-                    sendGreenAlert(alert, alertType);
+                    greenAlertHosts.add(alert.getHost());
                 }
             }
         }
+
+        return new AlertResult(redAlertHosts, greenAlertHosts);
+    }
+
+    public void sendAlerts(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList) {
+        AlertResult alertResult = generateAlertResult(thresholdSeconds, alertType, trafficMetricsAlertList);
+
+        if (!alertResult.redAlertHosts.isEmpty()) sendRedAlert(alertResult.redAlertHosts, alertType);
+        if (!alertResult.greenAlertHosts.isEmpty()) sendGreenAlert(alertResult.greenAlertHosts, alertType);
     }
 
     public String getWebhookUrl() {
@@ -262,5 +320,9 @@ public class TrafficUpdates {
 
     public String getMetricsUrl() {
         return metricsUrl;
+    }
+
+    public int getThresholdSeconds() {
+        return thresholdSeconds;
     }
 }
