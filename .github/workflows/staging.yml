@@ -119,6 +119,28 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
       
       # Run QA tests
+    
+      #Wait for staging environment to be setup 
+      # - name: Sleep for 3 minutes
+      #   run: sleep 3m
+      #   shell: bash
+
+      - name: Run testsigma end to end tests
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+        env:
+            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+            #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
+            TESTSIGMA_TEST_PLAN_ID: 361
+            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+        run: bash ./.github/workflows/akto-testsigma.sh
+
+      - name: Run Akto CI/CD tests
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+        uses: akto-api-security/run-scan@v1.0.3
+        with:
+          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+          AKTO_TEST_ID: 64f025c28858442a897032c3
 
       - name: Check Vulnerable API's
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
@@ -129,36 +151,14 @@ jobs:
         run: |
           npm install axios
           node ./vulnerable_checker.js
-        
-      # Wait for staging environment to be setup 
-      # - name: Sleep for 3 minutes
-      #   run: sleep 3m
-      #   shell: bash
 
-      # - name: Run testsigma end to end tests
-      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-      #   env:
-            # TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            # #TESTSIGMA_TEST_PLAN_ID: ${{ vars.TESTSIGMA_TESTPLAN_ID }}
-            # TESTSIGMA_TEST_PLAN_ID: 361
-            # TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-      #   run: bash ./.github/workflows/akto-testsigma.sh
-
-      # - name: Run Akto CI/CD tests
-      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-      #   uses: akto-api-security/run-scan@v1.0.3
-      #   with:
-      #     AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-      #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-      #     AKTO_TEST_ID: 64f025c28858442a897032c3
-
-      # - name: Check for Akto test completion
-      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-      #   env:
-            # AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-            # AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-            # AKTO_TEST_ID: 64f025c28858442a897032c3
-      #   run: bash ./.github/workflows/akto-cicd.sh
+      - name: Check for Akto test completion
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+        env:
+            AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+            AKTO_TEST_ID: 64f025c28858442a897032c3
+        run: bash ./.github/workflows/akto-cicd.sh
 
   # deploy:
   #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}

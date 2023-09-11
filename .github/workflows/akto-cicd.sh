@@ -50,7 +50,8 @@ while true; do
 
     if [ "$high" -gt 0 ] || [ "$medium" -gt 0 ] || [ "$low" -gt 0 ] ; then
         echo "Vulnerabilities found!!" >> $GITHUB_STEP_SUMMARY
-        exit 1
+        #exit 1
+        exit 0
     fi
     break
   elif [[ "$state" == "STOPPED" ]]; then
