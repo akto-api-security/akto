@@ -122,12 +122,12 @@ jobs:
 
       - name: Check Vulnerable API's
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-        working-directory: ./.github/workflows
+        working-directory: ./,github/workflows
         env:
-          AKTO_DASHBOARD_URL:  https://flash.staging.akto.io
+          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
         run: |
-          npm install
+          npm install axios
           node ./vulnerable_checker.js
         
       # Wait for staging environment to be setup 
