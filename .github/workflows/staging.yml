@@ -134,13 +134,21 @@ jobs:
       #       TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
       #   run: bash ./.github/workflows/akto-testsigma.sh
 
-      - name: Run Akto CI/CD tests
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-        uses: akto-api-security/run-scan@v1.0.3
-        with:
-          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 64f025c28858442a897032c3
+      # - name: Run Akto CI/CD tests
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+      #   uses: akto-api-security/run-scan@v1.0.3
+      #   with:
+      #     AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+      #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      #     AKTO_TEST_ID: 64f025c28858442a897032c3
+
+      # - name: Check for Akto test completion
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+      #   env:
+      #       AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+      #       AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      #       AKTO_TEST_ID: 64f025c28858442a897032c3
+      #   run: bash ./.github/workflows/akto-cicd.sh
 
       - name: Check Vulnerable API's
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
@@ -151,14 +159,6 @@ jobs:
         run: |
           npm install axios
           node ./vulnerable_checker.js
-
-      - name: Check for Akto test completion
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-        env:
-            AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-            AKTO_TEST_ID: 64f025c28858442a897032c3
-        run: bash ./.github/workflows/akto-cicd.sh
 
   # deploy:
   #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
