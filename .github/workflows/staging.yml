@@ -126,7 +126,7 @@ jobs:
           AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
         run: |
-          npm install -g axios
+          npm install
           node ./.github/workflows/vulnerable_checker.js
         
       # Wait for staging environment to be setup 
