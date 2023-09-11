@@ -122,6 +122,7 @@ jobs:
 
       - name: Check Vulnerable API's
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+        working-directory: ./.github/workflows
         env:
           AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
