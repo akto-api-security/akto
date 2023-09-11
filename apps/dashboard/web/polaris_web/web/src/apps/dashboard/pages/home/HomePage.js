@@ -9,7 +9,7 @@ function HomePage() {
   const leftNavCollapsed = Store(state => state.leftNavCollapsed)
 
   const logo = {
-    width: 124,
+    width: 78,
     topBarSource:
       '/public/akto_name_with_logo.svg',
     url: '/dashboard/observe/inventory',

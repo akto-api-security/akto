@@ -3,13 +3,13 @@ import { Box, Button, Modal } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
-import ObserveStore from "../observeStore"
 import dashboardFunc from "../../transform";
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
+import transform from "../transform";
 
 function ApiDetails(props) {
 
@@ -17,23 +17,25 @@ function ApiDetails(props) {
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
-    const setSamples = ObserveStore(state => state.setSamples)
     const [selectedUrl,setSelectedUrl] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [badgeActive, setBadgeActive] = useState(false)
 
     const fetchData = async() => {
         setLoading(true)
         const { apiCollectionId, endpoint, method } = apiDetail
         setSelectedUrl({url: endpoint, method: method})
         await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
-            if (res.sampleDataList.length > 0) {
-                setSampleData(res.sampleDataList[0].samples.map((sample) => ({ message: sample, highlightPaths: [] })))
-                setSamples(res.sampleDataList[0].samples[0])
-            }else{
-                setSamples("")
-            }
+            api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then((resp) => {
+                if (res.sampleDataList.length > 0) {
+                    const commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples,resp)
+                    setSampleData(commonMessages)
+                }else{
+                    setSampleData(transform.prepareSampleData(resp, ''))
+                }
+            })
         })
         setTimeout(()=>{
             setLoading(false)
@@ -73,6 +75,10 @@ function ApiDetails(props) {
         func.setToast(true,false,"Triggered tests successfully!")
     }
 
+    const badgeClicked = () => {
+        setBadgeActive(true)
+    }
+
     useEffect(() => {
         fetchData();
     }, [apiDetail])
@@ -91,6 +97,8 @@ function ApiDetails(props) {
         component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
         <ApiSchema
             data={paramList} 
+            badgeActive={badgeActive}
+            setBadgeActive={setBadgeActive}
         />
         </Box>
     }
@@ -116,6 +124,8 @@ function ApiDetails(props) {
             data={apiDetail}
             headers={headers}
             getStatus={getStatus}
+            isBadgeClickable={true}
+            badgeClicked={badgeClicked}
         />,
         <LayoutWithTabs
             key="tabs"

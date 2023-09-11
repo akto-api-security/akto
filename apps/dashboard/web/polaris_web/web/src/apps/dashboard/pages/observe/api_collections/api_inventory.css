@@ -14,3 +14,11 @@
     transition: right 0.3s ease-in-out;
     top: 60px;
 }
+
+.control-row .Polaris-IndexTable__TableCell {
+    padding: 16px 16px 16px 0 !important;
+}
+
+.control-row .Polaris-IndexTable__TableCell--first{
+    padding: 16px 0 !important;
+}
