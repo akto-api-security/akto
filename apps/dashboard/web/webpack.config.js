@@ -20,7 +20,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, './dist'),
     // the path here and in login.jsp are different.
-    publicPath: process.env.VERSION ==='' || process.env.VERSION.includes("akto-release-version") ? '/dist/':  'https://d1hvi6xs55woen.cloudfront.net/web/' + process.env.VERSION +  '/dist/',
+    publicPath: process.env.VERSION ==='' || process.env.VERSION.includes("akto-release-version") ? '/dist/':  'https://d1hvi6xs55woen.cloudfront.net/on_prem/web/' + process.env.VERSION +  '/dist/',
     filename: '[name].js'
   },
   module: {

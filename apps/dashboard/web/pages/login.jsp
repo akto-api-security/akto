@@ -123,12 +123,12 @@
                             script.src = "/dist/main.js";
                         }
                     } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
-                        script.src = "https://d1hvi6xs55woen.cloudfront.net/web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/on_prem/web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
                     } else {
                         if (window.AKTO_UI_MODE == 'VERSION_2') {
-                            script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
+                            script.src = "https://d1hvi6xs55woen.cloudfront.net/on_prem/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
                         } else {
-                            script.src = "https://d1hvi6xs55woen.cloudfront.net/web/" + window.RELEASE_VERSION + "/dist/main.js";
+                            script.src = "https://d1hvi6xs55woen.cloudfront.net/on_prem/web/" + window.RELEASE_VERSION + "/dist/main.js";
                         }
                     }
                     document.body.appendChild(script);
