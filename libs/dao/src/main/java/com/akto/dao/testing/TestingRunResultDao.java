@@ -38,8 +38,8 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(ObjectId testRunResultSummaryId) {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId))
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
                 .projection(
                         Projections.include(
                             TestingRunResult.TEST_RUN_ID,
