@@ -975,6 +975,8 @@ public class InitializerListener implements ServletContextListener {
                                 runInitializerFunctions();
                             }
                         }, "context-initializer");
+                        setUpTrafficAlertScheduler();
+                        SingleTypeInfo.init();
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
@@ -1073,15 +1075,12 @@ public class InitializerListener implements ServletContextListener {
         try {
             setBackwardCompatibilities(backwardCompatibility);
 
-            SingleTypeInfo.init();
-
             insertPiiSources();
 
 //            setUpPiiCleanerScheduler();
-            setUpTrafficAlertScheduler();
-            setUpDailyScheduler();
-            setUpWebhookScheduler();
-            setUpPiiAndTestSourcesScheduler();
+//            setUpDailyScheduler();
+//            setUpWebhookScheduler();
+//            setUpPiiAndTestSourcesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
