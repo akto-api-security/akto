@@ -26,9 +26,11 @@ public class DateUtils {
             return "1 hour ago";
         } else if (diff < 86400) {
             return diff/3600 + " hours ago";
+        } else if (diff < 172_800) {
+            return "1 day ago";
         }
 
-        return "couple of days ago";
+        return diff/86400 + " days ago";
     }
 
     public static LocalDate getStartLocalDate(TrackingPeriod period, int date) {
