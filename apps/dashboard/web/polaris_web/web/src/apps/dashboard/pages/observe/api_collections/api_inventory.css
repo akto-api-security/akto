@@ -1,0 +1,16 @@
+.apiEndpointsTable .rowIconClass  .Polaris-Icon {
+    width: 4rem !important;
+}
+
+.styled-endpoint {
+    overflow-x:hidden; 
+    text-overflow: ellipsis; 
+    white-space: nowrap
+}
+.gpt-button-fixed {
+    position: absolute;
+    z-index: 400;
+    right: 24px !important;
+    transition: right 0.3s ease-in-out;
+    top: 60px;
+}
