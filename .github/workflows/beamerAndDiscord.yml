@@ -21,7 +21,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/vv1.30.0'
+          url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/latest'
           response = requests.get(url, headers=headers)
           data = response.json()
 
