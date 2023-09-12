@@ -205,7 +205,7 @@ export default {
     },
     convertSampleDataToCurl(sampleData) {
         return request({
-            url: '/tools/convertSampleDataToCurl',
+            url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSampleDataToCurl' :'/api/convertSampleDataToCurl',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {
@@ -214,7 +214,7 @@ export default {
     },
     convertSampleDataToBurpRequest(sampleData) {
         return request({
-            url: '/tools/convertSamleDataToBurpRequest',
+            url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSamleDataToBurpRequest' : '/api/convertSamleDataToBurpRequest',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {

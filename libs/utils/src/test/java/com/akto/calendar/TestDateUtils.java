@@ -26,7 +26,7 @@ public class TestDateUtils {
         assertEquals("2 hours ago", result);
 
         result = DateUtils.prettifyDelta(Context.now()-94000);
-        assertEquals("couple of days ago", result);
+        assertEquals("1 day ago", result);
     }
     
 }
