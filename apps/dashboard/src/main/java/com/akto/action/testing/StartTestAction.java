@@ -339,6 +339,8 @@ public class StartTestAction extends UserAction {
 
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
+    private boolean fetchOnlyVulnerable;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -348,7 +350,15 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        this.testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult( testingRunResultSummaryId);
+        List<Bson> testingRunResultFilters = new ArrayList<>();
+
+        if(fetchOnlyVulnerable){
+            testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+        }
+
+        testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
+
+        this.testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
 
         return SUCCESS.toUpperCase();
     }
@@ -683,6 +693,10 @@ public class StartTestAction extends UserAction {
     public void setLatestTestingRunResultSummaries(
         Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries) {
         this.latestTestingRunResultSummaries = latestTestingRunResultSummaries;
+    }
+
+    public void setFetchOnlyVulnerable(boolean fetchOnlyVulnerable) {
+        this.fetchOnlyVulnerable = fetchOnlyVulnerable;
     }
 
     public enum CallSource{

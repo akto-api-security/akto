@@ -63,16 +63,18 @@
                     CI/CD Run Details: {{ this.currentTest.metadata }}
                 </div>
 
-                <simple-table
+                <layout-with-tabs title="" :tabs="['Vulnerable', 'All']">
+                <template slot="Vulnerable">
+                    <simple-table
                     :headers="testingRunResultsHeaders" 
-                    :items="testingRunResultsItems" 
+                    :items="vulnerableTestingRunResultsItems" 
                     name="" 
                     sortKeyDefault="vulnerable" 
                     :pageSize="10"
                     :sortDescDefault="true"
                     :dense="true"
                     @rowClicked="openDetails"
-                >
+                    >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
                             :sensitiveTags="(item.severity || item.severity.value !== 0) ? getItemSeverity(item.severity.value) : []"
@@ -82,7 +84,31 @@
                         />
                     </template>
                 
-                </simple-table>
+                    </simple-table>
+                </template>
+                <template slot="All">
+                    <simple-table
+                    :headers="testingRunResultsHeaders" 
+                    :items="testingRunResultsItems" 
+                    name="" 
+                    sortKeyDefault="vulnerable" 
+                    :pageSize="10"
+                    :sortDescDefault="true"
+                    :dense="true"
+                    @rowClicked="openDetails"
+                    >
+                    <template #item.severity="{item}">
+                        <sensitive-chip-group 
+                            :sensitiveTags="(item.severity || item.severity.value !== 0) ? getItemSeverity(item.severity.value) : []"
+                            :chipColor="getColor(item.severity.value)"
+                            :hideTag="true"
+                            class="z-80"
+                        />
+                    </template>
+                
+                    </simple-table>
+                </template>
+                </layout-with-tabs>
                 <div v-if="openDetailsDialog">
                     <div class="details-dialog z-80">
                         <test-results-dialog 
@@ -113,6 +139,7 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import TestResultsDialog from "./TestResultsDialog";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 
 import api from '../api'
 import issuesApi from '../../issues/api'
@@ -138,7 +165,8 @@ export default {
         SensitiveChipGroup,
         TestResultsDialog,
         WorkflowTestBuilder,
-        Spinner
+        Spinner,
+        LayoutWithTabs,
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
@@ -151,6 +179,7 @@ export default {
             selectedDate: +func.dayStart(endTimestamp * 1000) / 1000,
             testingRunResultSummaries: [],
             testingRunResults: [],
+            vulnerableTestingRunResults: [],
             testingRunResultsHeaders: [
                 {
                     text: "",
@@ -395,11 +424,18 @@ export default {
         currentTest() {
             let currentSummary = this.testingRunResultSummaries.filter(x => x.startTimestamp === this.selectedDate)[0]
             if (currentSummary) {
+                api.fetchTestingRunResults(currentSummary.hexId, true).then(resp => {
+                    this.vulnerableTestingRunResults = resp.testingRunResults
+                })
                 api.fetchTestingRunResults(currentSummary.hexId).then(resp => {
                     this.testingRunResults = resp.testingRunResults
                 })
             }
             return currentSummary
+        },
+        vulnerableTestingRunResultsItems(){
+            let result = (this.vulnerableTestingRunResults || []).map(x => this.prepareForTable(x))
+            return result.filter(x => x.vulnerable && x.testSubType && x.testSuperType)
         },
         testingRunResultsItems() {
             let result = (this.testingRunResults || []).map(x => this.prepareForTable(x))
