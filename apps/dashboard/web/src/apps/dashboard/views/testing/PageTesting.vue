@@ -268,7 +268,15 @@ export default {
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
         },
-        toggleOriginalStateDb() {
+        toggleOriginalStateDb({reqData, authParamsList}) {
+            let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, authParamsList)
+            result.then((resp) => {
+                func.showSuccessSnackBar("Login Flow saved successfully!")
+                
+            }).catch((err) => {
+                console.log(err);
+            })
+
             console.log('got db state event')
             this.fetchAuthMechanismData()
         },

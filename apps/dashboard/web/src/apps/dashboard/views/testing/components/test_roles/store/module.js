@@ -99,9 +99,9 @@ const test_roles = {
                 })
                 }
         },
-        async addAuthToRole({commit}, {roleName, apiCond, authParamData}) {
+        async addAuthToRole({commit}, {roleName, apiCond, authParamData, authAutomationType, reqData}) {
             state.loading = true
-            let resp = await api.addAuthToRole(roleName, apiCond, authParamData)
+            let resp = await api.addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData)
             commit('SAVE_SELECTED_ROLE', resp);
             commit('UPDATE_TESTROLES', resp);
 

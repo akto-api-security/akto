@@ -5,16 +5,15 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -41,7 +40,7 @@ public class BFLATest {
         return new TestPlugin.ApiExecutionDetails(statusCode, 0, testResponse, originalHttpResponse, originalMessage);
     }
 
-    public List<String> updateAllowedRoles(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
+    public List<String> updateAllowedRoles(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws Exception {
         List<String> ret = new ArrayList<>();
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
 
@@ -63,7 +62,15 @@ public class BFLATest {
                 }
 
                 if (allHeadersMatched) {
-                    authWithCond.getAuthMechanism().addAuthToRequest(testRequest);
+                    AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
+                    if (authMechanismForRole.getType().equalsIgnoreCase(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.name())) {
+                        LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
+                        if (!loginFlowResponse.getSuccess()) throw new Exception(loginFlowResponse.getError());
+
+                        authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                    }
+
+                    authMechanismForRole.addAuthToRequest(testRequest);
                     break;
                 }
             }
