@@ -58,6 +58,7 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.Utils;
 import com.akto.utils.scripts.FixMultiSTIs;
+import com.akto.utils.notifications.TrafficUpdates;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -99,7 +100,7 @@ public class InitializerListener implements ServletContextListener {
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-
+    public static String aktoVersion;
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
@@ -298,6 +299,32 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+    public void setUpTrafficAlertScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                                loggerMaker.infoAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
+                                return;
+                            }
+
+                            SlackWebhook webhook = listWebhooks.get(0);
+                            loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(), LogDb.DASHBOARD);
+
+                            TrafficUpdates trafficUpdates = new TrafficUpdates(webhook.getWebhook(), webhook.getDashboardUrl()+"/dashboard/settings#Metrics", 60*60*4);
+                            trafficUpdates.run();
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "traffic-alerts-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
 
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -1094,6 +1121,12 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         System.out.println("MONGO URI " + mongoURI);
 
+        try {
+            readAndSaveBurpPluginVersion();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
 
         executorService.schedule(new Runnable() {
             public void run() {
@@ -1116,6 +1149,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        updateGlobalAktoVersion();
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -1136,6 +1170,19 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
+    }
+
+    private void updateGlobalAktoVersion() throws Exception{
+        try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
+            if (in != null) {
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+                bufferedReader.readLine();
+                bufferedReader.readLine();
+                InitializerListener.aktoVersion = bufferedReader.readLine();
+            } else  {
+                throw new Exception("Input stream null");
+            }
+        }
     }
 
     public static void insertPiiSources(){
@@ -1221,6 +1268,7 @@ public class InitializerListener implements ServletContextListener {
             insertPiiSources();
 
 //            setUpPiiCleanerScheduler();
+            setUpTrafficAlertScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -1237,35 +1285,14 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
-        try {
-            readAndSaveBurpPluginVersion();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
 
     public static int burpPluginVersion = -1;
 
     public void readAndSaveBurpPluginVersion() {
-        URL url = this.getClass().getResource("/Akto.jar");
-        if (url == null) return;
-
-        try (JarFile jarFile = new JarFile(url.getPath())) {
-            Enumeration<JarEntry> jarEntries = jarFile.entries();
-
-            while (jarEntries.hasMoreElements()) {
-                JarEntry entry = jarEntries.nextElement();
-                if (entry.getName().contains("AktoVersion.txt")) {
-                    InputStream inputStream = jarFile.getInputStream(entry);
-                    String result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
-                    burpPluginVersion = Integer.parseInt(result.trim());
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        // todo get latest version from github
+        burpPluginVersion = 5;
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
