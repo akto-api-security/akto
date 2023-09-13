@@ -24,6 +24,7 @@ function ApiDetails(props) {
     const [badgeActive, setBadgeActive] = useState(false)
 
     const fetchData = async() => {
+        if(showDetails){
         setLoading(true)
         const { apiCollectionId, endpoint, method } = apiDetail
         setSelectedUrl({url: endpoint, method: method})
@@ -62,7 +63,7 @@ function ApiDetails(props) {
                 setParamList(resp.data.params)
             })
         })
-    }
+    }}
 
     const runTests = async(testsList) => {
         setIsGptScreenActive(false)

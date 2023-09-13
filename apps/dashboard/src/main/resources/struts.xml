@@ -415,6 +415,15 @@
                 <param name="status">401</param>
             </result>
         </action>
+        <action name="api/getSensitiveInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchSensitiveInfoForCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
 
         <!--   NEVER CHANGE VALUE OF api/uploadHar (path) this is used in ApiToken     -->
         <action name="api/uploadHar" class="com.akto.action.HarAction">
