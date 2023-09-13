@@ -63,6 +63,7 @@ jobs:
           IMAGE_TAG: latest
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_latest
         run: |
+          docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
