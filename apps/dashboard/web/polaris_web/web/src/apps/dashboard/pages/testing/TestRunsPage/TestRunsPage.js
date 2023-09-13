@@ -74,8 +74,8 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp' },
-  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp' },
+  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'run_time_epoch' },
+  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'run_time_epoch' },
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity' },
 ];
@@ -160,13 +160,13 @@ function getActions(item){
   let section1 = {items:[]}
   let actionsList = getActionsList(item.id);
   if(item['run_type'] === 'One-time'){
-    section1.items.push(actionsList[0])
+    // section1.items.push(actionsList[0])
   }else{
     section1.items.push(actionsList[1])
   }
 
   if(item['run_type'] === 'CI/CD'){
-    section1.items.push(actionsList[0])
+    // section1.items.push(actionsList[0])
   }else{
     section1.items.push(actionsList[2])
   }
@@ -188,16 +188,43 @@ const storeSetTestRuns = TestingStore(state => state.setTestRuns);
 const testRuns = TestingStore(state => state.testRuns);
 const [loading, setLoading] = useState(true);
 
-useEffect(()=>{
-  async function fetchData () {
+async function fetchData () {
     await api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
+      setLoading(false)
       let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
       storeSetTestRuns(testRuns);
-      setLoading(false);
     })
-  }
+}
+
+const checkIsTestRunning = (testingRuns) => {
+  let val = false
+  testingRuns.forEach(element => {
+    if(element.orderPriority == 1){
+      val = true
+    }
+  });
+  return val ;
+}
+
+const refreshSummaries = () =>{
+  let intervalId = setInterval(()=> {
+    api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
+      let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
+      storeSetTestRuns(testRuns);
+      if(!checkIsTestRunning(testRuns)){
+        clearInterval(intervalId)
+      }
+    })
+  },2000)
+}
+
+useEffect(()=>{
   fetchData();
 }, [])
+
+useEffect(()=>{
+  refreshSummaries()
+},[])
 
   return (
     <PageWithMultipleCards

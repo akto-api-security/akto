@@ -3,7 +3,7 @@ import Store from "../../store";
 
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
-        let apiCollection = apiCollectionMap[res.data.endpoints[0].apiCollectionId];
+        let apiCollection = apiCollectionMap[res?.data?.endpoints[0]?.apiCollectionId];
         let lastSeen = res.data.endpoints.reduce((max, item) => {
             return (max > item.lastSeen ? max : item.lastSeen );
             }, 0)
