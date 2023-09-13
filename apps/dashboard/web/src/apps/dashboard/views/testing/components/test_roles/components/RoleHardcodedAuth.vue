@@ -31,7 +31,7 @@
     <div class="pt-4">
       <v-radio-group v-model="authAutomationType" row>
         <v-radio
-          v-for='n in ["Hardcoded", "Automated"]'
+          v-for='n in ["Hardcoded", "LOGIN_REQUEST"]'
           :key="n"
           :label='n'
           :value="n"
