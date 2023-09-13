@@ -7,9 +7,6 @@ jobs:
   push-release-notes:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
       - name: Get Latest Release
         id: get_latest_release
         run: |
@@ -88,9 +85,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
       - name: Get Latest Release
         id: get_latest_release
         run: |
@@ -138,3 +132,53 @@ jobs:
               }
             ]
           }' ${{ secrets.DISCORD_WEBHOOK_URL }}
+          
+  notify_slack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Latest Release
+        id: get_latest_release
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install requests
+          python3 - <<EOF
+          import os
+          import requests
+          import json
+          
+          github_token = os.getenv('GITHUB_TOKEN')
+          repo_owner = 'akto-api-security'
+          repo_name = 'akto'
+          headers = {'Authorization': f'Bearer {github_token}'}
+          url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/latest'
+          response = requests.get(url, headers=headers)
+          data = response.json()
+
+          tag_name = data.get('tag_name')
+          description = data.get('body').replace("'", "")
+          print("description", description)
+          description_lines = description.split('\n') if description else []
+          description_lines = [line.strip() for line in description_lines if line.strip()]
+          
+          slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': '"
+          slack_message_body += repo_name
+          slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
+          slack_message_body += tag_name
+          slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
+          slack_message_body += ('%0A'.join(description_lines))[:2000]
+          slack_message_body += "' } } ] }"
+          slack_message_body = slack_message_body.replace("'", "\"")
+
+          print("slack_message_body", slack_message_body)
+          
+          print(f"::set-output name=tag_name::{tag_name}")
+          print(f"::set-output name=slack_message_body::{slack_message_body}")
+          EOF
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send to Slack
+        run: |
+          echo "Tag Name: ${{ steps.get_latest_release.outputs.tag_name }}"
+          payload=`echo ${{ toJSON(steps.get_latest_release.outputs.slack_message_body) }}`
+          curl -X POST -H "Content-Type: application/json" -d "${payload}" ${{secrets.SLACK_WEBHOOK_URL}}          
