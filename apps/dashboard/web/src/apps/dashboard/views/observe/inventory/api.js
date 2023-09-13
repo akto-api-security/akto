@@ -212,6 +212,16 @@ export default {
             return resp
         })
     },
+
+    async convertSampleDataListToCurl(sampleDataList) {
+        debugger
+        const resp = await request({
+            url: '/api/convertBulkSampleDataToCurl',
+            method: 'post',
+            data: { sampleDataList }
+        })
+        return resp
+    },
     convertSampleDataToBurpRequest(sampleData) {
         return request({
             url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSamleDataToBurpRequest' : '/api/convertSamleDataToBurpRequest',

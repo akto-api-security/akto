@@ -674,6 +674,18 @@
             </result>
         </action>
 
+        <action name="api/convertBulkSampleDataToCurl" class="com.akto.action.ExportSampleDataAction" method="generateMultipleCurls">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchSensitiveSampleData" class="com.akto.action.TrafficAction" method="fetchSensitiveSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1017,6 +1029,17 @@
         </action>
 
         <action name="api/fetchTestingRunResults" class="com.akto.action.testing.StartTestAction" method="fetchTestingRunResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchVulnerableTestRunResults" class="com.akto.action.testing.StartTestAction" method="fetchVulnerableTestRunResults">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

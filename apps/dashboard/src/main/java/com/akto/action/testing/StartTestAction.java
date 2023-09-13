@@ -290,6 +290,24 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchVulnerableTestRunResults() {
+        ObjectId testingRunResultSummaryId;
+        try {
+            testingRunResultSummaryId= new ObjectId(testingRunResultSummaryHexId);
+            Bson filters = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                    Filters.eq(TestingRunResult.VULNERABLE, true)
+            );
+            this.testingRunResults = TestingRunResultDao.instance.findAll(filters);
+        } catch (Exception e) {
+            addActionError("Invalid test summary id");
+            return ERROR.toUpperCase();
+        }
+
+
+        return SUCCESS.toUpperCase();
+    }
+
     private String testingRunResultHexId;
     private TestingRunResult testingRunResult;
     public String fetchTestRunResultDetails() {
