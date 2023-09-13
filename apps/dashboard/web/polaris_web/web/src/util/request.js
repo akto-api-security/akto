@@ -42,7 +42,10 @@ const err = async (error) => {
       const originalRequest = error.config;
       if (originalRequest._retry) {
         // if done multiple times, then redirect to login.
-        console.log("access token error");
+        func.setToast(true, true, "Session expired. Redirecting you to login page in some time.")
+        setTimeout(()=>{
+          window.location.pathname = "/login"
+        },3000)
       }
       originalRequest._retry = true
       await service({

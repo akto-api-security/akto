@@ -8,10 +8,6 @@ let testingStore = (set)=>({
     setSelectedTestRun: (selectedTestRun) => set({ selectedTestRun: selectedTestRun }),
     selectedTestRunResult: {},
     setSelectedTestRunResult: (selectedTestRunResult) => set({ selectedTestRunResult: selectedTestRunResult }),
-    subCategoryMap: {},
-    setSubCategoryMap: (subCategoryMap) => set({subCategoryMap: subCategoryMap}),
-    subCategoryFromSourceConfigMap: {},
-    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({subCategoryFromSourceConfigMap: subCategoryFromSourceConfigMap}),
     authMechanism: null,
     setAuthMechanism: (authMechanism) => set({authMechanism: authMechanism}),
 })
