@@ -214,7 +214,6 @@ export default {
     },
 
     async convertSampleDataListToCurl(sampleDataList) {
-        debugger
         const resp = await request({
             url: '/api/convertBulkSampleDataToCurl',
             method: 'post',

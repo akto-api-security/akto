@@ -1,15 +1,15 @@
 <template>
     <div class="ma-5">
-        <span>Akto vulnerabilities Report</span>
-
+        <div class="d-flex jc-sb"><span class="title-1">Akto vulnerabilities Report</span><img class='logo' src="https://www.gitbook.com/cdn-cgi/image/width=40,dpr=2,height=40,fit=contain,format=auto/https%3A%2F%2F2145800921-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252F9TtwDRUoDpcKWPIWVZ4q%252Ficon%252FKTBERH1etBA4IqbzZYdm%252FWhatsApp%2520Image%25202021-11-15%2520at%25209.22.47%2520PM.jpeg%3Falt%3Dmedia%26token%3D84e8c466-06e5-4fc2-b333-8f92adb46dfb" alt /></div>
+        
         <div>
-            <!-- <span>
+            <span class="summary-alert my-3">
                 Summary of Alerts
             </span>
-            <table>
+            <table class="severity-global-table my-3">
                 <tr>
-                    <td>Risk Level</td>
-                    <td>Number of Alerts</td>
+                    <th>Severity</th>
+                    <th>Vulnerable APIs </th>
                 </tr>
                 <tr>
                     <td>High</td>
@@ -24,7 +24,7 @@
                     <td>{{ low }}</td>
                 </tr>
             </table>
- -->
+
             <span>vulnerabilities Details</span>
 
             <div v-for="testSubType in categoryVsVulnerabilitiesMap">
@@ -123,7 +123,6 @@ import func from "@/util/func";
 export default {
     name: "PDFExportHTML",
     props: {
-        subCatogoryMap: obj.objR,
         testingRunResultSummaries: obj.arrR
     },
     data() {
@@ -221,7 +220,6 @@ export default {
             this.updateSampleDataVsCurlMap(sampleDataMsgList)
         },
         async updateSampleDataVsCurlMap(sampleDataMsgList) {
-            debugger
             let _this = this
             await inventoryApi.convertSampleDataListToCurl(sampleDataMsgList).then(resp => {
                 _this.sampleDataVsCurlMap = resp.sampleDataVsCurlMap
@@ -236,17 +234,46 @@ export default {
         }
     },
     async mounted() {
+        await this.$store.dispatch('issues/fetchAllSubCategories')
         let interval = setInterval(() => {
-            if (this.testingRunResultSummaries.length !== undefined && this.testingRunResultSummaries[this.testingRunResultSummaries.length - 1].hexId) {
+            if (this.testingRunResultSummaries  && this.testingRunResultSummaries.length > 0 && this.testingRunResultSummaries[this.testingRunResultSummaries.length - 1].hexId) {
                 this.fetchVulnerableTestingRunResults()
                 clearInterval(interval)
             }
         }, 1000)
+    },
+    computed: {
+        subCatogoryMap: {
+            get() {
+                return this.$store.state.issues.subCatogoryMap
+            }
+        }
     }
 }
 </script>
 
 <style scoped>
+.title-1 {
+    margin: auto;
+    font-weight: 600;
+    font-size:24px;
+    color: var(--themeColorDark)
+}
+.summary-alert {
+    font-weight: 500;
+    font-size:20px;
+    color: var(--themeColorDark)
+}
+.severity-global-table {
+    width: 40%;
+    color: var(--themeColorDark);
+    text-align: right;
+    border: 2px solid var(--themeColorDark);
+}
+
+.severity-global-table .th .td{
+    border-bottom: 1px solid var(--themeColorDark);
+}
 .description-title {
     font-size: 14px !important;
     font-weight: 500;
@@ -274,5 +301,8 @@ export default {
 .table-column {
     padding: 4px 8px !important;
     color: var(--themeColorDark);
+}
+.logo {
+    height: 35px;
 }
 </style>
