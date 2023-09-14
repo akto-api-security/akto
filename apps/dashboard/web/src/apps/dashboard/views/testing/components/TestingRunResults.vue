@@ -101,10 +101,6 @@
                 <workflow-test-builder :endpointsList="[]" apiCollectionId=0 :originalStateFromDb="originalStateFromDb" :defaultOpenResult="true" class="white-background"/>
             </div>
         </div>
-        <div ref="pdfExport">
-            <p-d-f-export-h-t-m-l :testingRunResultSummaries="testingRunResultSummaries" :subCatogoryMap="subCatogoryMap">
-            </p-d-f-export-h-t-m-l>
-        </div>
     </div>
 </template>
 
@@ -210,53 +206,8 @@ export default {
     },
     methods: {
         async downloadAsPDF() {
-            debugger
-            // window.html2canvas = html2canvas;
-            // var doc = new JsPDF({
-            //     orientation: 'p',
-            //     unit: 'px',
-            //     format: 'a4',
-            //     hotfixes: ['px_scaling'],
-            // });
-            // var pdfToExport = document.getElementById("pdfToExport")
-            // var pdfToExport = document.getElementById("test1")
-            // console.log(pdfToExport)
-            // doc.html(pdfToExport, {
-            // callback: function (doc) {
-            //     doc.save();
-            // },
-            // x: 10,
-            // y: 10
-            // });
-
-            // const htmlContent = this.$refs.pdfExport.innerHTML;
-            // const pdfDoc = await PDFDocument.create();
-            // const page = pdfDoc.addPage([600, 400]);
-            // page.drawText(htmlContent, {
-            //     x: 50,
-            //     y: 300,
-            //     size: 12,
-            //     color: rgb(0, 0, 0),
-            // });
-            // const pdfBytes = await pdfDoc.save();
-            // const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
-            // const pdfUrl = URL.createObjectURL(pdfBlob);
-            // window.open(pdfUrl);
-
-            const htmlContent = this.$refs.pdfExport.innerHTML;
-            const blob = new Blob([htmlContent], { type: "html" });
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "exported.html";
-            a.style.display = "none";
-            document.body.appendChild(a);
-            a.click();
-
-            // Clean up
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            const routeData = this.$router.resolve({name: 'testing-export-html', query: {testingRunResultSummaries: btoa(JSON.stringify(this.testingRunResultSummaries))}});
+            window.open(routeData.href, '_blank');
         },
         getColor(severity) {
             switch (severity) {
