@@ -106,7 +106,7 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchSensitiveInfoInApiCollections(){
+    public String fetchSensitiveInfoInCollections(){
         this.sensitiveInfoInApiCollections = SingleTypeInfoDao.instance.getSensitiveInfoForCollections() ;
         return Action.SUCCESS.toUpperCase();
     }
@@ -135,8 +135,5 @@ public class ApiCollectionsAction extends UserAction {
         return sensitiveInfoInApiCollections;
     }
 
-    public void setSensitiveInfoInApiCollections(List<SensitiveInfoInApiCollections> sensitiveInfoInApiCollections) {
-        this.sensitiveInfoInApiCollections = sensitiveInfoInApiCollections;
-    }
 
 }

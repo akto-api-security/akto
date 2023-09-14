@@ -496,4 +496,12 @@ export default {
             }
         })
     },
+
+    async getSensitiveInfoForCollections(){
+        return await request({
+            url: '/api/getSensitiveInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    }
 }

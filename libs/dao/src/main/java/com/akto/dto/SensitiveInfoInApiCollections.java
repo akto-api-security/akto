@@ -13,11 +13,11 @@ public class SensitiveInfoInApiCollections {
     private List<String> sensitiveSubtypesInResponse;
 
     public SensitiveInfoInApiCollections(int apiCollectionId, int sensitiveUrlsInRequest, List<String> sensitiveSubtypesInRequest, int sensitiveUrlsInResponse, List<String> sensitiveSubtypesInResponse){
-        apiCollectionId = this.apiCollectionId;
-        sensitiveUrlsInRequest = this.sensitiveUrlsInRequest;
-        sensitiveSubtypesInRequest = this.sensitiveSubtypesInRequest ;
-        sensitiveUrlsInResponse = this.sensitiveUrlsInResponse;
-        sensitiveSubtypesInResponse = this.sensitiveSubtypesInResponse;
+        this.apiCollectionId = apiCollectionId;
+        this.sensitiveUrlsInRequest = sensitiveUrlsInRequest;
+        this.sensitiveSubtypesInRequest = sensitiveSubtypesInRequest ;
+        this.sensitiveUrlsInResponse = sensitiveUrlsInResponse;
+        this.sensitiveSubtypesInResponse = sensitiveSubtypesInResponse;
     }
 
     public int getSensitiveUrlsInResponse() {

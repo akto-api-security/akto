@@ -95,7 +95,8 @@ function ApiCollections() {
     }
 
     async function fetchData() {
-        let apiCollectionsResp = await api.getAllCollections()
+        let [apiCollectionsResp, sensitiveInfoResp] = await Promise.all([api.getAllCollections(), api.getSensitiveInfoForCollections()])
+        console.log(sensitiveInfoResp)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
         setAllCollections(apiCollectionsResp.apiCollections || [])
