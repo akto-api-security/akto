@@ -20,7 +20,7 @@ public class SecurityHeadersFilter implements Filter {
         HttpServletRequest httpServletRequest = (HttpServletRequest) request;
 
         if (!httpServletRequest.getRequestURI().startsWith("/tools/")) {
-            httpServletResponse.addHeader("Content-Security-Policy", "frame-ancestors *");
+            httpServletResponse.addHeader("Content-Security-Policy", "frame-ancestors https://*");
         }
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
