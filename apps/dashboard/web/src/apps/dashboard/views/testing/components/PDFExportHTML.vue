@@ -5,7 +5,7 @@
             <span class="summary-alert my-3">
                 Summary of Alerts
             </span>
-            <table class="severity-global-table my-3">
+            <table class="severity-global-table my-3" style="width:40%;">
                 <tr class="header-row">
                     <th>Severity</th>
                     <th>Vulnerable APIs </th>
@@ -24,90 +24,103 @@
                 </tr>
             </table>
 
-            <span>vulnerabilities Details</span>
+            <span class="summary-alert">Vulnerabilities details</span>
+            <div class="vulnerability-div">
+                <div v-for="testSubType in categoryVsVulnerabilitiesMap" style="border: 2px solid var(--themeColorDark);">
+                    <div class="d-flex" style="border-bottom: 1px solid var(--themeColorDark);">
+                        <span class="vulnerable-title">Vulnerability</span>
+                        <span class="vulnerable-data">{{ testSubType.category.testName }}</span>
+                    </div>
 
-            <div v-for="testSubType in categoryVsVulnerabilitiesMap">
-                <table>
-                    <tr>
-                        <th>vulnerability</th>
-                        <th>{{ testSubType.category.testName }}</th>
-                    </tr>
-                </table>
-                <div class="d-flex flex-column">
-                    <div class="d-flex flex-column">
-                        <span class="description-title mt-4">Issue summary</span>
-                        <div class="mt-3 issue-summary-border">
-                            <v-container fluid class="ma-0 pa-0">
-                                <v-row :style="{ 'margin-top': '10px' }" v-for="(item, index) in getIssueSummaryTable(testSubType)"
-                                    :key="index" class="mx-0 mb-0 pa-0">
+                    <div class="d-flex flex-column" style="padding: 2px 4px; border-bottom: 1px solid var(--themeColorDark);">
+                        <div class="d-flex flex-column">
+                            <span class="description-title mt-4">Issue summary</span>
+                            <div class="mt-3 issue-summary-border">
+                                <v-container fluid class="ma-0 pa-0">
+                                    <v-row :style="{ 'margin-top': '10px' }" v-for="(item, index) in getIssueSummaryTable(testSubType)"
+                                        :key="index" class="mx-0 mb-0 pa-0">
 
-                                    <v-col cols="2" class="ma-0 pa-0">
-                                        <span class="description-content">{{ item.title }}</span>
-                                    </v-col>
+                                        <v-col cols="2" class="ma-0 pa-0">
+                                            <span class="description-content">{{ item.title }}</span>
+                                        </v-col>
 
-                                    <v-col class="my-0 mr-0 ml-7 pa-0">
-                                        <span class="issue-summary">
-                                            {{ item.description }}
-                                        </span>
-                                    </v-col>
-                                </v-row>
-                                <v-row class="mx-0 pa-0"
-                                    :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
-                                    <v-col cols="2" class="ma-0 pa-0">
-                                        <span class="description-content">Tags</span>
-                                    </v-col>
-                                    <v-col class="my-0 mr-0 ml-7 pa-0">
-                                        <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
-                                            class="issue-summary mr-2" text-color="var(--white)" :key="index1"
-                                            v-for="(chipItem, index1) in testSubType.category.issueTags">
-                                            {{ chipItem }}
-                                        </v-chip>
-                                    </v-col>
-                                </v-row>
-                            </v-container>
+                                        <v-col class="my-0 mr-0 ml-7 pa-0">
+                                            <span class="issue-summary">
+                                                {{ item.description }}
+                                            </span>
+                                        </v-col>
+                                    </v-row>
+                                    <v-row class="mx-0 pa-0"
+                                        :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
+                                        <v-col cols="2" class="ma-0 pa-0">
+                                            <span class="description-content">Tags</span>
+                                        </v-col>
+                                        <v-col class="my-0 mr-0 ml-7 pa-0">
+                                            <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
+                                                class="issue-summary mr-2" text-color="var(--white)" :key="index1"
+                                                v-for="(chipItem, index1) in testSubType.category.issueTags">
+                                                {{ chipItem }}
+                                            </v-chip>
+                                        </v-col>
+                                    </v-row>
+                                </v-container>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column mt-4">
+                            <span class="description-title">Issue Details</span>
+                            <div class="mt-3">
+                                <span class="description-content"
+                                    v-html="replaceTags(testSubType.category.issueDetails, testSubType.category.vulnerableTestingRunResults)"></span>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column mt-4">
+                            <span class="description-title">Impact</span>
+                            <div class="mt-3">
+                                <span class="description-content"
+                                    v-html="testSubType.category.issueImpact"></span>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column mt-4">
+                            <span class="description-title">References</span>
+                            <ul class="mt-3">
+                                <li class="description-content mt-2 "
+                                    v-for="item in testSubType.category.references">
+                                    <span><a :href="item" target="_blank" class="clickable-line">{{
+                                        item
+                                    }}</a></span>
+                                </li>
+                            </ul>
                         </div>
                     </div>
-                    <div class="d-flex flex-column mt-4">
-                        <span class="description-title">Issue Details</span>
-                        <div class="mt-3">
-                            <span class="description-content"
-                                v-html="replaceTags(testSubType.category.issueDetails, testSubType.category.vulnerableTestingRunResults)"></span>
+                    <div class="attempts-div" v-for="testingRun in testSubType.category.vulnerableTestingRunResults">
+                        <div class="row-div">
+                            <span class="title-name" style="font-weight: 600;">
+                                Vulnerable Endpoint
+                            </span>
+                            <span class="url-name" style="font-weight: 600;">
+                                {{ testingRun.apiInfoKey.url }}
+                            </span>
                         </div>
-                    </div>
-                    <div class="d-flex flex-column mt-4">
-                        <span class="description-title">Impact</span>
-                        <div class="mt-3">
-                            <span class="description-content"
-                                v-html="testSubType.category.issueImpact"></span>
+
+                        <div class="row-div">
+                            <span class="title-name" style="font-weight: 500;">
+                                Attempt
+                            </span>
+                            <span class="url-name" style="font-weight: 500;">
+                                Original request
+                            </span>
                         </div>
-                    </div>
-                    <div class="d-flex flex-column mt-4">
-                        <span class="description-title">References</span>
-                        <ul class="mt-3">
-                            <li class="description-content mt-2 "
-                                v-for="item in testSubType.category.references">
-                                <span><a :href="item" target="_blank" class="clickable-line">{{
-                                    item
-                                }}</a></span>
-                            </li>
-                        </ul>
+
+                        <div class="row-div" v-for="testRun in testingRun.testResults">
+                            <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
+                                {{ getOriginalCurl(testRun.message) }}
+                            </span>
+                            <span class="message">
+                                {{ getOriginalCurl(testRun.originalMessage) }}
+                            </span>
+                        </div>
                     </div>
                 </div>
-                <table v-for="testingRun in testSubType.category.vulnerableTestingRunResults">
-                    <tr>
-                        <th>Vulnerable Endpoint</th>
-                        <th>{{ testingRun.apiInfoKey.url }}</th>
-                    </tr>
-                    <tr>
-                        <th>Original Request</th>
-                        <th>Attempt</th>
-                    </tr>
-                    <tr v-for="testRun in testingRun.testResults">
-                        <td>{{ getOriginalCurl(testRun.message) }}</td>
-                        <td>{{ getOriginalCurl(testRun.originalMessage) }}</td>
-                    </tr>
-
-                </table>
             </div>
         </div>
     </div>
@@ -264,11 +277,8 @@ export default {
     color: var(--themeColorDark)
 }
 .severity-global-table {
-    width: 40%;
-    text-align: right;
     border: 2px solid var(--themeColorDark);
     border-radius: 4px;
-    padding: 2px;
 }
 .header-row{
     display: flex;
@@ -328,7 +338,56 @@ export default {
     padding: 4px 8px !important;
     color: var(--themeColorDark);
 }
-.logo {
-    height: 35px;
+
+.vulnerable-title{
+    font-size: 16px;
+    font-weight: 500;
+    border-right: 2px solid var(--themeColorDark);
+    padding:2px 4px;
+    width: 35%;
+}
+.vulnerable-data{
+    padding: 2px 4px;
+}
+
+.vulnerability-div{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.attempts-div {
+    display: flex;
+    flex-direction: column;
+    margin: 4px 8px;
+    border: 1px solid var(--themeColorDark10);
+}
+.row-div{
+    display: flex;
+    border-bottom: 1px solid var(--themeColorDark10);
+}
+.row-div:last-child{
+    border-bottom: none !important;
+}
+.title-name {
+    width: 50%;
+    font-size: 16px;
+    color: var(--themeColorDark);
+    padding: 0 4px;
+    justify-content: center;
+    display: flex;
+    border-right: 1px solid var(--themeColorDark10);
+}
+.url-name {
+    justify-content: center;
+    display: flex;
+    width: 50%;
+    color: var(--themeColorDark);
+}
+.message {
+    width: 50%;
+    font-size: 12px;
+    padding: 4px;
+    word-break: break-all;
 }
 </style>
