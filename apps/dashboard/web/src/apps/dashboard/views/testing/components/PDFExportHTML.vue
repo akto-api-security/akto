@@ -1,25 +1,24 @@
 <template>
     <div class="ma-5">
-        <div class="d-flex jc-sb"><span class="title-1">Akto vulnerabilities Report</span><img class='logo' src="https://www.gitbook.com/cdn-cgi/image/width=40,dpr=2,height=40,fit=contain,format=auto/https%3A%2F%2F2145800921-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252F9TtwDRUoDpcKWPIWVZ4q%252Ficon%252FKTBERH1etBA4IqbzZYdm%252FWhatsApp%2520Image%25202021-11-15%2520at%25209.22.47%2520PM.jpeg%3Falt%3Dmedia%26token%3D84e8c466-06e5-4fc2-b333-8f92adb46dfb" alt /></div>
-        
-        <div>
+        <div class="d-flex jc-sb"><v-icon size="40" color="var(--themeColor)">$aktoWhite</v-icon><span class="title-1">Akto Vulnerabilities Report</span></div>
+        <div class="mt-4">
             <span class="summary-alert my-3">
                 Summary of Alerts
             </span>
             <table class="severity-global-table my-3">
-                <tr>
+                <tr class="header-row">
                     <th>Severity</th>
                     <th>Vulnerable APIs </th>
                 </tr>
-                <tr>
+                <tr class="data-row">
                     <td>High</td>
                     <td>{{ high }}</td>
                 </tr>
-                <tr>
+                <tr class="data-row">
                     <td>Medium</td>
                     <td>{{ medium }}</td>
                 </tr>
-                <tr>
+                <tr class="data-row">
                     <td>Low</td>
                     <td>{{ low }}</td>
                 </tr>
@@ -227,7 +226,7 @@ export default {
         },
         async fetchVulnerableTestingRunResults() {
             let _this = this
-            await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaries[this.testingRunResultSummaries.length - 1].hexId).then(resp => {
+            await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaries[0].hexId).then(resp => {
                 _this.vulnerableTestingRunResults = resp.testingRunResults
                 _this.refreshVulnerabilityCount(_this.vulnerableTestingRunResults)
             })
@@ -252,7 +251,7 @@ export default {
 }
 </script>
 
-<style scoped>
+<style scoped lang="css">
 .title-1 {
     margin: auto;
     font-weight: 600;
@@ -266,9 +265,36 @@ export default {
 }
 .severity-global-table {
     width: 40%;
-    color: var(--themeColorDark);
     text-align: right;
     border: 2px solid var(--themeColorDark);
+    border-radius: 4px;
+    padding: 2px;
+}
+.header-row{
+    display: flex;
+    background: #666666;
+    color: var(--white) ;
+    border-bottom: 4px solid var(--white);
+}
+
+.header-row th{
+    width: 50%;
+    display: flex;
+    justify-content: center;
+    border-right: 4px solid;
+}
+
+.data-row{
+    display: flex;
+    background: #e8e8e8;
+    border-bottom: 4px solid var(--white);
+}
+
+.data-row td{
+    width: 50%;
+    justify-content: center;
+    display: flex;
+    border-right: 4px solid var(--white);
 }
 
 .severity-global-table .th .td{
