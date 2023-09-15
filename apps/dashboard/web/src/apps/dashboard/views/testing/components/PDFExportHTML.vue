@@ -27,7 +27,7 @@
             <span class="summary-alert">Vulnerabilities details</span>
             <div class="vulnerability-div">
                 <div v-for="testSubType in categoryVsVulnerabilitiesMap" style="border: 2px solid var(--themeColorDark);">
-                    <div class="d-flex" style="border-bottom: 1px solid var(--themeColorDark);">
+                    <div class="d-flex" style="border-bottom: 1px solid var(--themeColorDark);" :style="getSeverityColor(testSubType.category.severityIndex)">
                         <span class="vulnerable-title">Vulnerability</span>
                         <span class="vulnerable-data">{{ testSubType.category.testName }}</span>
                     </div>
@@ -93,11 +93,11 @@
                         </div>
                     </div>
                     <div class="attempts-div" v-for="testingRun in testSubType.category.vulnerableTestingRunResults">
-                        <div class="row-div">
-                            <span class="title-name" style="font-weight: 600;">
-                                Vulnerable Endpoint
+                        <div class="row-div-1">
+                            <span class="api-text">
+                                Vulnerable endpoint : 
                             </span>
-                            <span class="url-name" style="font-weight: 600;">
+                            <span class="url-text">
                                 {{ testingRun.apiInfoKey.url }}
                             </span>
                         </div>
@@ -112,10 +112,10 @@
                         </div>
                         <div class="row-div" v-for="testRun in testingRun.testResults">
                             <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
-                                {{ getOriginalCurl(testRun.originalMessage) }}
+                                {{ getTruncatedString(getOriginalCurl(testRun.originalMessage)) }}
                             </span>
                             <span class="message">
-                                {{ getOriginalCurl(testRun.message) }}
+                                {{ getTruncatedString(getOriginalCurl(testRun.message)) }}
                             </span>
                         </div>
                         <div class="row-div">
@@ -128,10 +128,10 @@
                         </div>
                         <div class="row-div" v-for="testRun in testingRun.testResults">
                             <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
-                                {{ getResponse(testRun.originalMessage) }}
+                                {{ getTruncatedString(getResponse(testRun.originalMessage)) }}
                             </span>
                             <span class="message">
-                                {{ getResponse(testRun.message) }}
+                                {{ getTruncatedString(getResponse(testRun.message)) }}
                             </span>
                         </div>
                     </div>
@@ -163,8 +163,20 @@ export default {
         }
     },
     methods: {
+        getTruncatedString(str) {
+            if (str.length > 3000) {
+                return str.substr(0, 3000) + '  .........';
+            }
+            return str;
+        },
+        getSeverityColor(severityIndex) {
+            switch (severityIndex) {
+                case 2: return {'backgroundColor' : "var(--hexColor33)"}
+                case 1:  return {'backgroundColor' : "var(--hexColor34)"}
+                case 0: return {'backgroundColor' : "var(--hexColor35)"}
+            }  
+         },
         getResponse(message) {
-            debugger
             let messageJson = JSON.parse(message)
             if (messageJson['response']) {
                 return JSON.stringify(messageJson['response'])
@@ -385,6 +397,23 @@ export default {
     margin: 4px 8px;
     border: 1px solid var(--themeColorDark10);
 }
+.row-div-1{
+    display: flex;
+    border-bottom: 1px solid var(--themeColorDark10);
+    background: var(--hexColor23);
+    gap: 10px;
+    padding: 0 8px;
+}
+
+.url-text{
+    font-weight: 500;
+    color: var(--themeColorDark);
+}
+
+.api-text{
+    font-weight: 600;
+    color: var(--themeColorDark);
+}
 .row-div{
     display: flex;
     border-bottom: 1px solid var(--themeColorDark10);
@@ -406,6 +435,10 @@ export default {
     display: flex;
     width: 50%;
     color: var(--themeColorDark);
+}
+
+.row-div-1 .title-name{
+    border-right: none !important;
 }
 .message {
     width: 50%;
