@@ -114,9 +114,6 @@ import TestResultsDialog from "./TestResultsDialog";
 import PDFExportHTML from "./PDFExportHTML.vue";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
-import JsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
-import { PDFDocument, rgb } from "pdf-lib";
 
 import api from '../api'
 import issuesApi from '../../issues/api'
