@@ -29,7 +29,7 @@
                                         <secondary-button 
                                             color="var(--themeColorDark)" 
                                             text="Export vulnerability report"
-                                            @click="$emit('downloadAsPDF')" 
+                                            @click="$emit('exportAsHTML')" 
                                             v-if="!hideDownloadCSVIcon"
                                         />
                                     </div>
