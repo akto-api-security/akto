@@ -101,38 +101,39 @@
                                 {{ testingRun.apiInfoKey.url }}
                             </span>
                         </div>
-
-                        <div class="row-div">
-                            <span class="title-name" style="font-weight: 500;">
-                                Original request
-                            </span>
-                            <span class="url-name" style="font-weight: 500;">
-                                Attempt
-                            </span>
-                        </div>
-                        <div class="row-div" v-for="testRun in testingRun.testResults">
-                            <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
-                                {{ getTruncatedString(getOriginalCurl(testRun.originalMessage)) }}
-                            </span>
-                            <span class="message">
-                                {{ getTruncatedString(getOriginalCurl(testRun.message)) }}
-                            </span>
-                        </div>
-                        <div class="row-div">
-                            <span class="title-name" style="font-weight: 500;">
-                                Original Response
-                            </span>
-                            <span class="url-name" style="font-weight: 500;">
-                                Attempt Response
-                            </span>
-                        </div>
-                        <div class="row-div" v-for="testRun in testingRun.testResults">
-                            <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
-                                {{ getTruncatedString(getResponse(testRun.originalMessage)) }}
-                            </span>
-                            <span class="message">
-                                {{ getTruncatedString(getResponse(testRun.message)) }}
-                            </span>
+                        <div v-for="testRun in testingRun.testResults">
+                            <div class="row-div">
+                                <span class="title-name" style="font-weight: 500;">
+                                    Original request
+                                </span>
+                                <span class="url-name" style="font-weight: 500;">
+                                    Attempt
+                                </span>
+                            </div>
+                            <div class="row-div">
+                                <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
+                                    {{ getTruncatedString(getOriginalCurl(testRun.originalMessage)) }}
+                                </span>
+                                <span class="message">
+                                    {{ getTruncatedString(getOriginalCurl(testRun.message)) }}
+                                </span>
+                            </div>
+                            <div class="row-div">
+                                <span class="title-name" style="font-weight: 500;">
+                                    Original Response
+                                </span>
+                                <span class="url-name" style="font-weight: 500;">
+                                    Attempt Response
+                                </span>
+                            </div>
+                            <div class="row-div">
+                                <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
+                                    {{ getTruncatedString(getResponse(testRun.originalMessage)) }}
+                                </span>
+                                <span class="message">
+                                    {{ getTruncatedString(getResponse(testRun.message)) }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -164,7 +165,7 @@ export default {
     },
     methods: {
         getTruncatedString(str) {
-            if (str.length > 3000) {
+            if (str && str.length > 3000) {
                 return str.substr(0, 3000) + '  .........';
             }
             return str;
