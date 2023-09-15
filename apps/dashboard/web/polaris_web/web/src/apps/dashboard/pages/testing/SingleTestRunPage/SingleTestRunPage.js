@@ -8,6 +8,7 @@ import {
   Badge,
   Box,
   Tooltip,
+  LegacyCard
 } from '@shopify/polaris';
 import {
   SearchMinor,
@@ -57,6 +58,11 @@ let headers = [
     itemOrder: 3,
     icon: LinkMinor
   },
+  {
+    text: 'CWE',
+    value: 'cweDisplay',
+    itemOrder: 2,
+  },
 ]
 
 const sortOptions = [
@@ -77,6 +83,7 @@ function disambiguateLabel(key, value) {
       return (value).map((val) => `${val} severity`).join(', ');
     case 'apiFilter':
       return value.length + 'API' + (value.length==1 ? '' : 's')
+    case 'cwe':
     case 'categoryFilter':
     case 'testFilter':
       return func.convertToDisambiguateLabelObj(value, null, 2)
@@ -109,7 +116,13 @@ let filters = [
     label: 'Test',
     title: 'Test',
     choices: [],
-  }
+  },
+  {
+    key: 'cwe',
+    label: 'CWE',
+    title: 'CWE',
+    choices: [],
+  },
 ]
 
 function SingleTestRunPage() {
@@ -217,7 +230,28 @@ const promotedBulkActions = (selectedDataHexIds) => {
     />
   )
 
-  const components = [!workflowTest ? ResultTable : workflowTestBuilder];
+  const metadataComponent = () => {
+
+    if(!selectedTestRun.metadata){
+      return undefined
+    }
+
+    return (
+      <LegacyCard title="Metadata" sectioned key="metadata">
+      {
+        selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
+          return (
+            <HorizontalStack key={key} spacing="tight">
+              <Text>{key} : {selectedTestRun.metadata[key]}</Text>
+            </HorizontalStack>
+          )
+        }) : ""
+      }
+    </LegacyCard>
+    )
+  }
+
+  const components = [ metadataComponent() , !workflowTest ? ResultTable : workflowTestBuilder];
 
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {

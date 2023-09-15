@@ -80,6 +80,37 @@ function getTestsInfo(testResultsCount, state){
     return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
 }
 
+function tagList(list, cweLink){
+
+  let ret = list?.map((tag, index) => {
+
+    let linkUrl = ""
+    if(cweLink){ 
+      let cwe = tag.split("-")
+      if(cwe[1]){
+          linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
+      }
+    }
+
+    return (
+      <Link key={index} url={linkUrl} target="_blank">
+        <Badge progress="complete" key={index}>{tag}</Badge>
+      </Link>
+    )
+  })
+  return ret;
+}
+
+function minimizeTagList(items){
+  if(items.length>2){
+
+    let ret = items.slice(0,2)
+    ret.push(`+${items.length-2} more`)
+    return ret;
+  }
+  return items;
+}
+
 const transform = {
     prepareTestRun : (data, testingRunResultSummary) => {
       let obj={};
@@ -111,6 +142,9 @@ const transform = {
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       obj['nextUrl'] = "/dashboard/testing/"+data.hexId
+      obj['metadata'] = func.flattenObject(testingRunResultSummary.metadata)
+      obj['repository'] = [obj?.metadata?.repository]
+      obj['branch'] = [obj?.metadata?.branch]
       return obj;
     },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries) => {
@@ -141,6 +175,8 @@ const transform = {
       obj['singleTypeInfos'] = data['singleTypeInfos'] || []
       obj['vulnerable'] = data['vulnerable'] || false
       obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
+      obj['cwe'] = subCategoryMap[data.testSubType]?.cwe ? subCategoryMap[data.testSubType]?.cwe : []
+      obj['cweDisplay'] = minimizeTagList(obj['cwe'])
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
@@ -192,21 +228,24 @@ const transform = {
       moreInfoSections[1].content = (
         <HorizontalStack gap="2">
           {
-            subCategoryMap[runIssues.id.testSubCategory]?.issueTags.map((tag, index) => {
-              return (
-                <Badge progress="complete" key={index}>{tag}</Badge>
-              )
-            })
+            tagList(subCategoryMap[runIssues.id.testSubCategory]?.issueTags)
           }
         </HorizontalStack>
       )
-      moreInfoSections[3].content = (
+      moreInfoSections[2].content = (
+        <HorizontalStack gap="2">
+          {
+            tagList(subCategoryMap[runIssues.id.testSubCategory]?.cwe, true)
+          }
+        </HorizontalStack>
+      )
+      moreInfoSections[4].content = (
         <List type='bullet' spacing="extraTight">
           {
             subCategoryMap[runIssues.id?.testSubCategory]?.references.map((reference) => {
               return (
                 <List.Item key={reference}>
-                  <Link key={reference} url={reference} monochrome removeUnderline>
+                  <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
                     <Text color='subdued'>
                       {reference}
                     </Text>
@@ -219,7 +258,7 @@ const transform = {
       )
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         let similarlyAffectedIssues = resp1['similarlyAffectedIssues'];
-        moreInfoSections[2].content = (
+        moreInfoSections[3].content = (
           <List type='bullet'>
             {
               similarlyAffectedIssues.map((item, index) => {

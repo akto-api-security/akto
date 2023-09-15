@@ -26,6 +26,7 @@ export default {
     data: obj.arrR,
     height: obj.numR,
     defaultChartOptions: obj.objR,
+    tooltipMetadata: obj.objN,
     backgroundColor: {
       type: String,
       default: "var(--white)"
@@ -61,6 +62,20 @@ export default {
             }
           },
           tooltip: {
+            formatter: function (tooltip) {
+
+              let def = tooltip.defaultFormatter.call(this, tooltip);
+              let tooltipMetadata = this?.points?.length > 0 ? this.points[0]?.series?.userOptions?.tooltipMetadata : undefined;
+              if(tooltipMetadata?.[this.x]){
+                if(tooltipMetadata[this.x]?.branch){
+                  def.push(`<span>branch: ${tooltipMetadata[this.x].branch}</span><br/>`)
+                }
+                if(tooltipMetadata[this.x].repository){
+                  def.push(`<span>repository: ${tooltipMetadata[this.x].repository}</span><br/>`)
+                }
+              }
+              return def;
+            },
             shared: true
           },
           plotOptions: {
@@ -92,7 +107,8 @@ export default {
                 marker: {
                   enabled: this.data.length <= 2
                 },
-                yAxis: 0
+                yAxis: 0,
+                tooltipMetadata: this.tooltipMetadata
               }
             }),
           ],
