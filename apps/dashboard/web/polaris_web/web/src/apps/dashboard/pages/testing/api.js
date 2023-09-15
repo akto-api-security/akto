@@ -19,12 +19,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId, fetchOnlyVulnerable
             }
         })
         return resp        
