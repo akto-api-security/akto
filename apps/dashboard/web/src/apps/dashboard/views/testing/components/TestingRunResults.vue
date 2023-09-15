@@ -72,7 +72,7 @@
                     :sortDescDefault="true"
                     :dense="true"
                     @rowClicked="openDetails"
-                    @downloadAsPDF="downloadAsPDF"
+                    @exportAsHTML="exportAsHTML"
                 >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
@@ -205,7 +205,7 @@ export default {
         }
     },
     methods: {
-        async downloadAsPDF() {
+        async exportAsHTML() {
             const routeData = this.$router.resolve({name: 'testing-export-html', query: {testingRunResultSummaries: btoa(JSON.stringify(this.testingRunResultSummaries))}});
             window.open(routeData.href, '_blank');
         },
