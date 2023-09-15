@@ -28,13 +28,13 @@
                                     <div v-on="on" v-bind="attrs">
                                         <secondary-button 
                                             color="var(--themeColorDark)" 
-                                            text="Export as PDF"
+                                            text="Export vulnerability report"
                                             @click="$emit('downloadAsPDF')" 
                                             v-if="!hideDownloadCSVIcon"
                                         />
                                     </div>
                                 </template>
-                                Download as PDF
+                                Export vulnerability report
                             </v-tooltip>
                         </div>
                         <div class="clickable download-csv">

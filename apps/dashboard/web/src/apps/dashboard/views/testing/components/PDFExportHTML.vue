@@ -104,19 +104,34 @@
 
                         <div class="row-div">
                             <span class="title-name" style="font-weight: 500;">
-                                Attempt
-                            </span>
-                            <span class="url-name" style="font-weight: 500;">
                                 Original request
                             </span>
+                            <span class="url-name" style="font-weight: 500;">
+                                Attempt
+                            </span>
                         </div>
-
                         <div class="row-div" v-for="testRun in testingRun.testResults">
                             <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
-                                {{ getOriginalCurl(testRun.message) }}
+                                {{ getOriginalCurl(testRun.originalMessage) }}
                             </span>
                             <span class="message">
-                                {{ getOriginalCurl(testRun.originalMessage) }}
+                                {{ getOriginalCurl(testRun.message) }}
+                            </span>
+                        </div>
+                        <div class="row-div">
+                            <span class="title-name" style="font-weight: 500;">
+                                Original Response
+                            </span>
+                            <span class="url-name" style="font-weight: 500;">
+                                Attempt Response
+                            </span>
+                        </div>
+                        <div class="row-div" v-for="testRun in testingRun.testResults">
+                            <span class="message" style="border-right: 1px solid var(--themeColorDark10);">
+                                {{ getResponse(testRun.originalMessage) }}
+                            </span>
+                            <span class="message">
+                                {{ getResponse(testRun.message) }}
                             </span>
                         </div>
                     </div>
@@ -148,6 +163,14 @@ export default {
         }
     },
     methods: {
+        getResponse(message) {
+            debugger
+            let messageJson = JSON.parse(message)
+            if (messageJson['response']) {
+                return JSON.stringify(messageJson['response'])
+            }
+            return JSON.stringify({"statusCode":messageJson['statusCode'],  "body": messageJson['responsePayload'],   "headers": messageJson['responseHeaders']})
+        },
         getOriginalCurl(message) {
             return this.sampleDataVsCurlMap[message]
         },
