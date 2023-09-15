@@ -28,6 +28,26 @@
         <div v-else>
             <div class="testing-runs-history" v-if="!isWorkflow">
                 <div class="d-flex jc-end">
+                <div v-for = "(header,index) in getMetadataFilters()">
+                    <v-menu :key="index" offset-y :close-on-content-click="false"> 
+                    <template v-slot:activator="{ on, attrs }">
+                            <secondary-button 
+                            :text="header.text" 
+                            v-bind="attrs"
+                            v-on="on"
+                            :color="metadataFilters[header.value].size > 0 ? 'var(--themeColor) !important' : null">
+                            </secondary-button>
+                        </template>
+                        <filter-column
+                            :title="header.text"
+                            :typeAndItems="header.data"
+                            @clickedItem="appliedFilter(header.value, $event)" 
+                            @operatorChanged="operatorChanged(header.value, $event)"
+                            @selectedAll="selectedAll(header.value, $event)"
+                            :listOperators="['OR', 'NOT']"
+                        />
+                    </v-menu>
+                </div>
                     <date-range v-model="dateRange"/>
                 </div>
                 <stacked-chart
@@ -37,6 +57,7 @@
                     :height="250"
                     title="Test results"
                     :data="testResultsChartData()"
+                    :tooltipMetadata="getChartTooltipMetadata()"
                     :defaultChartOptions="{legend:{enabled: false}}"
                     background-color="var(--transparent)"
                     :text="true"
@@ -82,6 +103,15 @@
                         />
                     </template>
                 
+                    <template #item.cwe="{item}">
+                        <sensitive-chip-group 
+                            :sensitiveTags="item.cwe"
+                            :chipColor="getColor(2)"
+                            :hideTag="true"
+                            class="z-80"
+                        />
+                    </template>
+
                 </simple-table>
                 <div v-if="openDetailsDialog">
                     <div class="details-dialog z-80">
@@ -113,6 +143,8 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import TestResultsDialog from "./TestResultsDialog";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import FilterColumn from '../../../shared/components/FilterColumn'
+import SecondaryButton from '../../../shared/components/buttons/SecondaryButton'
 
 import api from '../api'
 import issuesApi from '../../issues/api'
@@ -138,7 +170,9 @@ export default {
         SensitiveChipGroup,
         TestResultsDialog,
         WorkflowTestBuilder,
-        Spinner
+        Spinner,
+        FilterColumn,
+        SecondaryButton
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
@@ -175,6 +209,10 @@ export default {
                 {
                     text: "Vulnerable",
                     value: "vulnerable"
+                },
+                {
+                    text: "CWE",
+                    value: "cwe"
                 }
             ],
             testingRunResult: null,
@@ -196,7 +234,15 @@ export default {
                 ["API Security matters!!!"]
             ],
             refreshSummariesInterval: null,
-            refreshTestResultsInterval : null
+            refreshTestResultsInterval : null,
+            metadataFilters:  {
+                branch: new Set(),
+                repository: new Set()
+            },
+            metadataFilterOperators: {
+                branch: "OR",
+                repository: "OR"
+            }
         }
     },
     methods: {
@@ -229,7 +275,27 @@ export default {
             let retM = []
             let retL = []
 
-            this.testingRunResultSummaries.forEach((x) => {
+            let items = this.testingRunResultSummaries;
+
+            items = items.filter((x) => {
+                let ret = true;
+                Object.keys(this.metadataFilters).forEach((key) => {
+                    if(this.metadataFilters[key].size > 0){
+                        switch(this.metadataFilterOperators[key]){
+                            case "AND":
+                            case "OR":
+                                ret &= (this.metadataFilters[key].has(x?.metadata?.[key]))
+                                break;
+                            case "NOT":
+                                ret &= !(this.metadataFilters[key].has(x?.metadata?.[key]))
+                        }
+                    }
+                })
+
+                return ret
+            })
+
+            items.forEach((x) => {
                 let ts = x["startTimestamp"] * 1000
                 let countIssuesMap = x["countIssues"]
 
@@ -261,6 +327,88 @@ export default {
                 }
             ]
         },
+        getChartTooltipMetadata(){
+
+            let ret = {}
+
+            this.testingRunResultSummaries.forEach((x) => {
+                let ts = x["startTimestamp"] * 1000
+
+                let dt = +func.dayStart(ts)
+                let s = +func.dayStart(this.startTimestamp*1000)
+                let e = +func.dayStart(this.endTimestamp*1000)
+                if (dt < s || dt > e) return
+
+                ret[ts] = {
+                    branch: x?.metadata?.branch,
+                    repository: x?.metadata?.repository
+                }
+            })
+
+            return ret;
+        },
+        getMetadataFilters(){
+
+            let ret = []
+            let tmp = {
+                branch: new Set(),
+                repository: new Set()
+            }
+            this.testingRunResultSummaries.forEach((x) => {
+
+                if(x?.metadata?.branch){
+                    tmp.branch.add(x?.metadata?.branch)
+                }
+
+                if(x?.metadata?.repository){
+                    tmp.repository.add(x?.metadata?.repository)
+                }
+            })
+
+            Object.keys(tmp).forEach((key) => {
+                if(tmp[key].size > 0){
+                    ret.push({
+                        text: func.toSentenceCase(key),
+                        value: key,
+                        data: {
+                            type: "STRING",
+                            values: [...tmp[key]].map((x) => {
+                                return {
+                                    title: x,
+                                    subtitle: '',
+                                    value: x
+                                }
+                            })
+                        }
+                    })
+                }
+            })
+
+            return ret;
+        },
+        selectedAll (hValue, {items, checked}) {
+            for(var index in items) {
+                if (checked) {
+                    this.metadataFilters[hValue].add(items[index].value)
+                } else {
+                    this.metadataFilters[hValue].delete(items[index].value)
+                }
+            }
+            this.metadataFilters = {...this.metadataFilters}
+        },
+        appliedFilter (hValue, {item, checked, operator}) { 
+
+            this.metadataFilterOperators[hValue] = operator || 'OR'
+            if (checked) {
+                this.metadataFilters[hValue].add(item.value)
+            } else {
+                this.metadataFilters[hValue].delete(item.value)
+            }
+            this.metadataFilters = {...this.metadataFilters}
+        },
+        operatorChanged(hValue, {operator}) {
+            this.metadataFilterOperators[hValue] = operator || 'OR'
+        },
         dateClicked(point) {
             this.selectedDate = point / 1000
         },
@@ -280,7 +428,8 @@ export default {
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
                 severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : {title: "NONE", value: 0},
                 testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
-                testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
+                testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName"),
+                cwe: func.getRunResultCwe(runResult, this.subCatogoryMap)
             }
         },
         async openDetails(row) {

@@ -97,6 +97,18 @@ let filters = [
     label: 'Run type',
     title: 'Run type',
     choices: [],
+  },
+  {
+    key: 'repository',
+    label: 'Test run repository',
+    title: 'Test run repository',
+    choices: [],
+  },
+  {
+    key: 'branch',
+    label: 'Test run branch',
+    title: 'Test run branch',
+    choices: [],
   }
 ]
 

@@ -5,6 +5,7 @@ import {
   LinkMinor,
   ProductsMinor,
   FlagMajor,
+  CreditCardSecureMajor,
   MarketingMajor} from '@shopify/polaris-icons';
 import {
   Text,
@@ -74,6 +75,11 @@ let moreInfoSections = [
   {
     icon: ProductsMinor,
     title: "Tags",
+    content: ""
+  },
+  {
+    icon: CreditCardSecureMajor,
+    title: "CWE",
     content: ""
   },
   {
