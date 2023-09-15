@@ -109,12 +109,12 @@ export default {
             return resp
         })
     },
-    fetchTestingRunResults(testingRunResultSummaryHexId) {
+    fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
         return request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId, fetchOnlyVulnerable
             }
         }).then((resp) => {
             return resp
