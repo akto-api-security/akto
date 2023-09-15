@@ -69,18 +69,7 @@ validate:
     lt: 300
   response_payload:
     contains_either:
-      - root
       - daemon
-      - http
       - Linux
       - Ubuntu
-      - OS
-      - 127.0.0.1
-      - localhost
-      - =
-      - :
       - /proc/self/cmdline
-      - php
-      - import
-      - def
-      - main
