@@ -10,6 +10,9 @@
         <cookie-config>
             <http-only>true</http-only>
         </cookie-config>
+        <cookie-config>
+            <comment>__SAME_SITE_NONE__</comment>
+        </cookie-config>
     </session-config>
 
     <error-page>

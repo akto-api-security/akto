@@ -8,14 +8,13 @@ import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
-import com.akto.utils.Token;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.JWT;
+import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -30,8 +29,6 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
-
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -138,7 +135,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
             cookie.setHttpOnly(true);
             cookie.setPath("/dashboard");
-
+            cookie.setDomain("akto-aktol-1aya2275y5xpf-873673715.ap-south-1.elb.amazonaws.com");
+            cookie.setComment("__SAME_SITE_NONE__");
             cookie.setSecure(HttpUtils.isHttpsEnabled());
             
 
