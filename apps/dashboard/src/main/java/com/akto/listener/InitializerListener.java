@@ -150,7 +150,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         try {
                             // lookback period 3 days
-                            TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*3);
+                            TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
                             trafficUpdates.populate();
 
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
