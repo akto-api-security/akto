@@ -362,7 +362,6 @@ public class StartTestAction extends UserAction {
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                     Filters.eq(TestingRunResult.VULNERABLE, true)
             );
-            this.testingRunsCount = TestingRunResultDao.instance.count(filters);
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             for (TestingRunResult runResult: testingRunResultList) {

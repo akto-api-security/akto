@@ -268,19 +268,21 @@ export default {
         },
         async fetchVulnerableTestingRunResults() {
             let _this = this
-            let remaining = 50
             let vulnerableTestingRunResults = []
             let sampleDataVsCurlMap = {}
             let skip = 0
-            while (remaining > 0) {
-                let countFromDB = 0
+            while (true) {
+                let testingRunCountsFromDB = 0
                 await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaryHexId, skip).then(resp => {
-                    countFromDB = resp.testingRunsCount
                     vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
+                    testingRunCountsFromDB = resp.testingRunResults.length
                     sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
                 })
                 skip += 50
-                remaining = countFromDB - skip
+                if (testingRunCountsFromDB < 50) {
+                    //EOF: break as no further documents exists
+                    break
+                }
             }
             this.sampleDataVsCurlMap = sampleDataVsCurlMap
             this.vulnerableTestingRunResults = vulnerableTestingRunResults
