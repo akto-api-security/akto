@@ -42,7 +42,7 @@ const err = async (error) => {
       const originalRequest = error.config;
       if (originalRequest._retry) {
         // if done multiple times, then redirect to login.
-        func.setToast(true, true, "Session expired. Redirecting you to login page in 3s.")
+        func.setToast(true, true, "Session expired. Redirecting you to login page in some time.")
         setTimeout(()=>{
           window.location.pathname = "/login"
         },3000)
