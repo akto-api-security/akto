@@ -211,6 +211,7 @@ public class ExportSampleDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
+
     public static String getCurl(String sampleData) throws IOException {
         HttpResponseParams httpResponseParams;
         try {
