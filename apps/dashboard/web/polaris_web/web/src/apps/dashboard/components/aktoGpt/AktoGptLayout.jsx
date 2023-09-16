@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Avatar, Box, Button, HorizontalStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import { ConversationMinor, SendMajor } from "@shopify/polaris-icons"
+import { SendMajor } from "@shopify/polaris-icons"
 import PromptContainer from './PromptContainer'
 import "./style.css"
 import Store from '../../store'
@@ -107,12 +107,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
         <div style={{display:"flex"}}>
             <div className='left-nav-gpt'>
                 <Box padding="3">
-                    <HorizontalStack gap={"2"}>
-                        <Box>
-                            <Icon source={ConversationMinor}/>
-                        </Box>
-                        <Text variant="bodyLg" fontWeight="semibold">Select any prompt</Text>
-                    </HorizontalStack>
+                    <Text variant="bodyLg" fontWeight="semibold">Select any prompt</Text>
                 </Box>
                 <br/>
 

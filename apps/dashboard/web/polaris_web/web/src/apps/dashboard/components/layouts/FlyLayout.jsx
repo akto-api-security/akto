@@ -1,6 +1,6 @@
 import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner } from "@shopify/polaris"
 import {
-    CancelMinor
+    CancelMajor
 } from '@shopify/polaris-icons';
 import "./style.css"
 
@@ -18,7 +18,7 @@ function FlyLayout(props) {
                             <Text variant="headingMd">
                                 {title}
                             </Text>
-                            <Button icon={CancelMinor} onClick={() => { setShow(!show) }} plain></Button>
+                            <Button icon={CancelMajor} onClick={() => { setShow(!show) }} plain></Button>
                         </HorizontalStack>
                         <Box paddingBlockEnd={"28"}>
                         <VerticalStack gap="4">

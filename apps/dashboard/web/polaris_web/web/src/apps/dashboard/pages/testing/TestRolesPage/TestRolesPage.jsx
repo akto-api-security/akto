@@ -6,8 +6,8 @@ import { Button } from "@shopify/polaris"
 import { useNavigate } from "react-router-dom"
 import func from "@/util/func"
 import {
-    CustomersMinor,
-    ClockMinor
+    ProfileMinor,
+    CalendarMinor
   } from '@shopify/polaris-icons';
 
 const headers = [
@@ -20,13 +20,13 @@ const headers = [
         text:"Last updated",
         value:"timestamp",
         itemOrder: 3,
-        icon:ClockMinor
+        icon:CalendarMinor
     },
     {
         text:"Created by",
         value:"createdBy",
         itemOrder: 3,
-        icon:CustomersMinor
+        icon:ProfileMinor
     }
 ]
 

@@ -103,7 +103,7 @@ function GithubCell(props){
                 }).map((header) => {
                     return (
                         <HorizontalStack key={header.value} gap="1">
-                            <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                            <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
                                 <Icon source={header.icon} color="subdued" />
                             </div>
                             <TooltipText

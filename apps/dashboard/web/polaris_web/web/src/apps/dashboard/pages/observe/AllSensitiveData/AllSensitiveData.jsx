@@ -5,8 +5,8 @@ import { useEffect,useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
-    CircleCancelMinor,
-    CircleTickMinor
+    CircleCancelMajor,
+    CircleTickMajor
   } from '@shopify/polaris-icons';
 
 import { useNavigate } from "react-router-dom"
@@ -102,7 +102,7 @@ function AllSensitiveData() {
                         response:0,
                         id:type.name,
                         nextUrl:type.name,
-                        icon: CircleTickMinor,
+                        icon: CircleTickMajor,
                         iconColor: "success",
                         iconTooltip: "Active",
                         sensitiveCount:0
@@ -117,7 +117,7 @@ function AllSensitiveData() {
                         response:0,
                         id:type.name,
                         nextUrl:type.name,
-                        icon: type.active ? CircleTickMinor : CircleCancelMinor,
+                        icon: type.active ? CircleTickMajor : CircleCancelMajor,
                         iconColor: type.active ? "success" : "critical",
                         iconTooltip: type.active ? "Active" : "Inactive",
                         sensitiveCount:0
