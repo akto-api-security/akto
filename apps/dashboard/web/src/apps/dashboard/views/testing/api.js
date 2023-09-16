@@ -121,12 +121,13 @@ export default {
         })        
     },
 
-    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId) {
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId,
+                skip
             }
         }).then((resp) => {
             return resp
