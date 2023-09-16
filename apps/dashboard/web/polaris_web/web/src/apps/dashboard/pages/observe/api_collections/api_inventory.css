@@ -16,9 +16,6 @@
 }
 
 .control-row .Polaris-IndexTable__TableCell {
-    padding: 16px 16px 16px 0 !important;
-}
-
-.control-row .Polaris-IndexTable__TableCell--first{
-    padding: 16px 0 !important;
+    padding-top: 16px !important;
+    padding-bottom: 16px !important;
 }

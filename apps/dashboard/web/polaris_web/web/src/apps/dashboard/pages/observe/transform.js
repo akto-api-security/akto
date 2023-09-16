@@ -106,7 +106,7 @@ const transform = {
             endpoint: x.url,
             url: x.url,
             method: x.method,
-            added: func.prettifyEpoch(x.timestamp),
+            added: "Discovered " + func.prettifyEpoch(x.timestamp),
             location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
             subType: x.subType.name,
             detectedTs: x.timestamp,

@@ -5,3 +5,7 @@
     left: 20px;
     cursor: pointer;
 }
+
+.Polaris-ActionList-SearchField {
+    display: none !important;
+}

@@ -23,10 +23,6 @@ let store = (set)=>({
             }
         })
     },
-    allCollections: [],
-    setAllCollections:(allCollections)=>{
-        set({allCollections: allCollections})
-    },
     dataTypeNames: [],
     setDataTypeNames: (dataTypeNames) => {
         set({dataTypeNames:dataTypeNames})  
@@ -38,10 +34,6 @@ let store = (set)=>({
         set({allRoutes: allRoutes})
     },
     
-    collectionsMap: {},
-    setCollectionsMap:(collectionsMap)=>{
-        set({collectionsMap: collectionsMap})
-    },
 })
 
 store = devtools(store)

@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {HomeMinor,OrdersMinor, CustomersMinor,AnalyticsMinor,DiscountsMinor,ProductsMinor,SettingsMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -27,7 +27,7 @@ export default function LeftNav(){
             items={[
                 {
                   label: <Text variant="bodyMd" fontWeight="medium">Quick Start</Text>,
-                  icon: HomeMinor,
+                  icon: AppsFilledMajor,
                   onClick: ()=>{
                     handleSelect("quick_start")
                     setActive("normal")
@@ -49,7 +49,7 @@ export default function LeftNav(){
                 {   
                   url: '#',
                   label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("inventory") ? (active === 'active' ? "subdued" : ""): ""}>API Inventory</Text>,
-                  icon: ProductsMinor,
+                  icon: InventoryFilledMajor,
                   onClick: ()=>{
                     handleSelect("inventory")
                     setActive("normal")
@@ -89,7 +89,7 @@ export default function LeftNav(){
                 {
                   url: '#',
                   label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
-                  icon: CustomersMinor,
+                  icon: MarketingFilledMinor,
                   onClick: ()=>{
                       handleSelect('testing')
                       setActive("normal")
@@ -128,7 +128,7 @@ export default function LeftNav(){
                 },
                 {
                   label: <Text variant="bodyMd" fontWeight="medium">Test Editor</Text>,
-                  icon: DiscountsMinor,
+                  icon: FileFilledMinor,
                   onClick: ()=>{ 
                     handleSelect("test-editor")
                     navigate("/dashboard/test-editor/REMOVE_TOKENS")
@@ -139,7 +139,7 @@ export default function LeftNav(){
                 },
                 {
                   label: <Text variant="bodyMd" fontWeight="medium">Issues</Text>,
-                  icon: AnalyticsMinor,
+                  icon: AnalyticsFilledMinor,
                   onClick: ()=>{ 
                       handleSelect("issues")
                       navigate("/dashboard/issues")
@@ -154,7 +154,7 @@ export default function LeftNav(){
                items={[
                 {
                   label:<Text variant="bodyMd" fontWeight="medium">Settings</Text>,
-                  icon: SettingsMinor,
+                  icon: SettingsFilledMinor,
                   onClick: ()=>{
                     navigate("/dashboard/settings/about")
                     setActive("normal")
