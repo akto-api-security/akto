@@ -24,17 +24,10 @@ import java.util.*;
 
 public class TrafficUpdates {
 
-    private final String webhookUrl;
-    private final String metricsUrl;
 
-    private final int thresholdSeconds;
-
-    public static final int LOOK_BACK_PERIOD = 3;
-
-    public TrafficUpdates(String webhookUrl, String metricsUrl, int thresholdSeconds) {
-        this.webhookUrl = webhookUrl;
-        this.metricsUrl = metricsUrl;
-        this.thresholdSeconds = thresholdSeconds;
+    private int lookBackPeriod;
+    public TrafficUpdates(int lookBackPeriod) {
+        this.lookBackPeriod = lookBackPeriod;
     }
 
     enum AlertType {
@@ -44,7 +37,7 @@ public class TrafficUpdates {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficUpdates.class);
 
-    public void run() {
+    public void populate() {
         loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
         populateTrafficDetails(AlertType.OUTGOING_REQUESTS_MIRRORING);
         loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
@@ -52,17 +45,20 @@ public class TrafficUpdates {
         loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
         populateTrafficDetails(AlertType.FILTERED_REQUESTS_RUNTIME);
         loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
+    }
+
+    public void sendAlerts(String webhookUrl, String metricsUrl, int thresholdSeconds) {
 
         List<TrafficMetricsAlert> trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(new BasicDBObject());
         List<TrafficMetricsAlert> filteredTrafficMetricsAlertsList = filterTrafficMetricsAlertsList(trafficMetricsAlertList);
         loggerMaker.infoAndAddToDb("filteredTrafficMetricsAlertsList: " + filteredTrafficMetricsAlertsList.size(), LoggerMaker.LogDb.DASHBOARD);
 
         loggerMaker.infoAndAddToDb("Starting sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
-        sendAlerts(thresholdSeconds,AlertType.OUTGOING_REQUESTS_MIRRORING, filteredTrafficMetricsAlertsList);
+        sendAlerts(thresholdSeconds,AlertType.OUTGOING_REQUESTS_MIRRORING, filteredTrafficMetricsAlertsList, webhookUrl, metricsUrl);
         loggerMaker.infoAndAddToDb("Finished sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
 
         loggerMaker.infoAndAddToDb("Starting sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
-        sendAlerts(thresholdSeconds, AlertType.FILTERED_REQUESTS_RUNTIME, filteredTrafficMetricsAlertsList);
+        sendAlerts(thresholdSeconds, AlertType.FILTERED_REQUESTS_RUNTIME, filteredTrafficMetricsAlertsList, webhookUrl, metricsUrl);
         loggerMaker.infoAndAddToDb("Finished sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
     }
 
@@ -106,7 +102,7 @@ public class TrafficUpdates {
         List<Bson> pipeline = new ArrayList<>();
 
         // we want to bring only last 3 days data to find traffic alerts. More efficient than getting all traffic.
-        int time = (Context.now() - 60*60*24*LOOK_BACK_PERIOD) / (60*60*24);
+        int time = (Context.now() - lookBackPeriod) / (60*60*24);
 
         Bson filter = Filters.and(
                 Filters.eq("_id." + TrafficMetrics.Key.NAME, name.toString()),
@@ -159,13 +155,13 @@ public class TrafficUpdates {
         }
     }
 
-    public void sendRedAlert(Set<String> hosts, AlertType alertType) {
+    public void sendRedAlert(Set<String> hosts, AlertType alertType, String webhookUrl, String metricsUrl) {
         Slack slack = Slack.getInstance();
-        String payload = generateRedAlertPayload(hosts, alertType, this.metricsUrl);
+        String payload = generateRedAlertPayload(hosts, alertType, metricsUrl);
         if (payload == null) return;
 
         try {
-            slack.send(this.webhookUrl, payload);
+            slack.send(webhookUrl, payload);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -215,11 +211,11 @@ public class TrafficUpdates {
         return result.toString();
     }
 
-    public void sendGreenAlert(Set<String> hosts, AlertType alertType) {
+    public void sendGreenAlert(Set<String> hosts, AlertType alertType, String webhookUrl, String metricsUrl) {
         Slack slack = Slack.getInstance();
-        String payload = generateGreenAlertPayload(hosts, alertType, this.metricsUrl);
+        String payload = generateGreenAlertPayload(hosts, alertType, metricsUrl);
         try {
-            slack.send(this.webhookUrl, payload);
+            slack.send(webhookUrl, payload);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -307,22 +303,12 @@ public class TrafficUpdates {
         return new AlertResult(redAlertHosts, greenAlertHosts);
     }
 
-    public void sendAlerts(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList) {
+    public void sendAlerts(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList,
+                           String webhookUrl, String metricsUrl) {
         AlertResult alertResult = generateAlertResult(thresholdSeconds, alertType, trafficMetricsAlertList);
 
-        if (!alertResult.redAlertHosts.isEmpty()) sendRedAlert(alertResult.redAlertHosts, alertType);
-        if (!alertResult.greenAlertHosts.isEmpty()) sendGreenAlert(alertResult.greenAlertHosts, alertType);
+        if (!alertResult.redAlertHosts.isEmpty()) sendRedAlert(alertResult.redAlertHosts, alertType, webhookUrl, metricsUrl);
+        if (!alertResult.greenAlertHosts.isEmpty()) sendGreenAlert(alertResult.greenAlertHosts, alertType, webhookUrl,  metricsUrl);
     }
 
-    public String getWebhookUrl() {
-        return webhookUrl;
-    }
-
-    public String getMetricsUrl() {
-        return metricsUrl;
-    }
-
-    public int getThresholdSeconds() {
-        return thresholdSeconds;
-    }
 }
