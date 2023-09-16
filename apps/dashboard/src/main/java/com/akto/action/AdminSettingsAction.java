@@ -73,8 +73,9 @@ public class AdminSettingsAction extends UserAction {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
 
-        if (trafficAlertThresholdSeconds > 3600*24*3) {
-            addActionError("Alert can't be set for more than 3 days"); // todo: language
+        if (trafficAlertThresholdSeconds > 3600*24*6) {
+            // this was done because our lookback period to calculate last timestamp is 6 days
+            addActionError("Alert can't be set for more than 10 days"); // todo: language
             return ERROR.toUpperCase();
         }
 

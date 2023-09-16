@@ -120,10 +120,11 @@ import {mapState} from 'vuex'
             return {
                 setup_types: ["STAGING", "PROD", "QA", "DEV"],
                 traffic_alert_durations: [
-                    {text : "1 Day", value: 60*60*24},
-                    {text : "12 hours", value: 60*60*12},
-                    {text : "4 hours", value: 60*60*4},
                     {text : "1 hour", value: 60*60*1},
+                    {text : "4 hours", value: 60*60*4},
+                    {text : "12 hours", value: 60*60*12},
+                    {text : "1 Day", value: 60*60*24},
+                    {text : "4 Days", value: 60*60*24*4},
                 ]
             }
         },
