@@ -147,6 +147,7 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
+                e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             }
         }

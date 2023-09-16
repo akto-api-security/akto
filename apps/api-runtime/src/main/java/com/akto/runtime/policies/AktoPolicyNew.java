@@ -320,6 +320,9 @@ public class AktoPolicyNew {
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
+            // last tested
+            subUpdates.add(Updates.set(ApiInfo.LAST_TESTED, apiInfo.getLastTested())) ;
+
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),
