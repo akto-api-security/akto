@@ -2,13 +2,19 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
@@ -52,6 +58,36 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             String[] fieldNames = {"_id.apiCollectionId", "_id.url"};
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
+        }
+    }
+
+    private boolean hasApiHitTest(List<TestingRunResult> testingRunResults){
+        for(TestingRunResult result : testingRunResults){
+            List<TestResult> testResults = result.getTestResults() ;
+            for(TestResult singleTestResult : testResults){
+                List<String> errors = singleTestResult.getErrors();
+                if(errors.size() == 0 && singleTestResult.getMessage().length() > 0){
+                    return true ;
+                }
+            }
+        }
+        return false;
+    }
+
+    public void updateLastTestedField(List<TestingRunResult> testingRunResults, ApiInfo.ApiInfoKey apiInfoKey){
+        if(hasApiHitTest(testingRunResults)){
+            UpdateOptions updateOptions = new UpdateOptions();
+
+            System.out.println("should be atleast one");
+            updateOptions.upsert(true);
+            instance.getMCollection().updateOne(
+                getFilter(apiInfoKey), 
+                Updates.combine(
+                    Updates.set("lastTested", Context.now()),
+                    Updates.setOnInsert("allAuthTypesFound", new ArrayList<>())
+                ),
+                updateOptions
+            ) ;
         }
     }
 

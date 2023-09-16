@@ -24,7 +24,9 @@ public class ApiInfo {
     public static final String VIOLATIONS = "violations";
     private Map<String, Integer> violations;
     public static final String LAST_SEEN = "lastSeen";
+    public static final String LAST_TESTED = "lastTested";
     private int lastSeen;
+    private int lastTested;
 
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
@@ -122,6 +124,7 @@ public class ApiInfo {
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
+        this.lastTested = 0 ;
     }
 
     public ApiInfo(HttpResponseParams httpResponseParams) {
@@ -146,6 +149,10 @@ public class ApiInfo {
         // never merge id
         if (that.lastSeen > this.lastSeen) {
             this.lastSeen = that.lastSeen;
+        }
+
+        if((that.lastTested != 0) && that.lastTested > this.lastTested){
+            this.lastTested = that.lastTested ;
         }
 
         for (String k: that.violations.keySet()) {
@@ -208,6 +215,7 @@ public class ApiInfo {
                 " id='" + getId() + "'" +
                 ", allAuthTypesFound='" + getAllAuthTypesFound() + "'" +
                 ", lastSeen='" + getLastSeen() + "'" +
+                ", lastTested='" + getLastTested() + "'" +
                 ", violations='" + getViolations() + "'" +
                 ", accessTypes='" + getApiAccessTypes() + "'" +
                 "}";
@@ -252,5 +260,13 @@ public class ApiInfo {
 
     public void setLastSeen(int lastSeen) {
         this.lastSeen = lastSeen;
+    }
+
+     public int getLastTested() {
+        return lastTested;
+    }
+
+    public void setLastTested(int lastTested) {
+        this.lastTested = lastTested;
     }
 }
