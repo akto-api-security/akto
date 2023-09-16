@@ -211,25 +211,7 @@ public class ExportSampleDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
-    private Map<String, String> sampleDataVsCurlMap;
     private List<String> sampleDataList;
-    public String generateMultipleCurls() {
-        Map<String, String> mapOfSampleDataVsCurl = new HashMap<>();
-        try {
-            for (String sampleData : sampleDataList) {
-                String curl = getCurl(sampleData);
-                mapOfSampleDataVsCurl.put(sampleData, curl);
-            }
-        } catch (Exception e) {
-            addActionError("Couldn't parse the data");
-            return ERROR.toUpperCase();
-        }
-        if (!mapOfSampleDataVsCurl.isEmpty()) {
-            this.setSampleDataVsCurlMap(mapOfSampleDataVsCurl);
-        }
-        return SUCCESS.toUpperCase();
-    }
-
     public static String getCurl(String sampleData) throws IOException {
         HttpResponseParams httpResponseParams;
         try {
@@ -366,14 +348,6 @@ public class ExportSampleDataAction extends UserAction {
 
     public String getLastMethodFetched() {
         return lastMethodFetched;
-    }
-
-    public Map<String, String> getSampleDataVsCurlMap() {
-        return sampleDataVsCurlMap;
-    }
-
-    public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
-        this.sampleDataVsCurlMap = sampleDataVsCurlMap;
     }
 
     public List<String> getSampleDataList() {

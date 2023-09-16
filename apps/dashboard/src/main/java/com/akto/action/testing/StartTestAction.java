@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.DaoInit;
+import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
@@ -62,7 +63,7 @@ public class StartTestAction extends UserAction {
     private String triggeredBy;
     private boolean isTestRunByTestEditor;
     private Map<ObjectId,TestingRunResultSummary> latestTestingRunResultSummaries;
-
+    private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
@@ -361,7 +362,22 @@ public class StartTestAction extends UserAction {
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                     Filters.eq(TestingRunResult.VULNERABLE, true)
             );
-            this.testingRunResults = TestingRunResultDao.instance.findAll(filters);
+            this.testingRunsCount = TestingRunResultDao.instance.count(filters);
+            List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
+            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            for (TestingRunResult runResult: testingRunResultList) {
+                List<TestResult> testResults = new ArrayList<>();
+                for (TestResult testResult : runResult.getTestResults()) {
+                    if (testResult.isVulnerable()) {
+                        testResults.add(testResult);
+                        sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
+                        sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                    }
+                }
+                runResult.setTestResults(testResults);
+            }
+            this.testingRunResults = testingRunResultList;
+            this.sampleDataVsCurlMap = sampleDataVsCurlMap;
         } catch (Exception e) {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
@@ -701,6 +717,14 @@ public class StartTestAction extends UserAction {
     public void setLatestTestingRunResultSummaries(
         Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries) {
         this.latestTestingRunResultSummaries = latestTestingRunResultSummaries;
+    }
+
+    public Map<String, String> getSampleDataVsCurlMap() {
+        return sampleDataVsCurlMap;
+    }
+
+    public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
+        this.sampleDataVsCurlMap = sampleDataVsCurlMap;
     }
 
     public enum CallSource{

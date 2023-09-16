@@ -215,7 +215,7 @@ export default {
             ]
             return issueTable
         },
-        refreshVulnerabilityCount(testingRunResults) {
+        createVulnerabilityMap(testingRunResults) {
             let categoryVsVulMap = {}
             let sampleDataMsgList = []
             testingRunResults.forEach((testingRun) => {
@@ -265,20 +265,26 @@ export default {
                 return severityB - severityA
             }
             this.categoryVsVulnerabilitiesMap.sort(compare)
-            this.updateSampleDataVsCurlMap(sampleDataMsgList)
-        },
-        async updateSampleDataVsCurlMap(sampleDataMsgList) {
-            let _this = this
-            await inventoryApi.convertSampleDataListToCurl(sampleDataMsgList).then(resp => {
-                _this.sampleDataVsCurlMap = resp.sampleDataVsCurlMap
-            })
         },
         async fetchVulnerableTestingRunResults() {
             let _this = this
-            await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaries[0].hexId).then(resp => {
-                _this.vulnerableTestingRunResults = resp.testingRunResults
-                _this.refreshVulnerabilityCount(_this.vulnerableTestingRunResults)
-            })
+            let remaining = 50
+            let vulnerableTestingRunResults = []
+            let sampleDataVsCurlMap = {}
+            let skip = 0
+            while (remaining > 0) {
+                let countFromDB = 0
+                await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaries[0].hexId, skip).then(resp => {
+                    countFromDB = resp.testingRunsCount
+                    vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
+                    sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                })
+                skip += 50
+                remaining = countFromDB - skip
+            }
+            this.sampleDataVsCurlMap = sampleDataVsCurlMap
+            this.vulnerableTestingRunResults = vulnerableTestingRunResults
+            this.createVulnerabilityMap(_this.vulnerableTestingRunResults)
         }
     },
     async mounted() {
