@@ -211,7 +211,6 @@ public class ExportSampleDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
-    private List<String> sampleDataList;
     public static String getCurl(String sampleData) throws IOException {
         HttpResponseParams httpResponseParams;
         try {
@@ -348,14 +347,6 @@ public class ExportSampleDataAction extends UserAction {
 
     public String getLastMethodFetched() {
         return lastMethodFetched;
-    }
-
-    public List<String> getSampleDataList() {
-        return sampleDataList;
-    }
-
-    public void setSampleDataList(List<String> sampleDataList) {
-        this.sampleDataList = sampleDataList;
     }
 }
 
