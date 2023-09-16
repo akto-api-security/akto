@@ -83,7 +83,7 @@ const router =  new Router({
             name: 'testing-export-html',
             component: PDFExportHTML,
             props: route => ({
-                testingRunResultSummaries: JSON.parse(atob(route.query.testingRunResultSummaries))
+                testingRunResultSummaryHexId: route.query.testingRunResultSummaryHexId
             })
         },
         {
