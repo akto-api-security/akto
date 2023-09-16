@@ -203,7 +203,8 @@ export default {
     },
     methods: {
         async exportAsHTML() {
-            const routeData = this.$router.resolve({name: 'testing-export-html', query: {testingRunResultSummaries: btoa(JSON.stringify(this.testingRunResultSummaries))}});
+            let currentSummary = this.testingRunResultSummaries.filter(x => x.startTimestamp === this.selectedDate)[0]
+            const routeData = this.$router.resolve({name: 'testing-export-html', query: {testingRunResultSummaryHexId:currentSummary.hexId}});
             window.open(routeData.href, '_blank');
         },
         getColor(severity) {

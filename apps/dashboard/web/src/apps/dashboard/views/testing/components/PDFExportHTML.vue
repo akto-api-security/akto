@@ -151,7 +151,7 @@ import func from "@/util/func";
 export default {
     name: "PDFExportHTML",
     props: {
-        testingRunResultSummaries: obj.arrR
+        testingRunResultSummaryHexId: obj.strR
     },
     data() {
         return {
@@ -274,7 +274,7 @@ export default {
             let skip = 0
             while (remaining > 0) {
                 let countFromDB = 0
-                await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaries[0].hexId, skip).then(resp => {
+                await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaryHexId, skip).then(resp => {
                     countFromDB = resp.testingRunsCount
                     vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
                     sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
@@ -289,12 +289,7 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('issues/fetchAllSubCategories')
-        let interval = setInterval(() => {
-            if (this.testingRunResultSummaries  && this.testingRunResultSummaries.length > 0 && this.testingRunResultSummaries[this.testingRunResultSummaries.length - 1].hexId) {
-                this.fetchVulnerableTestingRunResults()
-                clearInterval(interval)
-            }
-        }, 1000)
+        this.fetchVulnerableTestingRunResults()
     },
     computed: {
         subCatogoryMap: {
