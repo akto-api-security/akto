@@ -259,11 +259,20 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId);
+        List<Bson> filterQ = new ArrayList<>();
+        filterQ.add(Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId));
+
+        if(this.startTimestamp!=0){
+            filterQ.add(Filters.gte(TestingRunResultSummary.START_TIMESTAMP, this.startTimestamp));
+        }
+
+        if(this.endTimestamp!=0){
+            filterQ.add(Filters.lte(TestingRunResultSummary.START_TIMESTAMP, this.endTimestamp));
+        }
 
         Bson sort = Sorts.descending(TestingRunResultSummary.START_TIMESTAMP) ;
 
-        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ, 0, limitForTestingRunResultSummary , sort);
+        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0, limitForTestingRunResultSummary , sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
 
         if (this.testingRun.getTestIdConfig() == 1) {
