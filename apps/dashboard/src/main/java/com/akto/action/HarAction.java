@@ -2,8 +2,11 @@ package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.User;
+import com.akto.dto.UserAccountEntry;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
 import com.akto.dto.ApiToken.Utility;
@@ -17,12 +20,16 @@ import com.sun.jna.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class HarAction extends UserAction {
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private String harString;
     private List<String> harErrors;
     private BasicDBObject content;
@@ -107,6 +114,54 @@ public class HarAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String filename;
+    private String username;
+    public String createCollectionWithUrl() {
+        Pattern pattern = Pattern.compile("[a-zA-Z0-9\\-_]{1,100}");
+        if (filename.length() > 100) {
+            addActionError("filename should be limited to 100 chars");
+            return ERROR.toUpperCase();
+        }
+
+        if (!pattern.matcher(filename).matches()) {
+            addActionError("filename should contain only alphanumeric, hyphen or underscores");
+            return ERROR.toUpperCase();
+        }
+
+        String fileUrl = "https://akto-setup.s3.amazonaws.com/templates/sample_data/" + filename + ".har";
+        String tempFileUrl = "temp_" + UUID.randomUUID() + "_" + filename;
+        try {
+            FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+
+            User user = UsersDao.instance.findOne(User.LOGIN, username);
+            if (user == null) return SUCCESS.toUpperCase();
+
+            for(UserAccountEntry entry: user.getAccounts().values()) {
+                int accountId = entry.getAccountId();
+
+                loggerMaker.infoAndAddToDb("Checking for account " + accountId + " " + filename, LoggerMaker.LogDb.DASHBOARD);
+
+                Context.accountId.set(accountId);
+                ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(filename);
+                if (apiCollection != null) return SUCCESS.toUpperCase();
+
+                loggerMaker.infoAndAddToDb("Adding to account " + accountId + " " + filename, LoggerMaker.LogDb.DASHBOARD);
+                this.apiCollectionName = filename;
+                this.harString = FileUtils.readFileToString(new File(tempFileUrl), StandardCharsets.UTF_8);
+                this.execute();
+                loggerMaker.infoAndAddToDb("Completed adding to account " + accountId + " " + filename, LoggerMaker.LogDb.DASHBOARD);
+
+                break;
+            }
+
+        } catch (IOException e) {
+            addActionError("An error occurred: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     public void setContent(BasicDBObject content) {
         this.content = content;
     }
@@ -161,6 +216,14 @@ public class HarAction extends UserAction {
             return Action.ERROR.toUpperCase();        
         }
 
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
     }
 
     interface Awesome extends Library {          
