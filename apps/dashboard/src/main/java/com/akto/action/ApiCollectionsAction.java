@@ -2,14 +2,13 @@ package com.akto.action;
 
 import java.util.*;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.SensitiveInfoInApiCollections;
 import com.mongodb.client.model.Filters;
@@ -20,6 +19,9 @@ public class ApiCollectionsAction extends UserAction {
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     List<SensitiveInfoInApiCollections> sensitiveInfoInApiCollections = new ArrayList<>() ;
+    Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
+    
+    Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
 
     int apiCollectionId;
 
@@ -111,6 +113,16 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchCoverageInfoInCollections(){
+        this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSeverityInfoInCollections(){
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections();
+        return Action.SUCCESS.toUpperCase();
+    }
+    
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -135,5 +147,12 @@ public class ApiCollectionsAction extends UserAction {
         return sensitiveInfoInApiCollections;
     }
 
+    public Map<Integer, Integer> getTestedEndpointsMaps() {
+        return testedEndpointsMaps;
+    }
+
+    public Map<Integer, Map<String, Integer>> getSeverityInfo() {
+        return severityInfo;
+    }
 
 }

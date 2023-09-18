@@ -4,7 +4,10 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.UpdateOptions;
@@ -14,8 +17,9 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
@@ -59,6 +63,12 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
         }
+
+        if (counter == 4) {
+            String[] fieldNames = {"lastTested"};
+            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            counter++;
+        }
     }
 
     private boolean hasApiHitTest(List<TestingRunResult> testingRunResults){
@@ -84,11 +94,37 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
                 getFilter(apiInfoKey), 
                 Updates.combine(
                     Updates.set("lastTested", Context.now()),
-                    Updates.setOnInsert("allAuthTypesFound", new ArrayList<>())
+                    Updates.setOnInsert("allAuthTypesFound", new ArrayList<>()),
+                    Updates.setOnInsert("lastSeen", 0),
+                    Updates.setOnInsert("apiAccessTypes",  new ArrayList<>()),
+                    Updates.setOnInsert("violations", new HashMap<>())
                 ),
                 updateOptions
             ) ;
         }
+    }
+
+    public Map<Integer,Integer> getCoverageCount(){
+        Map<Integer,Integer> result = new HashMap<>();
+        List<Bson> pipeline = new ArrayList<>();
+        int oneMonthAgo = Context.now() - (30 * 24 * 60 * 60) ;
+        pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
+
+        BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
+
+        MongoCursor<BasicDBObject> collectionsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(collectionsCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = collectionsCursor.next();
+                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int count = basicDBObject.getInt("count");
+                result.put(apiCollectionId, count);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
     }
 
     @Override

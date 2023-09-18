@@ -425,6 +425,26 @@
             </result>
         </action>
 
+        <action name="api/getCoverageInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchCoverageInfoInCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getSeverityInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchSeverityInfoInCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <!--   NEVER CHANGE VALUE OF api/uploadHar (path) this is used in ApiToken     -->
         <action name="api/uploadHar" class="com.akto.action.HarAction">
             <interceptor-ref name="json"/>
