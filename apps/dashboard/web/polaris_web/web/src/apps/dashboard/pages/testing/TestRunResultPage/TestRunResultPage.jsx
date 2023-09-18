@@ -177,7 +177,6 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     async function fetchData() {
-      if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
         if (hexId2 != undefined) {
           if (testingRunResult == undefined) {
             let res = await api.fetchTestRunResultDetails(hexId2)
@@ -189,9 +188,6 @@ function TestRunResultPage(props) {
           }
         }
         setData(testingRunResult, runIssues);
-      } else {
-        transform.setTestMetadata();
-      }
       setLoading(false);
     }
     fetchData();
