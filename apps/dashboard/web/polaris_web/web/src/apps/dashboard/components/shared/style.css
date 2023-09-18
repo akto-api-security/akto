@@ -14,6 +14,64 @@
     font-weight: 600 !important;
 }
 
+.deleted-block{
+    border-left: 4px solid #D72C0D;
+    border-top: 1px solid #D72C0D;
+    border-bottom: 1px solid #D72C0D;
+    margin-left: -62px;
+    width: 550px !important;
+    border-radius: 2px;
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+.updated-content{
+    color: #916A00 !important;
+    font-weight: 600 !important;
+    background-color: #FFEBD3 !important;
+}
+
+.added-block{
+    border-left: 4px solid #238636;
+    border-top: 1px solid #238636;
+    border-bottom: 1px solid #238636;
+    margin-left: -62px;
+    width: 550px !important;
+    border-radius: 2px;
+    background-color: rgba(0, 255, 0, 0.1);
+}
+
+.new-diff .view-line{
+    padding-left: 10px ;
+}
+
+.new-diff .view-lines{
+    background: #FAFBFB !important;
+}
+
+.new-diff .monaco-hover{
+    background-color: #FFF5EA !important;
+    border-radius: 2px;
+    border: 2px solid #B98900 !important;
+}
+
+.new-diff .active-line{
+    margin-left: -62px;
+    width: 550px !important;
+    border-radius: 2px;
+    animation: colorChange 0.8s ease forwards
+}
+@keyframes colorChange {
+    0% {
+      background-color: unset; /* Start with the original color */
+    }
+    50% {
+      background-color: rgba(98,0,234,0.4); /* Change to the new color at 50% of the animation */
+    }
+    100% {
+      background-color: unset; /* Revert to the original color at the end of the animation */
+    }
+  }
+
 .Polaris-DropZone{
     min-height: 0 !important;
 }
@@ -32,6 +90,7 @@
     overflow-x:hidden; 
     text-overflow: ellipsis; 
     white-space: nowrap;
+    max-width: 63vw;
 }
 
 .modified .line-numbers{

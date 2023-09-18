@@ -218,6 +218,7 @@ import testingApi from "../views/testing/api"
 
 import func from "@/util/func"
 import obj from "@/util/obj"
+import editorSetup from "./editorSetup"
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -292,13 +293,30 @@ export default {
     data() {
         return {
             editorOptions: {
-                language: "yaml",
+                language: "custom_yaml",
                 minimap: { enabled: false },
                 wordWrap: true,
                 automaticLayout: true,
                 colorDecorations: true,
-                scrollBeyondLastLine: false
+                scrollBeyondLastLine: false,
+                theme: "customTheme"
             },
+            // UPDATE THIS LIST WHILE ADDING ANY NEW KEY
+            keywords: [
+                "id", "info", 
+                "name", "description", "details", "impact", "category", "shortName", "displayName", "subCategory", "severity", "tags", "references",
+                "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", "api_collection_id",
+                "regex", "eq", "neq", "gt", "gte", "lt", "lte", 
+                "key", "value", "requests", "req", "res",
+                "not_contains", "not_contains_either", "contains_jwt", "contains_all", "contains_either",
+                "for_one", "or", "and", "extract", 
+                "add_body_param", "modify_body_param", "delete_body_param", "add_query_param", "modify_query_param", "delete_query_param", 
+                "modify_url", "modify_method", "replace_body", "add_header", "modify_header", "delete_header", "remove_auth_header", "follow_redirect", "replace_auth_header", 
+                "api_selection_filters", "execute", "type", "auth", "validate", "authenticated", 
+                "private_variable_context", "param_context", "endpoint_in_traffic_context",
+                "sample_request_payload", "sample_response_payload", "sample_request_headers", "sample_response_headers", 
+                "test_request_payload", "test_response_payload", "test_request_headers", "test_response_headers",
+            ],
             textEditor: null,
             testCategories: [],
             testsObj: {},
@@ -519,6 +537,10 @@ export default {
             }
         },
         createEditor() {
+            editorSetup.registerLanguage()
+            editorSetup.setTokenizer()
+            editorSetup.setEditorTheme()
+            editorSetup.setAutoComplete(this.keywords)
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
             this.textEditor.addAction({
                 id: "giveTypingEffect",
@@ -528,7 +550,7 @@ export default {
                     this.giveTypingEffect(false, true);
                 },
             });
-
+            editorSetup.findErrors(this.textEditor, this.keywords)
         },
         giveTypingEffect() {
             let str = this.textEditor.getValue()

@@ -274,14 +274,28 @@ export default {
           label: "Settings",
           click: () => this.$router.push('/dashboard/settings')
         },
-        // {
-        //   label: "Switch to new UI",
-        //   click: () => {
-        //     api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
-        //       window.location.reload()
-        //     })
-        //   }
-        // },
+        {
+          label: "Switch to new UI",
+          click: () => {
+            api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
+              let currPath = window.location.pathname
+              if(currPath.includes("inventory")){
+                let paths = currPath.split("/");
+                if(paths.length > 5){
+                  let path = ""
+                  for(var i = 0 ; i < 5 ; i++){
+                    path = path + paths[i] + '/' ;
+                  }
+                  window.location.pathname = path
+                }else{
+                  window.location.reload() ;
+                }
+              }else{
+                window.location.reload()
+              }
+            })
+          }
+        },
         {
           label: "Terms and Policies",
           click: () => window.open("https://www.akto.io/terms-and-policies", "_blank")

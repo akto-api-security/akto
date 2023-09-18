@@ -1,4 +1,4 @@
-import { ResourcesMajor } from '@shopify/polaris-icons';
+import { HideMinor, ViewMinor } from '@shopify/polaris-icons';
 import { useState } from 'react';
 import { Button, TextField } from '@shopify/polaris';
 
@@ -17,7 +17,7 @@ function PasswordTextField(props) {
     };
 
     let type = isTextVisible ? 'string' : 'password'
-    let buttonIcon = ResourcesMajor
+    let buttonIcon = isTextVisible ? HideMinor : ViewMinor
 
     const toggleButton = (
         <Button icon={buttonIcon} onClick={toggleTextVisibility} plain />

@@ -131,6 +131,19 @@ export default {
         })        
     },
 
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+        return request({
+            url: '/api/fetchVulnerableTestRunResults',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId,
+                skip
+            }
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
     stopAllTests() {
         return request({
             url: '/api/stopAllTests',

@@ -9,11 +9,12 @@ import "../settings.css"
 import settingFunctions from '../module'
 import GraphMetric from '../../../components/GraphMetric'
 import values from '@/util/values'
+import PersistStore from '../../../../main/PersistStore'
 
 function Metrics() {
     
     const [hosts, setHosts] = useState([])
-    const apiCollections = Store(state => state.allCollections)
+    const apiCollections = PersistStore(state => state.allCollections)
     const [metricsList, setMetricList] = useState([])
     const [orderedResult, setOrderedResult] = useState([])
     const [hostsActive, setHostsActive] = useState(false)

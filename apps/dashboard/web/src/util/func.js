@@ -825,17 +825,43 @@ export default {
             let a = testSubType.superCategory["severity"]["_name"]
             switch(a){
                 case "HIGH": 
-                    return 3
+                    return {title: a, value: 3}
 
                 case "MEDIUM": 
-                    return 2
+                    return {title: a, value: 2}
 
                 case "LOW": 
-                    return 1
+                    return {title: a, value: 1}
 
                 default:
-                    return 3    
+                    return {title: a, value: 3}
             }
         }
-    }
+    },
+
+    convertSecondsToReadableTime(seconds) {
+        if (seconds < 60) {
+          return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+        } else if (seconds < 3600) {
+          const minutes = Math.floor(seconds / 60);
+          return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+        } else if (seconds < 86400) {
+          const hours = Math.floor(seconds / 3600);
+          const remainingMinutes = Math.floor((seconds % 3600) / 60);
+          let result = `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+          if (remainingMinutes > 0) {
+            result += ` ${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}`;
+          }
+          return result;
+        } else {
+          const days = Math.floor(seconds / 86400);
+          const remainingHours = Math.floor((seconds % 86400) / 3600);
+          let result = `${days} ${days === 1 ? 'day' : 'days'}`;
+          if (remainingHours > 0) {
+            result += ` ${remainingHours} ${remainingHours === 1 ? 'hour' : 'hours'}`;
+          }
+          return result;
+        }
+      }
+
 }
