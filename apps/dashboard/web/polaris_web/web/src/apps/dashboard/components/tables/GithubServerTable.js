@@ -191,7 +191,6 @@ function GithubServerTable(props) {
 
   return (
     <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
-      {props.loading ?  <SpinnerCentered key="loading"/> :
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -219,6 +218,7 @@ function GithubServerTable(props) {
                 setMode={setMode}
                 loading={props.loading || false}
               />
+              <div className={props.increasedHeight ? "control-row" : ""}>
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -240,6 +240,7 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
+            </div>
             </LegacyCard.Section>
             <LegacyCard.Section>
               <HorizontalStack
@@ -262,7 +263,6 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
-      }
     </div>
   );
 

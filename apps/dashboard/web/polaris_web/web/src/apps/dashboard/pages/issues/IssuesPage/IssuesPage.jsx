@@ -2,14 +2,11 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import GithubServerTable from "../../../components/tables/GithubServerTable"
 import { useState } from "react";
 import api from "../api"
-import testingApi from "../../testing/api"
 import Store from "../../../store";
-import TestingStore from "../../testing/testingStore";
 import transform from "../transform";
 import func from "@/util/func";
-import {
-    SearchMinor,
-    FraudProtectMinor  } from '@shopify/polaris-icons';
+import { ClockMinor,DynamicSourceMinor,LinkMinor } from '@shopify/polaris-icons';
+import PersistStore from "../../../../main/PersistStore";
 
 const headers = [
     {
@@ -22,7 +19,7 @@ const headers = [
         text: "Collection",
         value: "collection",
         itemOrder: 3,
-        icon: FraudProtectMinor,
+        icon: DynamicSourceMinor,
     },
     {
         text: "API Collection ID",
@@ -32,7 +29,7 @@ const headers = [
         text: "Discovered",
         value: "detected_timestamp",
         itemOrder: 3,
-        icon: SearchMinor,
+        icon: ClockMinor,
     },
     {
         text: "Timestamp",
@@ -42,7 +39,7 @@ const headers = [
         text: "Endpoint",
         value: "url",
         itemOrder: 3,
-        icon: SearchMinor,
+        icon: LinkMinor,
     },
     {
         text:"Severity",
@@ -136,16 +133,11 @@ async function getNextUrl(issueId){
 function IssuesPage(){
 
     const [loading, setLoading] = useState(true);
-    const allCollections = Store(state => state.allCollections);
-    const subCategoryMap = TestingStore(state => state.subCategoryMap);
-    const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
-    const setSubCategoryMap = TestingStore(state => state.setSubCategoryMap);
-    const setSubCategoryFromSourceConfigMap = TestingStore(state => state.setSubCategoryFromSourceConfigMap);
+    const subCategoryMap = PersistStore(state => state.subCategoryMap);
+    const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
     const [issueStatus, setIssueStatus] = useState([]);
     const [key, setKey] = useState(false);
-    const apiCollectionMap = allCollections.reduce(
-        (map, e) => {map[e.id] = e.displayName; return map}, {}
-    )
+    const apiCollectionMap = PersistStore(state => state.collectionsMap);
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -250,25 +242,6 @@ function IssuesPage(){
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
 
-        let c={subCategoryMap:subCategoryMap, subCategoryFromSourceConfigMap:subCategoryFromSourceConfigMap};
-        
-        if(Object.keys(subCategoryMap) == 0 || Object.keys(subCategoryFromSourceConfigMap) == 0 ){
-            let subCategoryMap = {}
-            let subCategoryFromSourceConfigMap = {}
-            await testingApi.fetchAllSubCategories().then((resp) => {
-                resp.subCategories.forEach((x) => {
-                    subCategoryMap[x.name] = x
-                })
-                resp.testSourceConfigs.forEach((x) => {
-                    subCategoryFromSourceConfigMap[x.id] = x
-                })
-            })
-            await setSubCategoryMap(subCategoryMap)
-            await setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
-            c.subCategoryMap=subCategoryMap;
-            c.subCategoryFromSourceConfigMap=subCategoryFromSourceConfigMap
-        }
-
         let total =0;
         let ret = []
         let filterCollectionsId = filters.apiCollectionId;
@@ -283,7 +256,7 @@ function IssuesPage(){
 
         await api.fetchIssues(skip, limit,filterStatus,filterCollectionsId,filterSeverity,filterSubCategory,startTimestamp).then((res) => {
             total = res.totalIssuesCount;
-            ret = transform.prepareIssues(res, c.subCategoryMap, c.subCategoryFromSourceConfigMap, apiCollectionMap);
+            ret = transform.prepareIssues(res, subCategoryMap, subCategoryFromSourceConfigMap, apiCollectionMap);
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)

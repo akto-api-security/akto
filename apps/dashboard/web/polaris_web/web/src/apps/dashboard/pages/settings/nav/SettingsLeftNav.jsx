@@ -1,13 +1,5 @@
 import { Navigation } from "@shopify/polaris"
-import { RichTextMinor, 
-    ProductsMinor, 
-    LockMinor, 
-    ReportMinor, 
-    AnalyticsLineMinor, 
-    AppsMinor,
-    CustomersMinor,
-    DiamondAlertMinor,
-    MarketingMinor } from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor} from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 
 const SettingsLeftNav = () => {
@@ -23,55 +15,55 @@ const SettingsLeftNav = () => {
                 items={[
                     {
                         label: 'About',
-                        icon: RichTextMinor,
+                        icon: StoreDetailsFilledMinor,
                         selected: page === "about",
                         onClick: () => navigate("/dashboard/settings/about")
                     },
                     {
                         label: 'Users',
-                        icon: CustomersMinor,
+                        icon: IdentityCardFilledMajor,
                         selected: page === "users",
                         onClick: () => navigate("/dashboard/settings/users")
                     },
-                    {
-                        label: 'Alerts',
-                        icon: DiamondAlertMinor,
-                        selected: page === "alerts",
-                        onClick: () => navigate("/dashboard/settings")
-                    },
+                    // {
+                    //     label: 'Alerts',
+                    //     icon: DiamondAlertMinor,
+                    //     selected: page === "alerts",
+                    //     onClick: () => navigate("/dashboard/settings")
+                    // },
                     {
                         label: 'CI/CD',
-                        icon: MarketingMinor,
-                        selected: page === "cicd",
-                        onClick: () => navigate("/dashboard/settings")
+                        icon: AutomationFilledMajor,
+                        selected: page === "ci-cd",
+                        onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
                     },
                     {
                         label: 'Integrations',
-                        icon: AppsMinor,
+                        icon: AppsFilledMajor,
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
                     {
                         label: 'Logs',
-                        icon: ReportMinor,
+                        icon: ListFilledMajor,
                         selected: page === "logs",
                         onClick: () => navigate("/dashboard/settings/logs")
                     },
                     {
                         label: 'Metrics',
-                        icon: AnalyticsLineMinor,
+                        icon: ReportFilledMinor,
                         selected: page === "metrics",
                         onClick: () => navigate("/dashboard/settings/metrics")
                     },
                     {
                         label: 'Auth types',
-                        icon: LockMinor,
+                        icon: LockFilledMajor,
                         selected: page === "auth-types",
                         onClick: () => navigate("/dashboard/settings/auth-types")
                     },
                     {
                         label: 'Tags',
-                        icon: ProductsMinor,
+                        icon: CollectionsFilledMajor,
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
                     },

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import quickStartFunc from '../transform';
 import { Badge, Button, Card, HorizontalStack, Page, Scrollable, Tag, Text } from '@shopify/polaris';
-import {CancelMinor} from "@shopify/polaris-icons"
+import {CancelMajor} from "@shopify/polaris-icons"
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
 import QuickStartStore from '../quickStartStore';
@@ -61,7 +61,7 @@ function UpdateConnections(props) {
                         <Scrollable shadow style={{maxHeight: '85vh'}} focusable>
                             <div className='settings'>
                                 <Text variant="headingMd" as="h6">Setup guide </Text>
-                                <Button plain icon={CancelMinor} onClick={closeAction} />
+                                <Button plain icon={CancelMajor} onClick={closeAction} />
                             </div>
                             <HorizontalStack gap="1">
                                 <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>

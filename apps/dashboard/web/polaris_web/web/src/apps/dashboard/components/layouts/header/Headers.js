@@ -27,7 +27,7 @@ export default function Header() {
     const activeAccount = Store(state => state.activeAccount)
 
     const allRoutes = Store((state) => state.allRoutes)
-    const allCollections = Store((state) => state.allCollections)
+    const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
     const handleLeftNavCollapse = () => {
@@ -55,8 +55,34 @@ export default function Header() {
     }
 
     const handleSwitchUI = async () => {
+        let currPath = window.location.pathname
         await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
-        window.location.reload()
+        if(currPath.includes("sensitive")){
+            let arr = currPath.split("/") ;
+            let last = arr.pop()
+            if(last !== 'sensitive'){
+                let path = arr.toString().replace(/,/g, '/')
+                let id = arr.pop()
+                if(id !== 'sensitive'){
+                    path="/dashboard/observe/inventory/" + id + '/' + last
+                }
+                window.location.pathname=path
+            }else{
+                window.location.reload()
+            }
+        }else if(currPath.includes('testing')){
+            let child = currPath.split("testing")[1].split("/")
+            let lastStr = child.length > 1 ? child[1] : '' ;
+            if(lastStr === 'issues'){
+                window.location.pathname = "/dashboard/issues"
+            }
+            else if(lastStr === 'roles' || lastStr.includes('user')){
+                lastStr = ''
+            }
+            window.location.pathname = "/dashboard/testing/" + lastStr
+        }else{
+            window.location.reload()
+        }
     }
 
     

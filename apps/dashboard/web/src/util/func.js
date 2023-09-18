@@ -157,6 +157,9 @@ export default {
         if (d.length < 2) d = '0' + d
         return y + "-" + m + "-" + d
     },
+    toHyphenatedDate(epochInMs) {
+        return this.toDateStrShort(new Date(epochInMs))
+    },
     toYMD (date) {
         var d = date.getDate();
         var m = date.getMonth() + 1; //Month from 0 to 11
@@ -752,10 +755,22 @@ export default {
     getRunResultSeverity(runResult, subCategoryMap) {
         let testSubType = subCategoryMap[runResult.testSubType]
         if (!testSubType) {
-            return "HIGH"
+            return 3
         } else {
             let a = testSubType.superCategory["severity"]["_name"]
-            return a
+            switch(a){
+                case "HIGH": 
+                    return {title: a, value: 3}
+
+                case "MEDIUM": 
+                    return {title: a, value: 2}
+
+                case "LOW": 
+                    return {title: a, value: 1}
+
+                default:
+                    return {title: a, value: 3}
+            }
         }
     },
 

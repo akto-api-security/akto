@@ -1,12 +1,12 @@
 import request from '@/util/request'
 
 export default {
-    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd}) {
+    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters}) {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd
+                startTimestamp, endTimestamp, fetchCicd , sortKey, sortOrder, skip, limit, filters
             }
         }).then((resp) => {
             return resp
@@ -115,6 +115,19 @@ export default {
             method: 'post',
             data: {
                 testingRunResultSummaryHexId
+            }
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+        return request({
+            url: '/api/fetchVulnerableTestRunResults',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId,
+                skip
             }
         }).then((resp) => {
             return resp

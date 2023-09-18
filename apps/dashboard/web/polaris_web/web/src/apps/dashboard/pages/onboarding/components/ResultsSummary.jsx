@@ -8,6 +8,7 @@ import { Badge, Button, ButtonGroup, HorizontalStack, Spinner, Text, VerticalSta
 import testingApi from "../../testing/api"
 import TestingStore from '../../testing/testingStore'
 import GridRows from '../../../components/shared/GridRows'
+import PersistStore from '../../../../main/PersistStore'
 
 function ResultsSummary() {
 
@@ -18,8 +19,8 @@ function ResultsSummary() {
     const selectedCollection = OnboardingStore(state => state.selectedCollection)
     const setTestingRunHexId = OnboardingStore(state => state.setTestingRunHexId)
     const testingRunHexId = OnboardingStore(state => state.testingRunHexId)
-    const subCategoryMap = TestingStore(state => state.subCategoryMap)
-    const subCategoryFromSourceConfigMap =  TestingStore(state => state.subCategoryFromSourceConfigMap)
+    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+    const subCategoryFromSourceConfigMap =  PersistStore(state => state.subCategoryFromSourceConfigMap)
 
     const [loading, setLoading] = useState(false)
     const [testingResults, setTestingResults] = useState([])

@@ -3,19 +3,19 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import OnboardingLayout from './OnboardingLayout'
 import CollectionSelection from './CollectionSelection'
 import OnboardingStore from '../OnboardingStore'
-import Store from '../../../store'
 import TestSuites from './TestSuites'
 import func from '../../../../../util/func'
 import SetConfig from './SetConfig'
 import ResultsSummary from './ResultsSummary'
 import { useNavigate } from "react-router-dom"
 import api from '../api'
+import PersistStore from '../../../../main/PersistStore'
 
 function OnboardingBuilder() {
 
     const [loading, setLoading] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
-    const apiCollections = Store(state => state.allCollections)
+    const apiCollections = PersistStore(state => state.allCollections)
     const selectedTestSuite = OnboardingStore(state => state.selectedTestSuite)
     const authObj = OnboardingStore(state => state.authObject)
     const hexId = OnboardingStore(state => state.testingRunHexId)

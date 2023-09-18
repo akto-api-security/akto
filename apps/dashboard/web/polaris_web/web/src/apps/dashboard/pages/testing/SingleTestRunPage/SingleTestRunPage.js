@@ -10,8 +10,8 @@ import {
   Tooltip,
 } from '@shopify/polaris';
 import {
-  SearchMinor,
-  FraudProtectMinor,
+  CircleTickMinor,
+  ArchiveMinor,
   LinkMinor,
   ReplayMinor
 } from '@shopify/polaris-icons';
@@ -25,6 +25,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
+import PersistStore from "../../../../main/PersistStore";
 
 let headers = [
   {
@@ -42,13 +43,13 @@ let headers = [
     text: "Detected time",
     value: "detected_time",
     itemOrder: 3,
-    icon: SearchMinor,
+    icon: CircleTickMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder: 3,
-    icon: FraudProtectMinor
+    icon: ArchiveMinor
   },
   {
     text: 'url',
@@ -114,47 +115,54 @@ let filters = [
 function SingleTestRunPage() {
 
   const [testRunResults, setTestRunResults] = useState([])
-  const selectedTestRun = TestingStore(state => state.selectedTestRun);
-  const setSelectedTestRun = TestingStore(state => state.setSelectedTestRun);
-  const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
-  const subCategoryMap = TestingStore(state => state.subCategoryMap);
+  const [ selectedTestRun, setSelectedTestRun ] = useState({})
+  const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
+  const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
   const [tempLoading , setTempLoading] = useState(false)
   const [workflowTest, setWorkflowTest ] = useState(false);
   const hexId = params.hexId;
 
-  useEffect(()=>{
-    async function fetchData() {
-      setLoading(true);
-        await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
-          if(testingRun.testIdConfig == 1){
-            setWorkflowTest(workflowTest);
-            setLoading(false);
-          }
-          let localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
-            setSelectedTestRun(localSelectedTestRun);
+  async function fetchData(setData) {
+    let localSelectedTestRun = {}
+    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
+      if(testingRun.testIdConfig == 1){
+        setWorkflowTest(workflowTest);
+      }
+      localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
+      if(setData){
+        setSelectedTestRun(localSelectedTestRun);
+      }
+      if(localSelectedTestRun.testingRunResultSummaryHexId) {
+          await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
+            setTempLoading(false);
+            let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+            setTestRunResults(testRunResults)
+          })
+        }
       }) 
+    return localSelectedTestRun;
+}
+
+  const refreshSummaries = () => {
+    let intervalId = setInterval(async() => {
+      let localSelectedTestRun = await fetchData(false);
+      if(localSelectedTestRun.orderPriority !== 1){
+        clearInterval(intervalId)
+      }
+    },2000)
+  }
+
+  useEffect(()=>{
+    async function loadData(){
+      setLoading(true);
+      await fetchData(true);
       setLoading(false);
     }
-    fetchData();
-}, [])
-
-useEffect(()=>{
-  async function fetchData(){
-    setTempLoading(true);
-    if (Object.keys(subCategoryMap) != 0 && 
-    Object.keys(subCategoryFromSourceConfigMap) != 0 && 
-    selectedTestRun.testingRunResultSummaryHexId) {
-        await api.fetchTestingRunResults(selectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-          let testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-          setTestRunResults(testRunResults)
-        })
-    }
-    setTempLoading(false);
-  }
-  fetchData();
-},[selectedTestRun, subCategoryMap, subCategoryFromSourceConfigMap])
+    loadData();
+    refreshSummaries();
+  }, [])
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
@@ -166,21 +174,37 @@ const promotedBulkActions = (selectedDataHexIds) => {
   },
 ]};
 
+  function getHeadingStatus(selectedTestRun) {
+
+    if (selectedTestRun?.pickedUpTimestamp < selectedTestRun?.run_time_epoch) {
+      return `Last scanned ${func.prettifyEpoch(selectedTestRun.run_time_epoch)} for a duration of 
+      ${selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp} second${(selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp) === 1 ? '' : 's'}`
+    }
+
+    switch (selectedTestRun.orderPriority) {
+      case 1:
+        return "Test is running";
+      case 4:
+        return "Test has been scheduled";
+      default:
+        return "";
+    }
+  }
+
   const ResultTable = (
-    loading || tempLoading ? <SpinnerCentered /> :
-    <GithubSimpleTable
-      key="table"
-      data={testRunResults}
-      sortOptions={sortOptions}
-      resourceName={resourceName}
-      filters={filters}
-      disambiguateLabel={disambiguateLabel}
-      headers={headers}
-      selectable={true}
-      promotedBulkActions={promotedBulkActions}
-      loading={loading || tempLoading}
-      getStatus={func.getTestResultStatus}
-    />
+      <GithubSimpleTable
+        key="table"
+        data={testRunResults}
+        sortOptions={sortOptions}
+        resourceName={resourceName}
+        filters={filters}
+        disambiguateLabel={disambiguateLabel}
+        headers={headers}
+        selectable={true}
+        promotedBulkActions={promotedBulkActions}
+        loading={loading || tempLoading}
+        getStatus={func.getTestResultStatus}
+      />
   )
 
   const workflowTestBuilder = (
@@ -194,7 +218,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     />
   )
 
-  const components = [loading || tempLoading ? <SpinnerCentered key = "loading" /> : !workflowTest ? ResultTable : workflowTestBuilder];
+  const components = [!workflowTest ? ResultTable : workflowTestBuilder];
 
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {
@@ -235,9 +259,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
             </HorizontalStack>
             <Text color="subdued" fontWeight="regular" variant="bodyMd">
               {
-                selectedTestRun && 
-                selectedTestRun?.pickedUpTimestamp < selectedTestRun?.run_time_epoch &&
-                `Last scanned ${func.prettifyEpoch(selectedTestRun.run_time_epoch)} for a duration of ${selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp} second${(selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp)==1 ? '':'s'}`
+                getHeadingStatus(selectedTestRun)
               }
             </Text>
           </VerticalStack>

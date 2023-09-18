@@ -7,12 +7,12 @@ import {
 import { SearchMinor } from '@shopify/polaris-icons';
 
 import { useState, useCallback, useMemo } from 'react';
-import Store from '../../store';
+import PersistStore from '../../../main/PersistStore';
 
 
 function ApiCollectionsDropdown({ selectedCollections, setSelectedCollections }) {
 
-    const allCollections = Store(state => state.allCollections)
+    const allCollections = PersistStore(state => state.allCollections)
 
     const deselectedOptions = useMemo(
         () => allCollections.map(collection => ({

@@ -5,12 +5,11 @@ import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
-    SearchMajor,
-    CircleTickMinor
+    SearchMinor,
+    CircleTickMajor
   } from '@shopify/polaris-icons';
-
-import { useNavigate } from "react-router-dom"
 import ObserveStore from "../observeStore"
+import PersistStore from "../../../../main/PersistStore"
 
 const headers = [
     {
@@ -27,8 +26,9 @@ const headers = [
     {
         text: "Discovered",
         value: "detected",
-        icon: SearchMajor,
-        itemOrder: 3
+        icon: SearchMinor,
+        itemOrder: 3,
+        iconColor: "subdued"
     }
 ]
 
@@ -50,7 +50,7 @@ function convertToCollectionData(c) {
         ...c,
         endpoints: c["urlsCount"] || 0,
         detected: "Last seen " + func.prettifyEpoch(c.startTs),
-        icon: CircleTickMinor,
+        icon: CircleTickMajor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
     }    
 }
@@ -81,6 +81,9 @@ function ApiCollections() {
         setActive(true)
     }
 
+    const setAllCollections = PersistStore(state => state.setAllCollections)
+    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+
     const createNewCollection = async () => {
         let newColl = await api.createCollection(newCollectionName)
         setNewCollectionName('')
@@ -94,6 +97,8 @@ function ApiCollections() {
         let apiCollectionsResp = await api.getAllCollections()
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        setAllCollections(apiCollectionsResp.apiCollections || [])
+        setCollectionsMap(func.mapCollectionIdToName(tmp))
         setData(tmp)
     }
 
@@ -178,6 +183,7 @@ function ApiCollections() {
                 headers={headers}
                 selectable={true}
                 promotedBulkActions={promotedBulkActions}
+                increasedHeight={true}
                 />)
             ]}
         />

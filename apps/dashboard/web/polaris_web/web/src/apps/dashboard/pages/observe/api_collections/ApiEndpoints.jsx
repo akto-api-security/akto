@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, ButtonGroup, Box, Popover, ActionList, Icon, Modal } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Box, Popover, ActionList, Icon, Modal } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -9,10 +9,9 @@ import { saveAs } from 'file-saver'
 import {
     ClockMinor,
     LockMinor,
-    CircleAlertMajor,
-    GlobeMinor,
-    HintMajor,
     ChevronDownMinor,
+    InfoMinor,
+    SearchMinor
 } from '@shopify/polaris-icons';
 
 import "./api_inventory.css"
@@ -24,10 +23,10 @@ import StyledEndpoint from "./component/StyledEndpoint"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
-import Store from "../../../store"
 import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
 import OpenApiSpec from "../OpenApiSpec"
+import PersistStore from "../../../../main/PersistStore"
 
 const headers = [
     {
@@ -57,13 +56,13 @@ const headers = [
     {
         text: 'Last Seen',
         value: 'last_seen',
-        icon: HintMajor,
+        icon: SearchMinor,
         itemOrder: 3
     },
     {
         text: 'Access Type',
         value: 'access_type',
-        icon: GlobeMinor,
+        icon: InfoMinor,
         itemOrder: 3,
         showFilter: true
     },
@@ -83,7 +82,7 @@ const headers = [
     {
         text: 'Changes',
         value: 'changes',
-        icon: CircleAlertMajor,
+        icon: InfoMinor,
         itemOrder: 3
 
     }
@@ -109,7 +108,7 @@ function ApiEndpoints() {
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
-    const collectionsMap = Store(state => state.collectionsMap)
+    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const pageTitle = collectionsMap[apiCollectionId]
 
@@ -383,21 +382,27 @@ function ApiEndpoints() {
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={
-                <ButtonGroup spacing="loose">
-                    <Button onClick={handleRefresh} plain monochrome removeUnderline>Refresh</Button>
+                <HorizontalStack gap="2">
+                    <Box paddingInlineEnd="3" paddingInlineStart="3">
+                        <Button onClick={handleRefresh} plain monochrome removeUnderline>
+                            <Text fontWeight="medium" variant="bodyMd">Refresh</Text>
+                        </Button>
+                    </Box>
                     <Popover
                         active={exportOpen}
                         activator={(
+                            <Box paddingInlineEnd="1" paddingInlineStart="3">
                             <Button
                                 plain monochrome removeUnderline
                                 onClick={() => setExportOpen(true)}>
                                 <HorizontalStack gap="1">
-                                    <Text>Export</Text>
+                                <Text fontWeight="medium" variant="bodyMd">Export</Text>
                                     <Box>
                                         <Icon source={ChevronDownMinor} />
                                     </Box>
                                 </HorizontalStack>
                             </Button>
+                            </Box>
                         )}
                         autofocusTarget="first-node"
                         onClose={() => { setExportOpen(false) }}
@@ -414,10 +419,10 @@ function ApiEndpoints() {
                         fileFormat=".har"
                         fileChanged={file => handleFileChange(file)}
                         tooltipText="Upload traffic(.har)"
-                        label="Upload traffic"
+                        label={(<Box paddingInlineEnd="3" paddingInlineStart="3"><Text fontWeight="medium" variant="bodyMd">Upload traffic</Text></Box>)}
                         primary={false} />
 
-                    {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button> : null}
+                    {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
                     
                     <RunTest
                         apiCollectionId={apiCollectionId}
@@ -425,7 +430,7 @@ function ApiEndpoints() {
                         filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
                         disabled={tabs[selected].component !== undefined}
                     />
-                </ButtonGroup>
+                </HorizontalStack>
             }
             components={
                 loading ? [<SpinnerCentered key="loading" />] :
