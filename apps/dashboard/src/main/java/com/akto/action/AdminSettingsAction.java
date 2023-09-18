@@ -68,6 +68,26 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private int trafficAlertThresholdSeconds;
+    public String updateTrafficAlertThresholdSeconds() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (trafficAlertThresholdSeconds > 3600*24*6) {
+            // this was done because our lookback period to calculate last timestamp is 6 days
+            addActionError("Alert can't be set for more than 6 days");
+            return ERROR.toUpperCase();
+        }
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.TRAFFIC_ALERT_THRESHOLD_SECONDS, trafficAlertThresholdSeconds),
+                new UpdateOptions().upsert(true)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     private boolean redactPayload;
     public String toggleRedactFeature() {
         User user = getSUser();
@@ -141,5 +161,9 @@ public class AdminSettingsAction extends UserAction {
 
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
+    }
+
+    public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
+        this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
     }
 }
