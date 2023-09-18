@@ -1,8 +1,8 @@
 import {
-  CircleCancelMinor,
+  CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMinor
+  CircleTickMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -188,8 +188,8 @@ const func = {
     switch (state?._name || state) {
       case "RUNNING": return ClockMinor;
       case "SCHEDULED": return CalendarMinor;
-      case "STOPPED": return CircleCancelMinor;
-      case "COMPLETED": return CircleTickMinor;
+      case "STOPPED": return CircleCancelMajor;
+      case "COMPLETED": return CircleTickMajor;
       default: return ClockMinor;
     }
   },
