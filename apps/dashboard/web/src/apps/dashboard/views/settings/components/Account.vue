@@ -173,6 +173,7 @@
                         </v-btn>
                     </div>
                 </div>
+            </div>
         </div>
 
         <div class="toggle-redact-feature mt-8">
@@ -243,7 +244,7 @@
     
       </div>
     </div>
-</div>
+
 </template>
 
 <script>
