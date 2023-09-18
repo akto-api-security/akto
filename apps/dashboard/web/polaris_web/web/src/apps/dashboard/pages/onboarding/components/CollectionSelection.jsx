@@ -5,9 +5,10 @@ import OnboardingStore from '../OnboardingStore'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from '../../../../../util/func'
 import { Spinner } from '@shopify/polaris'
+import PersistStore from '../../../../main/PersistStore'
 
 function CollectionSelection() {
-    const apiCollections = Store(state => state.allCollections)
+    const apiCollections = PersistStore(state => state.allCollections)
     const setCollections = Store(state => state.setAllCollections)
     const setSelectedCollection = OnboardingStore(state => state.setSelectedCollection)
     const collection = OnboardingStore(state => state.selectedCollection)

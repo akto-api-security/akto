@@ -38,6 +38,7 @@
     "file-saver": "^2.0.5",
     "highcharts": "^9.0.1",
     "highcharts-vue": "^1.0.4",
+    "leven": "^4.0.0",
     "monaco-editor": "^0.38.0",
     "react": "17.0.2",
     "react-dom": "17.0.2",

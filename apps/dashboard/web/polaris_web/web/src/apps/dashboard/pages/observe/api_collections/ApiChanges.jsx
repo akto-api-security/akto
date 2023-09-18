@@ -3,7 +3,6 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { useEffect, useReducer, useState } from "react";
 import api from "../api";
 import func from "@/util/func";
-import Store from "../../../store";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import transform from "../transform";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -13,11 +12,12 @@ import {produce} from "immer"
 import values from "@/util/values";
 import ObserveStore from "../observeStore";
 import ApiDetails from "./ApiDetails";
+import PersistStore from "../../../../main/PersistStore";
 
 
 function ApiChanges() {
 
-    const allCollections = Store(state => state.allCollections);
+    const allCollections = PersistStore(state => state.allCollections);
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
     const [newEndpoints, setNewEndpoints] = useState([])
     const [newParametersCount, setNewParametersCount] = useState("")

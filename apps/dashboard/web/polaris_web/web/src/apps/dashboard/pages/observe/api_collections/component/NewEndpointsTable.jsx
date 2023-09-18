@@ -1,9 +1,9 @@
 import GithubSimpleTable from '../../../../components/tables/GithubSimpleTable';
 import {
-    ClockMinor,
+    SearchMinor,
     LockMinor,
-    GlobeMinor,
-    FraudProtectMinor
+    InfoMinor,
+    DynamicSourceMinor
 } from '@shopify/polaris-icons';
 import StyledEndpoint from "./StyledEndpoint";
 import func from "@/util/func"
@@ -25,7 +25,7 @@ const headers = [
         text: 'Collection',
         value: 'apiCollectionName',
         itemOrder: 3,
-        icon: FraudProtectMinor,
+        icon: DynamicSourceMinor,
         showFilter: true
     },
     {
@@ -48,7 +48,7 @@ const headers = [
     {
         text: 'Access Type',
         value: 'access_type',
-        icon: GlobeMinor,
+        icon: InfoMinor,
         itemOrder: 3,
         showFilter: true
     },
@@ -62,7 +62,7 @@ const headers = [
     {
         text: 'Last Seen',
         value: 'last_seen',
-        icon: ClockMinor,
+        icon: SearchMinor,
         itemOrder: 3
     }
 ]
