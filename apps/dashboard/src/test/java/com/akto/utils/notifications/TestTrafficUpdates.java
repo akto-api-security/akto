@@ -22,6 +22,7 @@ public class TestTrafficUpdates extends MongoBasedTest {
         TrafficMetricsDao.instance.getMCollection().drop();
         TrafficMetricsAlertsDao.instance.getMCollection().drop();
         int maxH = 0;
+        int lookBackPeriod = 3;
 
         List<TrafficMetrics> trafficMetricsList = new ArrayList<>();
         for (int day=1; day<10; day++) {
@@ -38,7 +39,7 @@ public class TestTrafficUpdates extends MongoBasedTest {
                             // h is hour of the day
                             int randomNumber = 1000;
                             countMap.put(""+h, (long) randomNumber);
-                            if (day <= TrafficUpdates.LOOK_BACK_PERIOD) maxH = Math.max(maxH, h); // to keep count last hour of traffic
+                            if (day <= lookBackPeriod) maxH = Math.max(maxH, h); // to keep count last hour of traffic
                         }
                         TrafficMetrics trafficMetrics = new TrafficMetrics(key, countMap);
                         trafficMetricsList.add(trafficMetrics);
@@ -49,7 +50,7 @@ public class TestTrafficUpdates extends MongoBasedTest {
 
         TrafficMetricsDao.instance.insertMany(trafficMetricsList);
 
-        TrafficUpdates trafficUpdates = new TrafficUpdates("", "", 60);
+        TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*lookBackPeriod);
         trafficUpdates.populateTrafficDetails(TrafficUpdates.AlertType.FILTERED_REQUESTS_RUNTIME);
 
         List<TrafficMetricsAlert>  trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(new BasicDBObject());

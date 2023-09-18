@@ -78,6 +78,7 @@ import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -148,17 +149,31 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
+                            // look back period 6 days
+                            loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
+                            TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
+                            trafficUpdates.populate();
+
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
                             if (listWebhooks == null || listWebhooks.isEmpty()) {
                                 loggerMaker.infoAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
                                 return;
                             }
-
                             SlackWebhook webhook = listWebhooks.get(0);
                             loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(), LogDb.DASHBOARD);
 
-                            TrafficUpdates trafficUpdates = new TrafficUpdates(webhook.getWebhook(), webhook.getDashboardUrl()+"/dashboard/settings#Metrics", 60*60*4);
-                            trafficUpdates.run();
+                            int thresholdSeconds = defaultTrafficAlertThresholdSeconds;
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                            if (accountSettings != null) {
+                                // override with user supplied value
+                                thresholdSeconds = accountSettings.getTrafficAlertThresholdSeconds();
+                            }
+
+                            loggerMaker.infoAndAddToDb("threshold seconds: " + thresholdSeconds, LoggerMaker.LogDb.DASHBOARD);
+
+                            if (thresholdSeconds > 0) {
+                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds);
+                            }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb("Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
                         }
