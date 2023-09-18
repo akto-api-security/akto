@@ -121,7 +121,11 @@ public class Main {
             public void run() {
                 AccountTask.instance.executeTask(account -> {
                     AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                    matrixAnalyzer.run();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
                 },"matrix-analyser-task");
             }
         }, 0, 1, TimeUnit.MINUTES);

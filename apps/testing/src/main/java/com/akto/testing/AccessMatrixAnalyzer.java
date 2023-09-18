@@ -72,7 +72,7 @@ public class AccessMatrixAnalyzer {
         return ret;
     }
 
-    public void run() {
+    public void run() throws Exception {
         Bson pendingTasks = Filters.lt(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now());
         for(AccessMatrixTaskInfo task: AccessMatrixTaskInfosDao.instance.findAll(pendingTasks)) {
             loggerMaker.infoAndAddToDb("Running task: " + task.toString(),LogDb.TESTING);
