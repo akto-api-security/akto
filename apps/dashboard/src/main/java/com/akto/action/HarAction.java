@@ -116,6 +116,7 @@ public class HarAction extends UserAction {
 
     private String filename;
     private String username;
+    private String replaceByUrl;
     public String createCollectionWithUrl() {
         Pattern pattern = Pattern.compile("[a-zA-Z0-9\\-_]{1,100}");
         if (filename.length() > 100) {
@@ -148,6 +149,7 @@ public class HarAction extends UserAction {
                 loggerMaker.infoAndAddToDb("Adding to account " + accountId + " " + filename, LoggerMaker.LogDb.DASHBOARD);
                 this.apiCollectionName = filename;
                 this.harString = FileUtils.readFileToString(new File(tempFileUrl), StandardCharsets.UTF_8);
+                this.harString = this.harString.replaceAll("strigourl", replaceByUrl);
                 this.execute();
                 loggerMaker.infoAndAddToDb("Completed adding to account " + accountId + " " + filename, LoggerMaker.LogDb.DASHBOARD);
 
@@ -224,6 +226,10 @@ public class HarAction extends UserAction {
 
     public void setFilename(String filename) {
         this.filename = filename;
+    }
+
+    public void setReplaceByUrl(String replaceByUrl) {
+        this.replaceByUrl = replaceByUrl;
     }
 
     interface Awesome extends Library {          
