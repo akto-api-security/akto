@@ -280,6 +280,13 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    updateTrafficAlertThresholdSeconds(trafficAlertThresholdSeconds) {
+        return request({
+            url: '/api/updateTrafficAlertThresholdSeconds',
+            method: 'post',
+            data: {trafficAlertThresholdSeconds}
+        })
     }
 
 }

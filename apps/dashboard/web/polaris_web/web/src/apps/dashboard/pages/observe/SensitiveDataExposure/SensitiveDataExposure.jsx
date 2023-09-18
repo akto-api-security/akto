@@ -1,15 +1,16 @@
 import { Text, Button } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import api from "../api"
 import Store from "../../../store"
 import func from "@/util/func"
 import { useNavigate, useParams } from "react-router-dom"
 import {
-    SearchMinor,
-    FraudProtectMinor  } from '@shopify/polaris-icons';
+    LocationsMinor,
+    DynamicSourceMinor, ClockMinor  } from '@shopify/polaris-icons';
 import StyledEndpoint from "../api_collections/component/StyledEndpoint"
+import PersistStore from "../../../../main/PersistStore"
 
 const headers = [
     {
@@ -22,7 +23,7 @@ const headers = [
         text: "Collection",
         value: "collection",
         itemOrder: 3,
-        icon: FraudProtectMinor,
+        icon: DynamicSourceMinor,
     },
     {
         text: "API Collection ID",
@@ -32,7 +33,7 @@ const headers = [
         text: "Discovered",
         value: "detected_timestamp",
         itemOrder: 3,
-        icon: SearchMinor,
+        icon: ClockMinor,
     },
     {
         text: "Timestamp",
@@ -42,7 +43,7 @@ const headers = [
         text: "Location",
         value: "location",
         itemOrder: 3,
-        icon: SearchMinor,
+        icon: LocationsMinor,
     },
     {
         text: "API call",
@@ -112,12 +113,9 @@ let promotedBulkActions = (selectedResources) => {
 
 function SensitiveDataExposure() {
     const [loading, setLoading] = useState(true);
-    const allCollections = Store(state => state.allCollections);
     const params = useParams()
     const subType = params.subType;
-    const apiCollectionMap = allCollections.reduce(
-        (map, e) => {map[e.id] = e.displayName; return map}, {}
-    )
+    const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -170,7 +168,7 @@ function SensitiveDataExposure() {
                 temp['collection'] = apiCollectionMap[endpoint.apiCollectionId]
                 temp['apiCollectionId'] = endpoint.apiCollectionId
                 temp['url'] = endpoint.method + " " + endpoint.url
-                temp['detected_timestamp'] = "Detected " + func.prettifyEpoch(endpoint.timestamp)
+                temp['detected_timestamp'] = "Discovered " + func.prettifyEpoch(endpoint.timestamp)
                 temp['timestamp'] = endpoint.timestamp
                 temp['location'] = "Detected in " + (endpoint.isHeader ? "header" : (endpoint.isUrlParam ? "URL param" : "payload"))
                 temp['isHeader'] = endpoint.isHeader

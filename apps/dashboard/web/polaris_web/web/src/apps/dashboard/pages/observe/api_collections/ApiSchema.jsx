@@ -1,47 +1,83 @@
 import { VerticalStack, Box, Button, ButtonGroup, HorizontalStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func"
+import transform from "../transform";
 
-function prepareData(data, isHeader) {
+function prepareTableData (data) {
+    let sensitivePayload = []
+    let normalPayload = []
+    let standardHeader = []
+    let customHeader = []
+    let sensitiveHeader = []
 
-    if (data == undefined) {
-        return []
-    }
-    let res = data.filter((x) => isHeader == x.isHeader).map((x, index) => {
-        return [(<HorizontalStack gap={"2"} key={index}>
-            <Text>
-                {x.param.replaceAll("#", ".").replaceAll(".$", "")}
+    const standardHeadersList = transform.getStandardHeaderList()
+    let tabSensitive = ""
+
+    data.forEach((element,index) => {
+        let paramText = element.param.replaceAll("#", ".").replaceAll(".$", "")
+        let isSensitive = func.isSubTypeSensitive(element)
+        let comp = [(<HorizontalStack gap={"2"} key={index}>
+            <Text fontWeight="regular" variant="bodyMd">
+                {paramText}
             </Text>
             {
-                func.isSubTypeSensitive(x) ?
+                isSensitive ?
                     <Badge status="warning">
-                        {x.subType.name}
+                        {element.subType.name}
                     </Badge> : null
             }
-        </HorizontalStack>), func.prepareValuesTooltip(x)
+            </HorizontalStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]
+        if(element.isHeader){
+            if(isSensitive){
+                sensitiveHeader.push(comp)
+                tabSensitive = "Header"
+            }
+            else if(standardHeadersList.includes(paramText)){
+                standardHeader.push(comp)
+            }else{
+                customHeader.push(comp)
+            }
+        }else{
+            if(isSensitive){
+                sensitivePayload.push(comp)
+                tabSensitive = "Payload"
+            }else{
+                normalPayload.push(comp)
+            }
+        }
     })
 
-    return res;
+    const headers = [...sensitiveHeader,...customHeader,...standardHeader]
+    const payload = [...sensitivePayload, ...normalPayload]
+
+    return{
+        headerData: headers,
+        payloadData: payload,
+        tabSensitive : tabSensitive,
+    }
 }
 
 function ApiSingleSchema(props) {
-    const { data, title } = props;
+    const { data, title, badgeActive, setBadgeActive } = props;
 
     const [open, setOpen] = useState(true);
     const handleToggle = useCallback(() => setOpen((open) => !open), []);
     const [isHeader, setIsHeader] = useState(true)
-    let headerCount = 0
-    let payloadCount = 0
 
-    data.forEach(element => {
-        if(element.isHeader){
-            headerCount++
-        }else{
-            payloadCount++
-        }
+    const [dataObj,setDataObj] = useState({
+        headerData: [],
+        payloadData: [],
+        tabSensitive: ''
     });
+    useEffect(()=>{
+        setDataObj(prepareTableData(data));
+    },[])
+    const headerCount = dataObj?.headerData?.length
+    const payloadCount = dataObj?.payloadData?.length
+
+    const activeTab = badgeActive ? (dataObj.tabSensitive === "Header") : isHeader
 
     return (
         <VerticalStack gap={"2"}>
@@ -63,17 +99,25 @@ function ApiSingleSchema(props) {
             >
                 <VerticalStack gap={"2"}>
                     <ButtonGroup segmented>
-                        <Button size="slim" primarySuccess={isHeader} onClick={() => setIsHeader(true)}> 
-                            <HorizontalStack gap="2">
-                                <Text variant="bodyMd">Header</Text>
-                                <Badge size="small">{headerCount.toString()}</Badge>
-                            </HorizontalStack>
+                        <Button primarySuccess={activeTab} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
+                            <Box paddingBlockStart="05" paddingBlockEnd="05"> 
+                                <HorizontalStack gap="2">
+                                    <Text variant="bodyMd">Header</Text>
+                                    <span style={{padding: '4px 8px', width: '30px', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
+                                        {headerCount}
+                                    </span>
+                                </HorizontalStack>
+                            </Box>
                         </Button>
-                        <Button size="slim" primarySuccess={!isHeader} onClick={() => setIsHeader(false)}>
-                            <HorizontalStack gap="2">
-                                <Text variant="bodyMd">Payload</Text>
-                                <Badge size="small">{payloadCount.toString()}</Badge>
-                            </HorizontalStack>
+                        <Button primarySuccess={!activeTab} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
+                            <Box paddingBlockStart="05" paddingBlockEnd="05"> 
+                                <HorizontalStack gap="2">
+                                    <Text variant="bodyMd">Payload</Text>
+                                    <span style={{padding: '4px 8px', width: '30px', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
+                                        {payloadCount}
+                                    </span>
+                                </HorizontalStack>
+                            </Box>
                         </Button>
                     </ButtonGroup>
                     <Scrollable style={{ height: '25vh' }} focusable>
@@ -83,7 +127,7 @@ function ApiSingleSchema(props) {
                                 'text',
                                 'numeric'
                             ]}
-                            rows={prepareData(data, isHeader)}
+                            rows={activeTab ? dataObj.headerData : dataObj.payloadData}
                             increasedTableDensity
                             truncate
                         >
@@ -97,7 +141,7 @@ function ApiSingleSchema(props) {
 
 function ApiSchema(props) {
 
-    const { data } = props
+    const { data, badgeActive, setBadgeActive } = props
 
     let reqData = data.filter((item) => item.responseCode === -1)
     let resData = data.filter((item) => item.responseCode !== -1)
@@ -106,7 +150,7 @@ function ApiSchema(props) {
         <VerticalStack gap="2">
             {
                 ['Request', 'Response'].map((type, index) => {
-                    return <ApiSingleSchema title={type} key={type} data={index == 0 ? reqData : resData} />
+                    return <ApiSingleSchema title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
                 })
             }
 
