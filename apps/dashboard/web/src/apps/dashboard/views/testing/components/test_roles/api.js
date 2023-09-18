@@ -55,11 +55,11 @@ export default {
             return resp
         })
     },
-    addAuthToRole(roleName, apiCond, authParamData) {
+    addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData) {
         return request({
             url: '/api/addAuthToRole',
             method: 'post',
-            data: {roleName, apiCond, authParamData}
+            data: {roleName, apiCond, authParamData, authAutomationType, reqData}
         })
     },
     deleteAuthFromRole(roleName, index) {

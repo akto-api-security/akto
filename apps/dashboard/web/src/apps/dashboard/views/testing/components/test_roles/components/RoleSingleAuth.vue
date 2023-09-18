@@ -33,7 +33,7 @@
         </div>
   
         <div class="fw-500 pt-4">
-          Hardcoded token
+          {{automationType}} token
         </div>
   
         <div v-for="(authParam, index) in authParams" :key="'auth_'+index">
@@ -55,9 +55,14 @@
   import SecondaryButton from "@/apps/dashboard/shared/components/buttons/SecondaryButton.vue";
   import ACard from "@/apps/dashboard/shared/components/ACard.vue";
   import RoleHardcodedAuth from "@/apps/dashboard/views/testing/components/test_roles/components/RoleHardcodedAuth.vue";
+
   export default {
     name: "RoleSingleAuth",
-    components: {RoleHardcodedAuth, ACard, SecondaryButton},
+    components: {
+      RoleHardcodedAuth, 
+      ACard, 
+      SecondaryButton
+    },
     props: {
       defAuth: obj.objN
     },
@@ -73,6 +78,7 @@
   
       },
       addAuthToRole(funcProps) {
+        console.log(funcProps);
         this.$emit('addAuthToRole', funcProps)
       },
       closeNewAuth() {
@@ -85,6 +91,9 @@
       },
       authParams() {
         return this.defAuth?.authMechanism.authParams || []
+      },
+      automationType() {
+        return this.defAuth?.authMechanism.type || "Hardcoded"
       },
       readOnly() {
         return !!this.defAuth

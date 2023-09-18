@@ -19,12 +19,9 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.store.AuthMechanismStore;
-import com.akto.store.SampleMessageStore;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -124,7 +121,11 @@ public class Main {
             public void run() {
                 AccountTask.instance.executeTask(account -> {
                     AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                    matrixAnalyzer.run();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
                 },"matrix-analyser-task");
             }
         }, 0, 1, TimeUnit.MINUTES);

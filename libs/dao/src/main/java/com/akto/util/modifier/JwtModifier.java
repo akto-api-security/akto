@@ -50,6 +50,7 @@ public abstract class JwtModifier extends PayloadModifier {
         // encode it and remove trailing =
         String encodedModifiedHeader = Base64.getEncoder().encodeToString(modifiedHeaderStr.getBytes(StandardCharsets.UTF_8));
         if (encodedModifiedHeader.endsWith("=")) encodedModifiedHeader = encodedModifiedHeader.substring(0, encodedModifiedHeader.length()-1);
+        if (encodedModifiedHeader.endsWith("=")) encodedModifiedHeader = encodedModifiedHeader.substring(0, encodedModifiedHeader.length()-1);
 
         String[] jwtArr = jwt.split("\\.");
 
