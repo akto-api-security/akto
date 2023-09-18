@@ -58,7 +58,7 @@ const team = {
                 state.dashboardVersion = "-"
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
-                state.trafficAlertThresholdSeconds = 14400 // todo:
+                state.trafficAlertThresholdSeconds = 14400
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"

@@ -75,7 +75,7 @@ public class AdminSettingsAction extends UserAction {
 
         if (trafficAlertThresholdSeconds > 3600*24*6) {
             // this was done because our lookback period to calculate last timestamp is 6 days
-            addActionError("Alert can't be set for more than 10 days"); // todo: language
+            addActionError("Alert can't be set for more than 6 days");
             return ERROR.toUpperCase();
         }
 
