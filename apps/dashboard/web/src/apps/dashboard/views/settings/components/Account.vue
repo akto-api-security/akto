@@ -78,6 +78,34 @@
             </div>
         </div>
 
+        <div class="toggle-redact-feature" v-if="localTrafficAlertThresholdSeconds">
+            <div class="entry-text">Traffic alert threshold</div>
+            <div class="entry-value">
+                <div class="text-center">
+                    <v-menu offset-y>
+                        <template v-slot:activator="{ on, attrs }">
+                            <span
+                                v-bind="attrs"
+                                v-on="on"
+                                style="text-decoration: underline"
+                            >
+                                {{convertSecondsToReadableTime(localTrafficAlertThresholdSeconds)}}
+                            </span>
+                        </template>
+                        <v-list>
+                            <v-list-item
+                                v-for="(item, index) in traffic_alert_durations"
+                                :key="index"
+                                @click="localTrafficAlertThresholdSeconds = item.value"
+                            >
+                                <v-list-item-title>{{ item.text }}</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+                </div>
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -90,10 +118,20 @@ import {mapState} from 'vuex'
         },
         data () {
             return {
-                setup_types: ["STAGING", "PROD", "QA", "DEV"]
+                setup_types: ["STAGING", "PROD", "QA", "DEV"],
+                traffic_alert_durations: [
+                    {text : "1 hour", value: 60*60*1},
+                    {text : "4 hours", value: 60*60*4},
+                    {text : "12 hours", value: 60*60*12},
+                    {text : "1 Day", value: 60*60*24},
+                    {text : "4 Days", value: 60*60*24*4},
+                ]
             }
         },
         methods: {
+            convertSecondsToReadableTime(val) {
+                return func.convertSecondsToReadableTime(val)
+            },
             getActiveAccount() {
                 return this.$store.state.auth.activeAccount
             },
@@ -106,7 +144,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'urlRegexMatchingEnabled']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'urlRegexMatchingEnabled', 'trafficAlertThresholdSeconds']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -121,6 +159,14 @@ import {mapState} from 'vuex'
               },
               set(v) {
                 this.$store.dispatch('team/updateSetupType', v)
+              }
+            },
+            localTrafficAlertThresholdSeconds: {
+              get() {
+                return this.trafficAlertThresholdSeconds
+              },
+              set(v) {
+                this.$store.dispatch('team/updateTrafficAlertThresholdSeconds', v)
               }
             },
             localMergeAsyncOutside: {
