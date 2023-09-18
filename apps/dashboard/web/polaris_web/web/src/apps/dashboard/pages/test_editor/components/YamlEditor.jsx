@@ -28,6 +28,9 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 
+import editorSetup from "./editor_config/editorSetup";
+import keywords from "./editor_config/keywords"
+
 const YamlEditor = ({ fetchAllTests }) => {
     const navigate = useNavigate()
 
@@ -77,26 +80,22 @@ const YamlEditor = ({ fetchAllTests }) => {
 
         if (!editorInstance) {
             const yamlEditorOptions = {
-                language: "yaml",
+                language: "custom_yaml",
                 minimap: { enabled: false },
                 wordWrap: true,
                 automaticLayout: true,
                 colorDecorations: true,
                 scrollBeyondLastLine: false,
+                theme: "customTheme"
               }
       
-              editor.defineTheme('subdued', {
-                  base: 'vs',
-                  inherit: true,
-                  rules: [],
-                  colors: {
-                      'editor.background': '#FAFBFB',
-                  },
-              });
-              
-              editor.setTheme('subdued')
-      
+                editorSetup.registerLanguage()
+                editorSetup.setTokenizer()
+                editorSetup.setEditorTheme()
+                editorSetup.setAutoComplete(keywords)
+
               Editor = editor.create(yamlEditorRef.current, yamlEditorOptions)
+              editorSetup.findErrors(Editor, keywords)
               Editor.onDidChangeModelContent(handleYamlUpdate)
               setEditorInstance(Editor)
         } else {

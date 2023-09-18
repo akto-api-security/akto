@@ -2,9 +2,9 @@ import { ButtonGroup, HorizontalStack, TextField } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import Dropdown from './layouts/Dropdown';
 import DropdownSearch from './shared/DropdownSearch';
-import Store from '../store';
 import func from "@/util/func"
 import api from '../pages/testing/api';
+import PersistStore from '../../main/PersistStore';
 
 function ConditionComponent(props) {
 
@@ -13,7 +13,7 @@ function ConditionComponent(props) {
     useEffect(()=>{
         fetchApiEndpoints(condition)
     },[condition])
-    const allCollections = Store(state => state.allCollections);
+    const allCollections = PersistStore(state => state.allCollections);
     const allCollectionsOptions = allCollections.map(collection => {
         return {
             label: collection.displayName,

@@ -4,7 +4,7 @@ import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import FileUpload from '../../../components/shared/FileUpload';
-import {CancelMinor} from "@shopify/polaris-icons"
+import {CancelMajor} from "@shopify/polaris-icons"
 import api from '../api';
 import Store from '../../../store';
 
@@ -126,7 +126,7 @@ function PostmanSource() {
                     {files ? 
                         <Badge size='medium' status='success'>
                             {files.name}
-                            <Button icon={CancelMinor} plain onClick={() => setFiles(null)} />
+                            <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} />

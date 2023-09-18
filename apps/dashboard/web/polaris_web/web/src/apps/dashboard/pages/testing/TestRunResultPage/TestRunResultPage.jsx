@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import {
-  SearchMinor,
-  FraudProtectMinor,
+  CircleTickMinor,
+  ArchiveMinor,
   LinkMinor,
-  ProductsMinor,
+  ResourcesMajor,
+  CollectionsMajor,
   FlagMajor,
   MarketingMajor} from '@shopify/polaris-icons';
 import {
@@ -47,14 +48,14 @@ const headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: SearchMinor,
+    icon: CircleTickMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: FraudProtectMinor
+    icon: ArchiveMinor
   },
   {
     text: 'url',
@@ -72,7 +73,7 @@ let moreInfoSections = [
     content: ""
   },
   {
-    icon: ProductsMinor,
+    icon: CollectionsMajor,
     title: "Tags",
     content: ""
   },
@@ -82,7 +83,7 @@ let moreInfoSections = [
     content: ""
   },
   {
-    icon: LinkMinor,
+    icon: ResourcesMajor,
     title: "References",
     content: ""
   }

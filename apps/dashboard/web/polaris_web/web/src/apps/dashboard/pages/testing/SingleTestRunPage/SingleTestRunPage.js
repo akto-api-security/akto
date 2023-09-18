@@ -10,8 +10,8 @@ import {
   Tooltip,
 } from '@shopify/polaris';
 import {
-  SearchMinor,
-  FraudProtectMinor,
+  CircleTickMinor,
+  ArchiveMinor,
   LinkMinor,
   ReplayMinor
 } from '@shopify/polaris-icons';
@@ -43,13 +43,13 @@ let headers = [
     text: "Detected time",
     value: "detected_time",
     itemOrder: 3,
-    icon: SearchMinor,
+    icon: CircleTickMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder: 3,
-    icon: FraudProtectMinor
+    icon: ArchiveMinor
   },
   {
     text: 'url',
@@ -115,8 +115,7 @@ let filters = [
 function SingleTestRunPage() {
 
   const [testRunResults, setTestRunResults] = useState([])
-  const selectedTestRun = TestingStore(state => state.selectedTestRun);
-  const setSelectedTestRun = TestingStore(state => state.setSelectedTestRun);
+  const [ selectedTestRun, setSelectedTestRun ] = useState({})
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
@@ -125,14 +124,16 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest ] = useState(false);
   const hexId = params.hexId;
 
-  async function fetchData() {
+  async function fetchData(setData) {
     let localSelectedTestRun = {}
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
       if(testingRun.testIdConfig == 1){
         setWorkflowTest(workflowTest);
       }
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
-      setSelectedTestRun(localSelectedTestRun);
+      if(setData){
+        setSelectedTestRun(localSelectedTestRun);
+      }
       if(localSelectedTestRun.testingRunResultSummaryHexId) {
           await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
             setTempLoading(false);
@@ -146,7 +147,7 @@ function SingleTestRunPage() {
 
   const refreshSummaries = () => {
     let intervalId = setInterval(async() => {
-      let localSelectedTestRun = await fetchData();
+      let localSelectedTestRun = await fetchData(false);
       if(localSelectedTestRun.orderPriority !== 1){
         clearInterval(intervalId)
       }
@@ -156,7 +157,7 @@ function SingleTestRunPage() {
   useEffect(()=>{
     async function loadData(){
       setLoading(true);
-      await fetchData();
+      await fetchData(true);
       setLoading(false);
     }
     loadData();

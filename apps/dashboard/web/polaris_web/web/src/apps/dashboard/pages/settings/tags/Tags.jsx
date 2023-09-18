@@ -6,8 +6,8 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import func from "@/util/func";
 import tagsApi from "./api";
 import {
-    CustomersMinor,
-    ClockMinor
+    ProfileMinor,
+    CalendarMinor
   } from '@shopify/polaris-icons';
 
 function Tags(){
@@ -22,13 +22,13 @@ function Tags(){
             text: "Last updated",
             value: "updatedTimestamp",
             itemOrder: 3,
-            icon:ClockMinor
+            icon:CalendarMinor
         },
         {
             text: "Created by",
             value: "createdBy",
             itemOrder: 3,
-            icon:CustomersMinor
+            icon:ProfileMinor
         }
     ]
 
