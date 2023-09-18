@@ -453,11 +453,11 @@ public class Main {
         AccountTask.instance.executeTask(t -> {
             initializeRuntimeHelper();
         }, "initialize-runtime-task");
+        SingleTypeInfo.init();
     }
 
     public static void initializeRuntimeHelper() {
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
-        SingleTypeInfo.init();
         createIndices();
         insertRuntimeFilters();
         try {
