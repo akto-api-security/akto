@@ -503,5 +503,21 @@ export default {
             method: 'post',
             data:{},
         })
-    }
+    },
+
+    async getCoverageInfoForCollections(){
+        return await request({
+            url: '/api/getCoverageInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getSeverityInfoForCollections(){
+        return await request({
+            url: '/api/getSeverityInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
 }
