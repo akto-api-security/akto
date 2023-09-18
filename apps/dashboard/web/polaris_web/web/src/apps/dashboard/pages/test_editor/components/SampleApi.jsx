@@ -29,6 +29,7 @@ import "../TestEditor.css"
 import { useNavigate } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 import PersistStore from "../../../../main/PersistStore";
+import editorSetup from "./editor_config/editorSetup";
 
 const SampleApi = () => {
 
@@ -234,6 +235,12 @@ const SampleApi = () => {
         }
     }
 
+    const closeModal = () => {
+        setShowTestResult(!showTestResult)
+        editorSetup.setEditorTheme();
+        editorInstance.setTheme('vs')
+    }
+
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
             <Button id={"test-results"} removeUnderline monochrome plain 
@@ -259,7 +266,7 @@ const SampleApi = () => {
             {resultComponent}
             <Modal
                 open={showTestResult}
-                onClose={() => setShowTestResult(!showTestResult)}
+                onClose={() => closeModal()}
                 title="Results"
                 large
             >
