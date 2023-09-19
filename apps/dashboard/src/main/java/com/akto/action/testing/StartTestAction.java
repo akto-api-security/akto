@@ -66,13 +66,27 @@ public class StartTestAction extends UserAction {
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
-    private static List<ObjectId> getCicdTests(){
+    private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
                 Projections.excludeId(),
                 Projections.include("testingRunId"));
         return TestingRunResultSummariesDao.instance.findAll(
-                Filters.exists("metadata"), projections).stream().map(summary -> summary.getTestingRunId())
+                filters, projections).stream().map(summary -> summary.getTestingRunId())
                 .collect(Collectors.toList());
+    }
+
+    private static List<ObjectId> getCicdTests(){
+        return getTestingRunListFromSummary(Filters.exists("metadata"));
+    }
+
+    private static List<ObjectId> getTestsWithSeverity(List<String> severities){
+
+        List<Bson> severityFilters = new ArrayList<>();
+        for(String severity : severities){
+            severityFilters.add(Filters.gt(TestingRunResultSummary.COUNT_ISSUES + "." + severity, 0));
+        }
+
+        return getTestingRunListFromSummary(Filters.or(severityFilters));
     }
 
     private CallSource source;
@@ -245,14 +259,26 @@ public class StartTestAction extends UserAction {
                 String key = entry.getKey();
                 List value = entry.getValue();
 
-                if (value.size() == 0)
+                if (value == null || value.isEmpty())
                     continue;
 
-                if("endTimestamp".equals(key)){
-                    List<Long> ll = value;
+                switch(key){
+
+                    case "endTimestamp":
+                        List<Long> ll = Utils.castList(Long.class, value);
                         filterList.add(Filters.gte(key, ll.get(0)));
                         filterList.add(Filters.lte(key, ll.get(1)));
+                    break;
+                    
+                    case "severity":
+                        List<String> severities = Utils.castList(String.class, value);
+                        filterList.add(Filters.in(Constants.ID, getTestsWithSeverity(severities)));
+                    break;
+                    
+                    default:
+                    break;
                 }
+
             }
         } catch (Exception e) {
             return filterList;
@@ -303,6 +329,15 @@ public class StartTestAction extends UserAction {
                 Filters.and(testingRunFilters), skip, pageLimit,
                 prepareSort());
 
+        List<ObjectId> testingRunHexIds = new ArrayList<>();
+        testingRuns.forEach(
+            localTestingRun -> {
+                testingRunHexIds.add(localTestingRun.getId());
+            }
+        );
+
+        latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(testingRunHexIds);
+
         testingRunsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(testingRunFilters));
 
         return SUCCESS.toUpperCase();
@@ -322,11 +357,20 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId);
+        List<Bson> filterQ = new ArrayList<>();
+        filterQ.add(Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId));
+
+        if(this.startTimestamp!=0){
+            filterQ.add(Filters.gte(TestingRunResultSummary.START_TIMESTAMP, this.startTimestamp));
+        }
+
+        if(this.endTimestamp!=0){
+            filterQ.add(Filters.lte(TestingRunResultSummary.START_TIMESTAMP, this.endTimestamp));
+        }
 
         Bson sort = Sorts.descending(TestingRunResultSummary.START_TIMESTAMP) ;
 
-        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ, 0, limitForTestingRunResultSummary , sort);
+        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0, limitForTestingRunResultSummary , sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
 
         if (this.testingRun.getTestIdConfig() == 1) {
@@ -452,12 +496,6 @@ public class StartTestAction extends UserAction {
 
         addActionError("Unable to stop test run");
         return ERROR.toLowerCase();
-    }
-
-    public String fetchTestRunTableInfo() {
-        testingRuns = TestingRunDao.instance.findAll(Filters.ne("triggeredBy", "test_editor"));
-        latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries();
-        return SUCCESS.toUpperCase();
     }
 
     public void setType(TestingEndpoints.Type type) {

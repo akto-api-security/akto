@@ -449,8 +449,17 @@ export default {
         dateClicked(point) {
             this.selectedDate = point / 1000
         },
-        refreshSummaries() {
-            return api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
+        refreshSummaries(firstTime) {
+
+            let st = this.startTimestamp
+            let en = this.endTimestamp
+
+            if(firstTime){
+                st = 0;
+                en = 0;
+            }
+
+            return api.fetchTestingRunResultSummaries(st, en, this.testingRunHexId).then(resp => {
                 if (resp.testingRun.testIdConfig == 1) {
                     this.isWorkflow = true
                     this.originalStateFromDb = resp.workflowTest
@@ -495,7 +504,7 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('issues/fetchAllSubCategories')
-        await this.refreshSummaries()
+        await this.refreshSummaries(true)
 
         if (this.testingRunResultSummaries.length !== 0) {
             this.loading = false

@@ -14,6 +14,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 
 public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunResultSummary> {
@@ -27,10 +28,11 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         return "testing_run_result_summaries";
     }
 
-    public Map<ObjectId, TestingRunResultSummary> fetchLatestTestingRunResultSummaries() {
+    public Map<ObjectId, TestingRunResultSummary> fetchLatestTestingRunResultSummaries(List<ObjectId> testingRunHexIds) {
         Map<ObjectId, TestingRunResultSummary> trss = new HashMap<>();
         try {
             List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.in(TestingRunResultSummary.TESTING_RUN_ID,testingRunHexIds)));
             BasicDBObject groupedId = new BasicDBObject(TestingRunResultSummary.TESTING_RUN_ID, "$testingRunId");
             pipeline.add(Aggregates.sort(Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)));
             pipeline.add(Aggregates.group(groupedId,

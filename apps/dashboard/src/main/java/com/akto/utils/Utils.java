@@ -345,4 +345,16 @@ public class Utils {
         return (PostmanCredential) thirdPartyAccess.getCredential();
     }
 
+    public static <T> List<T> castList(Class<? extends T> clazz, Collection<?> rawCollection) {
+        List<T> result = new ArrayList<>(rawCollection.size());
+        for (Object o : rawCollection) {
+            try {
+                result.add(clazz.cast(o));
+            } catch (ClassCastException e) {
+                // skip the one that cannot be casted
+            }
+        }
+        return result;
+    }
+    
 }

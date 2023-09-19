@@ -9,7 +9,8 @@ import {
   Box,
   Tooltip,
   LegacyCard,
-  Card
+  Card,
+  Tag
 } from '@shopify/polaris';
 import {
   SearchMinor,
@@ -29,6 +30,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
+import TrendChart from "./TrendChart";
 
 let headers = [
   {
@@ -127,6 +129,15 @@ let filters = [
   },
 ]
 
+const TabHeading = (type, testRunResults) => {
+  return (
+    <HorizontalStack gap={2}>
+      <Text> {func.toSentenceCase(type)} </Text>
+      <Tag>{testRunResults[type].length}</Tag>
+    </HorizontalStack>
+  )
+}
+
 function SingleTestRunPage() {
 
   const [testRunResults, setTestRunResults] = useState({ vulnerable: [], all: [] })
@@ -143,12 +154,44 @@ function SingleTestRunPage() {
   function fillData(data, key){
     setTestRunResults((prev) => {
       prev[key] = data;
-      return prev;
+      return {...prev};
     })
     setTempLoading((prev) => {
       prev[key] = false;
-      return prev;
+      return {...prev};
     });
+  }
+
+  async function setSummary(summary){
+
+    setSelectedTestRun((prev) => {
+      prev['severity'] = func.getSeverity(summary.countIssues)
+      prev['severityStatus'] = func.getSeverityStatus(summary.countIssues)
+      prev['metadata'] = func.flattenObject(summary.metadata)
+      prev['testingRunResultSummaryHexId'] = summary?.hexId;
+
+      return {...prev};
+    });
+
+    await fetchTestingRunResultsData(summary.hexId);
+  }
+
+  async function fetchTestingRunResultsData(hexId){
+    setLoading(false);
+    setTempLoading((prev) => {
+      prev.vulnerable = true;
+      prev.all = true;
+      return {...prev};
+    });
+    let testRunResults = [];
+    await api.fetchTestingRunResults(hexId, true).then(({ testingRunResults }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+    fillData(testRunResults, 'vulnerable')
+    await api.fetchTestingRunResults(hexId).then(({ testingRunResults }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+    fillData(testRunResults, 'all')
   }
 
   async function fetchData(setData) {
@@ -157,12 +200,19 @@ function SingleTestRunPage() {
       if(testingRun.testIdConfig == 1){
         setWorkflowTest(workflowTest);
       }
-      localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0]);
-      
+      let cicd = false;
+      if(testingRunResultSummaries){
+        testingRunResultSummaries.forEach((item) => {
+          if(item.metadata != null){
+            cicd = true;
+          }
+        })
+      }
+      localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd);
       if(localSelectedTestRun.orderPriority === 1){
         setTempLoading((prev) => {
             prev.running = true;
-            return prev;
+            return {...prev};
         });
       }
 
@@ -175,20 +225,7 @@ function SingleTestRunPage() {
       }, 500)
 
       if(localSelectedTestRun.testingRunResultSummaryHexId) {
-          setTempLoading((prev) => {
-            prev.vulnerable = true;
-            prev.all = true;
-            return prev;
-          });
-          let testRunResults = [];
-          await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, true).then(({ testingRunResults }) => {
-            testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-          })
-          fillData(testRunResults, 'vulnerable')
-          await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId).then(({ testingRunResults }) => {
-            testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-          })
-          fillData(testRunResults, 'all')
+        await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId)
         }
       }) 
     return localSelectedTestRun;
@@ -269,7 +306,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const vulnerableResultTable = {
     id:  'vulnerable',
-    content: "Vulnerable",
+    content: TabHeading('vulnerable', testRunResults),
     component: (
       resultTable
     )
@@ -277,7 +314,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       
   const allResultTable = {
     id: 'all',
-    content: "All",
+    content: TabHeading('all', testRunResults),
     component: (
       resultTable
       )
@@ -333,7 +370,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const components = [loading ? <SpinnerCentered key="loading"/> : ( metadataComponent(), !workflowTest ? ResultTabs : workflowTestBuilder)];
+  const components = [ 
+  <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type!='One-time'}/> , 
+    metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? ResultTabs : workflowTestBuilder)];
 
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {

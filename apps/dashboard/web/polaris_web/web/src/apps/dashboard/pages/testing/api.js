@@ -1,20 +1,25 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestRunTableInfo() {
+    async fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters}) {
         const resp = await request({
-            url: '/api/fetchTestRunTableInfo',
+            url: '/api/retrieveAllCollectionTests',
             method: 'post',
-            data: {}
+            data: {
+                startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters
+            }
         })
         return resp
     },
-    async fetchTestingRunResultSummaries(testingRunHexId) {
+
+    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchTestingRunResultSummaries',
             method: 'post',
             data: {
-                testingRunHexId
+                testingRunHexId,
+                startTimestamp, 
+                endTimestamp
             }
         })
         return resp
