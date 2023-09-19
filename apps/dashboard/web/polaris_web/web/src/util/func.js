@@ -203,12 +203,7 @@ const func = {
     }
   },
   getSeverity(countIssues) {
-    if (countIssues == null) {
-      return []
-    }
-    return Object.keys(countIssues).filter((key) => {
-      return (countIssues[key] > 0)
-    }).map((key) => {
+    return func.getSeverityStatus(countIssues).map((key) => {
       return countIssues[key] + " " + key
     })
   },

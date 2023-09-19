@@ -1,14 +1,19 @@
 const today = new Date(new Date().setHours(0, 0, 0, 0));
+const todayDayEnd = new Date(new Date().setHours(23, 59, 59, 999));
 const yesterday = new Date(
     new Date(new Date().setDate(today.getDate() - 1)).setHours(0, 0, 0, 0)
 );
+const yesterdayDayEnd = new Date(
+    new Date(new Date().setDate(today.getDate() - 1)).setHours(23, 59, 59, 999)
+);
+
 const ranges = [
     {
         title: "Today",
         alias: "today",
         period: {
             since: today,
-            until: today,
+            until: todayDayEnd,
         },
     },
     {
@@ -16,7 +21,7 @@ const ranges = [
         alias: "yesterday",
         period: {
             since: yesterday,
-            until: yesterday,
+            until: yesterdayDayEnd,
         },
     },
     {
@@ -31,7 +36,7 @@ const ranges = [
                     0
                 )
             ),
-            until: yesterday,
+            until: todayDayEnd,
         },
     },
     {
@@ -46,9 +51,9 @@ const ranges = [
                     0
                 )
             ),
-            until: today,
+            until: todayDayEnd,
         }
     }
 ];
 
-export default { today, yesterday, ranges };
+export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd };

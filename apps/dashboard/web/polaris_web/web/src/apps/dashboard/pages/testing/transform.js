@@ -23,14 +23,14 @@ function getOrderPriority(state){
     }
 }
 
-function getTestingRunType(testingRun, testingRunResultSummary){
-    if(testingRunResultSummary.metadata!=null){
+function getTestingRunType(testingRun, testingRunResultSummary, cicd){
+    if(testingRunResultSummary.metadata!=null || cicd){
         return 'CI/CD';
     }
-    if(testingRun.periodInSeconds==0){
-        return 'One-time'
+    if(testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400){
+      return 'Recurring';
     }
-    return 'Recurring';
+    return 'One-time'
 }
 
 function getTotalSeverity(countIssues){
@@ -112,7 +112,7 @@ function minimizeTagList(items){
 }
 
 const transform = {
-    prepareTestRun : (data, testingRunResultSummary) => {
+    prepareTestRun : (data, testingRunResultSummary, cicd) => {
       let obj={};
       if(testingRunResultSummary==null){
         testingRunResultSummary = {};
@@ -132,7 +132,7 @@ const transform = {
       obj['iconColor'] = func.getTestingRunIconColor(data.state)
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
-      obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
+      obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
       obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
@@ -145,14 +145,14 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary.metadata)
       obj['repository'] = [obj?.metadata?.repository]
       obj['branch'] = [obj?.metadata?.branch]
-      return obj;
+      return {...data, ...obj};
     },
-    prepareTestRuns : (testingRuns, latestTestingRunResultSummaries) => {
+    prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd) => {
       let testRuns = []
       testingRuns.forEach((data)=>{
         let obj={};
         let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']] || {};
-        obj = transform.prepareTestRun(data, testingRunResultSummary)
+        obj = transform.prepareTestRun(data, testingRunResultSummary, cicd)
         testRuns.push(obj);
     })
     return testRuns;
