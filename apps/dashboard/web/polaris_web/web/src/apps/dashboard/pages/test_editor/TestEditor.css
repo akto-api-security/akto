@@ -12,6 +12,7 @@
 .editor-navbar .Polaris-Navigation{
     max-width: 18rem !important;
     background: white !important;
+    height: auto !important;
 }
 
 .editor-navbar .Polaris-Navigation__Section{

@@ -20,8 +20,6 @@ import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
 import "monaco-editor/esm/vs/language/json/monaco.contribution"
 import "monaco-editor/esm/vs/language/json/json.worker"
-
-import Store from "../../../store";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
@@ -30,10 +28,12 @@ import TestEditorStore from "../testEditorStore"
 import "../TestEditor.css"
 import { useNavigate } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
+import PersistStore from "../../../../main/PersistStore";
+import editorSetup from "./editor_config/editorSetup";
 
 const SampleApi = () => {
 
-    const allCollections = Store(state => state.allCollections);
+    const allCollections = PersistStore(state => state.allCollections);
     const [editorInstance, setEditorInstance] = useState(null);
     const [selected, setSelected] = useState(0);
     const [selectApiActive, setSelectApiActive] = useState(false)
@@ -235,6 +235,12 @@ const SampleApi = () => {
         }
     }
 
+    const closeModal = () => {
+        setShowTestResult(!showTestResult)
+        editorSetup.setEditorTheme();
+        editorInstance.setTheme('vs')
+    }
+
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
             <Button id={"test-results"} removeUnderline monochrome plain 
@@ -260,7 +266,7 @@ const SampleApi = () => {
             {resultComponent}
             <Modal
                 open={showTestResult}
-                onClose={() => setShowTestResult(!showTestResult)}
+                onClose={() => closeModal()}
                 title="Results"
                 large
             >

@@ -27,7 +27,7 @@ export default function Header() {
     const activeAccount = Store(state => state.activeAccount)
 
     const allRoutes = Store((state) => state.allRoutes)
-    const allCollections = Store((state) => state.allCollections)
+    const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
     const handleLeftNavCollapse = () => {

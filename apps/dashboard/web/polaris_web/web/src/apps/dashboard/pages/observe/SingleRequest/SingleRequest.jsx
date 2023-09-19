@@ -4,12 +4,12 @@ import { Button, Text, Box, Popover, ActionList, VerticalStack, HorizontalStack,
 import api from "../api";
 import { useEffect, useState } from "react";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import Store from "../../../store";
 import {
     SearchMinor,
     FraudProtectMinor
   } from '@shopify/polaris-icons';
 import transform from "../transform";
+import PersistStore from "../../../../main/PersistStore";
 
 let headerDetails = [
     {
@@ -40,7 +40,7 @@ function SingleRequest(){
     function togglePopoverActive() {
         setPopoverActive(!popoverActive);
     }
-    const collectionsMap = Store(state => state.collectionsMap)
+    const collectionsMap = PersistStore(state => state.collectionsMap)
     const [endpointData, setEndpointData]=useState({})
 
     useEffect(() => {

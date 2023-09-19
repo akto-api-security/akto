@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
 import { Box, Button, Icon, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
 import {SortMinor, SearchMinor} from "@shopify/polaris-icons"
-import Store from "../../../store"
 import "../settings.css"
 import settingFunctions from '../module'
 import func from "@/util/func"
+import PersistStore from '../../../../main/PersistStore'
 
 function AktoGPT() {
 
-    const apiCollections = Store(state => state.allCollections)
+    const apiCollections = PersistStore(state => state.allCollections)
     const [selectedItems, setSelectedItems] = useState([]);
     const [clonedItems, setClonedItems] = useState([]);
     const [searchValue, setSearchValue] = useState("")

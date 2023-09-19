@@ -1014,6 +1014,17 @@
             </result>
         </action>
 
+        <action name="api/fetchVulnerableTestRunResults" class="com.akto.action.testing.StartTestAction" method="fetchVulnerableTestRunResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchTestingRunResultFromTestingRun" class="com.akto.action.test_editor.SaveTestEditorAction" method="fetchTestingRunResultFromTestingRun">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1899,6 +1910,19 @@
                 <param name="root">code</param>
             </result>
         </action>
+
+
+        <action name="api/updateTrafficAlertThresholdSeconds" class="com.akto.action.AdminSettingsAction" method="updateTrafficAlertThresholdSeconds">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

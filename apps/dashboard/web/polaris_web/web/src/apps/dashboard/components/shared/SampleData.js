@@ -186,6 +186,9 @@ function SampleData(props) {
             // this prop doesn't work currently might be fixed in future versions.
             // solving this using custom CSS.
             lightbulb: { enabled: false },
+            scrollbar:{
+              alwaysConsumeMouseWheel: false
+            }
         }
         let instance = "";
         if(editorLanguage.includes("custom")){
