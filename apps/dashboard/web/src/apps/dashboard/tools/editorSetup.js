@@ -2,6 +2,7 @@ import { editor, languages, MarkerSeverity } from "monaco-editor/esm/vs/editor/e
 import leven from "leven"
 import * as yamlConf from "monaco-editor/esm/vs/basic-languages/yaml/yaml" 
 import snippets from "./snippets"
+import keywordSnippets from "./keywordSnippets"
 
 let { conf,language } = yamlConf;
 
@@ -90,7 +91,10 @@ const editorSetup = {
                         return{
                             label: word,
                             kind: languages.CompletionItemKind.Keyword,
-                            insertText: word,
+                            insertText: keywordSnippets[word] ? keywordSnippets[word].join("\n") : word,
+                            insertTextRules:
+                                languages.CompletionItemInsertTextRule
+                                    .InsertAsSnippet,
                         }
                     }),
                     ...snippets.map(snippet => {

@@ -1,4 +1,6 @@
-
+.Polaris-Navigation__ItemInnerWrapper{
+    border-top: none !important;
+}
 .Polaris-Navigation__PrimaryNavigation{
     justify-content: space-between;
 }

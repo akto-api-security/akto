@@ -28,6 +28,21 @@
                                     <div v-on="on" v-bind="attrs">
                                         <secondary-button 
                                             color="var(--themeColorDark)" 
+                                            text="Export vulnerability report"
+                                            @click="$emit('exportAsHTML')" 
+                                            v-if="!hideDownloadCSVIcon"
+                                        />
+                                    </div>
+                                </template>
+                                Export vulnerability report
+                            </v-tooltip>
+                        </div>
+                        <div class="clickable download-csv">
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{on, attrs}">
+                                    <div v-on="on" v-bind="attrs">
+                                        <secondary-button 
+                                            color="var(--themeColorDark)" 
                                             text="Export"
                                             @click="downloadData(fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators))" 
                                             v-if="!hideDownloadCSVIcon"

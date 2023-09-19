@@ -49,8 +49,13 @@
     --p-color-text-primary-hover: var(--akto-primary) !important;
     
     --p-color-icon-primary: var(--akto-primary) !important;
+    --p-color-bg-interactive-selected: #F6F6F7 !important;
 }
 
 .Polaris-Page{
     padding: 0 32px !important;
+}
+
+.Polaris-Frame__Main, .Polaris-Navigation {
+    background: #F6F6F7 !important;
 }

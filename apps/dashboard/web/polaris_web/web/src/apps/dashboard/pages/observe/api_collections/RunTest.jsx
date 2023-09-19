@@ -7,7 +7,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
-import Store from "../../../store";
+import PersistStore from "../../../../main/PersistStore";
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
@@ -32,7 +32,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     const [testRun, setTestRun] = useState({
         ...initialState
     })
-    const collectionsMap = Store(state => state.collectionsMap)
+    const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
     const [active, setActive] = useState(false);
 
@@ -146,7 +146,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled} >Run Test</Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled} >Run test</Button>
         </div>
     );
 
