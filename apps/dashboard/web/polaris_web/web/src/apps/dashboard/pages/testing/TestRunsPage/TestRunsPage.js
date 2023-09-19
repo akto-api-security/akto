@@ -3,10 +3,10 @@ import {
   Text,
   Button} from '@shopify/polaris';
 import {
-  CircleCancelMinor,
+  CircleCancelMajor,
   CalendarMinor,
   ReplayMinor,
-  FileMinor,
+  NoteMinor,
   PlayCircleMajor,
   PlayMinor,
   ClockMinor
@@ -57,7 +57,7 @@ let headers = [
     text: "Number of tests",
     value: "number_of_tests_str",
     itemOrder: 3,
-    icon: FileMinor,
+    icon: NoteMinor,
   },
   {
     text: 'Run type',
@@ -148,7 +148,7 @@ const getActionsList = (hexId) => {
   },
   {
       content: 'Stop',
-      icon: CircleCancelMinor,
+      icon: CircleCancelMajor,
       destructive:true,
       onAction: () => {stopTest(hexId || "")},
       disabled: true,
