@@ -7,6 +7,7 @@ import { Frame, Toast } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
+import PersistStore from "../../main/PersistStore";
 
 function Dashboard() {
 
@@ -15,8 +16,10 @@ function Dashboard() {
     history.navigate = useNavigate();
     const navigate = useNavigate()
 
-    const setAllCollections = Store(state => state.setAllCollections)
-    const setCollectionsMap = Store(state => state.setCollectionsMap)
+    const setAllCollections = PersistStore(state => state.setAllCollections)
+    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+
+    const allCollections = PersistStore(state => state.allCollections)
 
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
@@ -26,7 +29,9 @@ function Dashboard() {
     }
 
     useEffect(() => {
-        fetchAllCollections()
+        if(allCollections && allCollections.length === 0){
+            fetchAllCollections()
+        }
         transform.setTestMetadata();
         if(location.hash?.length > 0){
             let newPath = location.pathname

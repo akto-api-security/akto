@@ -218,6 +218,7 @@ function GithubServerTable(props) {
                 setMode={setMode}
                 loading={props.loading || false}
               />
+              <div className={props.increasedHeight ? "control-row" : ""}>
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -239,6 +240,7 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
+            </div>
             </LegacyCard.Section>
             <LegacyCard.Section>
               <HorizontalStack

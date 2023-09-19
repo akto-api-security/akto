@@ -100,7 +100,7 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 | Title | Link |
 | ------------- | ------------- |
 | Introduction | https://www.youtube.com/watch?v=oFt4OVmfE2s |
-| More tutorials | coming soon |
+| **Tutorial 1:** SSRF Port Scanning (OWASP API7:2023) | https://www.youtube.com/watch?v=WjNNh6asAD0 |
 
 
 ## Develop and contribute

@@ -464,18 +464,16 @@ export default {
             }
             this.selectedAnonymousOption = 'Sample data'
         },
-        setMessageJson(result) {
+        setMessageJson(result, doNotUpdateAPIjson) {
             this.messageJson = result.messageJson
             this.sampleDataListForTestRun = result.sampleDataListForTestRun
         },
-        setSelectedMethod(testId) {
+        setSelectedMethod(testId, doNotUpdateAPIjson) {
             let test = this.findTestFromTestValue(testId)
             this.changeValue(test?.label ? test.label : null)
             this.defaultTest = testId
             this.testInactive = test?.inactive ? test.inactive : null
 
-            this.selectedUrl = {}
-            this.messageJson = {}
             this.runTest = false
 
             let pathname = window.location.pathname
@@ -485,9 +483,10 @@ export default {
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
-
-            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0]) {
-
+            debugger
+            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0] && !doNotUpdateAPIjson) {
+                this.selectedUrl = {}
+                this.messageJson = {}
                 let obj = {
                     apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
                     url: this.mapRequestsToId[testId][0].url,
@@ -536,7 +535,7 @@ export default {
                         color: 'green'
                     });
                     await this.refreshTestTemplates()
-                    this.setSelectedMethod(resp.finalTestId)
+                    this.setSelectedMethod(resp.finalTestId, true)
                 })
             }
         },
