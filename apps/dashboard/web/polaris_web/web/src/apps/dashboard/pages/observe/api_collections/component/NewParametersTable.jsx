@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import api from "../../api";
 import transform from "../../transform";
 import {
-    GlobeMinor} from '@shopify/polaris-icons';
+    GlobeMinor, PasskeyMinor, DynamicSourceMinor, LinkMinor, LocationsMinor, ClockMinor, PriceLookupMinor} from '@shopify/polaris-icons';
 import Store from "../../../../store";
 import func from "@/util/func"
+import PersistStore from "../../../../../main/PersistStore";
 
 const headers = [
     {
@@ -16,13 +17,13 @@ const headers = [
     {
         text: 'Type',
         value: 'subType',
-        icon: GlobeMinor,
+        icon: PasskeyMinor,
         itemOrder: 3
     },
     {
         text: 'Endpoint',
         value: 'endpoint',
-        icon: GlobeMinor,
+        icon: LinkMinor,
         itemOrder: 3,
         sortKey: 'url',
         showFilterMenu: true
@@ -30,7 +31,7 @@ const headers = [
     {
         text: 'Collection',
         value: 'apiCollectionName',
-        icon: GlobeMinor,
+        icon: DynamicSourceMinor,
         itemOrder: 3,
         sortKey: 'apiCollectionId',
         showFilterMenu: true
@@ -46,7 +47,7 @@ const headers = [
     {
         text: 'Location',
         value: 'location',
-        icon: GlobeMinor,
+        icon: LocationsMinor,
         itemOrder: 3,
         sortKey: 'isHeader',
         showFilterMenu: true
@@ -54,7 +55,7 @@ const headers = [
     {
         text: "Discovered",
         value: 'added',
-        icon: GlobeMinor,
+        icon: ClockMinor,
         itemOrder: 3,
         sortKey: 'timestamp',
         showFilterMenu: true
@@ -62,7 +63,7 @@ const headers = [
     {
         text: 'Values',
         value: 'domain',
-        icon: GlobeMinor,
+        icon: PriceLookupMinor,
         itemOrder: 3,
         showFilterMenu: true
     }
@@ -126,7 +127,7 @@ function NewParametersTable(props) {
         setKey(!key);
     }, [startTimestamp, endTimestamp])
 
-    const allCollections = Store(state => state.allCollections);
+    const allCollections = PersistStore(state => state.allCollections);
     const dataTypeNames = Store(state => state.dataTypeNames);
     const apiCollectionMap = allCollections.reduce(
         (map, e) => { map[e.id] = e.displayName; return map }, {}

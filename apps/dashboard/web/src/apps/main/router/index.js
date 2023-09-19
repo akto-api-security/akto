@@ -26,6 +26,7 @@ const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState"
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
 const TestEditorForWebsite = () => import("@/apps/dashboard/tools/TestEditorForWebsite.vue")
+const PDFExportHTML = () => import("@/apps/dashboard/views/testing/components/PDFExportHTML")
 
 Vue.use(Router)
 
@@ -76,6 +77,14 @@ const router =  new Router({
                 defaultTestId: decodeURIComponent(route.params.toolsTestId),
                 isAnonymousPage: true
             })    
+        },
+        {
+            path: '/dashboard/export/testing',
+            name: 'testing-export-html',
+            component: PDFExportHTML,
+            props: route => ({
+                testingRunResultSummaryHexId: route.query.testingRunResultSummaryHexId
+            })
         },
         {
             path: '/dashboard/onboarding',

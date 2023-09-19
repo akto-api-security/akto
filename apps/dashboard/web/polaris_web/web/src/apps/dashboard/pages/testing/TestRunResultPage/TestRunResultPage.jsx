@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import {
-  SearchMinor,
-  FraudProtectMinor,
+  CircleTickMinor,
+  ArchiveMinor,
   LinkMinor,
-  ProductsMinor,
+  ResourcesMajor,
+  CollectionsMajor,
   FlagMajor,
   CreditCardSecureMajor,
   MarketingMajor} from '@shopify/polaris-icons';
@@ -48,14 +49,14 @@ const headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: SearchMinor,
+    icon: CircleTickMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: FraudProtectMinor
+    icon: ArchiveMinor
   },
   {
     text: 'url',
@@ -73,7 +74,7 @@ let moreInfoSections = [
     content: ""
   },
   {
-    icon: ProductsMinor,
+    icon: CollectionsMajor,
     title: "Tags",
     content: ""
   },
@@ -88,7 +89,7 @@ let moreInfoSections = [
     content: ""
   },
   {
-    icon: LinkMinor,
+    icon: ResourcesMajor,
     title: "References",
     content: ""
   }
@@ -182,7 +183,6 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     async function fetchData() {
-      if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
         if (hexId2 != undefined) {
           if (testingRunResult == undefined) {
             let res = await api.fetchTestRunResultDetails(hexId2)
@@ -194,9 +194,6 @@ function TestRunResultPage(props) {
           }
         }
         setData(testingRunResult, runIssues);
-      } else {
-        transform.setTestMetadata();
-      }
       setLoading(false);
     }
     fetchData();
