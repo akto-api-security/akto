@@ -111,13 +111,11 @@ export default {
     },
     mounted() {
         let _this = this
-        issuesApi.fetchAllSubCategories().then(resp => {
+        issuesApi.fetchAllSubCategories(true).then(resp => {
             _this.businessLogicSubcategories = resp.subCategories
+            _this.categories = resp.categories
             _this.loading = false
             _this.mapCategoryToSubcategory = _this.populateMapCategoryToSubcategory()
-            _this.categories = resp.categories.filter((category) => {
-                return _this.filterInactiveTests(_this.mapCategoryToSubcategory[category.name]?.all).length > 0
-            })
         })
         testingApi.fetchAuthMechanismData().then(resp => {
             if(resp.authMechanism){
@@ -168,9 +166,7 @@ export default {
         },
         populateMapCategoryToSubcategory() {
             let ret = {}
-            this.businessLogicSubcategories
-            .filter(x => !x.inactive)
-            .forEach(x => {
+            this.businessLogicSubcategories.forEach(x => {
                 if (!ret[x.superCategory.name]) {
                     ret[x.superCategory.name] = {selected: [], all: []}
                 }
@@ -185,12 +181,6 @@ export default {
             })
             this.selectedCategory = Object.keys(ret)[0]
             return ret
-        },
-        filterInactiveTests(tests) {
-            if(tests){
-                return tests.filter(test => !test.inactive)
-            }
-            return []
         }
     },
     computed: {
