@@ -412,7 +412,20 @@ export default {
                     color: 'green'
                 });
             })
-            await this.refreshTestTemplates();
+            Object.values(this.testsObj).map (x => x.all).flat().forEach((x, i) => {
+                if(x.value==this.defaultTest){
+                    x.inactive = this.testInactive
+                    this.mapTestToStamp[x.label] = this.lastEdited
+                }
+            })
+            Object.values(this.customTestObj).map (x => x.all).flat().forEach((x, i) => {
+                if(x.value==this.defaultTest){
+                    x.inactive = this.testInactive
+                    this.mapTestToStamp[x.label] = this.lastEdited
+                }
+            })
+            this.copyTestObj = JSON.parse(JSON.stringify(this.testsObj))
+            this.copyCustomObj = JSON.parse(JSON.stringify(this.customTestObj))
         },
         getFormValues(param, formValues) {
             if (param === 'choose') {
@@ -483,7 +496,7 @@ export default {
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
-            debugger
+            
             if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0] && !doNotUpdateAPIjson) {
                 this.selectedUrl = {}
                 this.messageJson = {}

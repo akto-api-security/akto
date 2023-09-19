@@ -117,17 +117,25 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     const setTestInactive = () => {
-        // reversed because we are toggling the value
-        let activeConf = selectedTest.inactive ? "active" : "inactive"
 
-        testEditorRequests.setTestInactive(selectedTest.value, !selectedTest.inactive).then(async (res) => {
+        let newVal = !selectedTest.inactive;
+        let activeConf = newVal ? "inactive" : "active"
+
+        testEditorRequests.setTestInactive(selectedTest.value, newVal).then(async (res) => {
             func.setToast(true, false, `Test marked as ${activeConf}`)
-            setSelectedTest({...selectedTest, inactive: !selectedTest.inactive})
-            const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
-            if (allSubCategoriesResponse) {
-                const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
-                setTestsObj(obj)
-            }
+            setSelectedTest({...selectedTest, inactive: newVal})
+            let obj = {...testsObj}
+            let dataObj = obj.mapTestToData[selectedTest.label]
+            obj.mapTestToData[selectedTest.label] = {...dataObj, 
+                lastUpdated: func.prettifyEpoch(func.timeNow()), inactive: selectedTest.inactive}
+            let type = dataObj.type === 'CUSTOM' ? 'customTests' : 'aktoTests'
+            
+            obj[type][dataObj.superCategory].forEach((x, i) => {
+                if(x.value == selectedTest.value){
+                    obj[type][dataObj.superCategory][i].inactive = newVal
+                }
+            })
+            setTestsObj(obj);
         }).catch((err) => {
             func.setToast(true, true, `Unable to mark test as ${activeConf}`)
         })

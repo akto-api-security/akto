@@ -5,19 +5,30 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.bson.conversions.Bson;
 
 public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
 
-    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent) {
+    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
-        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
+        List<Bson> filters = new ArrayList<>();
+        if (fetchOnlyActive) {
+            filters.add(Filters.exists(YamlTemplate.INACTIVE, false));
+            filters.add(Filters.eq(YamlTemplate.INACTIVE, false));
+        } else {
+            filters.add(new BasicDBObject());
+        }
+        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(Filters.or(filters));
         for (YamlTemplate yamlTemplate: yamlTemplates) {
             try {
                 TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());

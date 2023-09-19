@@ -58,29 +58,18 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     }
     const apiCollectionName = collectionsMap[apiCollectionId]
 
-
-    function filterInactiveTests(tests) {
-        if(tests){
-            return tests.filter(test => !test.inactive)
-        }
-        return []
-    }
-
     async function fetchData() {
         setLoading(true)
 
-        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories()
+        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true)
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
+        const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
 
         // Store all tests
         const processMapCategoryToSubcategory = {}
         Object.keys(mapCategoryToSubcategory).map(category => {
             processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
-        })
-
-        const categories = allSubCategoriesResponse.categories.filter((category) => {
-            return filterInactiveTests(processMapCategoryToSubcategory[category.name]).length > 0
         })
 
         // Set if a test is selected or not
@@ -121,9 +110,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     function populateMapCategoryToSubcategory(businessLogicSubcategories) {
         let ret = {}
-        businessLogicSubcategories
-        .filter(x => !x.inactive)
-        .forEach(x => {
+        businessLogicSubcategories.forEach(x => {
             if (!ret[x.superCategory.name]) {
                 ret[x.superCategory.name] = { selected: [], all: [] }
             }
