@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import {
-  SearchMinor,
-  FraudProtectMinor,
+  CircleTickMinor,
+  ArchiveMinor,
   LinkMinor,
-  ProductsMinor,
+  ResourcesMajor,
+  CollectionsMajor,
   FlagMajor,
   MarketingMajor} from '@shopify/polaris-icons';
 import {
@@ -22,6 +23,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import SampleDataList from '../../../components/shared/SampleDataList';
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+import PersistStore from '../../../../main/PersistStore';
 
 const headerDetails = [
   {
@@ -46,14 +48,14 @@ const headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: SearchMinor,
+    icon: CircleTickMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: FraudProtectMinor
+    icon: ArchiveMinor
   },
   {
     text: 'url',
@@ -71,7 +73,7 @@ let moreInfoSections = [
     content: ""
   },
   {
-    icon: ProductsMinor,
+    icon: CollectionsMajor,
     title: "Tags",
     content: ""
   },
@@ -81,7 +83,7 @@ let moreInfoSections = [
     content: ""
   },
   {
-    icon: LinkMinor,
+    icon: ResourcesMajor,
     title: "References",
     content: ""
   }
@@ -124,9 +126,9 @@ function TestRunResultPage(props) {
 
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
-  const subCategoryFromSourceConfigMap = TestingStore(state => state.subCategoryFromSourceConfigMap);
+  const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
-  const subCategoryMap = TestingStore(state => state.subCategoryMap);
+  const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
@@ -136,7 +138,26 @@ function TestRunResultPage(props) {
   
   function getDescriptionText(fullDescription){
     let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
-    return fullDescription ? str : str[0] + " "
+    let finalStr = ""
+
+    if(typeof(str) !== 'string'){
+      str?.forEach((element) =>{
+        if(typeof(element) === 'object'){
+          if(element?.props?.children !== null){
+            finalStr = finalStr + element.props.children
+          }
+        }else{
+          finalStr = finalStr + element
+        }
+      })
+      finalStr = finalStr.replace(/"/g, '');
+      let firstLine = finalStr.split('.')[0]
+      return fullDescription ? finalStr : firstLine + ". "
+    }
+    str = str.replace(/"/g, '');
+    let firstLine = str.split('.')[0]
+    return fullDescription ? str : firstLine + ". "
+    
   }
 
   async function setData(testingRunResult, runIssues) {
@@ -156,7 +177,6 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     async function fetchData() {
-      if (Object.keys(subCategoryMap) != 0 && Object.keys(subCategoryFromSourceConfigMap) != 0) {
         if (hexId2 != undefined) {
           if (testingRunResult == undefined) {
             let res = await api.fetchTestRunResultDetails(hexId2)
@@ -168,9 +188,6 @@ function TestRunResultPage(props) {
           }
         }
         setData(testingRunResult, runIssues);
-      } else {
-        transform.setTestMetadata();
-      }
       setLoading(false);
     }
     fetchData();
@@ -192,10 +209,10 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.map((result) => {
         return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
       })}
-      showDiff={true}
+      isNewDiff={selectedTestRunResult?.vulnerable}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
-      isVulnerable
+      isVulnerable={selectedTestRunResult.vulnerable}
     />,
       issueDetails.id &&
       <MoreInformationComponent
@@ -219,8 +236,8 @@ function TestRunResultPage(props) {
     divider= {true}
     backUrl = {props?.source == "editor" ? undefined : (hexId=="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
     isFirstPage = {props?.source == "editor"}
-    primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
-    secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
+    // primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
+    // secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {components}
     />
   )

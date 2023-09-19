@@ -11,7 +11,24 @@ let persistStore = (set) => ({
     quickstartTasksCompleted: 0,
     setQuickstartTasksCompleted: (quickstartTasksCompleted)=>{
         set({quickstartTasksCompleted: quickstartTasksCompleted})
-    }
+    },
+    subCategoryMap: {},
+    setSubCategoryMap: (subCategoryMap) => set({subCategoryMap: subCategoryMap}),
+    subCategoryFromSourceConfigMap: {},
+    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({subCategoryFromSourceConfigMap: subCategoryFromSourceConfigMap}),
+
+    active: '',
+    setActive: (selected) =>  set({ active: selected }),
+    
+    collectionsMap: {},
+    setCollectionsMap:(collectionsMap)=>{
+        set({collectionsMap: collectionsMap})
+    },
+
+    allCollections: [],
+    setAllCollections:(allCollections)=>{
+        set({allCollections: allCollections})
+    },
 })
 
 persistStore = devtools(persistStore)

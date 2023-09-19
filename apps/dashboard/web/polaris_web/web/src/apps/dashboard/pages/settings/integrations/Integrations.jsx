@@ -35,7 +35,7 @@ function Integrations() {
         source: '/public/aktoApis_logo.svg'
     }
     let ciCdObj={
-        id: 'ci_cd',
+        id: 'ci-cd',
         name:'CI/CD',
         source: '/public/ciCd_logo.svg'
     }

@@ -23,7 +23,8 @@ const team = {
         privateCidrList: null,
         enableDebugLogs: null,
         filterHeaderValueMap: {},
-        apiCollectionNameMapper: null
+        apiCollectionNameMapper: null,
+        trafficAlertThresholdSeconds: null
     },
     getters: {
         getId: (state) => state.id,
@@ -39,7 +40,8 @@ const team = {
         getPrivateCidrList: (state) => state.privateCidrList,
         getEnableDebugLogs: (state) => state.enableDebugLogs,
         getFilterHeaderValueMap: (state) => state.filterHeaderValueMap,
-        getApiCollectionNameMapper: (state) => state.apiCollectionNameMapper
+        getApiCollectionNameMapper: (state) => state.apiCollectionNameMapper,
+        getTrafficAlertThresholdSeconds: (state) => state.trafficAlertThresholdSeconds
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -67,6 +69,7 @@ const team = {
                 state.enableDebugLogs = false
                 state.filterHeaderValueMap = {}
                 state.apiCollectionNameMapper = null
+                state.trafficAlertThresholdSeconds = 14400
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
@@ -79,6 +82,7 @@ const team = {
                 state.enableDebugLogs = resp.accountSettings.enableDebugLogs
                 state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap ? resp.accountSettings.filterHeaderValueMap : {}
                 state.apiCollectionNameMapper = resp.accountSettings.apiCollectionNameMapper
+                state.trafficAlertThresholdSeconds = resp.accountSettings.trafficAlertThresholdSeconds || 14400
             }
         },
         SET_USER_INFO(state, resp) {
@@ -177,6 +181,11 @@ const team = {
         },
         emptyState({commit, dispatch}) {
             commit('EMPTY_STATE')
+        },
+        updateTrafficAlertThresholdSeconds({commit, dispatch, state}, val) {
+            api.updateTrafficAlertThresholdSeconds(val).then(resp => {
+                state.trafficAlertThresholdSeconds = val
+            })
         }
     }
 }

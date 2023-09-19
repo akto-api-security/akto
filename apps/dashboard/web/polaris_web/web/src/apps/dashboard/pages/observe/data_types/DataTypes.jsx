@@ -189,8 +189,6 @@ function DataTypes() {
     dispatchCurrState({type:"update", obj:obj})
 }
 
-console.log(change)
-
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>

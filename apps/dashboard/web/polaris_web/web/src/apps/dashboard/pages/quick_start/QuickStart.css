@@ -29,6 +29,7 @@
     top: 54px;
     width: 27vw;
     border-radius: unset;
+    height: 100% !important;
 }
 .settings {
     display: flex;
@@ -68,11 +69,4 @@
 
 .update-connections .Polaris-Page--divider{
     padding-top: 20px !important;
-}
-.connection-card-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    justify-content: space-between;
-    gap: 8px;
 }
