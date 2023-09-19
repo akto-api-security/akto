@@ -598,6 +598,9 @@ export default {
 
             case "AKTOGPT":
                 return {name: '$chatGPT', color: 'rgb(16, 163, 127)'}
+            
+            case "GITHUB":
+                return {name: '$githubIcon', color: cs.getPropertyValue('--hexColor42')}
         }
     },
 

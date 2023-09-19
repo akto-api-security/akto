@@ -3,21 +3,19 @@ package com.akto.action;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.GithubLogin;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
-import com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.apache.struts2.interceptor.SessionAware;
-import org.jetbrains.annotations.Nullable;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 
 import static com.akto.action.SignupAction.*;
@@ -45,6 +43,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     public String execute() {
 
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
+        if (GithubLogin.getClientId() != null) {
+            servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
+        }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "akto-release-version");
         } else {
