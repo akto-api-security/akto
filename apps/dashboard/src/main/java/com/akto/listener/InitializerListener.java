@@ -46,6 +46,7 @@ import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.notifications.TrafficUpdates;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -77,6 +78,7 @@ import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -140,6 +142,46 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+    public void setUpTrafficAlertScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            // look back period 6 days
+                            loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
+                            TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
+                            trafficUpdates.populate();
+
+                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                                loggerMaker.infoAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
+                                return;
+                            }
+                            SlackWebhook webhook = listWebhooks.get(0);
+                            loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(), LogDb.DASHBOARD);
+
+                            int thresholdSeconds = defaultTrafficAlertThresholdSeconds;
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                            if (accountSettings != null) {
+                                // override with user supplied value
+                                thresholdSeconds = accountSettings.getTrafficAlertThresholdSeconds();
+                            }
+
+                            loggerMaker.infoAndAddToDb("threshold seconds: " + thresholdSeconds, LoggerMaker.LogDb.DASHBOARD);
+
+                            if (thresholdSeconds > 0) {
+                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds);
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "traffic-alerts-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
 
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -332,6 +374,14 @@ public class InitializerListener implements ServletContextListener {
                 BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
                 Bson findQ = Filters.eq("_id", id);
 
+                List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+                Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
+                for(CustomDataType customDataType : customDataTypes){
+                    customDataTypesMap.put(customDataType.getName(), customDataType);
+                }
+
+                List<Bson> piiUpdates = new ArrayList<>();
+
                 for (Object dtObj : dataTypes) {
                     BasicDBObject dt = (BasicDBObject) dtObj;
                     String piiKey = dt.getString("name").toUpperCase();
@@ -342,38 +392,70 @@ public class InitializerListener implements ServletContextListener {
                             dt.getBoolean("onKey")
                     );
 
-                    if (!dt.getBoolean("active", true)) {
-                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
-                        CustomDataType existingCDT = CustomDataTypeDao.instance.findOne("name", piiKey);
-                        if (existingCDT == null) {
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
-                            continue;
-                        } else {
-                            CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
-                        }
-                    }
+                    CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
+                    CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
 
-                    if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
+                    if (currTypes.containsKey(piiKey) &&
+                            (currTypes.get(piiKey).equals(piiType) &&
+                                    dt.getBoolean(PIISource.ACTIVE, true))) {
                         continue;
                     } else {
-                        CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
-                        if (!dt.getBoolean("active", true)) {
-                            PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
-
+                        if (!dt.getBoolean(PIISource.ACTIVE, true)) {
+                            if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
+                                piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
+                            }
                         } else {
-                            Bson updateQ = Updates.set("mapNameToPIIType." + piiKey, piiType);
-                            PIISourceDao.instance.updateOne(findQ, updateQ);
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, true));
+                            if (currTypes.getOrDefault(piiKey, null) != piiType || piiSource.getLastSynced() == 0) {
+                                piiUpdates.add(Updates.set(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey, piiType));
+                            }
+                            newCDT.setActive(true);
                         }
 
+                        if (existingCDT == null) {
+                            CustomDataTypeDao.instance.insertOne(newCDT);
+                        } else {
+                            List<Bson> updates = getCustomDataTypeUpdates(existingCDT, newCDT);
+                            if (!updates.isEmpty()) {
+                                CustomDataTypeDao.instance.updateOne(
+                                    Filters.eq(CustomDataType.NAME, piiKey),
+                                    Updates.combine(updates)
+                                );
+                            }
+                        }
                     }
+
+                }
+
+                if(!piiUpdates.isEmpty()){
+                    piiUpdates.add(Updates.set(PIISource.LAST_SYNCED, Context.now()));
+                    PIISourceDao.instance.updateOne(findQ, Updates.combine(piiUpdates));
                 }
 
             } catch (IOException e) {
                 loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
             }
         }
+    }
+
+    private static List<Bson> getCustomDataTypeUpdates(CustomDataType existingCDT, CustomDataType newCDT){
+
+        List<Bson> ret = new ArrayList<>();
+
+        if(!Conditions.areEqual(existingCDT.getKeyConditions(), newCDT.getKeyConditions())){
+            ret.add(Updates.set(CustomDataType.KEY_CONDITIONS, newCDT.getKeyConditions()));
+        }
+        if(!Conditions.areEqual(existingCDT.getValueConditions(), newCDT.getValueConditions())){
+            ret.add(Updates.set(CustomDataType.VALUE_CONDITIONS, newCDT.getValueConditions()));
+        }
+        if(existingCDT.getOperator()!=newCDT.getOperator()){
+            ret.add(Updates.set(CustomDataType.OPERATOR, newCDT.getOperator()));
+        }
+
+        if (!ret.isEmpty()) {
+            ret.add(Updates.set(CustomDataType.TIMESTAMP, Context.now()));
+        }
+
+        return ret;
     }
 
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
@@ -948,6 +1030,7 @@ public class InitializerListener implements ServletContextListener {
                                 runInitializerFunctions();
                             }
                         }, "context-initializer");
+                        setUpTrafficAlertScheduler();
                         SingleTypeInfo.init();
                         setUpDailyScheduler();
                         setUpWebhookScheduler();

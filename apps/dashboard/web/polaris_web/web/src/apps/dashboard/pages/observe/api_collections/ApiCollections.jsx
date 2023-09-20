@@ -5,13 +5,11 @@ import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
-    SearchMajor,
-    CircleTickMinor
+    SearchMinor,
+    CircleTickMajor
   } from '@shopify/polaris-icons';
-
-import { useNavigate } from "react-router-dom"
 import ObserveStore from "../observeStore"
-import Store from "../../../store"
+import PersistStore from "../../../../main/PersistStore"
 
 const headers = [
     {
@@ -28,8 +26,9 @@ const headers = [
     {
         text: "Discovered",
         value: "detected",
-        icon: SearchMajor,
-        itemOrder: 3
+        icon: SearchMinor,
+        itemOrder: 3,
+        iconColor: "subdued"
     }
 ]
 
@@ -51,7 +50,7 @@ function convertToCollectionData(c) {
         ...c,
         endpoints: c["urlsCount"] || 0,
         detected: "Last seen " + func.prettifyEpoch(c.startTs),
-        icon: CircleTickMinor,
+        icon: CircleTickMajor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
     }    
 }
@@ -82,8 +81,8 @@ function ApiCollections() {
         setActive(true)
     }
 
-    const setAllCollections = Store(state => state.setAllCollections)
-    const setCollectionsMap = Store(state => state.setCollectionsMap)
+    const setAllCollections = PersistStore(state => state.setAllCollections)
+    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
 
     const createNewCollection = async () => {
         let newColl = await api.createCollection(newCollectionName)

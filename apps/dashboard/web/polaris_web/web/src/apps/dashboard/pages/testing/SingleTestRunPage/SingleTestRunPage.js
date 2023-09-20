@@ -10,8 +10,8 @@ import {
   Tooltip,
 } from '@shopify/polaris';
 import {
-  SearchMinor,
-  FraudProtectMinor,
+  CircleTickMinor,
+  ArchiveMinor,
   LinkMinor,
   ReplayMinor
 } from '@shopify/polaris-icons';
@@ -43,13 +43,13 @@ let headers = [
     text: "Detected time",
     value: "detected_time",
     itemOrder: 3,
-    icon: SearchMinor,
+    icon: CircleTickMinor,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder: 3,
-    icon: FraudProtectMinor
+    icon: ArchiveMinor
   },
   {
     text: 'url',
