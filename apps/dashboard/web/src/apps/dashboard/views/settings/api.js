@@ -261,6 +261,14 @@ export default {
             method: 'post',
             data: {githubClientId, githubClientSecret}
         })
+    },
+
+    fetchGithubSso() {
+        return request({
+            url: '/api/fetchGithubSso',
+            method: 'post',
+            data: {}
+        })
     }
 
 }

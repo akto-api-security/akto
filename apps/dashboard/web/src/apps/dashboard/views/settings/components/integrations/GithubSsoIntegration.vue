@@ -81,7 +81,7 @@ export default {
       return {
         githubClientId: null,
         githubClientSecret: null,
-        githubClientIdOrig: window.GITHUB_CLIENT_ID,
+        githubClientIdOrig: null,
         showDeleteGithubSsoPopup: false,
         showAddGithubSsoPopup: false
       }
@@ -116,6 +116,10 @@ export default {
           this.githubClientId = null
         })
       }
+    },
+    async mounted() {
+      let {githubClientId} = await api.fetchGithubSso();
+      this.githubClientIdOrig = githubClientId
     }
 }
 </script>
