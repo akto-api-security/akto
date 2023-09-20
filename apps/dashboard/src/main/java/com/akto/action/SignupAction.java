@@ -419,7 +419,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String refreshToken = tokenData.get("refresh_token").toString();
             int refreshTokenExpiry = Integer.parseInt(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
             Map<String,Object> userData = CustomHttpRequest.getRequest("https://api.github.com/user", "Bearer " + accessToken);
-            String company = userData.get("company").toString();
+            String company = userData.getOrDefault("company", "-").toString();
             String username = userData.get("login").toString() + "@" + company;
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
             shouldLogin = "true";
