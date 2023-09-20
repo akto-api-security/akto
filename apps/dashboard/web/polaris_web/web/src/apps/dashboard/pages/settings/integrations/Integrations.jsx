@@ -54,8 +54,13 @@ function Integrations() {
         name:'Webhooks',
         source: '/public/webhooks_logo.svg'
     }
+    let githubSsoObj={
+      id: 'github_sso',
+      name:'Github SSO',
+      source: '/public/github_icon.svg'
+    }
 
-    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj]
+    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj]
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
@@ -84,6 +89,11 @@ function Integrations() {
             component: <TabsList />
         },
         {
+          id: 'sso',
+          content: <span>SSO <Badge status='new'>1</Badge></span>,
+          component: <TabsList />
+        },
+        {
             id: 'automation',
             content: <span>Automation <Badge status='new'>2</Badge></span>,
             component: <TabsList />
@@ -102,8 +112,13 @@ function Integrations() {
               setCurrentItems(currObjs)
               break;
 
-            case 'ai':
+              case 'ai':
                 currObjs= [aktoGptObj]
+                setCurrentItems(currObjs)
+                break;
+
+            case 'sso':
+                currObjs= [githubSsoObj]
                 setCurrentItems(currObjs)
                 break;
 

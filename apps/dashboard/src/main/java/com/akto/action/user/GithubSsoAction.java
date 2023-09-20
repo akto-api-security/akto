@@ -66,13 +66,23 @@ public class GithubSsoAction extends UserAction {
 
     @Override
     public String execute() throws Exception {
-        throw new IllegalStateException("execute is not allowed");
+        Config.GithubConfig githubConfig = (Config.GithubConfig) ConfigsDao.instance.findOne("_id", "GITHUB-ankush");
+
+        if (githubConfig != null) {
+            this.githubClientId = githubConfig.getClientId();
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     public void setGithubClientId(String githubClientId) {
         this.githubClientId = githubClientId;
     }
 
+    public String getGithubClientId() {
+        return this.githubClientId;
+    }
+    
     public void setGithubClientSecret(String githubClientSecret) {
         this.githubClientSecret = githubClientSecret;
     }
