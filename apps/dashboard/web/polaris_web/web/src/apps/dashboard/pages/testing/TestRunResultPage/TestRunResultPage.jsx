@@ -7,12 +7,7 @@ import {
   CollectionsMajor,
   FlagMajor,
   MarketingMajor} from '@shopify/polaris-icons';
-import {
-  Text,
-  Button,
-  VerticalStack,
-  HorizontalStack, Icon, LegacyCard
-  } from '@shopify/polaris';
+import { Button, LegacyCard } from '@shopify/polaris';
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
@@ -24,6 +19,7 @@ import SampleDataList from '../../../components/shared/SampleDataList';
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import PersistStore from '../../../../main/PersistStore';
+import MoreInformationComponent from '../../../components/shared/MoreInformationComponent';
 
 const headerDetails = [
   {
@@ -66,59 +62,29 @@ const headerDetails = [
   },
 ]
 
-let moreInfoSections = [
-  {
+const moreInfoSections = {
+  impact:{
     icon: FlagMajor,
     title: "Impact",
     content: ""
   },
-  {
+  tags:{
     icon: CollectionsMajor,
     title: "Tags",
     content: ""
   },
-  {
+  urls:{
     icon: MarketingMajor,
     title: "API endpoints affected",
     content: ""
   },
-  {
+  references:{
     icon: ResourcesMajor,
     title: "References",
     content: ""
   }
-]
-
-function MoreInformationComponent(props) {
-  return (
-    <VerticalStack gap={"4"}>
-      <Text variant='headingMd'>
-        More information
-      </Text>
-      <LegacyCard>
-        <LegacyCard.Section>
-          {
-            props.sections.map((section) => {
-              return (<LegacyCard.Subsection key={section.title}>
-                <VerticalStack gap="3">
-                  <HorizontalStack gap="2" align="start" blockAlign='start'>
-                    <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                      {section?.icon && <Icon source={section.icon}></Icon>}
-                    </div>
-                    <Text variant='headingSm'>
-                      {section?.title || "Heading"}
-                    </Text>
-                  </HorizontalStack>
-                  {section.content}
-                </VerticalStack>
-              </LegacyCard.Subsection>)
-            })
-          }
-        </LegacyCard.Section>
-      </LegacyCard>
-    </VerticalStack>
-  )
 }
+
 
 function TestRunResultPage(props) {
 
@@ -132,9 +98,9 @@ function TestRunResultPage(props) {
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
-  const [infoState, setInfoState] = useState(moreInfoSections)
   const [fullDescription, setFullDescription] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [infoData, setInfoData] = useState(null)
   
   function getDescriptionText(fullDescription){
     let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
@@ -169,7 +135,7 @@ function TestRunResultPage(props) {
     }
     if (runIssues) {
       setIssueDetails(...[runIssues]);
-      setInfoState(await transform.fillMoreInformation(runIssues, subCategoryMap, moreInfoSections))
+      setInfoData(subCategoryMap[runIssues?.id?.testSubCategory])
     } else {
       setIssueDetails(...[{}]);
     }
@@ -217,7 +183,9 @@ function TestRunResultPage(props) {
       issueDetails.id &&
       <MoreInformationComponent
         key="info"
-        sections={infoState}
+        data={infoData}
+        moreInfoSections={moreInfoSections}
+        runIssues={issueDetails}
       />
   ]
 

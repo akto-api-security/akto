@@ -173,4 +173,14 @@ export default {
             return resp
         })
     },
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+        return request({
+            url: '/api/fetchVulnerableTestRunResults',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId,
+                skip
+            }
+        })       
+    },
 }
