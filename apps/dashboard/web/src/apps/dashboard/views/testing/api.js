@@ -252,5 +252,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchMetadataFilters() {
+        return request({
+            url: '/api/fetchMetadataFilters',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
     }
 }
