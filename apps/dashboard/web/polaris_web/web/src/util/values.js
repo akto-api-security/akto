@@ -29,7 +29,7 @@ const ranges = [
         alias: "last7days",
         period: {
             since: new Date(
-                new Date(new Date().setDate(today.getDate() - 7)).setHours(
+                new Date(new Date().setDate(today.getDate() - 6)).setHours(
                     0,
                     0,
                     0,
