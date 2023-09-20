@@ -178,4 +178,12 @@ export default {
             return resp
         })
     },
+    async fetchMetadataFilters() {
+        const resp = await request({
+            url: '/api/fetchMetadataFilters',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
 }

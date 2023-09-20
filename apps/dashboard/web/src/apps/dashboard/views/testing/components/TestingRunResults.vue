@@ -28,7 +28,7 @@
         <div v-else>
             <div class="testing-runs-history" v-if="!isWorkflow">
                 <div class="d-flex jc-end">
-                <div v-for = "(header,index) in getMetadataFilters()">
+                <div v-for = "(header,index) in this.metadataFilterData">
                     <v-menu :key="index" offset-y :close-on-content-click="false"> 
                     <template v-slot:activator="{ on, attrs }">
                             <secondary-button 
@@ -281,7 +281,8 @@ export default {
             metadataFilterOperators: {
                 branch: "OR",
                 repository: "OR"
-            }
+            },
+            metadataFilterData: [],
         }
     },
     methods: {
@@ -391,26 +392,19 @@ export default {
 
             return ret;
         },
-        getMetadataFilters(){
+        async processMetadataFilters(){
 
             let ret = []
             let tmp = {
-                branch: new Set(),
-                repository: new Set()
+                branch: [],
+                repository: []
             }
-            this.testingRunResultSummaries.forEach((x) => {
 
-                if(x?.metadata?.branch){
-                    tmp.branch.add(x?.metadata?.branch)
-                }
-
-                if(x?.metadata?.repository){
-                    tmp.repository.add(x?.metadata?.repository)
-                }
-            })
+            let res = await api.fetchMetadataFilters()
+            tmp = res.metadataFilters
 
             Object.keys(tmp).forEach((key) => {
-                if(tmp[key].size > 0){
+                if(tmp[key].length > 0){
                     ret.push({
                         text: func.toSentenceCase(key),
                         value: key,
@@ -428,7 +422,7 @@ export default {
                 }
             })
 
-            return ret;
+            this.metadataFilterData = ret;
         },
         selectedAll (hValue, {items, checked}) {
             for(var index in items) {
@@ -512,6 +506,7 @@ export default {
     async mounted() {
         await this.$store.dispatch('issues/fetchAllSubCategories')
         await this.refreshSummaries(true)
+        await this.processMetadataFilters()
 
         if (this.testingRunResultSummaries.length !== 0) {
             this.loading = false

@@ -2,18 +2,23 @@ package com.akto.dao.testing;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.util.Constants;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.BsonField;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 
@@ -48,6 +53,44 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
             e.printStackTrace();
         }
         return trss;
+    }
+
+    public Map<String, Set<String>> fetchMetadataFilters(List<String> filterKeys) {
+        Map<String, Set<String>> ret = new HashMap<>();
+
+        try {
+            List<Bson> pipeline = new ArrayList<>();
+            BasicDBObject groupedId = new BasicDBObject(Constants.ID, "0");
+
+            List<Bson> filters = new ArrayList<>();
+            List<BsonField> acc = new ArrayList<>();
+            for(String filter : filterKeys){
+                filters.add(Filters.exists(TestingRunResultSummary.METADATA_STRING + "." + filter));
+                acc.add(Accumulators.addToSet(filter, "$" + TestingRunResultSummary.METADATA_STRING + "." + filter));
+            }
+
+            pipeline.add(Aggregates.match(Filters.or(filters)));
+            pipeline.add(Aggregates.group(groupedId, acc));
+            MongoCursor<BasicDBObject> endpointsCursor = TestingRunResultSummariesDao.instance
+                    .getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while (endpointsCursor.hasNext()) {
+                BasicDBObject temp = endpointsCursor.next();
+                
+                for(String filter : filterKeys){
+                    BasicDBList list = (BasicDBList) temp.get(filter);
+                    Set<String> dataSet = ret.getOrDefault(filter, new HashSet<>());
+                    for(Object data: list){
+                        dataSet.add((String)data);
+                    }
+                    ret.put(filter, dataSet);
+                }
+
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return ret;
     }
 
     @Override

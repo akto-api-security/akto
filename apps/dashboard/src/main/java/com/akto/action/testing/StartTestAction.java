@@ -38,9 +38,11 @@ import org.bson.types.ObjectId;
 
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -529,6 +531,24 @@ public class StartTestAction extends UserAction {
 
         addActionError("Unable to stop test run");
         return ERROR.toLowerCase();
+    }
+
+    Map<String, Set<String>> metadataFilters; 
+
+    public Map<String, Set<String>> getMetadataFilters() {
+        return metadataFilters;
+    }
+
+    public void setMetadataFilters(Map<String, Set<String>> metadataFilters) {
+        this.metadataFilters = metadataFilters;
+    }
+
+    public String fetchMetadataFilters(){
+
+        List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
+        metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
+        
+        return SUCCESS.toUpperCase();
     }
 
     public void setType(TestingEndpoints.Type type) {

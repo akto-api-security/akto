@@ -18,6 +18,7 @@ function TrendChart(props) {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
     const [appliedFilters, setAppliedFilters] = useState([]);
     const [testingRunResultSummaries, setTestingRunResultSummaries] = useState([]);
+    const [metadataFilterData, setMetadataFilterData] = useState([]);
 
     const dateRangeFilter =
     {
@@ -80,23 +81,10 @@ function TrendChart(props) {
 
     function processMetadataFilters(data) {
         let ret = []
-        let tmp = {
-            branch: new Set(),
-            repository: new Set()
-        }
-        data.forEach((x) => {
-
-            if (x?.metadata?.branch) {
-                tmp.branch.add(x?.metadata?.branch)
-            }
-
-            if (x?.metadata?.repository) {
-                tmp.repository.add(x?.metadata?.repository)
-            }
-        })
+        let tmp = data
 
         Object.keys(tmp).forEach((key) => {
-            if (tmp[key].size > 0) {
+            if (tmp[key].length > 0) {
                 ret.push({
                     key: key,
                     label: func.toSentenceCase(key),
@@ -104,7 +92,7 @@ function TrendChart(props) {
                         <ChoiceList
                             title={func.toSentenceCase(key)}
                             titleHidden
-                            choices={[...tmp[key]].map((x) => {
+                            choices={tmp[key].map((x) => {
                                 return {
                                     label: x,
                                     value: x
@@ -167,8 +155,14 @@ function TrendChart(props) {
         });
     }
 
+    async function setFilterData(){
+        let res = await api.fetchMetadataFilters()
+        setMetadataFilterData(res.metadataFilters);
+    }
+
     useEffect(() => {
         fetchData(currDateRange.period, true);
+        setFilterData();
     }, [])
 
 
@@ -242,7 +236,7 @@ function TrendChart(props) {
         getDate({ type: "update", period: values.ranges[2] });
     }, []);
 
-    const metadataFilters = processMetadataFilters(testingRunResultSummaries);
+    const metadataFilters = processMetadataFilters(metadataFilterData);
 
     function dateClicked(data) {
 
