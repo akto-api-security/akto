@@ -21,6 +21,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BsonField;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Sorts;
 
@@ -93,13 +94,24 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         }
 
         return ret;
+    }
+
     public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";
-        String[] indices = {"testingRunId_1"};
+        String[] indices = {"testingRunId_1", "metadata.branch_1", "metadata.repository_1"};
 
         if (!checkIndexExists(dbName, getCollName(), indices[0])) {
             instance.getMCollection().createIndex(Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID));
+        }
+
+        IndexOptions sparseIndex = new IndexOptions().sparse(true);
+
+        if (!checkIndexExists(dbName, getCollName(), indices[1])) {
+            instance.getMCollection().createIndex(Indexes.ascending("metadata.branch"), sparseIndex);
+        }
+        if (!checkIndexExists(dbName, getCollName(), indices[2])) {
+            instance.getMCollection().createIndex(Indexes.ascending("metadata.repository"), sparseIndex);
         }
     }
 
