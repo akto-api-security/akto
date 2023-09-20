@@ -183,16 +183,16 @@ const transform = {
       }
       return []
   },
-  async fillMoreInformation(runIssues, subCategoryMap, moreInfoSections){
-    moreInfoSections[0].content = (
+  async fillMoreInformation(data, runIssues, moreInfoSections){
+    moreInfoSections['impact'].content = (
         <Text color='subdued'>
-          {subCategoryMap[runIssues.id?.testSubCategory]?.issueImpact || "No impact found"}
+          {data?.issueImpact || "No impact found"}
         </Text>
       )
-      moreInfoSections[1].content = (
+      moreInfoSections['tags'].content = (
         <HorizontalStack gap="2">
           {
-            subCategoryMap[runIssues.id.testSubCategory]?.issueTags.map((tag, index) => {
+            data?.issueTags.map((tag, index) => {
               return (
                 <Badge progress="complete" key={index}>{tag}</Badge>
               )
@@ -200,10 +200,10 @@ const transform = {
           }
         </HorizontalStack>
       )
-      moreInfoSections[3].content = (
+      moreInfoSections['references'].content = (
         <List type='bullet' spacing="extraTight">
           {
-            subCategoryMap[runIssues.id?.testSubCategory]?.references.map((reference) => {
+            data?.references.map((reference) => {
               return (
                 <List.Item key={reference}>
                   <Link key={reference} url={reference} monochrome removeUnderline>
@@ -217,9 +217,9 @@ const transform = {
           }
         </List>
       )
-      await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
+      runIssues?.id && await api.fetchAffectedEndpoints(runIssues?.id).then((resp1) => {
         let similarlyAffectedIssues = resp1['similarlyAffectedIssues'];
-        moreInfoSections[2].content = (
+        moreInfoSections['urls'].content = (
           <List type='bullet'>
             {
               similarlyAffectedIssues.map((item, index) => {

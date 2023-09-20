@@ -134,9 +134,6 @@ function DateRangePicker(props) {
         setActiveDateRange(props.initialDispatch)
         props.setPopoverState(false);
       }
-
-      console.log(month)
-
       return (
         <Box>
           <Popover.Pane fixed>
