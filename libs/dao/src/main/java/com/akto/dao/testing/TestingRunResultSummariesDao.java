@@ -9,11 +9,13 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Sorts;
 
 public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunResultSummary> {
@@ -46,6 +48,16 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
             e.printStackTrace();
         }
         return trss;
+    }
+
+    public void createIndicesIfAbsent() {
+
+        String dbName = Context.accountId.get()+"";
+        String[] indices = {"testingRunId_1"};
+
+        if (!checkIndexExists(dbName, getCollName(), indices[0])) {
+            instance.getMCollection().createIndex(Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID));
+        }
     }
 
     @Override
