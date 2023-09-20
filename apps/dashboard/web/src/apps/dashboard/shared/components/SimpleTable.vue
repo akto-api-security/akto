@@ -30,7 +30,7 @@
                                             color="var(--themeColorDark)" 
                                             text="Export vulnerability report"
                                             @click="$emit('exportAsHTML')" 
-                                            v-if="!hideDownloadCSVIcon"
+                                            v-if="showExportVulnerabilityButton"
                                         />
                                     </div>
                                 </template>
@@ -97,6 +97,7 @@ export default {
         actions: obj.arrN,
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
+        showExportVulnerabilityButton: obj.boolN,
         showName: obj.boolN,
         showGridView:obj.boolN,
         leftView:obj.boolN,
