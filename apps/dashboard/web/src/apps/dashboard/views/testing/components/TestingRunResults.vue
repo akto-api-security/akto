@@ -72,6 +72,7 @@
                     :sortDescDefault="true"
                     :dense="true"
                     @rowClicked="openDetails"
+                    @exportAsHTML="exportAsHTML"
                 >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
@@ -100,7 +101,6 @@
                 <workflow-test-builder :endpointsList="[]" apiCollectionId=0 :originalStateFromDb="originalStateFromDb" :defaultOpenResult="true" class="white-background"/>
             </div>
         </div>
-
     </div>
 </template>
 
@@ -111,6 +111,7 @@ import StackedChart from '@/apps/dashboard/shared/components/charts/StackedChart
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import TestResultsDialog from "./TestResultsDialog";
+import PDFExportHTML from "./PDFExportHTML.vue";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
@@ -138,7 +139,8 @@ export default {
         SensitiveChipGroup,
         TestResultsDialog,
         WorkflowTestBuilder,
-        Spinner
+        Spinner,
+        PDFExportHTML,
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
@@ -200,6 +202,11 @@ export default {
         }
     },
     methods: {
+        async exportAsHTML() {
+            let currentSummary = this.testingRunResultSummaries.filter(x => x.startTimestamp === this.selectedDate)[0]
+            const routeData = this.$router.resolve({name: 'testing-export-html', query: {testingRunResultSummaryHexId:currentSummary.hexId}});
+            window.open(routeData.href, '_blank');
+        },
         getColor(severity) {
             switch (severity) {
                 case 3: return "var(--hexColor33)"
@@ -264,8 +271,16 @@ export default {
         dateClicked(point) {
             this.selectedDate = point / 1000
         },
-        refreshSummaries() {
-            return api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
+        refreshSummaries(firstTime) {
+
+            let st = this.startTimestamp
+            let en = this.endTimestamp
+            if(firstTime){
+                st = 0;
+                en = 0;
+            }
+
+            return api.fetchTestingRunResultSummaries(st, en, this.testingRunHexId).then(resp => {
                 if (resp.testingRun.testIdConfig == 1) {
                     this.isWorkflow = true
                     this.originalStateFromDb = resp.workflowTest
@@ -309,7 +324,7 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('issues/fetchAllSubCategories')
-        await this.refreshSummaries()
+        await this.refreshSummaries(true)
 
         if (this.testingRunResultSummaries.length !== 0) {
             this.loading = false

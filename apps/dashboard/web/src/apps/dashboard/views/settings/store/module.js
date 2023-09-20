@@ -19,7 +19,8 @@ const team = {
         apiRuntimeVersion: null,
         urlRegexMatchingEnabled: null,
         setupType: null,
-        lastLoginTs: null
+        lastLoginTs: null,
+        trafficAlertThresholdSeconds: null
     },
     getters: {
         getId: (state) => state.id,
@@ -31,7 +32,8 @@ const team = {
         getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
         getUrlRegexMatchingEnabled: (state) => state.urlRegexMatchingEnabled,
         getSetupType: (state) => state.setupType,
-        getLastLoginTs: (state) => state.lastLoginTs
+        getLastLoginTs: (state) => state.lastLoginTs,
+        getTrafficAlertThresholdSeconds: (state) => state.trafficAlertThresholdSeconds
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -56,6 +58,7 @@ const team = {
                 state.dashboardVersion = "-"
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
+                state.trafficAlertThresholdSeconds = 14400
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
@@ -64,6 +67,7 @@ const team = {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
+                state.trafficAlertThresholdSeconds = resp.accountSettings.trafficAlertThresholdSeconds || 14400
             }
         },
         SET_USER_INFO(state, resp) {
@@ -121,6 +125,11 @@ const team = {
         },
         emptyState({commit, dispatch}) {
             commit('EMPTY_STATE')
+        },
+        updateTrafficAlertThresholdSeconds({commit, dispatch, state}, val) {
+            api.updateTrafficAlertThresholdSeconds(val).then(resp => {
+                state.trafficAlertThresholdSeconds = val
+            })
         }
     }
 }
