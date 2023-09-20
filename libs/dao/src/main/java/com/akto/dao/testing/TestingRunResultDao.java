@@ -1,8 +1,10 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -65,4 +67,17 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
         return testingRunResults;
     }
+
+    public void createIndicesIfAbsent() {
+        
+        String dbName = Context.accountId.get()+"";
+        String[] indices = {"testRunResultSummaryId_-1__id_-1"};
+
+        if (!checkIndexExists(dbName, getCollName(), indices[0])) {
+            String[] fieldNames = { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID};
+            // need the index to be composite because the query sorts based on ID.
+            instance.getMCollection().createIndex(Indexes.descending(fieldNames), new IndexOptions().name(indices[0]));
+        }
+    }
+
 }

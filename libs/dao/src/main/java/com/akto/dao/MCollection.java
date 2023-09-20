@@ -23,6 +23,7 @@ public abstract class MCollection<T> {
     public static MongoClient[] clients = new MongoClient[1];
     public static final String SET = "$set";
     public static final String ID = "_id";
+    public static final String NAME = "name";
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
@@ -187,4 +188,41 @@ public abstract class MCollection<T> {
     public Logger getLogger() {
         return logger;
     }
+
+    public static boolean checkIndexExists(String dbName, String collName, String indexName) {
+        try{
+            boolean exists = false;
+            MongoDatabase db = clients[0].getDatabase(dbName);
+            for (String col: db.listCollectionNames()){
+                if (collName.equalsIgnoreCase(col)){
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists) {
+                db.createCollection(collName, new CreateCollectionOptions().capped(true).maxDocuments(100_000).sizeInBytes(100_000_000));
+            }
+            
+            MongoCursor<Document> cursor = db.getCollection(collName).listIndexes().cursor();
+            List<Document> indices = new ArrayList<>();
+
+            while (cursor.hasNext()) {
+                indices.add(cursor.next());
+            }
+
+            for (Document index: indices) {
+                if (index.get(NAME).equals(indexName)) {
+                    return true;
+                }
+            }
+
+        } catch (Exception e){
+            return false;
+        }
+
+        return false;
+
+    }
+
 }
