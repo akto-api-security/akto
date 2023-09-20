@@ -194,8 +194,6 @@ export default {
                     span_text: 'API',
                     items: [],
                 }
-
-                console.log(this.field1, this.field2)
             }
         },
         customTest(newVal){
