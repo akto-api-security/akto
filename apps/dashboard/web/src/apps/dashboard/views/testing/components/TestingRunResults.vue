@@ -210,7 +210,6 @@ export default {
         FilterColumn,
         SecondaryButton,
         LayoutWithTabs,
-        PDFExportHTML,
         Spinner
     },
     data () {
