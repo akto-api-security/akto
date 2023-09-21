@@ -136,7 +136,7 @@ export default {
                     break;
                 case func.testingType().inactive:
                     res = await api.fetchTestingDetails({
-                        startTimestamp: now - func.recencyPeriod, endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
+                        startTimestamp: Math.min(now - func.recencyPeriod, this.lastRunTs.startTimestamp) , endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
                     });
                     break;
             }
