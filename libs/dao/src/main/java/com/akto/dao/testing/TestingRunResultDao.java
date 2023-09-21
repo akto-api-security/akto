@@ -9,8 +9,10 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-
+import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.model.IndexOptions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
@@ -71,13 +73,11 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     public void createIndicesIfAbsent() {
         
         String dbName = Context.accountId.get()+"";
-        String[] indices = {"testRunResultSummaryId_-1__id_-1"};
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
-        if (!checkIndexExists(dbName, getCollName(), indices[0])) {
-            String[] fieldNames = { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID};
-            // need the index to be composite because the query sorts based on ID.
-            instance.getMCollection().createIndex(Indexes.descending(fieldNames), new IndexOptions().name(indices[0]));
-        }
+        Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
+        createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name(getIndexName(summaryIndex)));
+
     }
 
 }
