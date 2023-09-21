@@ -96,6 +96,7 @@
                     :dense="true"
                     @rowClicked="openDetails"
                     @exportAsHTML="exportAsHTML"
+                    :showExportVulnerabilityButton="true"
                 >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
@@ -175,7 +176,6 @@ import StackedChart from '@/apps/dashboard/shared/components/charts/StackedChart
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import TestResultsDialog from "./TestResultsDialog";
-import PDFExportHTML from "./PDFExportHTML.vue";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import FilterColumn from '../../../shared/components/FilterColumn'
@@ -211,6 +211,7 @@ export default {
         SecondaryButton,
         LayoutWithTabs,
         PDFExportHTML,
+        Spinner
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
