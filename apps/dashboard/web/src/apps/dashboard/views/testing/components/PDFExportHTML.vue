@@ -145,7 +145,6 @@
 <script>
 import obj from "@/util/obj"
 import api from '../api'
-import inventoryApi from "@/apps/dashboard/views/observe/inventory/api";
 import func from "@/util/func";
 
 export default {
