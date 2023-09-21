@@ -209,18 +209,11 @@ const func = {
   },
   getTestResultStatus(item) {
     let localItem = item.toUpperCase();
-    switch (true) {
-      case localItem.includes("HIGH"):
-        return 'critical';
-      case localItem.includes("MEDIUM"):
-        return 'warning';
-      case localItem.includes("LOW"):
-        return 'neutral';
-      case localItem.includes("CWE") || localItem.startsWith("+"):
-        return 'info';
-      default:
-        return "";
-    }
+    if(localItem.includes("HIGH")) return 'critical';
+    if(localItem.includes("MEDIUM")) return 'warning';
+    if(localItem.includes("LOW")) return 'neutral';
+    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info';
+    return "";
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
     if (subCategoryMap[runResult.testSubType] === undefined) {

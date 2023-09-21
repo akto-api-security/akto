@@ -128,7 +128,7 @@ function MoreInformationComponent(props) {
 
 function TestRunResultPage(props) {
 
-  let {testingRunResult, runIssues} = props;
+  let {testingRunResult, runIssues, testSubCategoryMap} = props;
 
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
@@ -143,7 +143,10 @@ function TestRunResultPage(props) {
   const [loading, setLoading] = useState(true);
   
   function getDescriptionText(fullDescription){
-    let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
+
+    let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
+
+    let str = parse(tmp[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
     let finalStr = ""
 
     if(typeof(str) !== 'string'){
@@ -167,15 +170,18 @@ function TestRunResultPage(props) {
   }
 
   async function setData(testingRunResult, runIssues) {
+    
+    let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
+
     if (testingRunResult) {
-      let testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
+      let testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, tmp, subCategoryFromSourceConfigMap)
       setSelectedTestRunResult(testRunResult)
     } else {
       setSelectedTestRunResult({})
     }
     if (runIssues) {
       setIssueDetails(...[runIssues]);
-      setInfoState(await transform.fillMoreInformation(runIssues, subCategoryMap, moreInfoSections))
+      setInfoState(await transform.fillMoreInformation(runIssues, tmp, moreInfoSections))
     } else {
       setIssueDetails(...[{}]);
     }

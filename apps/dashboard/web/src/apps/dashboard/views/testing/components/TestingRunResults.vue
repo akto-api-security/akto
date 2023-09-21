@@ -28,7 +28,7 @@
         <div v-else>
             <div class="testing-runs-history" v-if="!isWorkflow">
                 <div class="d-flex jc-end">
-                <div v-for = "(header,index) in this.metadataFilterData">
+                <div  v-if=" runType==='cicd' " v-for = "(header,index) in this.metadataFilterData">
                     <v-menu :key="index" offset-y :close-on-content-click="false"> 
                     <template v-slot:activator="{ on, attrs }">
                             <secondary-button 
@@ -283,6 +283,7 @@ export default {
                 repository: "OR"
             },
             metadataFilterData: [],
+            runType: "oneTime"
         }
     },
     methods: {
@@ -310,7 +311,15 @@ export default {
             return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
         },
         getScheduleStr() {
-            return this.isDaily ? "Running daily" : "Run once"
+
+            switch(this.runType){
+                case "cicd":
+                    return "CI/CD"
+                case "recurring":
+                    return "Running daily"
+                default:
+                    return "Run once"
+            }
         },
         toHyphenatedDate(epochInMs) {
             return func.toDateStrShort(new Date(epochInMs))
@@ -466,6 +475,15 @@ export default {
                     this.originalStateFromDb = resp.workflowTest
                 }
                 this.testingRunResultSummaries = resp.testingRunResultSummaries
+                if(resp.testingRun?.scheduleTimestamp > func.timeNow()){
+                    this.runType="recurring"
+                }
+                
+                this.testingRunResultSummaries.forEach((x) => {
+                    if(x.metadata){
+                        this.runType="cicd"
+                    }
+                })
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
