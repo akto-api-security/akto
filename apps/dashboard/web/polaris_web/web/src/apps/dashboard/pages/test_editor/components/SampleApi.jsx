@@ -238,7 +238,6 @@ const SampleApi = () => {
     const closeModal = () => {
         setShowTestResult(!showTestResult)
         editorSetup.setEditorTheme();
-        editorInstance.setTheme('vs')
     }
 
     const resultComponent = (

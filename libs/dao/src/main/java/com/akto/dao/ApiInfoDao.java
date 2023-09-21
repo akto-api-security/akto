@@ -87,8 +87,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public void updateLastTestedField(List<TestingRunResult> testingRunResults, ApiInfo.ApiInfoKey apiInfoKey){
         if(hasApiHitTest(testingRunResults)){
             UpdateOptions updateOptions = new UpdateOptions();
-
-            System.out.println("should be atleast one");
             updateOptions.upsert(true);
             instance.getMCollection().updateOne(
                 getFilter(apiInfoKey), 

@@ -88,6 +88,10 @@ function GithubSimpleTable(props) {
         onSelect={props.onSelect}
         onRowClick={props.onRowClick}
         increasedHeight = {props.increasedHeight}
+        mode={props?.mode}
+        headings={props?.headings}
+        useNewRow={props?.useNewRow}
+        condensedHeight={props?.condensedHeight}
     />
 
 }

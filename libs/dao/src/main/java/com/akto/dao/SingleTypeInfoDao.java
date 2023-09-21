@@ -86,7 +86,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         if (counter == 6) {
             String[] fieldNames = {"responseCode", "subType", "timestamp",};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+            counter++;    
+        }
+
+        if(counter == 7){
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.descending(new String[]{"lastSeen", "apiCollectionId"}));
         }
     }
 
@@ -505,5 +510,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         return result; 
+    }
+
+    public Map<Integer, Integer> getLastTrafficSeen(){
+        BasicDBObject id = new BasicDBObject("apiCollectionId", "$apiCollectionId");
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo.LAST_SEEN)));
+        pipeline.add(Aggregates.group(id, Accumulators.first(SingleTypeInfo.LAST_SEEN, "$$ROOT")));
     }
 }
