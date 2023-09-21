@@ -496,7 +496,6 @@ export default {
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
-            
             if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0] && !doNotUpdateAPIjson) {
                 this.selectedUrl = {}
                 this.messageJson = {}
