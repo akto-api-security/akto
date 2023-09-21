@@ -61,13 +61,9 @@ function GithubRow(props) {
         })
     }, [dataObj])
 
-    return (
-        <IndexTable.Row
-            id={data.id}
-            key={data.id}
-            selected={selectedResources.includes(data.id) || selectedIndex === index}
-            position={index}
-        >
+    function OldCell(){
+        return(
+            <>
             <IndexTable.Cell>
                 <div className='linkClass'>
                     <Link
@@ -126,6 +122,34 @@ function GithubRow(props) {
                     </HorizontalStack>
                 </IndexTable.Cell>
             }
+        </>
+        )
+    }
+
+    function NewCell(){
+        return(
+            <>
+                {headers.map((header) =>{
+                    return(
+                        <IndexTable.Cell key={header.title}>
+                            {header.isText ? <Text variant="bodyMd" fontWeight="regular">{data[header.value]}</Text> : data[header.value]}
+                        </IndexTable.Cell>
+                    )
+                })}
+            </>
+        )
+    }
+
+    return (
+        <IndexTable.Row
+            id={data.id}
+            key={data.id}
+            selected={selectedResources.includes(data?.id) || selectedIndex === index}
+            position={index}
+            {...props.newRow ? {onClick: () => navigate(data.nextUrl)} : {}}
+            {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
+        >
+            {props?.newRow ? <NewCell /> :<OldCell/>}   
         </IndexTable.Row>
     )
 

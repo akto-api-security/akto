@@ -1,5 +1,6 @@
 import func from "@/util/func";
 import Store from "../../store";
+import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -142,6 +143,68 @@ const transform = {
         })
         const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
         return finalArr
+    },
+
+    getColor(key){
+        switch(key){
+            case "HIGH" : return "bg-critical-subdued";
+            case "MEDIUM": return "bg-caution-subdued";
+            case "LOW": return "bg-info-subdued";
+            default:
+                return "bg";
+        }
+    },
+
+    getStatus(riskScore){
+        if(riskScore > 4.5){
+            return "critical"
+        }else if(riskScore > 4){
+            return "attention"
+        }else if(riskScore > 2.5){
+            return "warning"
+        }else if(riskScore > 0){
+            return "info"
+        }else{
+            return "success"
+        }
+    },
+
+    getIssuesList(severityInfo){
+        return (
+            <HorizontalStack gap="1">
+                {
+                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                        return(
+                            <Box borderRadius="2" background={this.getColor(key)} width="30px" key={index} paddingBlockEnd={"05"} paddingBlockStart={"05"}>
+                                <HorizontalStack align="center">
+                                    <Text variant="bodySm" color="subdued" fontWeight="regular">{severityInfo[key]}</Text>
+                                </HorizontalStack>
+                            </Box>
+                        )
+                    }):
+                    <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
+                }
+            </HorizontalStack>
+        )
+    },
+
+    prettifyCollectionsData(newData){
+        const prettifyData = newData.map((c)=>{
+            return{
+                id: c.id,
+                nextUrl: '/dashboard/observe/inventory/' + c.id,
+                displayName: c.displayName,
+                endpoints: c.endpoints,
+                riskScore: <Badge status={this.getStatus(0)} size="small">{"0"}</Badge>,
+                coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
+                issuesArr: this.getIssuesList(c.severityInfo),
+                sensitiveSubTypes: c.sensitiveInRespTypes.length,
+                lastTraffic: c.detected,
+            }
+        })
+
+
+        return prettifyData
     }
       
 }

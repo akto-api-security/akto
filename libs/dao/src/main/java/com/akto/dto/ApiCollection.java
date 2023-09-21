@@ -23,6 +23,10 @@ public class ApiCollection {
 
     @BsonIgnore
     int urlsCount;
+
+    @BsonIgnore
+    int lastSeenTraffic;
+
     public static final String VXLAN_ID = "vxlanId";
 
     public ApiCollection() {
@@ -105,6 +109,14 @@ public class ApiCollection {
         this.urlsCount = urlsCount;
     }
 
+
+    public int getLastSeenTraffic() {
+        return lastSeenTraffic;
+    }
+
+    public void setLastSeenTraffic(int lastSeenTraffic) {
+        this.lastSeenTraffic = lastSeenTraffic;
+    }
     // to be used in front end
     public String getDisplayName() {
         String result;

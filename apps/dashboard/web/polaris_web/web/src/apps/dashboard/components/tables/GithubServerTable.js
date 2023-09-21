@@ -22,7 +22,7 @@ import SpinnerCentered from '../progress/SpinnerCentered';
 
 function GithubServerTable(props) {
 
-  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
+  const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length > 0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -177,6 +177,7 @@ function GithubServerTable(props) {
           onRowClick={props.onRowClick}
           selectedIndex={selectedIndex}
           setSelectedIndex={setSelectedIndex}
+          newRow={props?.useNewRow}
         />
       ),
     );
@@ -189,8 +190,11 @@ function GithubServerTable(props) {
     setPage((page) => (page - 1));
   }
 
+  let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
+  let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
+
   return (
-    <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
+    <div className={tableClass}>
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -218,7 +222,7 @@ function GithubServerTable(props) {
                 setMode={setMode}
                 loading={props.loading || false}
               />
-              <div className={props.increasedHeight ? "control-row" : ""}>
+              <div className={tableHeightClass}>
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -228,7 +232,7 @@ function GithubServerTable(props) {
                 // condensed
                 selectable={props.selectable || false}
                 onSelectionChange={handleSelectionChange}
-                headings={[
+                headings={props?.headings ? props.headings :[
                   {
                     id: "data",
                     hidden: true,
