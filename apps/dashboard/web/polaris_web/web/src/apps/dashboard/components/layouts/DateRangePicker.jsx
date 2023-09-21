@@ -111,6 +111,7 @@ function DateRangePicker(props) {
         setDate({ month, year });
       }
       function handleCalendarChange({ start, end }) {
+        setInputValues({since: formatDate(start), until: formatDate(end)})
         const newDateRange = ranges.find((range) => {
           return (
             range.period.since.valueOf() === start.valueOf() &&
@@ -127,13 +128,17 @@ function DateRangePicker(props) {
         setActiveDateRange(newDateRange);
       }
       function apply() {
-        props.dispatch({type: "update", period: activeDateRange})
+        const newUntil = new Date(activeDateRange.period.until).setHours(23, 59, 59, 999);
+        let newPeriod = { ...activeDateRange};
+        newPeriod.period.until = new Date(newUntil);
+        props.dispatch({type: "update", period: newPeriod})
         props.setPopoverState(false);
       }
       function cancel() {
         setActiveDateRange(props.initialDispatch)
         props.setPopoverState(false);
       }
+
       return (
         <Box>
           <Popover.Pane fixed>

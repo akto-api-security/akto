@@ -33,7 +33,7 @@ function GithubServerTable(props) {
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
   const [selectedIndex, setSelectedIndex] = useState(-1)
 
-  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 
   useEffect(() => {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
@@ -59,7 +59,11 @@ function GithubServerTable(props) {
         temp.push(defaultAppliedFilter)
       }
     })
-    setAppliedFilters(temp);
+    if (key == "dateRange") {
+      getDate({ type: "update", period: values.ranges[3] });
+    } else {
+      setAppliedFilters(temp);
+    }
   }
 
   const changeAppliedFilters = (key, value) => {
@@ -139,6 +143,7 @@ function GithubServerTable(props) {
 
   const handleFiltersClearAll = useCallback(() => {
     setAppliedFilters(props.appliedFilters || [])
+    getDate({ type: "update", period: values.ranges[3] });
   }, []);
 
   const resourceIDResolver = (data) => {
