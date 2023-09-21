@@ -72,14 +72,14 @@ public class StartTestAction extends UserAction {
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
                 Projections.excludeId(),
-                Projections.include("testingRunId"));
+                Projections.include(TestingRunResultSummary.TESTING_RUN_ID));
         return TestingRunResultSummariesDao.instance.findAll(
                 filters, projections).stream().map(summary -> summary.getTestingRunId())
                 .collect(Collectors.toList());
     }
 
     private static List<ObjectId> getCicdTests(){
-        return getTestingRunListFromSummary(Filters.exists("metadata"));
+        return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
     }
 
     private static List<ObjectId> getTestsWithSeverity(List<String> severities){
@@ -376,7 +376,7 @@ public class StartTestAction extends UserAction {
         this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0, limitForTestingRunResultSummary , sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
 
-        if (this.testingRun.getTestIdConfig() == 1) {
+        if (this.testingRun!=null && this.testingRun.getTestIdConfig() == 1) {
             WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
             this.workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", workflowTestingEndpoints.getWorkflowTest().getId()));
         }
@@ -534,14 +534,6 @@ public class StartTestAction extends UserAction {
     }
 
     Map<String, Set<String>> metadataFilters; 
-
-    public Map<String, Set<String>> getMetadataFilters() {
-        return metadataFilters;
-    }
-
-    public void setMetadataFilters(Map<String, Set<String>> metadataFilters) {
-        this.metadataFilters = metadataFilters;
-    }
 
     public String fetchMetadataFilters(){
 
@@ -796,6 +788,10 @@ public class StartTestAction extends UserAction {
 
     public void setFetchOnlyVulnerable(boolean fetchOnlyVulnerable) {
         this.fetchOnlyVulnerable = fetchOnlyVulnerable;
+    }
+
+    public Map<String, Set<String>> getMetadataFilters() {
+        return metadataFilters;
     }
 
     public enum CallSource{
