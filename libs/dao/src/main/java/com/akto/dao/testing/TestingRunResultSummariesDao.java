@@ -15,6 +15,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Sorts;
 
@@ -53,11 +55,11 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
     public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";
-        String[] indices = {"testingRunId_1"};
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+        
+        Bson testingRunIndex = Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID);
+        createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name(getIndexName(testingRunIndex)));
 
-        if (!checkIndexExists(dbName, getCollName(), indices[0])) {
-            instance.getMCollection().createIndex(Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID));
-        }
     }
 
     @Override
