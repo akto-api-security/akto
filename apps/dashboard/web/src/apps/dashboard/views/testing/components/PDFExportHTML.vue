@@ -150,7 +150,8 @@ import func from "@/util/func";
 export default {
     name: "PDFExportHTML",
     props: {
-        testingRunResultSummaryHexId: obj.strR
+        testingRunResultSummaryHexId: obj.strN,
+        issuesFilters: obj.strN
     },
     data() {
         return {
@@ -216,7 +217,6 @@ export default {
         },
         createVulnerabilityMap(testingRunResults) {
             let categoryVsVulMap = {}
-            let sampleDataMsgList = []
             testingRunResults.forEach((testingRun) => {
 
                 let subtype = testingRun['testSubType']
@@ -247,11 +247,6 @@ export default {
                 vulnerabilities['vulnerableTestingRunResults'] = vulnerableTestingRunResults
                 vulnerabilities['severityIndex'] = severityIndex
                 categoryVsVulMap[subtype] = vulnerabilities
-                let testResults = testingRun.testResults
-                testResults.forEach((testResult) => {
-                    sampleDataMsgList.push(testResult.message)
-                    sampleDataMsgList.push(testResult.originalMessage)
-                })
             })
             Object.keys(categoryVsVulMap).forEach((category) => {
                 let obj = categoryVsVulMap[category]

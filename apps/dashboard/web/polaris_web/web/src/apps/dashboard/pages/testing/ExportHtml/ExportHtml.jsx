@@ -2,13 +2,20 @@ import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
-import { Avatar, Box, Button,Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack } from '@shopify/polaris'
-import {FlagMajor, CollectionsMajor, ResourcesMajor} from "@shopify/polaris-icons"
+import { Avatar, Box, Button,Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon, Badge, List, Link } from '@shopify/polaris'
+import {FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor} from "@shopify/polaris-icons"
+import func from '@/util/func'
+import './styles.css'
 
 function ExportHtml() {
     const params = useParams() ;
     const testingRunSummaryId = params.summaryId
     const moreInfoSections = [
+        {
+            icon: InfoMinor,
+            title: "Description",
+            content: ""
+        },
         {
           icon: FlagMajor,
           title: "Impact",
@@ -20,11 +27,6 @@ function ExportHtml() {
           content: ""
         },
         {
-            icon: "",
-            title: "More Info",
-            content: "",
-        },
-        {
           icon: ResourcesMajor,
           title: "References",
           content: ""
@@ -33,13 +35,13 @@ function ExportHtml() {
 
     const [vulnerableResultsMap, setVulnerableResultsMap] = useState([]) ;
     const [dataToCurlObj, setDataToCurlObj] = useState({});
+    const [infoState, setInfoState] = useState(moreInfoSections)
     const [severitiesCount,setSeveritiesCount] = useState({HIGH: 0, MEDIUM: 0, LOW: 0}) ;
 
     const subCategoryMap = PersistStore(state => state.subCategoryMap)
 
-    const createVulnerabilityMap = (testingRunResults, sampleDataVsCurlMap) => {
+    const createVulnerabilityMap = (testingRunResults) => {
         let categoryVsVulMap = {}
-        let sampleDataMsgList = []
         let high = 0
         let medium = 0
         let low = 0
@@ -77,18 +79,12 @@ function ExportHtml() {
             vulnerabilities['vulnerableTestingRunResults'] = vulnerableTestingRunResults
             vulnerabilities['severityIndex'] = severityIndex
             categoryVsVulMap[subtype] = vulnerabilities
-            let testResults = testingRun?.testResults
-            testResults.forEach((testResult) => {
-                sampleDataMsgList.push(testResult.message)
-                sampleDataMsgList.push(testResult.originalMessage)
-            })
         })
-
         setSeveritiesCount({HIGH: high, MEDIUM: medium, LOW: low});
         let localCopy = vulnerableResultsMap
         Object.keys(categoryVsVulMap).forEach((category) => {
             let obj = categoryVsVulMap[category]
-            localCopy.push(obj)
+            localCopy.push({ category: obj })
         })
 
         let compare = function (a, b) {
@@ -119,7 +115,7 @@ function ExportHtml() {
             }
         }
         setDataToCurlObj(sampleDataVsCurlMap)
-        createVulnerabilityMap(vulnerableTestingRunResults,sampleDataVsCurlMap)
+        createVulnerabilityMap(vulnerableTestingRunResults)
     }
 
     useEffect(()=>{
@@ -143,7 +139,7 @@ function ExportHtml() {
     )
 
     const getColor = (item) =>{
-        switch(item.severityIndex){
+        switch(item.category.severityIndex){
             case 0:
                 return "bg-caution"
 
@@ -158,6 +154,80 @@ function ExportHtml() {
         }
     }
 
+    const fillContent = (item) => {
+        let filledSection = []
+        moreInfoSections.forEach((section) => {
+            let sectionLocal = {}
+            sectionLocal.icon = section.icon
+            sectionLocal.title = section.title
+            switch(section.title) {
+                case "Description":
+                    sectionLocal.content = (
+                        <Text color='subdued'>
+                          {replaceTags(item.category.issueDetails, item.category.vulnerableTestingRunResults) || "No impact found"}
+                        </Text>
+                      )
+                    break;
+                case "Impact":
+                    sectionLocal.content = (
+                        <Text color='subdued'>
+                          {item.category.issueImpact || "No impact found"}
+                        </Text>
+                      )
+                    break;
+                case "Tags":
+                    sectionLocal.content = (
+                        <HorizontalStack gap="2">
+                          {
+                            item.category.issueTags.map((tag, index) => {
+                              return (
+                                <Badge progress="complete" key={index}>{tag}</Badge>
+                              )
+                            })
+                          }
+                        </HorizontalStack>
+                      )
+                    
+                    break;
+                case "References":
+                    sectionLocal.content = (
+                        <List type='bullet' spacing="extraTight">
+                          {
+                            item?.category?.references?.map((reference) => {
+                              return (
+                                <List.Item key={reference}>
+                                  <Link key={reference} url={reference} monochrome removeUnderline>
+                                    <Text color='subdued'>
+                                      {reference}
+                                    </Text>
+                                  </Link>
+                                </List.Item>
+                              )
+                            })
+                          }
+                        </List>
+                      )
+                    break;
+            }
+            filledSection.push(sectionLocal)
+        })
+        return filledSection
+    }
+
+    const replaceTags = (details, vulnerableRequests) => {
+        let percentageMatch = 0;
+        vulnerableRequests.forEach((request) => {
+            let testRun = request['testResults']
+            testRun.forEach((runResult) => {
+                if (percentageMatch < runResult.percentageMatch) {
+                    percentageMatch = runResult.percentageMatch
+                }
+            })
+        })
+        return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
+    }
+
+
     const cardTitleComponent = (item) =>{
         return(
             <Box borderWidth="1" background={getColor(item)}>
@@ -169,7 +239,7 @@ function ExportHtml() {
                 </Box>
                 <Box>
                     <Box padding={1}>
-                        <Text variant="headingMd">{item?.testName}</Text>
+                        <Text variant="headingMd">{item?.category.testName}</Text>
                     </Box>
                 </Box>
                 </HorizontalStack>
@@ -236,17 +306,120 @@ function ExportHtml() {
                             {vulnerableResultsMap.map((item,index)=>(
                                 <LegacyCard sectioned title={cardTitleComponent(item)} key={index}>
                                     <LegacyCard.Section>
+                                        <MoreInformationComponent
+                                            key="info"
+                                            sections={fillContent(item)}
+                                            item={item}
+                                            dataToCurlObj={dataToCurlObj}
 
+                                        />
                                     </LegacyCard.Section>
                                 </LegacyCard>
                             ))}
                         </VerticalStack>
                     </VerticalStack>
-
                 </VerticalStack>
             </div>
         </Frame>
     )
 }
+
+function MoreInformationComponent(props) {
+    const getTruncatedString = (str) => {
+        if (str && str.length > 3000) {
+            return str.substr(0, 3000) + '  .........';
+        }
+        return str;
+    }
+
+    const getOriginalCurl = (message) => {
+        return props.dataToCurlObj[message]
+    }
+
+
+    const getResponse = (message) => {
+        let messageJson = JSON.parse(message)
+        if (messageJson['response']) {
+            return JSON.stringify(messageJson['response'])
+        }
+        return JSON.stringify({"statusCode":messageJson['statusCode'],  "body": messageJson['responsePayload'],   "headers": messageJson['responseHeaders']})
+    }
+    return (
+      <VerticalStack gap={"4"}>
+        <LegacyCard>
+          <LegacyCard.Section>
+            {
+              props.sections.map((section) => {
+                return (<LegacyCard.Subsection key={section.title}>
+                  <VerticalStack gap="3">
+                    <HorizontalStack gap="2" align="start" blockAlign='start'>
+                      <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                        {section?.icon && <Icon source={section.icon}></Icon>}
+                      </div>
+                      <Text variant='headingSm'>
+                        {section.title || "Heading"}
+                      </Text>
+                    </HorizontalStack>
+                    {section.content}
+                  </VerticalStack>
+                </LegacyCard.Subsection>)
+              })
+            }
+          </LegacyCard.Section>
+          <LegacyCard.Section>
+            {props.item.category.vulnerableTestingRunResults.map((testingRun)=> (
+                <div className="attempts-div">
+                    <div className="row-div-1">
+                        <span className="api-text">
+                            Vulnerable endpoint : 
+                        </span>
+                        <span className="url-text">
+                            { testingRun.apiInfoKey.url }
+                        </span>
+                    </div>
+                    {testingRun.testResults.map((testRun) => (
+                        <div>
+                            <div className="row-div">
+                                <span className="title-name" style={{fontWeight: "500"}}>
+                                    Original request
+                                </span>
+                                <span className="url-name" style={{fontWeight: "500"}}>
+                                    Attempt
+                                </span>
+                            </div>
+                            <div className="row-div">
+                                <span className="message" style={{borderRight: "1px solid #47466A73"}}>
+                                    { getTruncatedString(getOriginalCurl(testRun.originalMessage)) }
+                                </span>
+                                <span className="message">
+                                    { getTruncatedString(getOriginalCurl(testRun.message)) }
+                                </span>
+                            </div>
+                            <div className="row-div">
+                                <span className="title-name" style={{fontWeight: "500"}}>
+                                    Original Response
+                                </span>
+                                <span className="url-name" style={{fontWeight: "500"}}>
+                                    Attempt Response
+                                </span>
+                            </div>
+                            <div className="row-div">
+                                <span className="message" style={{borderRight: "1px solid #47466A73"}}>
+                                    { getTruncatedString(getResponse(testRun.originalMessage)) }
+                                </span>
+                                <span className="message">
+                                    { getTruncatedString(getResponse(testRun.message)) }
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ))}
+          </LegacyCard.Section>
+        </LegacyCard>
+      </VerticalStack>
+    )
+  }
+  
 
 export default ExportHtml
