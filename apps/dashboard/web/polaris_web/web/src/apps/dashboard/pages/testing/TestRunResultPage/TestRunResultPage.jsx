@@ -200,13 +200,14 @@ function TestRunResultPage(props) {
           }
         }
         setData(testingRunResult, runIssues);
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 500)
     }
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
-  const components = [
-    loading ? [<SpinnerCentered key="loading" />] :
+  const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
         {

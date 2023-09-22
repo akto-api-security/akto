@@ -1,7 +1,7 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters}) {
+    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters) {
         const resp = await request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',

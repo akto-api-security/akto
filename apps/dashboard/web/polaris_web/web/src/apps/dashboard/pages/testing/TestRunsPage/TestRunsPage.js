@@ -229,25 +229,25 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     switch (currentTab) {
 
       case "cicd":
-        await api.fetchTestingDetails({
-          startTimestamp: 0, endTimestamp: 0, fetchCicd: true, sortKey, sortOrder, skip, limit, filters
-        }).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+        await api.fetchTestingDetails(
+          0, 0, true, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
         });
         break;
       case "recurring":
-        await api.fetchTestingDetails({
-          startTimestamp: 0, endTimestamp: 0, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
-        }).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+        await api.fetchTestingDetails(
+          0, 0, false, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
       case "onetime":
-        await api.fetchTestingDetails({
-          startTimestamp: now - func.recencyPeriod, endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
-        }).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+        await api.fetchTestingDetails(
+          now - func.recencyPeriod, now, false, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
