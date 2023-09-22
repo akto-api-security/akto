@@ -123,7 +123,6 @@ jobs:
         with:
           mask-password: 'true'
           registry-type: public
-          aws-region: us-east-1
 
       - name: Build, tag, and push docker image to Amazon ECR
         env:
