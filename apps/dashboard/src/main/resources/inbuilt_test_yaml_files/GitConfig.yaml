@@ -14,7 +14,7 @@ info:
   references:
     - https://pentester.land/blog/source-code-disclosure-via-exposed-git-folder/
   cwe:
-    CWE-16
+    - CWE-16
 
 api_selection_filters:
   response_code:
