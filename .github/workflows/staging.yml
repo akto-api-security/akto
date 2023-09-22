@@ -142,7 +142,7 @@ jobs:
       
   test:
     if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-    needs: deploy
+    # needs: deploy
     runs-on: ubuntu-latest
     steps:
 
