@@ -25,6 +25,8 @@ info:
   references:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
     - "https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:
