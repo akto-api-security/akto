@@ -25,7 +25,7 @@ info:
   references:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md"
   cwe:
-    CWE-915
+    - CWE-915
 
 api_selection_filters:
   response_code:
