@@ -52,9 +52,9 @@ jobs:
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
-      - name: Prepare Dashboard UI
-        working-directory: ./apps/dashboard/
-        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+#      - name: Prepare Dashboard UI
+#        working-directory: ./apps/dashboard/
+#        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
 #      - name: Prepare Dashboard polaris UI
 #        working-directory: ./apps/dashboard/web/polaris_web
 #        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
@@ -74,8 +74,8 @@ jobs:
 
       - name: Build, tag, and push docker image to Amazon ECR
         env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: akto-api-security
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: latest
         run: |
           docker buildx create --use
