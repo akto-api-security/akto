@@ -31,6 +31,11 @@ on:
         required: false
         type: boolean
         default: false
+      Test:
+        description: 'Run QA tests'
+        required: false
+        type: boolean
+        default: false
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -141,7 +146,7 @@ jobs:
         aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
       
   test:
-    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Test == 'true' }}
     needs: deploy
     runs-on: ubuntu-latest
     steps:
