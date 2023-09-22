@@ -1042,7 +1042,25 @@ getSizeOfFile(bytes) {
   } else {
     return bytes + ' B';
   }
-}
+  },
+  getTimeTakenByTest(startTimestamp, endTimestamp){
+    const timeDiff = Math.abs(endTimestamp - startTimestamp);
+    const hours = Math.floor(timeDiff / 3600);
+    const minutes = Math.floor((timeDiff % 3600) / 60);
+    const seconds = timeDiff % 60;
+
+    let duration = '';
+    if (hours > 0) {
+        duration += hours + ` hour${hours==1 ? '' : 's'} `;
+    }
+    if (minutes > 0) {
+        duration += minutes + ` minute${minutes==1 ? '' : 's'} `;
+    }
+    if (seconds > 0 || (hours === 0 && minutes === 0)) {
+        duration += seconds + ` second${seconds==1 ? '' : 's'}`;
+    }
+    return duration.trim();
+  },
 }
 
 export default func

@@ -50,15 +50,15 @@ function getTotalSeverityTestRunResult(severity){
   return ts;
 }
 
-function getRuntime(scheduleTimestamp ,endTimestamp, state){
+function getRuntime(scheduleTimestamp ,endTimestamp, startTimestamp, state){
   let status = getStatus(state);
     if(status==='RUNNING'){
         return "Currently running";
     }
-    const currTime = Date.now();
-    if(endTimestamp === -1){
-      if(currTime > scheduleTimestamp){
-        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+
+    if(endTimestamp <= 0 ){
+      if(startTimestamp > scheduleTimestamp){
+        return "Was started " + func.prettifyEpoch(startTimestamp)
     } else {
         return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
     }
@@ -71,7 +71,7 @@ function getAlternateTestsInfo(state){
     switch(status){
         case "RUNNING": return "Tests are still running";
         case "SCHEDULED": return "Tests have been scheduled";
-        case "STOPPED": return "Tests have been stopper";
+        case "STOPPED": return "Tests have been stopped";
         default: return "Information unavailable";
     }
 }
@@ -125,18 +125,27 @@ const transform = {
           delete testingRunResultSummary.countIssues['MEDIUM']
           delete testingRunResultSummary.countIssues['LOW']
       }
+
+      let state = testingRunResultSummary.state ? testingRunResultSummary.state : data.state;
+      let startTimestamp = testingRunResultSummary.startTimestamp ? testingRunResultSummary.startTimestamp : data.startTimestamp;
+      let endTimestamp = testingRunResultSummary.endTimestamp ? testingRunResultSummary.endTimestamp : data.endTimestamp;
+
+      obj['hexId']= data.hexId;
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
-      obj['orderPriority'] = getOrderPriority(data.state)
-      obj['icon'] = func.getTestingRunIcon(data.state);
-      obj['iconColor'] = func.getTestingRunIconColor(data.state)
+      obj['orderPriority'] = getOrderPriority(state)
+      obj['icon'] = func.getTestingRunIcon(state);
+      obj['iconColor'] = func.getTestingRunIconColor(state)
       obj['name'] = data.name || "Test"
-      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
+      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
+      obj['startTimestamp'] = startTimestamp
+      obj['endTimestamp'] = endTimestamp
+      obj['state'] = getStatus(state) 
+      obj['run_time'] = getRuntime(data.scheduleTimestamp ,endTimestamp, startTimestamp, state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
@@ -145,7 +154,7 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary.metadata)
       obj['repository'] = [obj?.metadata?.repository]
       obj['branch'] = [obj?.metadata?.branch]
-      return {...data, ...obj};
+      return obj;
     },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd) => {
       let testRuns = []
