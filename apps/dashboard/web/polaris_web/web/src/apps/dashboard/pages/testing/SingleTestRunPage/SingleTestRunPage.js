@@ -169,12 +169,9 @@ function SingleTestRunPage() {
     });
     clearInterval(refreshId.current);
     setSelectedTestRun((prev) => {
-      prev['severity'] = func.getSeverity(summary.countIssues)
-      prev['severityStatus'] = func.getSeverityStatus(summary.countIssues)
-      prev['metadata'] = func.flattenObject(summary.metadata)
-      prev['testingRunResultSummaryHexId'] = summary?.hexId;
-      prev['endTimestamp'] = summary?.endTimestamp;
-      prev['startTimestamp'] = summary?.startTimestamp;
+      let tmp = {...summary};
+      tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
+      prev = {...prev, ...transform.prepareDataFromSummary(tmp, prev.testRunState)}
 
       return {...prev};
     });
@@ -212,15 +209,17 @@ function SingleTestRunPage() {
         setWorkflowTest(workflowTest);
       }
       let cicd = false;
-      if(testingRunResultSummaries){
-        testingRunResultSummaries.forEach((item) => {
-          if(item.metadata != null){
-            cicd = true;
-          }
-        })
+      let res = await api.fetchTestingDetails(0,0,true,"",1,0,10,{endTimestamp: [testingRun.endTimestamp, testingRun.endTimestamp]});
+      if(res.testingRuns.map(x=>x.hexId).includes(testingRun.hexId)){
+        cicd = true;
       }
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd);
-      if(localSelectedTestRun.state === "RUNNING" || localSelectedTestRun.state === "SCHEDULED"){
+      if(localSelectedTestRun.orderPriority === 1 || localSelectedTestRun.orderPriority === 2){
+        if(setData){
+          setTimeout(() => {
+            refreshSummaries();
+          }, 2000)
+        }
         setTempLoading((prev) => {
             prev.running = true;
             return {...prev};
@@ -245,8 +244,8 @@ function SingleTestRunPage() {
   const refreshSummaries = () => {
     let intervalId = setInterval(async() => {
       let localSelectedTestRun = await fetchData(false);
-      if(localSelectedTestRun.hexId){
-        if(localSelectedTestRun.orderPriority !== 1){
+      if(localSelectedTestRun.id){
+        if(localSelectedTestRun.orderPriority !== 1 && localSelectedTestRun.orderPriority !== 2){
           setSelectedTestRun(localSelectedTestRun);
           setTempLoading((prev) => {
             prev.running = false;
@@ -274,7 +273,6 @@ function SingleTestRunPage() {
       await fetchData(true);
     }
     loadData();
-    refreshSummaries();
   }, [])
 
 const promotedBulkActions = (selectedDataHexIds) => { 
@@ -289,15 +287,18 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   function getHeadingStatus(selectedTestRun) {
 
-    switch (selectedTestRun.state) {
+    switch (selectedTestRun?.summaryState) {
       case "RUNNING":
         return "Test is running";
       case "SCHEDULED":
         return "Test has been scheduled";
       case "STOPPED":
+        return "Test has been stopped";
       case "COMPLETED":
-        return `Scanned ${func.prettifyEpoch(selectedTestRun.endTimestamp)} for a duration of 
+        return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of 
         ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
+      case "FAIL":
+        return "Test execution has failed during run";
       default:
         return "";
     }
@@ -392,7 +393,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {
       func.setToast(true, false, "Test re-run")
-      setStopRefresh(false);
       setTimeout(() => {
         refreshSummaries();
       }, 2000)

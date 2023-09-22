@@ -2,7 +2,8 @@ import {
   CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMajor
+  CircleTickMajor,
+  CircleAlertMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -177,7 +178,7 @@ const func = {
     return result;
   },
   getSeverityStatus(countIssues) {
-    if(countIssues==null){
+    if(countIssues==null || countIssues==undefined){
       return [];
     }
     return Object.keys(countIssues).filter((key) => {
@@ -190,6 +191,7 @@ const func = {
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMajor;
       case "COMPLETED": return CircleTickMajor;
+      case "FAIL": return CircleAlertMajor;
       default: return ClockMinor;
     }
   },
@@ -197,6 +199,7 @@ const func = {
     switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
+      case "FAIL":
       case "STOPPED": return "critical";
       case "COMPLETED": return "success";
       default: return "base";

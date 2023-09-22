@@ -19,6 +19,7 @@ function getOrderPriority(state){
         case "RUNNING": return 1;
         case "SCHEDULED": return 2;
         case "STOPPED": return 4;
+        case "FAIL": return 5;
         default: return 3;
     }
 }
@@ -50,15 +51,15 @@ function getTotalSeverityTestRunResult(severity){
   return ts;
 }
 
-function getRuntime(scheduleTimestamp ,endTimestamp, startTimestamp, state){
+function getRuntime(scheduleTimestamp ,endTimestamp, state){
   let status = getStatus(state);
     if(status==='RUNNING'){
         return "Currently running";
     }
-
+    const currTime = Date.now();
     if(endTimestamp <= 0 ){
-      if(startTimestamp > scheduleTimestamp){
-        return "Was started " + func.prettifyEpoch(startTimestamp)
+     if(currTime > scheduleTimestamp){
+        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
     } else {
         return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
     }
@@ -72,6 +73,7 @@ function getAlternateTestsInfo(state){
         case "RUNNING": return "Tests are still running";
         case "SCHEDULED": return "Tests have been scheduled";
         case "STOPPED": return "Tests have been stopped";
+        case "FAIL": return "Test execution has failed during run";
         default: return "Information unavailable";
     }
 }
@@ -111,26 +113,54 @@ function minimizeTagList(items){
   return items;
 }
 
+function checkTestFailure(summaryState, testRunState){
+  if(testRunState=='COMPLETED' && summaryState!='COMPLETED'){
+    return true;
+  }
+  return false;
+}
+
 const transform = {
+    prepareDataFromSummary : (data, testRunState) => {
+      let obj={};
+      obj['testingRunResultSummaryHexId'] = data?.hexId;
+      let state = data?.state;
+      if(checkTestFailure(state, testRunState)){
+        state = 'FAIL'
+      }
+      obj['orderPriority'] = getOrderPriority(state)
+      obj['icon'] = func.getTestingRunIcon(state);
+      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['summaryState'] = getStatus(state)
+      obj['startTimestamp'] = data?.startTimestamp
+      obj['endTimestamp'] = data?.endTimestamp
+      obj['severity'] = func.getSeverity(data?.countIssues)
+      obj['severityStatus'] = func.getSeverityStatus(data?.countIssues)
+      obj['metadata'] = func.flattenObject(data?.metadata)
+      return obj;
+    },
+    prepareCountIssues : (data) => {
+      let obj={
+        'High': data['HIGH'] || 0,
+        'Medium': data['MEDIUM'] || 0,
+        'Low': data['LOW'] || 0
+      };
+      return obj;
+    },
     prepareTestRun : (data, testingRunResultSummary, cicd) => {
       let obj={};
       if(testingRunResultSummary==null){
         testingRunResultSummary = {};
       }
       if(testingRunResultSummary.countIssues!=null){
-          testingRunResultSummary.countIssues['High'] = testingRunResultSummary.countIssues['HIGH']
-          testingRunResultSummary.countIssues['Medium'] = testingRunResultSummary.countIssues['MEDIUM']
-          testingRunResultSummary.countIssues['Low'] = testingRunResultSummary.countIssues['LOW']
-          delete testingRunResultSummary.countIssues['HIGH']
-          delete testingRunResultSummary.countIssues['MEDIUM']
-          delete testingRunResultSummary.countIssues['LOW']
+          testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
       }
 
-      let state = testingRunResultSummary.state ? testingRunResultSummary.state : data.state;
-      let startTimestamp = testingRunResultSummary.startTimestamp ? testingRunResultSummary.startTimestamp : data.startTimestamp;
-      let endTimestamp = testingRunResultSummary.endTimestamp ? testingRunResultSummary.endTimestamp : data.endTimestamp;
+      let state = data.state;
+      if(checkTestFailure(testingRunResultSummary.state, state)){
+        state = 'FAIL'
+      }
 
-      obj['hexId']= data.hexId;
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(state)
@@ -139,21 +169,20 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,endTimestamp)
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['startTimestamp'] = startTimestamp
-      obj['endTimestamp'] = endTimestamp
-      obj['state'] = getStatus(state) 
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,endTimestamp, startTimestamp, state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       obj['nextUrl'] = "/dashboard/testing/"+data.hexId
-      obj['metadata'] = func.flattenObject(testingRunResultSummary.metadata)
-      obj['repository'] = [obj?.metadata?.repository]
-      obj['branch'] = [obj?.metadata?.branch]
+      obj['testRunState'] = data.state
+      obj['summaryState'] = state
+      obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
+      obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
+      obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       return obj;
     },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd) => {
