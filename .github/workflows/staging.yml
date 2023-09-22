@@ -55,9 +55,9 @@ jobs:
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
-      - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/web/polaris_web
-        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+#      - name: Prepare Dashboard polaris UI
+#        working-directory: ./apps/dashboard/web/polaris_web
+#        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Configure AWS Credentials
         if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
@@ -66,67 +66,86 @@ jobs:
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY_PROD}}
           aws-region: ap-south-1
 
-      - name: Deploy static site to S3 bucket
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/on_prem/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
-      - name: Deploy polaris site to S3 bucket
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/on_prem/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: 'true'
 
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
-      - name: DockerHub login
-        if: ${{ github.event.inputs.Environment == 'prod' }}
+      - name: Build, tag, and push docker image to Amazon ECR
         env:
-          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Build, tag, and push the image to DockerHub
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        id: build-image-dockerhub
-        env:
-          ECR_REGISTRY: aktosecurity
-          ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: akto-api-security
+          IMAGE_TAG: latest
         run: |
           docker buildx create --use
-          # Build a docker container and push it to DockerHub 
           cd apps/dashboard
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"
-          cd ../api-runtime
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"       
-          cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
-          cd ../api-analyser
-          docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG"
-      - name: Set up JDK 11
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-      - name: Cache Maven packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=akto-api-security_mono
+
+
+      - name: Deploy static site to S3 bucket
+        if: ${{ github.event.inputs.Environment == 'prod' }}
+        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/on_prem/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+#      - name: Deploy polaris site to S3 bucket
+#        if: ${{ github.event.inputs.Environment == 'prod' }}
+#        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/on_prem/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+
+#      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+#      - name: DockerHub login
+#        if: ${{ github.event.inputs.Environment == 'prod' }}
+#        env:
+#          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+#          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+#        run: |
+#          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+#      - name: Build, tag, and push the image to DockerHub
+#        if: ${{ github.event.inputs.Environment == 'prod' }}
+#        id: build-image-dockerhub
+#        env:
+#          ECR_REGISTRY: aktosecurity
+#          ECR_REPOSITORY: akto-api-security
+#          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+#        run: |
+#          docker buildx create --use
+#          # Build a docker container and push it to DockerHub
+#          cd apps/dashboard
+#          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
+#          echo "Pushing image to ECR..."
+#          docker push $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG
+#          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"
+#          cd ../api-runtime
+#          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG .
+#          echo "Pushing image to ECR..."
+#          docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
+#          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"
+#          cd ../testing
+#          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
+#          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
+#          cd ../api-analyser
+#          docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .
+#          echo "Pushing image to ECR..."
+#          docker push $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG
+#          echo "::set-output name=image::$ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG"
+#      - name: Set up JDK 11
+#        uses: actions/setup-java@v1
+#        with:
+#          java-version: 11
+#      - name: Cache SonarCloud packages
+#        uses: actions/cache@v1
+#        with:
+#          path: ~/.sonar/cache
+#          key: ${{ runner.os }}-sonar
+#          restore-keys: ${{ runner.os }}-sonar
+#      - name: Cache Maven packages
+#        uses: actions/cache@v1
+#        with:
+#          path: ~/.m2
+#          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+#          restore-keys: ${{ runner.os }}-m2
+#      - name: Build and analyze
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=akto-api-security_mono
