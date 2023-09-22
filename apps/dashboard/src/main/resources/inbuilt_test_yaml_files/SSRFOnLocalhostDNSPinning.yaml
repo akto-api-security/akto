@@ -20,6 +20,9 @@ info:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
+  cwe:
+    - CWE-918
+
 api_selection_filters:
   response_code:
     and:

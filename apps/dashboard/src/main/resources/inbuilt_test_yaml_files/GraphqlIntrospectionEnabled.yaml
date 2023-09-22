@@ -24,6 +24,8 @@ info:
     - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
     - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
     - "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   url:
