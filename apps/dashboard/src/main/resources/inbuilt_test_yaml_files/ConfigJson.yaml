@@ -13,6 +13,9 @@ info:
   severity: MEDIUM
   references:
     - https://www.acunetix.com/vulnerabilities/web/unprotected-json-file-leaking-secrets/
+  cwe:
+    - CWE-200
+    - CWE-213
 
 api_selection_filters:
   response_code:

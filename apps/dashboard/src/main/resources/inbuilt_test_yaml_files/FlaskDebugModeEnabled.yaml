@@ -26,6 +26,8 @@ info:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
     - "https://flask.palletsprojects.com/en/2.3.x/debugging/"
     - "http://ghostlulz.com/flask-rce-debug-mode/"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:
