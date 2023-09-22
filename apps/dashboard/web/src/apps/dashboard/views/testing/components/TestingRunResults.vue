@@ -530,7 +530,7 @@ export default {
             this.loading = false
         } else {
             this.refreshSummariesInterval = setInterval(() => {
-                this.refreshSummaries().then(() => {
+                this.refreshSummaries(true).then(() => {
                 if (this.testingRunResultSummaries.length !== 0) {
                     this.loading = false
                     clearInterval(this.refreshSummariesInterval)
@@ -541,7 +541,7 @@ export default {
 
         this.refreshTestResultsInterval = setInterval(() => {
             if (this.currentTest && (this.currentTest.state === "SCHEDULED" || this.currentTest.state === "RUNNING")) {
-                this.refreshSummaries()
+                this.refreshSummaries(true)
             }
         }, 5000)
 

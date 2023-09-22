@@ -254,6 +254,15 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
     }
 
+    ret = ret.sort((a, b) => (a.orderPriority > b.orderPriority) ? 1 : ((b.orderPriority > a.orderPriority) ? -1 : 0));
+    // we send the test if any summary of the test is in the filter.
+    ret = ret.filter((item) => {
+      if(filters.severity && filters.severity.length > 0){
+        return item.severityStatus.some(x => filters.severity.includes(x.toUpperCase()))
+      } 
+      return true
+    })
+
     setLoading(false);
     return { value: ret, total: total };
 

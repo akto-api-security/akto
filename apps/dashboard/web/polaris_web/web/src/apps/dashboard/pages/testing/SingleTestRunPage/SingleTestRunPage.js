@@ -21,8 +21,7 @@ import {
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
-import { useState, useEffect } from 'react';
-import TestingStore from "../testingStore";
+import { useState, useEffect, useRef } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
@@ -149,6 +148,7 @@ function SingleTestRunPage() {
   const [loading, setLoading] = useState(false);
   const [tempLoading , setTempLoading] = useState({vulnerable: false, all: false, running: false})
   const [workflowTest, setWorkflowTest ] = useState(false);
+  const refreshId = useRef(null);
   const hexId = params.hexId;
 
   function fillData(data, key){
@@ -163,12 +163,18 @@ function SingleTestRunPage() {
   }
 
   async function setSummary(summary){
-
+    setTempLoading((prev) => {
+      prev.running = false;
+      return prev;
+    });
+    clearInterval(refreshId.current);
     setSelectedTestRun((prev) => {
       prev['severity'] = func.getSeverity(summary.countIssues)
       prev['severityStatus'] = func.getSeverityStatus(summary.countIssues)
       prev['metadata'] = func.flattenObject(summary.metadata)
       prev['testingRunResultSummaryHexId'] = summary?.hexId;
+      prev['endTimestamp'] = summary?.endTimestamp;
+      prev['startTimestamp'] = summary?.startTimestamp;
 
       return {...prev};
     });
@@ -214,7 +220,7 @@ function SingleTestRunPage() {
         })
       }
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd);
-      if(localSelectedTestRun.orderPriority === 1){
+      if(localSelectedTestRun.state === "RUNNING" || localSelectedTestRun.state === "SCHEDULED"){
         setTempLoading((prev) => {
             prev.running = true;
             return {...prev};
@@ -258,7 +264,8 @@ function SingleTestRunPage() {
       } else {
         clearInterval(intervalId)
       }
-    },2000)
+      refreshId.current = intervalId;
+    },5000)
   }
 
   useEffect(()=>{
@@ -282,16 +289,15 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   function getHeadingStatus(selectedTestRun) {
 
-    if (selectedTestRun?.pickedUpTimestamp < selectedTestRun?.run_time_epoch) {
-      return `Last scanned ${func.prettifyEpoch(selectedTestRun.run_time_epoch)} for a duration of 
-      ${selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp} second${(selectedTestRun.run_time_epoch - selectedTestRun.pickedUpTimestamp) === 1 ? '' : 's'}`
-    }
-
-    switch (selectedTestRun.orderPriority) {
-      case 1:
+    switch (selectedTestRun.state) {
+      case "RUNNING":
         return "Test is running";
-      case 4:
+      case "SCHEDULED":
         return "Test has been scheduled";
+      case "STOPPED":
+      case "COMPLETED":
+        return `Scanned ${func.prettifyEpoch(selectedTestRun.endTimestamp)} for a duration of 
+        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
       default:
         return "";
     }
@@ -386,6 +392,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {
       func.setToast(true, false, "Test re-run")
+      setStopRefresh(false);
       setTimeout(() => {
         refreshSummaries();
       }, 2000)
