@@ -7,6 +7,11 @@ on:
     inputs:
       release_version:
         required: true
+      invalidate_cache:
+        description: 'Invalidate cache on cdn'
+        required: false
+        type: boolean
+        default: false
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -45,3 +50,6 @@ jobs:
         run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{github.event.inputs.release_version}}/dist --delete
       - name: Deploy polaris site to S3 bucket
         run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{github.event.inputs.release_version}}/dist --delete
+      - name: Invalidate cache on cdn
+        if: ${{ github.event.inputs.invalidate_cache == true }}
+        run: aws cloudfront create-invalidation --distribution-id {{secrets.CDN_DISTRIBUTION_ID}} --paths "/web/${{github.event.inputs.release_version}}/*" "/polaris_web/${{github.event.inputs.release_version}}/*"
