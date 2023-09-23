@@ -61,7 +61,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     async function fetchData() {
         setLoading(true)
 
-        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories()
+        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true)
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)

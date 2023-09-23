@@ -18,7 +18,8 @@ const convertFunc = {
             let obj = {
                 label: test.testName,
                 value: test.name,
-                category: test.superCategory.displayName
+                category: test.superCategory.displayName,
+                inactive: test.inactive
             }
             if(test.templateSource._name === "CUSTOM"){
                 if(!customTests[test.superCategory.name]){
@@ -39,7 +40,8 @@ const convertFunc = {
                 lastUpdated: func.prettifyEpoch(test.updatedTs),
                 superCategory: test.superCategory.name,
                 type: test.templateSource._name,
-                category: test.superCategory.displayName
+                category: test.superCategory.displayName,
+                inactive: test.inactive
             }
 
             mapTestToData[test.testName] = dataObj
