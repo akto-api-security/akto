@@ -58,7 +58,7 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
         
         Bson testingRunIndex = Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID);
-        createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name(getIndexName(testingRunIndex)));
+        createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name("testingRunId_1"));
 
     }
 

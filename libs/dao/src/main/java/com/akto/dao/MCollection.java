@@ -212,21 +212,6 @@ public abstract class MCollection<T> {
         return false;
     }
 
-    public static String getIndexName(Bson idx){
-        String ret = "";
-        BsonDocument id = idx.toBsonDocument(Document.class, Bson.DEFAULT_CODEC_REGISTRY);
-        int c=0;
-        for(String key : id.keySet()){
-            if(c>0){
-                ret += "_";
-            }
-            int value = id.getInt32(key).getValue();
-            ret += key + "_" + value;
-            c++;
-        }
-        return ret;
-    }
-
     public static boolean createIndexIfAbsent(String dbName, String collName, Bson idx, IndexOptions options) {
         try{
             MongoDatabase db = clients[0].getDatabase(dbName);
