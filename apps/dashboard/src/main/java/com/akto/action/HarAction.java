@@ -117,6 +117,8 @@ public class HarAction extends UserAction {
     private String filename;
     private String username;
     private String replaceByUrl;
+
+    private String typeOfFile;
     public String createCollectionWithUrl() {
         Pattern pattern = Pattern.compile("[a-zA-Z0-9\\-_]{1,100}");
         if (filename.length() > 100) {
@@ -128,8 +130,19 @@ public class HarAction extends UserAction {
             addActionError("filename should contain only alphanumeric, hyphen or underscores");
             return ERROR.toUpperCase();
         }
+        boolean isHar = true;
+        switch (typeOfFile.toLowerCase()) {
+            case "postman":
+                isHar = false;
+                break;
+            case "har":
+                isHar = true;
+                break;
+            default:
+                addActionError("typeOfFile should be either postman or har");
+        }
 
-        String fileUrl = "https://akto-setup.s3.amazonaws.com/templates/sample_data/" + filename + ".har";
+        String fileUrl = "https://akto-setup.s3.amazonaws.com/templates/sample_data/" + filename + (isHar ? ".har" : ".json");
         String tempFileUrl = "temp_" + UUID.randomUUID() + "_" + filename;
         try {
             FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
@@ -150,7 +163,14 @@ public class HarAction extends UserAction {
                 this.apiCollectionName = filename;
                 this.harString = FileUtils.readFileToString(new File(tempFileUrl), StandardCharsets.UTF_8);
                 this.harString = this.harString.replaceAll("strigourl", replaceByUrl);
-                this.execute();
+
+                if (isHar) {
+                    this.execute();
+                } else {
+                    PostmanAction postmanAction = new PostmanAction();
+                    postmanAction.setPostmanCollectionFile(this.harString);
+                    postmanAction.importDataFromPostmanFile();
+                }
                 loggerMaker.infoAndAddToDb("Completed adding to account " + accountId + " " + filename, LoggerMaker.LogDb.DASHBOARD);
 
                 break;
@@ -222,6 +242,10 @@ public class HarAction extends UserAction {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public void setTypeOfFile(String typeOfFile) {
+        this.typeOfFile = typeOfFile;
     }
 
     public void setFilename(String filename) {

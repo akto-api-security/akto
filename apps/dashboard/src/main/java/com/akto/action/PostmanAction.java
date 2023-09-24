@@ -377,7 +377,12 @@ public class PostmanAction extends UserAction {
         int accountId = Context.accountId.get();
         postmanAktoCollectionId = aktoCollectionId;
 
-        ObjectId loaderId = createPostmanLoader();
+        final ObjectId loaderId;
+        if (getSUser() != null) {
+            loaderId = createPostmanLoader();
+        } else {
+            loaderId = new ObjectId();
+        }
 
         executorService.schedule(new Runnable() {
             public void run() {
