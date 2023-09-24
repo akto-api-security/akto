@@ -135,7 +135,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
             cookie.setHttpOnly(true);
             cookie.setPath("/dashboard");
-            cookie.setDomain("labs.sandbox01.akto.io");
+            cookie.setDomain("labs.sandbox.akto.io");
             cookie.setComment("__SAME_SITE_NONE__");
             cookie.setSecure(HttpUtils.isHttpsEnabled());
             
