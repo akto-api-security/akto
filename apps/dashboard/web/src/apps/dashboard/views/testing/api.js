@@ -254,11 +254,20 @@ export default {
         })
     },
 
-    fetchMetadataFilters() {
-        return request({
+    async fetchMetadataFilters() {
+        const resp = await request({
             url: '/api/fetchMetadataFilters',
             method: 'post',
             data: {}
+        })
+        return resp
+    },
+    
+    setTestInactive(testId, inactive){
+        return request({
+            url: '/api/setTestInactive',
+            method: 'post',
+            data: {originalTestId: testId, inactive: inactive}
         }).then((resp) => {
             return resp
         })

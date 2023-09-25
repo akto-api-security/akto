@@ -46,7 +46,8 @@ const TestEditor = () => {
             const selectedTestObj = {
                 label: testName,
                 value: testId,
-                category: obj.mapTestToData[testName].category
+                category: obj.mapTestToData[testName].category,
+                inactive: obj.mapTestToData[testName].inactive
             }
             setSelectedTest(selectedTestObj)
 

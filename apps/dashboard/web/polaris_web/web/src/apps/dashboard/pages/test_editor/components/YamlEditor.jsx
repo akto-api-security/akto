@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris"
 import { tokens } from "@shopify/polaris-tokens"
-import { InfoMinor, ClipboardMinor } from "@shopify/polaris-icons"
+import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
+import convertFunc from "../transform";
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
@@ -37,6 +38,8 @@ const YamlEditor = ({ fetchAllTests }) => {
     const setToastConfig = Store(state => state.setToastConfig)
     const testsObj = TestEditorStore(state => state.testsObj)
     const selectedTest = TestEditorStore(state => state.selectedTest)
+    const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
+    const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
 
     const [ isEdited, setIsEdited ] = useState(false)
@@ -113,10 +116,35 @@ const YamlEditor = ({ fetchAllTests }) => {
         func.copyToClipboard(editorInstance.getValue())
     }
 
+    const setTestInactive = () => {
+
+        let newVal = !selectedTest.inactive;
+        let activeConf = newVal ? "inactive" : "active"
+
+        testEditorRequests.setTestInactive(selectedTest.value, newVal).then(async (res) => {
+            func.setToast(true, false, `Test marked as ${activeConf}`)
+            setSelectedTest({...selectedTest, inactive: newVal})
+            let obj = {...testsObj}
+            let dataObj = obj.mapTestToData[selectedTest.label]
+            obj.mapTestToData[selectedTest.label] = {...dataObj, 
+                lastUpdated: func.prettifyEpoch(func.timeNow()), inactive: selectedTest.inactive}
+            let type = dataObj.type === 'CUSTOM' ? 'customTests' : 'aktoTests'
+            
+            obj[type][dataObj.superCategory].forEach((x, i) => {
+                if(x.value == selectedTest.value){
+                    obj[type][dataObj.superCategory][i].inactive = newVal
+                }
+            })
+            setTestsObj(obj);
+        }).catch((err) => {
+            func.setToast(true, true, `Unable to mark test as ${activeConf}`)
+        })
+    }
+
     return (
         <div>
             <div className="editor-header">
-                <HorizontalStack>
+                <HorizontalStack gap={"1"}>
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>
@@ -125,6 +153,9 @@ const YamlEditor = ({ fetchAllTests }) => {
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
                         <Button icon={ClipboardMinor} plain onClick={copyTestName} />
+                    </Tooltip>  
+                    <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
+                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
                     </Tooltip>  
                 </HorizontalStack>
         
