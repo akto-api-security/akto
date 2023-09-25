@@ -7,7 +7,8 @@ import {
     Button, 
     Popover, 
     ActionList,
-    Link
+    Link,
+    Box
 } from '@shopify/polaris';
 import {
     HorizontalDotsMinor
@@ -17,10 +18,11 @@ import { useState, useCallback, useEffect} from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
+import TooltipText from '../../shared/TooltipText';
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, selectedIndex, setSelectedIndex } = props;
+    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, selectedIndex, setSelectedIndex, headings } = props;
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
@@ -35,7 +37,7 @@ function GithubRow(props) {
         [],
     );
     async function nextPage(data){
-        if(data.nextUrl || getNextUrl){
+        if(data?.nextUrl || getNextUrl){
             navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), {replace:true}));
         }
     }
@@ -129,11 +131,19 @@ function GithubRow(props) {
     function NewCell(){
         return(
             <>
-                {headers.map((header) =>{
+                {headings.map((header) =>{
                     return(
-                        <IndexTable.Cell key={header.title}>
-                            {header.isText ? <Text variant="bodyMd" fontWeight="regular">{data[header.value]}</Text> : data[header.value]}
-                        </IndexTable.Cell>
+                        header.itemCell ? 
+                            <IndexTable.Cell key={header.title}>
+                                <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
+                                    {header.isText ? 
+                                        <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
+                                            <TooltipText text={data[header.value]} tooltip={data[header.value]} />
+                                        </Box>
+                                        : data[header.value]}
+                                </div>
+                            </IndexTable.Cell>
+                        :null
                     )
                 })}
             </>
@@ -144,10 +154,9 @@ function GithubRow(props) {
         <IndexTable.Row
             id={data.id}
             key={data.id}
-            selected={selectedResources.includes(data?.id) || selectedIndex === index}
             position={index}
-            {...props.newRow ? {onClick: () => navigate(data.nextUrl)} : {}}
             {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
+            {...props.newRow ? {} : {selected : selectedResources.includes(data?.id) || selectedIndex === index}}
         >
             {props?.newRow ? <NewCell /> :<OldCell/>}   
         </IndexTable.Row>

@@ -7,9 +7,12 @@ import java.util.Map;
 
 import javax.xml.crypto.dsig.spec.XPathType.Filter;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
@@ -17,10 +20,39 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
 
 public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
 
     public static final TestingRunIssuesDao instance = new TestingRunIssuesDao();
+
+    public void createIndicesIfAbsent() {
+
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
+        
+        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
+        int counter = 0;
+        while (cursor.hasNext()) {
+            counter++;
+            cursor.next();
+        }
+
+        if (counter == 1) {
+            String[] fieldNames = {"_id.apiInfoKey.apiCollectionId", "testRunIssueStatus"};
+            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            counter++;
+        }
+    }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
         Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;

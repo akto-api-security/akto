@@ -1,7 +1,3 @@
-.apiEndpointsTable .rowIconClass  .Polaris-Icon {
-    width: 4rem !important;
-}
-
 .styled-endpoint {
     overflow-x:hidden; 
     text-overflow: ellipsis; 

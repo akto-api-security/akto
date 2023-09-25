@@ -10,6 +10,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -65,8 +66,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         }
 
         if (counter == 4) {
-            String[] fieldNames = {"lastTested"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            String[] fieldNames = {"lastSeen"};
+            ApiInfoDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
             counter++;
         }
     }
@@ -124,6 +125,29 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         }
         return result;
     }
+
+    public Map<Integer,Integer> getLastTrafficSeen(){
+        Map<Integer,Integer> result = new HashMap<>();
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.sort(Sorts.descending(ApiInfo.LAST_SEEN)));
+        pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
+
+        MongoCursor<BasicDBObject> collectionsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(collectionsCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = collectionsCursor.next();
+                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int lastTrafficSeen = basicDBObject.getInt("lastSeen");
+                result.put(apiCollectionId, lastTrafficSeen);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
+    
 
     @Override
     public String getCollName() {

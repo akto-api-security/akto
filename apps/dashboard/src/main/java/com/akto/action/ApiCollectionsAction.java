@@ -2,6 +2,11 @@ package com.akto.action;
 
 import java.util.*;
 
+import javax.swing.text.html.FormSubmitEvent.MethodType;
+
+import org.bson.Document;
+
+import com.akto.DaoInit;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
@@ -10,9 +15,15 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveInfoInApiCollections;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.URLMethods;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.opensymphony.xwork2.Action;
 
 public class ApiCollectionsAction extends UserAction {
@@ -20,7 +31,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiCollection> apiCollections = new ArrayList<>();
     List<SensitiveInfoInApiCollections> sensitiveInfoInApiCollections = new ArrayList<>() ;
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
-    
+    Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
+
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
 
     int apiCollectionId;
@@ -122,6 +134,11 @@ public class ApiCollectionsAction extends UserAction {
         this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections();
         return Action.SUCCESS.toUpperCase();
     }
+
+    public String fetchLastSeenInfoInCollections(){
+        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        return Action.SUCCESS.toUpperCase();
+    }
     
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
@@ -153,6 +170,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Map<String, Integer>> getSeverityInfo() {
         return severityInfo;
+    }
+
+    public Map<Integer, Integer> getLastTrafficSeenMap() {
+        return lastTrafficSeenMap;
     }
 
 }

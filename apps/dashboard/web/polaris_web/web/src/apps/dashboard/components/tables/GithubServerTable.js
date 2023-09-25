@@ -178,6 +178,7 @@ function GithubServerTable(props) {
           selectedIndex={selectedIndex}
           setSelectedIndex={setSelectedIndex}
           newRow={props?.useNewRow}
+          headings={props?.headings}
         />
       ),
     );
@@ -213,7 +214,7 @@ function GithubServerTable(props) {
                   disabled: false,
                   loading: false,
                 }}
-                tabs={[]}
+                tabs={props.tableTabs ? props.tableTabs : []}
                 canCreateNewView={false}
                 filters={filters}
                 appliedFilters={appliedFilters}
@@ -221,6 +222,8 @@ function GithubServerTable(props) {
                 mode={mode}
                 setMode={setMode}
                 loading={props.loading || false}
+                selected={props?.selected}
+                onSelect={props?.onSelect}
               />
               <div className={tableHeightClass}>
               <IndexTable
