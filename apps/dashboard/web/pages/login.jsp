@@ -72,13 +72,13 @@
                     if (window.USER_NAME.length > 0) {
                         // Initialize mixpanel
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
-                        let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS ? "SAAS" : window.DASHBOARD_MODE);
+                        let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS === 'true' ? "SAAS" : window.DASHBOARD_MODE);
                         mixpanel.identify(distinct_id);
                         mixpanel.people.set({ "$email": window.USER_NAME, "$account Name": window.ACCOUNT_NAME });
 
                         mixpanel.register({
                             'email': window.USER_NAME,
-                            'dashboard_mode': (window.IS_SAAS ? "SAAS" : window.DASHBOARD_MODE),
+                            'dashboard_mode': (window.IS_SAAS === 'true' ? "SAAS" : window.DASHBOARD_MODE),
                             'account_name': window.ACCOUNT_NAME
                         })
 
