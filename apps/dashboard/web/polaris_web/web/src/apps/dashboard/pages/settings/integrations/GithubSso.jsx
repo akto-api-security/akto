@@ -26,6 +26,7 @@ function GithubSso() {
     async function fetchGithubSso() {
         let {githubClientId} = await settingRequests.fetchGithubSso()
         setGithubPresent(!!githubClientId)
+        setGithubClientId(githubClientId)
     }
 
     useEffect(() => {
@@ -54,7 +55,7 @@ function GithubSso() {
             <TextField 
                 label="Github Client Id"
                 value={githubClientId} 
-                onChange={(githubClientId) => setGithubClientId(githubClientId)} 
+                onChange={githubPresent ? () => {} : (githubClientId) => setGithubClientId(githubClientId)} 
             />
 
             <TextField 
