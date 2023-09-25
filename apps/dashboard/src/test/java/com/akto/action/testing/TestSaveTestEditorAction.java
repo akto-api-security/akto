@@ -11,28 +11,47 @@ import org.junit.Test;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestSaveTestEditorAction extends MongoBasedTest {
 
-    @Test
-    public void testSaveTestEditorFile() {
+    public static void saveTest(SaveTestEditorAction action){
         String userEmail = "test@akto.io";
         User user = new User();
 
         user.setLogin(userEmail);
-        SaveTestEditorAction action = new SaveTestEditorAction();
+        
         Map<String, Object> session = new HashMap<>();
         session.put("user", user);
         action.setSession(session);
         action.setContent(content);
         action.saveTestEditorFile();
+    }
+
+
+    @Test
+    public void testSaveTestEditorFile() {
+        SaveTestEditorAction action = new SaveTestEditorAction();
+        saveTest(action);
         YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", "REMOVE_TOKENS"));
         assertTrue(template != null);
     }
 
+    @Test
+    public void testSetTestInactive() {
+        SaveTestEditorAction action = new SaveTestEditorAction();
+        saveTest(action);
+        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", "REMOVE_TOKENS"));
+        assertEquals(false, template.getInactive());
+        action.setOriginalTestId("REMOVE_TOKENS");
+        action.setInactive(true);
+        action.setTestInactive();
+        template = YamlTemplateDao.instance.findOne(Filters.eq("_id", "REMOVE_TOKENS"));
+        assertEquals(true, template.getInactive());
+    }
 
-    private final String content = "id: REMOVE_TOKENS\n" +
+    private final static String content = "id: REMOVE_TOKENS\n" +
             "info:\n" +
             "  name: \"Broken Authentication by removing auth token\"\n" +
             "  description: \"API doesn't validate the authenticity of token. Attacker can remove the auth token and access the endpoint.\"\n" +

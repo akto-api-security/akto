@@ -21,6 +21,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BsonField;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Sorts;
@@ -99,20 +100,18 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
     public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";
-        String[] indices = {"testingRunId_1", "metadata.branch_1", "metadata.repository_1"};
-
-        if (!checkIndexExists(dbName, getCollName(), indices[0])) {
-            instance.getMCollection().createIndex(Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID));
-        }
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+        
+        Bson testingRunIndex = Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID);
+        createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name("testingRunId_1"));
 
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
 
-        if (!checkIndexExists(dbName, getCollName(), indices[1])) {
-            instance.getMCollection().createIndex(Indexes.ascending("metadata.branch"), sparseIndex);
-        }
-        if (!checkIndexExists(dbName, getCollName(), indices[2])) {
-            instance.getMCollection().createIndex(Indexes.ascending("metadata.repository"), sparseIndex);
-        }
+        Bson branchIndex = Indexes.ascending("metadata.branch");
+        createIndexIfAbsent(dbName, getCollName(), branchIndex, sparseIndex.name("metadata.branch_1"));
+        Bson repositoryIndex = Indexes.ascending("metadata.repository");
+        createIndexIfAbsent(dbName, getCollName(), repositoryIndex, sparseIndex.name("metadata.repository_1"));
+
     }
 
     @Override
