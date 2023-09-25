@@ -709,7 +709,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? ("Last seen " + this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
+              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
+              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : 0,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
@@ -1044,6 +1045,16 @@ getSizeOfFile(bytes) {
   } else {
     return bytes + ' B';
   }
+},
+mapCollectionIdToHostName(apiCollections){
+    let collectionsObj = {}
+    apiCollections.forEach((collection)=>{
+      if(!collectionsObj[collection.id]){
+        collectionsObj[collection.id] = collection.hostName
+      }
+    })
+
+    return collectionsObj
 }
 }
 

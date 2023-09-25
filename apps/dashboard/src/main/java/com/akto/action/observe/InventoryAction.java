@@ -1,17 +1,21 @@
 package com.akto.action.observe;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -54,6 +58,7 @@ public class InventoryAction extends UserAction {
 
     private int startTimestamp = 0; 
     private int endTimestamp = 0;
+    private Map<ApiInfoKey, Float> lastTestedSeverityMap= new HashMap<>();
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -150,7 +155,66 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private float calculateRiskValueForSeverity(String severity){
+        float riskScore = 0 ;
+        switch (severity) {
+            case "HIGH":
+                riskScore += 100;
+                break;
 
+            case "MEDIUM":
+                riskScore += 10;
+                break;
+
+            case "LOW":
+                riskScore += 1;
+        
+            default:
+                break;
+        }
+
+        return riskScore;
+    }
+
+    public String fetchLastTestedSeverityOfApisInCollection(){
+        List<Bson> pipeline = new ArrayList<>();
+        if (apiCollectionId != -1) {
+            pipeline.add(Aggregates.match(Filters.and(Filters.eq("_id.apiInfoKey.apiCollectionId", apiCollectionId), Filters.eq("testRunIssueStatus", "OPEN"))));
+        }
+
+        Map<ApiInfoKey, Float> resultMap = new HashMap<>();
+
+        MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(severitiesCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = severitiesCursor.next();
+                BasicDBObject temp = (BasicDBObject) basicDBObject.get("_id");
+                BasicDBObject apiInfo = (BasicDBObject) temp.get("apiInfoKey");
+                String severity = basicDBObject.getString("severity");
+                Float severityVal = calculateRiskValueForSeverity(severity);
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfoKey( 
+                        (int) apiInfo.get("apiCollectionId"),
+                        (String) apiInfo.get("url"),
+                        URLMethods.Method.fromString((String) apiInfo.get("method"))
+                );
+                if(resultMap.containsKey(apiInfoKey)){
+                    Float existingSeverity = resultMap.get(apiInfoKey);
+                    Float newSeverityVal = existingSeverity + severityVal;
+                    resultMap.put(apiInfoKey, newSeverityVal);
+                }else{
+                    resultMap.put(apiInfoKey, severityVal);
+                }
+                
+            } catch (Exception e) {
+                // TODO: handle exception
+                e.printStackTrace();
+            }
+        }
+
+        this.lastTestedSeverityMap = resultMap;
+
+        return SUCCESS.toUpperCase();
+    }
 
 
 
@@ -732,5 +796,9 @@ public class InventoryAction extends UserAction {
     
     public void setSubType(String subType) {
         this.subType = subType;
+    }
+
+    public Map<ApiInfoKey, Float> getLastTestedSeverityMap() {
+        return lastTestedSeverityMap;
     }
 }

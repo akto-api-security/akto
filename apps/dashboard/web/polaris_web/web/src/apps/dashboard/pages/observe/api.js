@@ -520,4 +520,22 @@ export default {
             data:{},
         })
     },
+
+    async getLastTrafficSeen(){
+        return await request({
+            url: '/api/getLastSeenTrafficInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getLastTestedSeverityInfo(apiCollectionId) {
+        return await request({
+            url: '/api/fetchSeverityInfoForEndpoints',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+    },
 }

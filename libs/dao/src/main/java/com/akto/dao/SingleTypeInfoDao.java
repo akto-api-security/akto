@@ -511,11 +511,4 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         return result; 
     }
-
-    public Map<Integer, Integer> getLastTrafficSeen(){
-        BasicDBObject id = new BasicDBObject("apiCollectionId", "$apiCollectionId");
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo.LAST_SEEN)));
-        pipeline.add(Aggregates.group(id, Accumulators.first(SingleTypeInfo.LAST_SEEN, "$$ROOT")));
-    }
 }

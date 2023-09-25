@@ -92,6 +92,7 @@ function GithubSimpleTable(props) {
         headings={props?.headings}
         useNewRow={props?.useNewRow}
         condensedHeight={props?.condensedHeight}
+        tableTabs={props?.tableTabs}
     />
 
 }

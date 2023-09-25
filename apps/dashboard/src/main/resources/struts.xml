@@ -249,6 +249,15 @@
             </result>
         </action>
 
+        <action name="api/fetchSeverityInfoForEndpoints" class="com.akto.action.observe.InventoryAction" method="fetchLastTestedSeverityOfApisInCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadRecentEndpoints" class="com.akto.action.observe.InventoryAction" method="loadRecentEndpoints">
@@ -436,6 +445,16 @@
         </action>
 
         <action name="api/getSeverityInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchSeverityInfoInCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getLastSeenTrafficInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchLastSeenInfoInCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
