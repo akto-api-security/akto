@@ -32,6 +32,7 @@ public class GithubSsoAction extends UserAction {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
                 BasicDBObject detailsObj = (BasicDBObject) obj;
                 UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.set("refreshTokens", new ArrayList<>()));
+                UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.unset("signupInfoMap.GITHUB-ankush"));
             }
         }
 
