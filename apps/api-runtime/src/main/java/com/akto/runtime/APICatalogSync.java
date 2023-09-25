@@ -1,23 +1,13 @@
 package com.akto.runtime;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
-
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
-import com.akto.dto.traffic.Key;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.TrafficRecorder;
-import com.akto.dto.type.URLStatic;
-import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.*;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
@@ -31,12 +21,15 @@ import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
-
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -1383,17 +1376,23 @@ public class APICatalogSync {
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
+        int from = 0;
+        int batch = 10000;
 
         long start = System.currentTimeMillis();
-
         if (writesForParams.size() >0) {
-            
-            BulkWriteResult res = 
-                SingleTypeInfoDao.instance.getMCollection().bulkWrite(
-                    writesForParams
-                );
+            do {
 
-                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
+                List<WriteModel<SingleTypeInfo>> slicedWrites = writesForParams.subList(from, Math.min(from + batch, writesForParams.size()));
+                from += batch;
+                BulkWriteResult res =
+                        SingleTypeInfoDao.instance.getMCollection().bulkWrite(
+                                slicedWrites,
+                                new BulkWriteOptions().ordered(true).bypassDocumentValidation(false)
+                        );
+
+                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " + res.getUpserts().size(), LogDb.RUNTIME);
+            } while (from < writesForParams.size());
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);

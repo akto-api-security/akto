@@ -121,7 +121,22 @@
                                     </v-icon>
                                 </div>
                                 <slot name="unsavedChanges" :IsEdited="IsEdited">
+                                    <span class="test-subheading">
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator='{ on, attrs }'>
+                                                <v-icon 
+                                                size=16 
+                                                @click="setTestInactive"
+                                                v-bind="attrs"
+                                                v-on="on"
+                                                >
+                                                {{ testInactive ? "$fas_check" : "$fas_times" }}
+                                                </v-icon>
+                                            </template>
+                                            <span>Set as {{ testInactive ? "active" : "inactive" }}</span>
+                                        </v-tooltip>
+                                    </span>
                                 </slot>
                             </div>
                             <slot name="saveEditedTemplate" :IsEdited="IsEdited">
@@ -355,6 +370,7 @@ export default {
             copyCustomObj: {},
             defaultTest: this.defaultTestId || "REMOVE_TOKENS",
             defaultTestName: null,
+            testInactive: false,
             currentCategory: '',
             allCustomTests: {},
             setTextId: {},
@@ -363,7 +379,7 @@ export default {
         }
     },
     methods: {
-        findTestLabelFromTestValue(testValue) {
+        findTestFromTestValue(testValue) {
             let aktoTest = Object.values(this.testsObj).map (x => x.all).flat().find(x=>x.value === testValue)
             let customTest = Object.values(this.customTestObj).map (x => x.all).flat().find(x=>x.value === testValue)
 
@@ -371,20 +387,45 @@ export default {
                 this.aktoToggle = true
                 this.customToggle = false
                 this.currentCategory = aktoTest.category
-                return aktoTest.label
+                return aktoTest
             }
 
             if (customTest) {
                 this.aktoToggle = false
                 this.customToggle = true
                 this.currentCategory = customTest.category
-                return customTest.label
+                return customTest
             }
 
             return null
         },
         openGithubLink() {
             return window.open("https://github.com/akto-api-security/akto/tree/master/apps/dashboard/src/main/resources/inbuilt_test_yaml_files", "_blank")
+        },
+        async setTestInactive() {
+            this.testInactive = !this.testInactive;
+            this.lastEdited = func.prettifyEpoch(Date.now()/1000);
+            await testingApi.setTestInactive(this.defaultTest, this.testInactive).then((res) => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `Test set as ${this.testInactive ? "inactive" : "active"}`,
+                    color: 'green'
+                });
+            })
+            Object.values(this.testsObj).map (x => x.all).flat().forEach((x, i) => {
+                if(x.value==this.defaultTest){
+                    x.inactive = this.testInactive
+                    this.mapTestToStamp[x.label] = this.lastEdited
+                }
+            })
+            Object.values(this.customTestObj).map (x => x.all).flat().forEach((x, i) => {
+                if(x.value==this.defaultTest){
+                    x.inactive = this.testInactive
+                    this.mapTestToStamp[x.label] = this.lastEdited
+                }
+            })
+            this.copyTestObj = JSON.parse(JSON.stringify(this.testsObj))
+            this.copyCustomObj = JSON.parse(JSON.stringify(this.customTestObj))
         },
         getFormValues(param, formValues) {
             if (param === 'choose') {
@@ -441,9 +482,10 @@ export default {
             this.sampleDataListForTestRun = result.sampleDataListForTestRun
         },
         setSelectedMethod(testId, doNotUpdateAPIjson) {
-            let testName = this.findTestLabelFromTestValue(testId)
-            this.changeValue(testName)
+            let test = this.findTestFromTestValue(testId)
+            this.changeValue(test?.label ? test.label : null)
             this.defaultTest = testId
+            this.testInactive = test?.inactive ? test.inactive : null
 
             this.runTest = false
 
@@ -454,7 +496,6 @@ export default {
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
-            debugger
             if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0] && !doNotUpdateAPIjson) {
                 this.selectedUrl = {}
                 this.messageJson = {}
@@ -632,14 +673,16 @@ export default {
                     label: x.testName,
                     value: x.name,
                     icon: "$aktoWhite",
-                    category: x.superCategory.displayName
+                    category: x.superCategory.displayName,
+                    inactive: x.inactive
                 }
                 this.mapTestToYaml[x.testName] = x.content
                 this.mapTestToStamp[x.testName] = func.prettifyEpoch(x.updatedTs)
                 if(x.templateSource._name === "CUSTOM"){
                     let customVal = {
                         name: x._name,
-                        category: x.superCategory.name
+                        category: x.superCategory.name,
+                        inactive: x.inactive
                     }
                     this.allCustomTests[x.testName] = customVal
                     this.totalCustomTests++
@@ -808,8 +851,11 @@ export default {
             align-items: center;
         }
 
-        .last-edited {
+        .test-subheading{
             font-size: 12px;
+        }
+
+        .last-edited {
             color: var(--themeColorDark10);
         }
     }
