@@ -48,6 +48,16 @@
  -->
               <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
             </div>
+            <div v-if="githubClientId">
+              <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px" @click="goToGithub">
+                <div>
+                  <v-icon>$githubIcon</v-icon>
+                  <span class="text">Sign in with GitHub</span>
+                </div>
+              </v-btn>
+
+              <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
+            </div>
               <div class="ma-4">
                 <login-fields @fieldsChanged="fieldsChanged" @enterPressed="login" :isSignUp="false" />
               </div>
@@ -88,9 +98,13 @@ export default {
       formModel: null,
       isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
       isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
+      githubClientId: window.GITHUB_CLIENT_ID
     }
   },
   methods: {
+    goToGithub() {
+      window.location.href = ("https://github.com/login/oauth/authorize?client_id=" + this.githubClientId);
+    },
     login() {
       this.loadingLogin = true
       var a = this.$store.dispatch('auth/login', this.formModel).catch((e) => {
