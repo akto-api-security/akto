@@ -31,6 +31,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -648,6 +649,9 @@ public class APICatalogSync {
             
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
                 newTypes[i] = SuperType.INTEGER;
+                newTokens[i] = null;
+            } else if(ObjectId.isValid(tempToken) && ObjectId.isValid(dbToken)){
+                newTypes[i] = SuperType.OBJECT_ID;
                 newTokens[i] = null;
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;

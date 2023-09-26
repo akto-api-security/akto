@@ -125,7 +125,7 @@ public class SingleTypeInfo {
     }
 
     public enum SuperType {
-        BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM
+        BOOLEAN, INTEGER, FLOAT, STRING, OBJECT_ID, NULL, OTHER, CUSTOM
     }
 
     public enum Position {
