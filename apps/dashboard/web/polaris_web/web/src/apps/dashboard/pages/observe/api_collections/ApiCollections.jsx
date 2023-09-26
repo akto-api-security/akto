@@ -49,7 +49,7 @@ function convertToCollectionData(c) {
     return {
         ...c,
         endpoints: c["urlsCount"] || 0,
-        detected: "Last seen " + func.prettifyEpoch(c.startTs),
+        detected: "Discovered " + func.prettifyEpoch(c.startTs),
         icon: CircleTickMajor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
     }    

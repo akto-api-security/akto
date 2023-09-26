@@ -262,5 +262,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    setTestInactive(testId, inactive){
+        return request({
+            url: '/api/setTestInactive',
+            method: 'post',
+            data: {originalTestId: testId, inactive: inactive}
+        }).then((resp) => {
+            return resp
+        })
     }
 }
