@@ -512,6 +512,26 @@ public class InventoryAction extends UserAction {
                     filterList.add(Filters.lte(key, (long) (Context.now()) - ll.get(0) * 86400L));
                     filterList.add(Filters.gte(key, (long) (Context.now()) - ll.get(1) * 86400L));
                     break;
+                case "location":
+                    boolean isHeader = value.contains("header");
+                    boolean isUrlParam = value.contains("urlParam");
+                    boolean isPayload = value.contains("payload");
+                    ArrayList<Bson> locationFilters = new ArrayList<>();
+                    if (isHeader) {
+                        locationFilters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
+                    }
+                    if (isUrlParam) {
+                        locationFilters.add(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+                    }
+                    if (isPayload) {
+                        locationFilters.add(Filters.and(
+                                Filters.eq(SingleTypeInfo._IS_HEADER, false),
+                                Filters.or(
+                                        Filters.exists(SingleTypeInfo._IS_URL_PARAM, false),
+                                        Filters.eq(SingleTypeInfo._IS_URL_PARAM, false))));
+                    }
+                    filterList.add(Filters.or(locationFilters));
+                    break;
                 default: 
                     switch (operator) {
                         case "OR":

@@ -2,6 +2,21 @@
   <v-app class="akto-app">
     <v-navigation-drawer v-model="drawer" app width="200px" :mini-variant.sync="mini" class="akto-nav" dark permanent>
 
+      <v-dialog v-model="showCreateAccountDialog" max-width="600px">
+        <v-card>
+          <v-card-title class="akto-app">Create new account</v-card-title>
+          <v-card-text>
+            <v-text-field label="Enter name" v-model="newName" dense class="e2e-new-account-name" />
+            <v-spacer />
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="#6200EA" text @click="createNewAccount" :loading="loading"
+                class="e2e-save-account">Save</v-btn>
+            </v-card-actions>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+
       <span class="expand-nav clickable" @click="mini = !mini">
         <v-icon v-if="mini" color="var(--themeColor)">$fas_angle-right</v-icon>
         <v-icon v-else color="var(--themeColor)">$fas_angle-left</v-icon>
@@ -83,7 +98,7 @@
 
         <simple-menu :items="myAccountItems">
           <template v-slot:activator2>
-            <v-list-item class='row-nav-drawer'>
+            <v-list-item class='row-nav-drawer e2e-show-accounts'>
               <v-list-item-icon class="icon-nav-drawer">
                 <owner-name :owner-name="getUsername()" :owner-id="0" :show-name="false" />
               </v-list-item-icon>
@@ -167,12 +182,19 @@ export default {
   components: {
     SimpleTextField,
     OwnerName,
-    'create-account-dialog': CreateAccountDialog,
     SimpleMenu,
     LoadingSnackBar,
     ChatGptInput
   },
   data() {
+    const listAccounts = Object.entries(window.ACCOUNTS).map(x => {
+      return {
+        label: x[1],
+        click: () => this.goToAccount(+(x[0])),
+        class: +x[0] === window.ACTIVE_ACCOUNT ? "underline" : ""
+      }
+    })
+
     const myItems = [
       {
         title: 'Quick start',
@@ -209,16 +231,6 @@ export default {
         title: 'Issues',
         icon: '$fas_exclamation-triangle',
         link: '/dashboard/issues'
-      },
-      {
-        title: 'Tests library',
-        icon: '$bookBookmark',
-        link: '/dashboard/library'
-      },
-      {
-        title: 'Test Editor',
-        icon: '$testEditorIcon',
-        link: '/dashboard/test-editor'
       }
     ]
 
@@ -232,16 +244,57 @@ export default {
       showField: {},
       showTeamField: false,
       newName: '',
+      showCreateAccountDialog: false,
+      loading: false,
       api_inventory_route: "/dashboard/observe/inventory",
       settings_route: "/dashboard/settings",
       showGptDialog:false,
       regexRequired:false,
       renderAktoButton:false,
       apiCollectionId:-1,
-      myAccountItems: [
+      isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
+      myAccountLocalItems:[
+      ...listAccounts,
         {
+          label: '',
+          click: () => { }
+        },
+        {
+          label: 'Create new account',
+          click: () => { this.showCreateAccountDialog = true }
+        },
+        {
+          label: '',
+          click: () => { }
+        }
+      ],
+      myAccountItems: [
+      {
           label: "Settings",
           click: () => this.$router.push('/dashboard/settings')
+        },
+        {
+          label: "Switch to new UI",
+          click: () => {
+            api.updateAktoUIMode({'aktoUIMode':'VERSION_2'}).then((resp) => {
+              let currPath = window.location.pathname
+              if(currPath.includes("inventory")){
+                let paths = currPath.split("/");
+                if(paths.length > 5){
+                  let path = ""
+                  for(var i = 0 ; i < 5 ; i++){
+                    path = path + paths[i] + '/' ;
+                  }
+                  window.location.pathname = path
+                }else{
+                  window.location.reload() ;
+                }
+              }else{
+                window.location.reload()
+              }
+            })
+          }
         },
         {
           label: "Terms and Policies",
@@ -251,6 +304,10 @@ export default {
           label: "Logout",
           click: () => {
             api.logout().then((resp) => {
+              if(resp.logoutUrl){
+                window.location.href = resp.logoutUrl;
+                return;
+              }
               window.location.href = "/login"
             })
           }
@@ -354,6 +411,12 @@ export default {
     }
   },
   async mounted() {
+      this.myItems.push({
+        title: 'Test Editor',
+        icon: '$testEditorIcon',
+        link: '/dashboard/test-editor'
+      })
+    this.myAccountItems.unshift(... ( this.isLocalDeploy ? this.myAccountLocalItems : [] ))
     window.Beamer.init();
     let i = setInterval(() => {
         this.$store.dispatch('dashboard/fetchActiveLoaders')
@@ -467,10 +530,15 @@ export default {
     goToAccount(accId) {
       api.goToAccount(+accId)
     },
-    saveNewAccount(newAccountName) {
-      api.saveToAccount(newAccountName, this)
-    },
-    saveNewTeam(name) {
+    createNewAccount() {
+      let newAccountName = this.newName;
+      this.newName = '';
+      this.showCreateAccountDialog = false;
+      api.saveToAccount(newAccountName).then(resp => {
+        window.location.href="/dashboard/onboarding"
+        window.location.reload()
+      })
+    },    saveNewTeam(name) {
       if (name.length > 0) {
         this.$store.dispatch('auth/addNewTeam', { name }).then(resp => {
           this.showTeamField = false

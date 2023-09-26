@@ -1,0 +1,50 @@
+id: GIT_CONFIG_NGINXOFFBYSLASH
+info:
+  name: Nginx - Git Configuration Exposure
+  description: "Nginx is vulnerable to git configuration exposure."
+  details: >
+              "Nginx - Git Configuration Exposure refers to the vulnerability where Nginx servers are susceptible to git configuration exposure due to an off-by-slash misconfiguration. By appending "../" in the URL path, unauthorized access to Git configuration files, such as /.git/config, is possible. Promptly addressing this vulnerability is essential to prevent unauthorized access, protect the confidentiality of repository data, and maintain the security of Nginx servers."
+  impact: "Exploiting the off-by-slash misconfiguration in Nginx exposes Git configuration files, revealing sensitive information such as repository configurations, URLs, and credentials. This enables attackers to gain unauthorized access, manipulate code, and launch further attacks."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GIT_CONFIG_NGINXOFFBYSLASH
+  severity: MEDIUM
+  references:
+    - https://beaglesecurity.com/blog/vulnerability/nginx-off-by-slash-exposes-git-config.html
+    - https://twitter.com/Random_Robbie/status/1262676628167110656
+    - https://github.com/PortSwigger/nginx-alias-traversal/blob/master/off-by-slash.py
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/static../.git/config
+    - ${urlVar}/js../.git/config
+    - ${urlVar}/images../.git/config
+    - ${urlVar}/img../.git/config
+    - ${urlVar}/css../.git/config
+    - ${urlVar}/assets../.git/config
+    - ${urlVar}/content../.git/config
+    - ${urlVar}/events../.git/config
+    - ${urlVar}/media../.git/config
+    - ${urlVar}/lib../.git/config
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - '[core]'

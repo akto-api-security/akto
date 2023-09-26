@@ -14,6 +14,19 @@ const state = {
     testingRunResults: []
 }
 
+function addMoreItem(arr, size, link){
+    if (size > 50) {
+        arr.push({
+            id: "More button",
+            title: `See all`,
+            link: link,
+            class: "no-style",
+            active: true
+        })
+    }
+    return arr;
+}
+
 const testing = {
     namespaced: true,
     state: state,
@@ -26,14 +39,17 @@ const testing = {
             state.pastTestingRuns = []
             state.cicdTestingRuns = []
         },
-        SAVE_DETAILS (state, {authMechanism, testingRuns}) {
+        SAVE_DETAILS (state, {authMechanism, testingRuns, testingRunsCount}) {
+            testingRuns = addMoreItem(testingRuns, testingRunsCount, "/dashboard/testing/active")
             state.authMechanism = authMechanism
             state.testingRuns = testingRuns
         },        
-        SAVE_CICD_DETAILS (state, {testingRuns}) {
+        SAVE_CICD_DETAILS (state, {testingRuns, testingRunsCount}) {
+            testingRuns = addMoreItem(testingRuns, testingRunsCount, "/dashboard/testing/cicd")
             state.cicdTestingRuns = testingRuns
         },
-        SAVE_PAST_DETAILS (state, {testingRuns}) {
+        SAVE_PAST_DETAILS (state, {testingRuns, testingRunsCount}) {
+            testingRuns = addMoreItem(testingRuns, testingRunsCount, "/dashboard/testing/inactive")
             state.pastTestingRuns = testingRuns
         },
         SAVE_TESTING_RUNS (state, {testingRuns}) {
@@ -75,8 +91,8 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName,testRunTime, maxConcurrentRequests} ) {
-            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests).then((resp) => {
+        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName,testRunTime, maxConcurrentRequests, overriddenTestAppUrl} ) {
+            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
@@ -85,8 +101,8 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source} ) {
-            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source).then((resp) => {
+        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source} ) {
+            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },

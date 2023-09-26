@@ -11,7 +11,7 @@ info:
   impact: "When the Content-Type header is missing, it can lead to various security risks, data integrity issues and possible DOS attacks"
   category:
     name: MHH
-    shortName: MHH
+    shortName: Misconfigured HTTP Headers
     displayName: Misconfigured HTTP Headers (MHH)
   subCategory: CONTENT_TYPE_HEADER_MISSING
   severity: LOW

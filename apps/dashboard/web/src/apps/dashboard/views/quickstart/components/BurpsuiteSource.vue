@@ -8,15 +8,9 @@
                     <div class="col_1">
                         <p> 1 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         <span style="text-decoration: underline; cursor: pointer" @click="downloadBurpJar">Download</span>
                         Akto's Burp extension
-                        <span v-if="this.downloadLoading === 1" style="padding-left: 4px">
-                            <v-progress-circular indeterminate color="grey" :size="12" :width="1.5"></v-progress-circular>
-                        </span>
-                        <span v-if="this.downloadLoading === 2">
-                            <v-icon color="green">$fas_check-circle</v-icon>
-                        </span>
                     </div>
             </div>
 
@@ -24,32 +18,42 @@
                     <div class="col_1">
                         <p> 2 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         Open Burp and add the downloaded jar file in extension tab
                     </div>
-                    <span v-if="this.sendInitialDataLoading === 1" style="padding-left: 4px">
-                        <v-progress-circular indeterminate color="grey" :size="12" :width="1.5"></v-progress-circular>
-                    </span>
-                    <span v-if="this.sendInitialDataLoading === 2">
-                        <v-icon color="green">$fas_check-circle</v-icon>
-                    </span>
             </div>
 
             <div class="row">
                     <div class="col_1">
                         <p> 3 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
+                        Once the plugin is loaded click on "options" tab inside the plugin
+                    </div>
+            </div>
+
+            <div class="row">
+                    <div class="col_1">
+                        <p> 4 </p>
+                    </div>
+                    <div class="info-box">
+                        Copy AKTO_IP: 
+                        <span style="color: var(--themeColor)">{{ aktoIp }}</span>
+                        and AKTO_TOKEN:
+                        <span style="color: var(--themeColor)">{{ aktoToken }}</span>
+                        and paste in the options tab
+                    </div>
+            </div>
+
+            <div class="row">
+                    <div class="col_1">
+                        <p> 5 </p>
+                    </div>
+                    <div class="info-box">
                         Start Burp proxy and browse any website. You will see traffic in 
                         <span v-if="!burpCollectionURL"> Burp collection </span>
                         <a :href="burpCollectionURL" v-else> <span style="text-decoratoin: underline; color: var(--themeColor)">Burp collection</span> </a>
                     </div>
-                    <span v-if="this.sendDataLoading === 1" style="padding-left: 4px">
-                        <v-progress-circular indeterminate color="grey" :size="12" :width="1.5"></v-progress-circular>
-                    </span>
-                    <span v-if="this.sendDataLoading === 2">
-                        <v-icon color="green">$fas_check-circle</v-icon>
-                    </span>
             </div>
         </div>
     </div>
@@ -67,51 +71,58 @@ export default {
     },
     data() {
         return {
-            downloadLoading: 0,
-            sendInitialDataLoading: 0,
-            sendDataLoading: 0,
-            burpCollectionURL: null
+            burpCollectionURL: null,
+            burpGithubLink: null,
+            aktoIp: null,
+            aktoToken: null,
         }
     },
+
+    mounted() {
+        api.fetchBurpPluginDownloadLink().then((resp) => {
+            if (resp && resp.burpGithubLink) {
+                this.burpGithubLink = resp.burpGithubLink
+            }
+        })
+
+        api.fetchBurpCredentials().then((resp) => {
+            if (!resp) return
+            this.aktoIp = resp.host
+            this.aktoToken = resp.apiToken.key
+        })
+
+    },
+
     methods: {
         async downloadBurpJar() {
-            this.downloadLoading = 1
-            this.sendInitialDataLoading = 0
-            this.sendDataLoading = 0
-
             let downloadTime = func.timeNow()
-            console.log(downloadTime);
+            let showBurpPluginConnectedFlag = false
 
-            let response = await api.downloadBurpPluginJar()
-            const href = URL.createObjectURL(response);
-            // create "a" HTML element with href to file & click
-            const link = document.createElement('a');
-            link.href = href;
-            link.setAttribute('download', 'Akto.jar'); //or any other extension
-            document.body.appendChild(link);
-            link.click();
-            // clean up "a" element & remove ObjectURL
-            document.body.removeChild(link);
-            URL.revokeObjectURL(href);
-
-            this.downloadLoading = 2
-            this.sendInitialDataLoading= 1
-
+            api.downloadBurpPluginJar()
+            window.open(this.burpGithubLink)
 
             let interval = setInterval(() => {
                 api.fetchBurpPluginInfo().then((response) => {
-                let lastBootupTimestamp = response.burpPluginInfo.lastBootupTimestamp
-                if (lastBootupTimestamp > downloadTime) {
-                    this.sendInitialDataLoading= 2
-                    this.sendDataLoading = 1
-                    if (response.burpPluginInfo.lastDataSentTimestamp > downloadTime) {
-                        clearInterval(interval)
-                        this.sendDataLoading = 2
-                        this.burpCollectionURL = "/dashboard/observe/inventory"
+                    let lastBootupTimestamp = response.burpPluginInfo.lastBootupTimestamp
+                    if (lastBootupTimestamp > downloadTime) {
+                        if (showBurpPluginConnectedFlag) {
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                text: "Burp plugin connected",
+                                color: 'success'
+                            })
+                        }
+                        showBurpPluginConnectedFlag = false
+                        if (response.burpPluginInfo.lastDataSentTimestamp > downloadTime) {
+                            clearInterval(interval)
+                            this.burpCollectionURL = "/dashboard/observe/inventory"
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                text: "Data received from burp plugin",
+                                color: 'success'
+                            })
+                        }
                     }
-                }
-            })
-            }, 5000)
+                })
+            }, 1000)
 
         }
     }
@@ -120,8 +131,8 @@ export default {
 
 <style lang="sass" scoped>
 
-.di-flex-bottom 
-    display: flex
+.di-flex-bottom
+  display: flex
     gap: 8px
     padding-top: 20px
     padding-bottom: 11px
@@ -156,4 +167,8 @@ export default {
     
 .row > div:first-child 
     width: 20px
+
+.info-box
+    margin-left: 4px
+    max-width: 800px
 </style>

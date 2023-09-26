@@ -74,7 +74,6 @@
 
 <script>
 
-import marketplaceApi from '../../../marketplace/api'
 import issuesApi from '../../../issues/api'
 import testingApi from '../../../testing/api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
@@ -97,7 +96,6 @@ export default {
     },
     data () {
         return {
-            testSourceConfigs: [],
             businessLogicSubcategories: [],
             categories: [],
             loading: false,
@@ -113,15 +111,11 @@ export default {
     },
     mounted() {
         let _this = this
-        marketplaceApi.fetchAllMarketplaceSubcategories().then(resp => {
-            _this.testSourceConfigs = resp.testSourceConfigs
-            issuesApi.fetchAllSubCategories().then(resp => {
-                //resp.subCategories.splice(resp.subCategories.findIndex(x => x.name === "CUSTOM_IAM"), 1)
-                _this.businessLogicSubcategories = resp.subCategories
-                _this.categories = resp.categories
-                _this.loading = false
-                _this.mapCategoryToSubcategory = _this.populateMapCategoryToSubcategory()
-            })
+        issuesApi.fetchAllSubCategories(true).then(resp => {
+            _this.businessLogicSubcategories = resp.subCategories
+            _this.categories = resp.categories
+            _this.loading = false
+            _this.mapCategoryToSubcategory = _this.populateMapCategoryToSubcategory()
         })
         testingApi.fetchAuthMechanismData().then(resp => {
             if(resp.authMechanism){
@@ -147,7 +141,7 @@ export default {
             let currObj = this.mapCategoryToSubcategory[this.selectedCategory]
             currObj.selected = this.globalCheckbox ? [...currObj.all] : []
         },
-        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests}) {
+        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}) {
             if (!this.testName) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -165,25 +159,13 @@ export default {
                 selectedTests, 
                 testRunTime,
                 maxConcurrentRequests,
-                testName: this.testName
+                testName: this.testName,
+                overriddenTestAppUrl
             }
             return this.$emit('testsSelected', ret)
         },
         populateMapCategoryToSubcategory() {
             let ret = {}
-            this.testSourceConfigs.forEach(x => {
-                if (!ret[x.category]) {
-                    ret[x.category] = {selected: [], all: []}
-                }
-
-                let obj = {
-                    label: x.id.substring(x.id.lastIndexOf("/")+1, x.id.lastIndexOf(".")), 
-                    value: x.id,
-                    icon: "$fab_github"
-                }
-                ret[x.category].all.push(obj);
-            })
-
             this.businessLogicSubcategories.forEach(x => {
                 if (!ret[x.superCategory.name]) {
                     ret[x.superCategory.name] = {selected: [], all: []}
@@ -235,14 +217,16 @@ export default {
 
 .category-list-container
     width: 40%
+    min-width: 40%
+    max-width: 40%
     flex-grow: 0
 
 .test-list
-    height: 400px
+    height: 350px
     overflow: scroll
 
 .category-list
-    height: 400px
+    height: 350px
     overflow: scroll
 
 .column-title

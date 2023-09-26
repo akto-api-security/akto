@@ -33,6 +33,7 @@
                     color="var(--themeColor)"
                     class="search-text-input"
                     prepend-inner-icon="$fas_search"
+                    @click.stop="() => {a=1}"
                 >
                     <template v-slot:prepend-inner>
                         <v-icon size="12" color="var(--themeColor)">$fas_search</v-icon>
@@ -109,9 +110,9 @@ export default {
         }
     },
     mounted() {
-        let inputEl = this.$refs.searchTextInput.$el.querySelector('.search-text-input input')
+        let inputEl = this.$refs?.searchTextInput?.$el.querySelector('.search-text-input input')
         setTimeout(()=>{
-            inputEl.focus()
+            inputEl?.focus()
         },200)
 
     },

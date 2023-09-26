@@ -1,0 +1,57 @@
+id: SESSION_FIXATION
+info:
+  name: Session fixation
+  description: "This test detects vulnerabilities in web applications, ensuring proper session management and protection against attacks."
+  details: >
+            "The session fixation test focuses on identifying vulnerabilities associated with session fixation attacks. In this type of attack, token and cookie values remain unchanged for a user before and after logging into the application, making their cookies consistent. Attackers can replay the attack by injecting the same vector values before login, allowing them access after login. To mitigate session fixation, it is crucial to utilize distinct parameter values for enhanced security."
+  impact: "The impact of the session fixation vulnerability can be significant, leading to unauthorized access and account compromise. Attackers can exploit fixed tokens and cookies, gaining control over user sessions and potentially manipulating sensitive data."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: SESSION_FIXATION
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.appsecmonkey.com/blog/session-fixation"
+    - "https://hackerone.com/reports/2421"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  request_headers:
+    for_one:
+      key:
+        eq: JSESSIONID
+        extract:  session_key
+      value: 
+        extract: session_value
+  url:
+    contains_either:
+      - login
+      - signin
+      - sign-in
+      - log-in
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  or:
+    - response_headers:
+        not_contains: set-cookie
+    - response_headers:
+        for_one:
+          key:
+            eq: set-cookie
+          value: 
+            contains_either: ${session_value}
+

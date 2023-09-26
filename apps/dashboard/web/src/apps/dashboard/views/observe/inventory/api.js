@@ -28,13 +28,11 @@ export default {
             }
         })
     },
-    uploadHarFile(content, apiCollectionId, skipKafka) {
+    uploadHarFile(formData) {
         return request({
             url: '/api/uploadHar',
             method: 'post',
-            data: {
-                content, apiCollectionId, skipKafka
-            }
+            data: formData,
         })
     },
     uploadTcpFile(content, apiCollectionId, skipKafka) {
@@ -207,7 +205,7 @@ export default {
     },
     convertSampleDataToCurl(sampleData) {
         return request({
-            url: '/api/convertSampleDataToCurl',
+            url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSampleDataToCurl' :'/api/convertSampleDataToCurl',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {
@@ -216,7 +214,7 @@ export default {
     },
     convertSampleDataToBurpRequest(sampleData) {
         return request({
-            url: '/api/convertSamleDataToBurpRequest',
+            url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSamleDataToBurpRequest' : '/api/convertSamleDataToBurpRequest',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {

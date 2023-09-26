@@ -14,22 +14,20 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.TestExecutor;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
 
-import java.sql.Timestamp;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.mongodb.client.model.Filters;
 
 import static com.akto.utils.RedactSampleData.convertHeaders;
 
@@ -47,6 +45,15 @@ public class Utils {
             result.put(variable.get("key").asText(), variable.get("value").asText());
         }
         return result;
+    }
+
+    public static boolean isValidURL(String url) {
+        try {
+            new URL(url).toURI();
+            return true;
+        } catch (MalformedURLException | URISyntaxException e) {
+            return false;
+        }
     }
 
     public static String replaceVariables(String payload, Map<String, String> variableMap) {
@@ -95,7 +102,7 @@ public class Utils {
             result.put("requestHeaders", requestHeadersString);
 
             JsonNode bodyNode = request.get("body");
-            String requestPayload = bodyNode != null ?  bodyNode.asText() : "";
+            String requestPayload = extractRequestPayload(bodyNode);
             requestPayload = replaceVariables(requestPayload, variables);
 
             JsonNode responseNode = apiInfo.get("response");
@@ -115,7 +122,7 @@ public class Utils {
 
                     OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
                     try {
-                        OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
+                        OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null);
                         responseHeadersString = convertHeaders(res.getHeaders());
                         responsePayload =  res.getBody();
                         statusCode =  res.getStatusCode()+"";
@@ -156,6 +163,49 @@ public class Utils {
             loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
             return null;
         }
+    }
+
+    public static String extractRequestPayload(JsonNode bodyNode) {
+        if(bodyNode == null || bodyNode.isNull()){
+            return "";
+        }
+        String mode = bodyNode.get("mode").asText();
+        if(mode.equals("none")){
+            return "";
+        }
+        if(mode.equals("raw")){
+            return bodyNode.get("raw").asText();
+        }
+        if(mode.equals("formdata")){
+            ArrayNode formdata = (ArrayNode) bodyNode.get("formdata");
+            StringBuilder sb = new StringBuilder();
+            for(JsonNode node : formdata){
+                String type = node.get("type").asText();
+                if(type.equals("file")){
+                    sb.append(node.get("key").asText()).append("=").append(node.get("src").asText()).append("&");
+                } else if(type.equals("text")){
+                    sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
+                }
+            }
+            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
+            return sb.toString();
+        }
+        if(mode.equals("urlencoded")){
+            ArrayNode urlencoded = (ArrayNode) bodyNode.get("urlencoded");
+            StringBuilder sb = new StringBuilder();
+            for(JsonNode node : urlencoded){
+                sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
+            }
+            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
+            return sb.toString();
+        }
+        if(mode.equals("graphql")){
+            return bodyNode.get("graphql").toPrettyString();
+        }
+        if(mode.equals("file")){
+            return bodyNode.get("file").get("src").asText();
+        }
+        return bodyNode.toPrettyString();
     }
 
     private static String getContentType(JsonNode request, JsonNode response, Map<String, String> responseHeadersMap) {
@@ -257,9 +307,26 @@ public class Utils {
         }
 
         if(skipKafka) {
-            SingleTypeInfo.fetchCustomDataTypes(); //todo:
-            APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
+            String accountIdStr = responses.get(0).accountId;
+            if (!StringUtils.isNumeric(accountIdStr)) {
+                return;
+            }
+
+            int accountId = Integer.parseInt(accountIdStr);
+            Context.accountId.set(accountId);
+
+            SingleTypeInfo.fetchCustomDataTypes(accountId);
+            AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+            if (info == null) { // account created after docker run
+                info = new AccountHTTPCallParserAktoPolicyInfo();
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                info.setHttpCallParser(callParser);
+                info.setPolicy(new AktoPolicyNew(false));
+                RuntimeListener.accountHTTPParserMap.put(accountId, info);
+            }
+
+            info.getHttpCallParser().syncFunction(responses, true, false);
+            info.getPolicy().main(responses, true, false);
         }
     }
 

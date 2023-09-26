@@ -346,9 +346,12 @@ export default {
                             active: true
                         },
                         ...(this.testingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })
@@ -369,9 +372,12 @@ export default {
                             active: true
                         },
                         ...(this.cicdTestingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true,
                                 cicd: true
                             }
@@ -393,9 +399,12 @@ export default {
                             active: true
                         },
                         ...(this.pastTestingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
-                                title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })

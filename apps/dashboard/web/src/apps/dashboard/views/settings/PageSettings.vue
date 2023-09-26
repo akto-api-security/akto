@@ -12,14 +12,34 @@
                 </data-types>
             </template>
             <template slot="Auth types">
-                <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
-                    :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
-                    <template #details-container="{}">
-                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                            <auth-type-details :auth_type_copy="auth_type" />
-                        </a-card>
+              <div>
+                <div class="d-flex jc-end pr-3 pt-3">
+                  <v-dialog v-model="showRestAuthTypesDialog" width="500">
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-btn outlined color="var(--themeColor)" @click="showRestAuthTypesDialog = true" v-bind="attrs" v-on="on">
+                        Reset
+                      </v-btn>
                     </template>
+                    <div class="dialog-box">
+                      <div class="entry-text">Are you sure you want to reset all custom auth types in your API inventory? </div>
+                      <div class="d-flex jc-end">
+                        <v-btn primary dark color="var(--themeColor)" @click="resetAllAuthTypes">
+                          Proceed
+                        </v-btn>
+                      </div>
+                    </div>
+                  </v-dialog>
+                </div>
+                <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
+                            :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
+                  <template #details-container="{}">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                      <auth-type-details :auth_type_copy="auth_type" />
+                    </a-card>
+                  </template>
                 </data-types>
+
+              </div>
             </template>
             <template slot="Tags">
                 <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
@@ -118,9 +138,14 @@ export default {
     data() {
         return {
             showDialog: false,
+            showRestAuthTypesDialog: false
         }
     },
     methods: {
+        async resetAllAuthTypes() {
+          this.showRestAuthTypesDialog = false
+          await api.resetAllCustomAuthTypes()
+        },
         createNewDataType() {
             return this.$store.dispatch('data_types/setNewDataType')
         },
@@ -157,13 +182,12 @@ export default {
 
         },
         getTabs() {
-          if(this.tab && this.tab=="health"){
-            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
-          }
-          else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
-          }
-          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
+            if (window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true') {
+                return ['Data types', 'Auth types', 'Tags', 'Users', 'Integrations'];
+            } else if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy') {
+                return ['Data types', 'Auth types', 'Tags', 'Users', 'Health', 'Integrations'];
+            }
+            return ['Data types', 'Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
         }
     },
     computed: {

@@ -24,8 +24,11 @@ public class TestConfig {
     private GlobalEnums.YamlTemplateSource templateSource;
     private int updateTs;
 
+    private Strategy strategy;
+    private boolean inactive;
+
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
-        ConfigParserResult validation) {
+        ConfigParserResult validation, Strategy strategy) {
         
         this.id = id;
         this.info = info;
@@ -34,6 +37,7 @@ public class TestConfig {
         this.wordlists = wordlists;
         this.execute = execute;
         this.validation = validation;
+        this.strategy = strategy;
     }
 
     public TestConfig() { }
@@ -116,5 +120,21 @@ public class TestConfig {
 
     public void setUpdateTs(int updateTs) {
         this.updateTs = updateTs;
+    }
+
+    public Strategy getStrategy() {
+        return strategy;
+    }
+
+    public void setStrategy(Strategy strategy) {
+        this.strategy = strategy;
+    }
+    
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
     }
 }

@@ -1,0 +1,47 @@
+id: GRAPHQL_FIELD_SUGGESTIONS_ENABLED
+info:
+  name: "Graphql Field Suggestions Enabled"
+  description: "GraphQL field suggestions provide auto-complete suggestions for available fields, enabling attackers to gain insights into data structures, potentially leading to data exposure and targeted attacks on the API."
+  details: > 
+          "The 'Graphql Field Suggestions Enabled' test focuses on identifying a security misconfiguration in the GraphQL implementation. By enabling GraphQL field suggestions, an attacker can retrieve the GraphQL schema, exposing critical information. This misconfiguration falls under the Security Misconfiguration (SM) category, with a severity level of HIGH. The test specifically targets APIs with URLs containing 'graphql' using regular expression filtering."
+          "The test executes a single request, modifying the URL to ensure it includes 'graphql.' Additionally, it replaces the request body with a GraphQL introspection query to retrieve schema details. The response payload is then validated to check if it contains either the phrases 'Did you mean' or 'Expected value of type.'"
+          "Tags associated with this test include Business logic, OWASP top 10, and HackerOne top 10. For more information, reference the provided link on why disabling GraphQL introspection in production is recommended."" 
+  impact: "Enabling GraphQL field suggestions exposes the GraphQL schema, allowing attackers to gain insight into the API structure, potentially leading to targeted attacks and unauthorized access to sensitive data."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GRAPHQL_FIELD_SUGGESTIONS_ENABLED
+  severity: LOW
+  tags:
+    - GraphQL
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://nostarch.com/black-hat-graphql Chapter 6 - Information Disclosure"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
+    - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
+
+api_selection_filters:
+  url:
+    regex: graphql
+
+execute:
+  type: single
+  requests:
+  - req:
+    - modify_url:
+        regex_replace:
+          regex: graphql.*
+          replace_with: graphql
+    - replace_body: '{ "query": "query IntrospectionQuery { __schema { queryType { nam } mutationType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } }" }'
+
+validate:
+  response_payload:
+    contains_either:
+      - "Did you mean" 
+      - "Expected value of type"
+
+strategy:
+  run_once: /

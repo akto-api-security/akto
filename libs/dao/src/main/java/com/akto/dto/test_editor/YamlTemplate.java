@@ -21,6 +21,8 @@ public class YamlTemplate {
     public static final String SHA = "sha";
     private String fileName;
     public static final String FILE_NAME = "fileName";
+    private boolean inactive;
+    public static final String INACTIVE = "inactive";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, String sha, String fileName) {
         this.id = id;
@@ -100,6 +102,14 @@ public class YamlTemplate {
         this.fileName = fileName;
     }
     
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
+    }
+
     public GlobalEnums.YamlTemplateSource getSource() {
         if (source == null) {
             source = GlobalEnums.YamlTemplateSource.AKTO_TEMPLATES;

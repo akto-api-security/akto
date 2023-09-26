@@ -25,6 +25,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ContainsAllFilter;
@@ -167,7 +168,7 @@ public final class FilterAction {
     }
 
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
-        String url = filterActionRequest.getApiInfoKey().getUrl();
+        String url = filterActionRequest.getRawApi().getRequest().getUrl();
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
             return;
@@ -493,7 +494,23 @@ public final class FilterAction {
                     newMatchingKeys.add(key);
                 }
                 result = result || res;
+
             }
+
+            if (headers.containsKey("cookie")) {
+                List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+                Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                for (String cookieKey : cookieMap.keySet()) {
+                    DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(cookieKey, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+                    res = invokeFilter(dataOperandFilterRequest);
+                    if (res) {
+                        newMatchingKeys.add(cookieKey);
+                        result = result || res;
+                        break;
+                    }
+                }
+            }
+
             if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
                 result = newMatchingKeys.size() == headers.size();
             }
@@ -514,6 +531,21 @@ public final class FilterAction {
                 }
                 result = result || res;
             }
+
+            if (headers.containsKey("cookie")) {
+                List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+                Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                for (String cookieKey : cookieMap.keySet()) {
+                    DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(cookieMap.get(cookieKey), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+                    res = invokeFilter(dataOperandFilterRequest);
+                    if (res) {
+                        matchingValueKeySet.add(cookieKey);
+                        result = result || res;
+                        break;
+                    }
+                }
+            }
+
             if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
                 result = matchingValueKeySet.size() == headers.size();
             }

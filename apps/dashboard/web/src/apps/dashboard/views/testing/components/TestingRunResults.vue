@@ -1,11 +1,18 @@
 <template>
     <div class="testing-run-results-container" ref="detailsDialog">
-        <div class="testing-run-header">
-            <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
-            <span>({{endpoints}})</span> | 
-            <span>{{getScheduleStr()}}</span> | 
-            <span>{{collectionName}}</span>
-        </div>
+        <div class="testing-run-header pt-2" style="display: flex; flex-direction: column;">
+                <v-tooltip bottom>
+                    <template v-slot:activator='{ on, attrs }'>
+                        <span v-bind="attrs" v-on="on" class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
+                    </template>
+                    <span>{{(testingRun && testingRun.name) || "Tests"}}x</span>
+                </v-tooltip>
+                <div>
+                    <span>({{endpoints}})</span> | 
+                    <span>{{getScheduleStr()}}</span> | 
+                    <span>{{collectionName}}</span>
+                </div>
+            </div>
 
         <div class="loading-bar" v-if="loading">
             <div>
@@ -65,11 +72,13 @@
                     :sortDescDefault="true"
                     :dense="true"
                     @rowClicked="openDetails"
+                    @exportAsHTML="exportAsHTML"
+                    :showExportVulnerabilityButton="true"
                 >
                     <template #item.severity="{item}">
                         <sensitive-chip-group 
-                            :sensitiveTags="item.severity ? [item.severity] : []" 
-                            :chipColor="getColor(item.severity)"
+                            :sensitiveTags="(item.severity || item.severity.value !== 0) ? getItemSeverity(item.severity.value) : []"
+                            :chipColor="getColor(item.severity.value)"
                             :hideTag="true"
                             class="z-80"
                         />
@@ -93,7 +102,6 @@
                 <workflow-test-builder :endpointsList="[]" apiCollectionId=0 :originalStateFromDb="originalStateFromDb" :defaultOpenResult="true" class="white-background"/>
             </div>
         </div>
-
     </div>
 </template>
 
@@ -193,13 +201,25 @@ export default {
         }
     },
     methods: {
+        async exportAsHTML() {
+            let currentSummary = this.testingRunResultSummaries.filter(x => x.startTimestamp === this.selectedDate)[0]
+            const routeData = this.$router.resolve({name: 'testing-export-html', query: {testingRunResultSummaryHexId:currentSummary.hexId}});
+            window.open(routeData.href, '_blank');
+        },
         getColor(severity) {
             switch (severity) {
-                case "HIGH": return "var(--hexColor33)"
-                case "MEDIUM":  return "var(--hexColor34)"
-                case "LOW": return "var(--hexColor35)"
+                case 3: return "var(--hexColor33)"
+                case 2:  return "var(--hexColor34)"
+                case 1: return "var(--hexColor35)"
+            }  
+        },
+        getItemSeverity(severity){
+            switch (severity) {
+                case 3: return ["HIGH"]
+                case 2:  return ["MEDIUM"]
+                case 1: return ["LOW"]
+                default: return []
             }
-            
         },
         selectedDateStr() {
             return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
@@ -250,8 +270,16 @@ export default {
         dateClicked(point) {
             this.selectedDate = point / 1000
         },
-        refreshSummaries() {
-            return api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
+        refreshSummaries(firstTime) {
+
+            let st = this.startTimestamp
+            let en = this.endTimestamp
+            if(firstTime){
+                st = 0;
+                en = 0;
+            }
+
+            return api.fetchTestingRunResultSummaries(st, en, this.testingRunHexId).then(resp => {
                 if (resp.testingRun.testIdConfig == 1) {
                     this.isWorkflow = true
                     this.originalStateFromDb = resp.workflowTest
@@ -264,7 +292,7 @@ export default {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
-                severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : null,
+                severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : {title: "NONE", value: 0},
                 testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
                 testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
             }
@@ -295,7 +323,7 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('issues/fetchAllSubCategories')
-        await this.refreshSummaries()
+        await this.refreshSummaries(true)
 
         if (this.testingRunResultSummaries.length !== 0) {
             this.loading = false
@@ -401,6 +429,10 @@ export default {
     
 .testing-run-title
     font-weight: 500 
+    max-width: 650px
+    text-overflow: ellipsis
+    overflow : hidden
+    white-space: nowrap
 
 .testing-run-header       
     font-size: 14px
