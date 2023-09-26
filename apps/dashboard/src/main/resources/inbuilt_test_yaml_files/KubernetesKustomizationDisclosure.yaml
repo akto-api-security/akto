@@ -1,0 +1,48 @@
+id: KUBERNETES_KUSTOMIZATION_DISCLOSURE
+info:
+  name: Kubernetes Kustomization Disclosure
+  description: "Search for the presence of Kubernetes Kustomization files (kustomization.yml) on the provided URLs."
+  details: >
+            "Kubernetes Kustomization Disclosure involves searching for the presence of Kubernetes Kustomization files (kustomization.yml) on the provided URLs. These files define customizations for Kubernetes deployments and may contain sensitive configuration information such as API versions, resource definitions, namespaces, and labels. Identifying and addressing this vulnerability is critical to prevent unauthorized access, protect sensitive data, and maintain the integrity of Kubernetes deployments."
+  impact: "Exposing Kubernetes Kustomization files reveals sensitive configuration details, enabling attackers to gain insights into the deployment structure and potentially launch unauthorized access, data leaks, or further attacks."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: KUBERNETES_KUSTOMIZATION_DISCLOSURE
+  severity: MEDIUM
+  references:
+    - https://github.com/detectify/ugly-duckling/blob/master/modules/crowdsourced/kubernetes-kustomization-disclosure.json
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/kustomization.yml
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - "apiVersion:"
+      - "resources:"
+      - "namespace:"
+      - "commonLabels:"
+      - "Kustomization"
+  response_headers:
+    for_one:
+      value:
+        contains_either:
+          - 'application/yaml'
+          - 'Application/Yaml'
+          - 'APPLICATION/YAML'
+          - 'Application/yaml'
+          - 'application/Yaml'

@@ -1,0 +1,61 @@
+id: CORS_MISCONFIGURATION_WHITELIST_ORIGIN
+info:
+  name: "CORS Whitelist Origin Validation"
+  description: "Validates the Cross-Origin Resource Sharing (CORS) whitelist, ensuring only authorized origins are included, enhancing application security."
+  details: >
+    "This test validates the configuration of Cross-Origin Resource Sharing (CORS) by exploiting the whitelist of allowed origins."
+    "It ensures that only authorized domains are included in the whitelist, preventing potential security risks and unauthorized access to resources, bolstering the overall security posture of the application"
+  impact: >
+    "A misconfigured CORS can have significant impact on web application security."
+    "If invalid origin values are not properly handled, it may allow unauthorized access to sensitive resources, leading to"
+    "data breaches, cross-site scripting (XSS) attacks, or unauthorized data manipulation, compromising the integrity and confidentiality of the system."
+  category:
+    name: CORS
+    shortName: CORS Misconfiguration
+    displayName: Cross-Origin Resource Sharing (CORS)
+  subCategory: CORS_MISCONFIGURATION_WHITELIST_ORIGIN
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://crashtest-security.com/cors-misconfiguration/"
+
+auth:
+  authenticated: true
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  request_headers:
+    for_one:
+      key:
+        eq: Host
+      value:
+        extract: host_val
+
+execute:
+  type: single
+  requests:
+    - req:
+      - add_header:
+          origin:  ${host_val}.evil.com
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    and:
+      - for_one:
+          key:
+            contains_either: access-control-allow-origin
+          value:
+            contains_either: ${host_val}.evil.com
+      - for_one:
+          key:
+            contains_either: access-control-allow-credentials
+          value:
+            contains_either: "true"

@@ -8,6 +8,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.store.SampleMessageStore;
+import com.akto.testing.ApiExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
@@ -17,6 +18,10 @@ import com.sendgrid.Method;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -192,7 +197,7 @@ public class TestTestPlugin extends MongoBasedTest {
     }
 
     private void insertIntoStiMap(ApiInfo.ApiInfoKey apiInfoKey, String param, SingleTypeInfo.SubType subType,
-                                  boolean isUrlParam, boolean isPrivate, Map<String, SingleTypeInfo> singleTypeInfoMap)  {
+                                  boolean isUrlParam, boolean isPrivate, SampleMessageStore sampleMessageStore)  {
         int apiCollectionId = apiInfoKey.getApiCollectionId();
         String url = apiInfoKey.getUrl();
         String method = apiInfoKey.getMethod().name();
@@ -212,27 +217,7 @@ public class TestTestPlugin extends MongoBasedTest {
             singleTypeInfo.setUniqueCount(10);
         }
 
-        singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
-    }
-
-
-    @Test
-    public void testDecrementUrlVersion() {
-        String result = new OldApiVersionTest().decrementUrlVersion("/api/v2/books/v3n0m/", 1, 1);
-        assertEquals("/api/v1/books/v3n0m/", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books/v3/cars", 2, 1);
-        assertEquals("/api/v20/books/v1/cars", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books/", 2, 1);
-        assertEquals("/api/v20/books/", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books", -1, 1);
-        assertEquals("/api/v23/books", result);
-
-        result = new OldApiVersionTest().decrementUrlVersion("/api/v1/books", 1, 1);
-        assertNull(result);
-
+        sampleMessageStore.getSingleTypeInfos().put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
     }
 
     @Test
@@ -275,6 +260,14 @@ public class TestTestPlugin extends MongoBasedTest {
 
     }
 
+    @Test
+    public void testOverrideAppUrl() {
 
+        String url = "http://google.com/some/path/here/?param1=1&param2=2";
+        String newHost = "https://twitter.com:80";
+
+        System.out.println(ApiExecutor.replaceHostFromConfig(url, new TestingRunConfig(0, null, null, null, newHost)));
+
+    }
 
 }

@@ -1,5 +1,5 @@
 <template>
-    <v-menu offset-y min-width="150" max-height="300px" v-model="showMenu" content-class="no-shadow">
+    <v-menu offset-y min-width="180" max-height="300px" v-model="showMenu" content-class="no-shadow" :attach="attach ? getString: undefined">
         <template v-slot:activator="{on, attrs}">
             <div v-on="on" v-bind="attrs">
                 <slot name="activator2"/>
@@ -12,7 +12,7 @@
               <v-list-item 
                   v-for="(item, index) in items"
                   :key=index
-                  class='row-nav-drawer' 
+                  :class='[item.label ? "row-nav-drawer" : "separator", "e2e-accounts"]'
                   active-class="active-item" 
                   @click="item.click"
               >
@@ -39,7 +39,8 @@ export default {
         items: obj.arrR,
         tooltipTriangle: obj.strN,
         showMenuOnDraw: obj.boolN,
-        extraArrowClasses: obj.arrN
+        extraArrowClasses: obj.arrN,
+        attach: obj.strN,
     },
     data() {
       return {
@@ -47,6 +48,9 @@ export default {
       }
     },
     computed: {
+      getString(){
+        return '#' + this.attach
+      },
       arrowClasses() {
         let ret = ["arrow-"+this.tooltipTriangle]
         if (this.extraArrowClasses) {
@@ -68,6 +72,13 @@ export default {
     text-decoration-color: var(--white)      
 .content-nav-drawer
   padding: 4px 0
+
+.separator
+  height: 0px !important
+  min-height: 0px !important
+  max-height: 0px !important
+  border-bottom: 1px solid #8F8F8F !important
+  
 .icon-nav-drawer
   justify-content: center
   align-self: center

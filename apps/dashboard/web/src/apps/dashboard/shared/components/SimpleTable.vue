@@ -28,6 +28,21 @@
                                     <div v-on="on" v-bind="attrs">
                                         <secondary-button 
                                             color="var(--themeColorDark)" 
+                                            text="Export vulnerability report"
+                                            @click="$emit('exportAsHTML')" 
+                                            v-if="showExportVulnerabilityButton"
+                                        />
+                                    </div>
+                                </template>
+                                Export vulnerability report
+                            </v-tooltip>
+                        </div>
+                        <div class="clickable download-csv">
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{on, attrs}">
+                                    <div v-on="on" v-bind="attrs">
+                                        <secondary-button 
+                                            color="var(--themeColorDark)" 
                                             text="Export"
                                             @click="downloadData(fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators))" 
                                             v-if="!hideDownloadCSVIcon"
@@ -82,6 +97,7 @@ export default {
         actions: obj.arrN,
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
+        showExportVulnerabilityButton: obj.boolN,
         showName: obj.boolN,
         showGridView:obj.boolN,
         leftView:obj.boolN,
@@ -196,16 +212,27 @@ export default {
 
                 }
             } else {
+                let filterValue = (itemValue.value || itemValue.value === 0) ? itemValue.value : itemValue
                 switch (filterOperators[header]) {
                     case "OR": 
                     case "AND":
-                        return selectedValues.has(itemValue)
+                        return selectedValues.has(filterValue)
                     case "NOT":
-                        return !selectedValues.has(itemValue)
+                        return !selectedValues.has(filterValue)
                 }
             }
         },
-        
+        getDistinctItems(array) {
+            const seen = new Set();
+            return array.filter(item => {
+                const key = typeof item === 'object' ? JSON.stringify(item) : item;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    return true;
+                }
+                return false;
+            });
+        }
     },
     mounted() {
         window.addEventListener('keydown',this.moveRowsOnKeys,null)
@@ -232,8 +259,8 @@ export default {
                         }
                     )
 
-                    let distinctItems = [...new Set(allItemValues.sort())]
-                    m[h.value] = distinctItems.map(x => {return {title: x, subtitle: '', value: x}})
+                    let distinctItems = this.getDistinctItems(allItemValues)
+                    m[h.value] = distinctItems.map(x => {return {title: x?.title ? x?.title : x, subtitle: '', value: (x?.value || x?.value === 0) ? x?.value : x}})
                     return m
                 }, {})
             }

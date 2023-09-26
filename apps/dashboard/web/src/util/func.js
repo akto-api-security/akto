@@ -157,6 +157,9 @@ export default {
         if (d.length < 2) d = '0' + d
         return y + "-" + m + "-" + d
     },
+    toHyphenatedDate(epochInMs) {
+        return this.toDateStrShort(new Date(epochInMs))
+    },
     toYMD (date) {
         var d = date.getDate();
         var m = date.getMonth() + 1; //Month from 0 to 11
@@ -595,6 +598,9 @@ export default {
 
             case "AKTOGPT":
                 return {name: '$chatGPT', color: 'rgb(16, 163, 127)'}
+            
+            case "GITHUB":
+                return {name: '$githubIcon', color: cs.getPropertyValue('--hexColor42')}
         }
     },
 
@@ -752,10 +758,48 @@ export default {
     getRunResultSeverity(runResult, subCategoryMap) {
         let testSubType = subCategoryMap[runResult.testSubType]
         if (!testSubType) {
-            return "HIGH"
+            return 3
         } else {
             let a = testSubType.superCategory["severity"]["_name"]
-            return a
+            switch(a){
+                case "HIGH": 
+                    return {title: a, value: 3}
+
+                case "MEDIUM": 
+                    return {title: a, value: 2}
+
+                case "LOW": 
+                    return {title: a, value: 1}
+
+                default:
+                    return {title: a, value: 3}
+            }
         }
-    }
+    },
+
+    convertSecondsToReadableTime(seconds) {
+        if (seconds < 60) {
+          return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+        } else if (seconds < 3600) {
+          const minutes = Math.floor(seconds / 60);
+          return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+        } else if (seconds < 86400) {
+          const hours = Math.floor(seconds / 3600);
+          const remainingMinutes = Math.floor((seconds % 3600) / 60);
+          let result = `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+          if (remainingMinutes > 0) {
+            result += ` ${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}`;
+          }
+          return result;
+        } else {
+          const days = Math.floor(seconds / 86400);
+          const remainingHours = Math.floor((seconds % 86400) / 3600);
+          let result = `${days} ${days === 1 ? 'day' : 'days'}`;
+          if (remainingHours > 0) {
+            result += ` ${remainingHours} ${remainingHours === 1 ? 'hour' : 'hours'}`;
+          }
+          return result;
+        }
+      }
+
 }

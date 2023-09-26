@@ -1,0 +1,36 @@
+id: CONFIGURATION_LISTING
+info:
+  name: Sensitive Configuration Files Listing
+  description: "Directory listing of sensitive files."
+  details: >
+              "Sensitive Configuration Files Listing refers to the vulnerability where the misconfiguration allows the listing of sensitive configuration files located in the "config" directory. This exposure can disclose critical information like database credentials and API keys, posing a significant risk to the application's security. Promptly addressing this vulnerability is essential to prevent unauthorized access and protect sensitive data from exploitation."
+  impact: "Listing sensitive configuration files exposes critical information, such as database credentials and API keys, enabling targeted attacks and unauthorized access."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: CONFIGURATION_LISTING
+  severity: MEDIUM
+  references:
+    - https://www.exploit-db.com/ghdb/7014 
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/config/
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - "Index of /configs"
+      - "Parent Directory"

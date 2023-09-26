@@ -2,11 +2,12 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -16,24 +17,30 @@ import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.AccountTask;
 import com.akto.util.Constants;
-import com.mongodb.BasicDBObject;
+import com.akto.util.EmailAccountName;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
+    public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
 
     private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId summaryId = new ObjectId();
@@ -60,17 +67,21 @@ public class Main {
 
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
             public void run() {
-                Context.accountId.set(1_000_000);
-                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                if (settings == null) {
-                    return;
-                }
-                int globalRateLimit = settings.getGlobalRateLimit();
-                Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance().getRateLimitsMap();
-                rateLimitMap.clear();
-                rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        if (settings == null) {
+                            return;
+                        }
+                        int globalRateLimit = settings.getGlobalRateLimit();
+                        int accountId = t.getId();
+                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
+                        rateLimitMap.clear();
+                        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+                    }
+                }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
     }
@@ -78,12 +89,11 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
-        Context.accountId.set(1_000_000);
 
         boolean connectedToMongo = false;
         do {
             try {
-                AccountSettingsDao.instance.getStats();
+                AccountsDao.instance.getStats();
                 connectedToMongo = true;
             } catch (Exception ignored) {
             } finally {
@@ -95,88 +105,110 @@ public class Main {
             }
         } while (!connectedToMongo);
 
-        int delta = Context.now() - 20*60;
         setupRateLimitWatcher();
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
-
-        TestExecutor testExecutor = new TestExecutor();
-
         while (true) {
-            int start = Context.now();
+            AccountTask.instance.executeTask(account -> {
+                int delta = Context.now() - 20*60;
 
-            Bson filter1 = Filters.and(
-                    Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-            );
-            Bson filter2 = Filters.and(
-                    Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
-            );
+                Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
+                );
+                Bson filter2 = Filters.and(
+                        Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
+                );
 
-            Bson update = Updates.combine(
-                    Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-            );
+                Bson update = Updates.combine(
+                        Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+                );
 
-            TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.or(filter1,filter2), update);
+                int start = Context.now();
+
+                TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                        Filters.or(filter1,filter2), update);
+
+                if (testingRun == null) {
+                    return;
+                }
 
 
-            if (testingRun == null) {
                 try {
-                    Thread.sleep(10 * 1000L);
-                    continue;
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    long timestamp = testingRun.getId().getTimestamp();
+                    long seconds = Context.now() - timestamp;
+                    loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
+                    if (testingRun.getTestIdConfig() > 1) {
+                        TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                        if (testingRunConfig != null) {
+                            loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
+                            testingRun.setTestingRunConfig(testingRunConfig);
+                        }else {
+                            loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
+                        }
+                    }
+                    ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
+                    TestExecutor testExecutor = new TestExecutor();
+                    testExecutor.init(testingRun, summaryId);
+                    raiseMixpanelEvent(summaryId, testingRun);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
                 }
-            }
+                Bson completedUpdate = Updates.combine(
+                        Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
+                        Updates.set(TestingRun.END_TIMESTAMP, Context.now())
+                );
 
-            long timestamp = testingRun.getId().getTimestamp();
-            long seconds = Context.now() - timestamp;
-            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
-            if (testingRun.getTestIdConfig() > 1) {
-                TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-                if (testingRunConfig != null) {
-                    loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
-                    testingRun.setTestingRunConfig(testingRunConfig);
-                } else {
-                    loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
+                if (testingRun.getPeriodInSeconds() > 0 ) {
+                    completedUpdate = Updates.combine(
+                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
+                    );
                 }
-            }
 
-            ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
-            loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
+                TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                        Filters.eq("_id", testingRun.getId()),  completedUpdate
+                );
 
-            try {
-                testExecutor.init(testingRun, summaryId);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
-            }
-
-            Bson completedUpdate = Updates.combine(
-                    Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                    Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-            );
-
-            if (testingRun.getPeriodInSeconds() > 0 ) {
-                completedUpdate = Updates.combine(
-                    Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                    Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                );                
-            }
-
-            TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.eq("_id", testingRun.getId()),  completedUpdate
-            );
-
-
-            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+            }, "testing");
+            Thread.sleep(1000);
         }
+    }
+
+    private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun) {
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne
+                (
+                        Filters.eq(TestingRunResultSummary.ID, summaryId)
+                );
+        int totalApis = testingRunResultSummary.getTotalApis();
+
+        String testType = "ONE_TIME";
+        if(testingRun.getPeriodInSeconds()>0)
+        {
+            testType = "SCHEDULED DAILY";
+        }
+
+        String dashboardMode = "saas";
+
+        String userEmail = testingRun.getUserEmail();
+        String distinct_id = userEmail + "_" + dashboardMode.toUpperCase();
+
+        EmailAccountName emailAccountName = new EmailAccountName(userEmail);
+        String accountName = emailAccountName.getAccountName();
+
+        JSONObject props = new JSONObject();
+        props.put("Email ID", userEmail);
+        props.put("Dashboard Mode", dashboardMode);
+        props.put("Account Name", accountName);
+        props.put("Test type", testType);
+        props.put("Total APIs tested", totalApis);
+
+
+        AktoMixpanel aktoMixpanel = new AktoMixpanel();
+        aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
     }
 }

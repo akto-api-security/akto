@@ -1,0 +1,44 @@
+id: FIREBASE_CONFIG_EXPOSURE
+info:
+  name: Firebase Config Exposure
+  description: "Attacker can get unauthorized access of Firebase configuration details." 
+  details: >
+              "Firebase Config Exposure refers to the vulnerability where Firebase configuration details, such as API key, authentication domain, database URL, and storage bucket, are exposed due to misconfiguration. Unauthorized access to these details can lead to misuse of the API key, unauthorized access to Firebase services, and potential manipulation of associated data. Addressing this vulnerability promptly is crucial to prevent unauthorized access and protect the security and integrity of Firebase services and associated resources."
+  impact: "Exposing Firebase configuration details enables attackers to potentially misuse the API key, gain unauthorized access to Firebase services, and manipulate associated data."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: FIREBASE_CONFIG_EXPOSURE
+  severity: LOW
+  references:
+    - https://github.com/firebase/firebaseui-web/blob/master/demo/public/sample-config.js
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}
+    - ${urlVar}/public/config.js
+    - ${urlVar}/config.js
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+      
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - "apiKey"
+      - "authDomain"
+      - "databaseURL"
+      - "storageBucket"

@@ -1,0 +1,50 @@
+id: OPEN_REDIRECT_IN_PATH
+info:
+  name: "Open redirect in path"
+  description: "Tests for open redirect vulnerability by injecting evil.com into URL path, ensuring secure redirection and protection against malicious redirects."
+  details: > 
+            "Executing a comprehensive vulnerability assessment by injecting 'evil.com' into the urls, aiming to detect and mitigate open redirect vulnerabilities.
+            Open redirects can enable attackers to trick users into visiting malicious websites, leading to various risks such as phishing, malware distribution, and unauthorized access.
+            Ensuring robust protection against this vulnerability is crucial for preserving user trust, data integrity, and overall system security.
+  impact: "This behavior can be leveraged to facilitate phishing attacks against users of the application."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: OPEN_REDIRECT_IN_PATH
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
+    - "https://hackerone.com/reports/469803"
+api_selection_filters:
+  response_code:
+    eq: 302
+  url:
+    regex: .*\/(https?:\/\/([^\s]+\/)*[^\s]+\.(?:com|live|net|org|edu|gov|mil|int|co|io|ai)).*
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+          regex_replace:
+            regex: /https?://([^/s]+)
+            replace_with: /http://evil.com
+      - follow_redirect: false
+
+
+validate:
+  response_code:
+    eq: 302
+  response_headers:
+    for_one:
+      key:
+        eq: location
+      value:
+        contains_either:
+          - evil.com

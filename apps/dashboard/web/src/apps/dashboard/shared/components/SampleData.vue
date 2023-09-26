@@ -54,10 +54,10 @@
         <div class="d-flex" v-else>
         <div class="flex-equal">
             <sample-single-side
-                :title="requestTitle" 
+                :title="requestTitle"
                 :firstLine='requestFirstLine'
                 :firstLineToolTipValue="requestFirstLineToolTipValue"
-                :headers="{}" 
+                :headers="{}"
                 :data="requestJson"
                 :complete-data="json['message']"
                 :simpleCopy="false"
@@ -65,10 +65,10 @@
             />
         </div>
         <div class="flex-equal" >
-            <sample-single-side               
-                :title="responseTitle" 
-                :firstLine='responseFirstLine' 
-                :headers="{}" 
+            <sample-single-side
+                :title="responseTitle"
+                :firstLine='responseFirstLine'
+                :headers="{}"
                 :data="responseJson"
                 :simpleCopy="true"
                 :complete-data="json['message']"

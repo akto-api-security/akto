@@ -1,0 +1,72 @@
+.items-list .Polaris-ResourceList{
+    border: none !important;
+}
+.items-list .Polaris-ResourceItem__ListItem{
+   border: none !important;
+}
+.connector-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    align-items: center;
+}
+.connector-item .Polaris-Text--root{
+    display: flex;
+    gap: 8px;
+}
+.connector-container{
+    margin-top: 16px;
+}
+.connector-container .Polaris-Connected{
+    width: 300px;
+}
+.card-popover .Polaris-Button{
+    padding: 8px !important;
+}
+.right-card .Polaris-Box {
+    position: fixed;
+    right: 2px;
+    top: 54px;
+    width: 27vw;
+    border-radius: unset;
+    height: 100% !important;
+}
+.settings {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 10px;
+}
+
+.card-items{
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.card-items .Polaris-HorizontalStack{
+    align-items: flex-start !important;
+}
+
+.right-card .Polaris-Text--bodySm{
+    display: flex;
+    align-items: center;
+}
+
+.card-items .Polaris-Box{
+    position: unset !important;
+    width: unset !important;
+}
+
+.copyRequest {
+    display: flex;
+    margin: 0 8px 0 16px;
+    justify-content: space-between;
+    border: 1px solid #dde0e4;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.update-connections .Polaris-Page--divider{
+    padding-top: 20px !important;
+}

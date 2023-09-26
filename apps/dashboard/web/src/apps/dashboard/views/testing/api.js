@@ -1,12 +1,12 @@
 import request from '@/util/request'
 
 export default {
-    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd}) {
+    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters}) {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd
+                startTimestamp, endTimestamp, fetchCicd , sortKey, sortOrder, skip, limit, filters
             }
         }).then((resp) => {
             return resp
@@ -44,21 +44,21 @@ export default {
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests}
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}
         }).then((resp) => {
             return resp
         })        
@@ -82,11 +82,29 @@ export default {
             return resp
         })
     },
-    runTestForTemplate(content, apiInfoKey) {
+    runTestForTemplate(content, apiInfoKey, sampleDataList) {
         return request({
             url: '/api/runTestForGivenTemplate',
             method: 'post',
-            data:{content, apiInfoKey}
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    runTestForTemplateAnonymous(content, apiInfoKey, sampleDataList) {
+        return request({
+            url: '/tools/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey, sampleDataList}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    setCustomSampleApi(sampleRequestString, sampleResponseString) {
+        return request({
+            url: '/tools/createSampleDataJson',
+            method: 'post',
+            data:{sampleRequestString, sampleResponseString}
         }).then((resp) => {
             return resp
         })
@@ -97,6 +115,19 @@ export default {
             method: 'post',
             data: {
                 testingRunResultSummaryHexId
+            }
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+        return request({
+            url: '/api/fetchVulnerableTestRunResults',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId,
+                skip
             }
         }).then((resp) => {
             return resp
@@ -218,6 +249,16 @@ export default {
             url: '/api/fetchTestingLogs',
             method: 'post',
             data: {logFetchStartTime, logFetchEndTime}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
+    setTestInactive(testId, inactive){
+        return request({
+            url: '/api/setTestInactive',
+            method: 'post',
+            data: {originalTestId: testId, inactive: inactive}
         }).then((resp) => {
             return resp
         })

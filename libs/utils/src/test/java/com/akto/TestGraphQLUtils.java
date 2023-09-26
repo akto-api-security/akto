@@ -1,5 +1,6 @@
 package com.akto;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -27,7 +28,7 @@ public class TestGraphQLUtils{
     @Test
     public void testGraphQLParser() throws Exception {
         HAR har = new HAR();
-        List<String> requests = har.getMessages(harString, 0);
+        List<String> requests = har.getMessages(harString, 0, 1_000_000);
         //Even with 2 har entries, we get 10 endpoints
 
         for (String request : requests) {

@@ -1,0 +1,42 @@
+id: UNAUTHENTICATED_MONGO_EXPRESS
+info:
+  name: Mongo Express - Unauthenticated Access
+  description: "Mongo Express was able to be access with no authentication requirements in place."
+  details: >
+              "The Mongo Express web interface is accessible without any authentication requirements, allowing anyone to access and interact with the database management interface. This exposes the entire database to potential unauthorized access, data manipulation, and sensitive information exposure, posing a significant security risk to the system and its data integrity."
+  impact: "Unauthenticated access to Mongo Express increases the risk of unauthorized data manipulation, sensitive information exposure, and potential compromise of the database."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: UNAUTHENTICATED_MONGO_EXPRESS
+  severity: HIGH
+  references:
+    - https://www.exploit-db.com/ghdb/5684
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}
+    - ${urlVar}/mongo-express/
+    - ${urlVar}/db/admin/system.users
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_either:
+      - '<title>Home - Mongo Express</title>'
+      - '<title>system.users - Mongo Express</title>'

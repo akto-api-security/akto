@@ -27,12 +27,14 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.runtime.policies.AktoPolicies;
+import com.akto.util.AccountTask;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -44,6 +46,7 @@ public class Main {
     public static final String GROUP_NAME = "group_name";
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
+    public static final String ACCOUNT_ID = "account_id";
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
@@ -66,8 +69,8 @@ public class Main {
             Map<String, Object> json = gson.fromJson(message, Map.class);
 
             // logger.info("Json size: " + json.size());
-            boolean withoutCidrCond = json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
-            boolean withCidrCond = json.size() == 3 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
+            boolean withoutCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
+            boolean withCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
             if (withCidrCond || withoutCidrCond) {
                 ret = true;
                 String groupName = (String) (json.get(GROUP_NAME));
@@ -78,9 +81,13 @@ public class Main {
                         Updates.set(ApiCollection.NAME, groupName)
                 );
 
-                if (json.size() == 3) {
+                if (json.containsKey(VPC_CIDR)) {
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
                     logger.info("cidrList: " + cidrList);
+                    // For old deployments, we won't receive ACCOUNT_ID. If absent, we assume 1_000_000.
+                    String accountIdStr = (String) (json.get(ACCOUNT_ID));
+                    int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
+                    Context.accountId.set(accountId);
                     AccountSettingsDao.instance.getMCollection().updateOne(
                         AccountSettingsDao.generateFilter(), Updates.addEachToSet("privateCidrList", cidrList), new UpdateOptions().upsert(true)
                     );
@@ -105,18 +112,21 @@ public class Main {
     }
 
     public static Kafka kafkaProducer = null;
-    private static void buildKafka(int accountId) {
-        Context.accountId.set(accountId);
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
-        if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
-            String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
-            int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
-            int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
-            if (centralKafkaBrokerUrl != null) {
-                kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
-                logger.info("Connected to central kafka @ " + Context.now());
+    private static void buildKafka() {
+        logger.info("Building kafka...................");
+        AccountTask.instance.executeTask(t -> {
+            int accountId = Context.accountId.get();
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
+            if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
+                String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
+                int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+                int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
+                if (centralKafkaBrokerUrl != null) {
+                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+                    logger.info("Connected to central kafka @ " + Context.now());
+                }
             }
-        }
+        }, "build-kafka-task");
     }
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -157,19 +167,16 @@ public class Main {
 
         if (topicName == null) topicName = "akto.api.logs";
 
-        // mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
-        Context.accountId.set(1_000_000);
         initializeRuntime();
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
-        int accountIdHardcoded = Context.accountId.get();
-        buildKafka(accountIdHardcoded);
+        buildKafka();
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (kafkaProducer == null || !kafkaProducer.producerReady) {
-                    buildKafka(accountIdHardcoded);
+                    buildKafka();
                 }
             }
         }, 5, 5, TimeUnit.MINUTES);
@@ -291,8 +298,7 @@ public class Main {
                     }
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
-                        APICatalogSync apiCatalogSync = httpCallParserMap.get(accountId).apiCatalogSync;
-                        AktoPolicies aktoPolicy = new AktoPolicies(apiCatalogSync, fetchAllSTI);
+                        AktoPolicies aktoPolicy = new AktoPolicies(fetchAllSTI);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 
@@ -336,9 +342,14 @@ public class Main {
     }
 
     public static void initializeRuntime(){
-        SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
+        AccountTask.instance.executeTask(t -> {
+            initializeRuntimeHelper();
+        }, "initialize-runtime-task");
         SingleTypeInfo.init();
+    }
 
+    public static void initializeRuntimeHelper() {
+        SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
         createIndices();
         insertRuntimeFilters();
         try {

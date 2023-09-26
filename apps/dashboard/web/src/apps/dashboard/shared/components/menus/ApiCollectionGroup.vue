@@ -29,7 +29,14 @@
             >
             
                 <v-list-item-content>
-                    <v-list-item-title v-text="child.title" class="menu-item-text"></v-list-item-title>
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{on, attrs}">
+                            <div v-on="on" v-bind="attrs">
+                                <v-list-item-title v-text="child.title" class="menu-item-text"></v-list-item-title>
+                            </div>
+                        </template>
+                        <span>{{child.title}}</span>
+                    </v-tooltip>
                 </v-list-item-content>
             </v-list-item>
         </v-list-group>
@@ -71,8 +78,11 @@ export default {
     &:before
         border-radius: 0px !important
 
-.menu-item-active
+.menu-item-active:not(.no-style)
     background: var(--themeColorDark5) !important
     color: var(--white) !important
+
+.no-style
+    background: var(--themeColorDark15) !important
 
 </style>

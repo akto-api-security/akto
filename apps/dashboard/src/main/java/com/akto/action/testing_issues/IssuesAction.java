@@ -10,11 +10,15 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -132,39 +136,49 @@ public class IssuesAction extends UserAction {
     private List<VulnerableRequestForTemplate> vulnerableRequests;
     private TestCategory[] categories;
     private List<TestSourceConfig> testSourceConfigs;
+
+    public static BasicDBObject createSubcategoriesInfoObj(TestConfig testConfig) {
+        Info info = testConfig.getInfo();
+        if (info.getName().equals("FUZZING")) {
+            return null;
+        }
+        BasicDBObject infoObj = new BasicDBObject();
+        BasicDBObject superCategory = new BasicDBObject();
+        BasicDBObject severity = new BasicDBObject();
+        infoObj.put("issueDescription", info.getDescription());
+        infoObj.put("issueDetails", info.getDetails());
+        infoObj.put("issueImpact", info.getImpact());
+        infoObj.put("issueTags", info.getTags());
+        infoObj.put("testName", info.getName());
+        infoObj.put("references", info.getReferences());
+        infoObj.put("name", testConfig.getId());
+        infoObj.put("_name", testConfig.getId());
+        infoObj.put("content", testConfig.getContent());
+        infoObj.put("templateSource", testConfig.getTemplateSource());
+        infoObj.put("updatedTs", testConfig.getUpdateTs());
+
+        superCategory.put("displayName", info.getCategory().getDisplayName());
+        superCategory.put("name", info.getCategory().getName());
+        superCategory.put("shortName", info.getCategory().getShortName());
+
+        severity.put("_name",info.getSeverity());
+        superCategory.put("severity", severity);
+        infoObj.put("superCategory", superCategory);
+        infoObj.put(YamlTemplate.INACTIVE, testConfig.getInactive());
+        return infoObj;
+    }
+
+    private boolean fetchOnlyActive;
+
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true);
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
-            Info info = entry.getValue().getInfo();
-            if (info.getName().equals("FUZZING")) {
-                continue;
+            BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
+            if (infoObj != null) {
+                subCategories.add(infoObj);
             }
-            BasicDBObject infoObj = new BasicDBObject();
-            BasicDBObject superCategory = new BasicDBObject();
-            BasicDBObject severity = new BasicDBObject();
-            infoObj.put("issueDescription", info.getDescription());
-            infoObj.put("issueDetails", info.getDetails());
-            infoObj.put("issueImpact", info.getImpact());
-            infoObj.put("issueTags", info.getTags());
-            infoObj.put("testName", info.getName());
-            infoObj.put("references", info.getReferences());
-            infoObj.put("name", entry.getValue().getId());
-            infoObj.put("_name", entry.getValue().getId());
-            infoObj.put("content", entry.getValue().getContent());
-            infoObj.put("templateSource", entry.getValue().getTemplateSource());
-            infoObj.put("updatedTs", entry.getValue().getUpdateTs());
-            
-            superCategory.put("displayName", info.getCategory().getDisplayName());
-            superCategory.put("name", info.getCategory().getName());
-            superCategory.put("shortName", info.getCategory().getShortName());
-
-            severity.put("_name",info.getSeverity());
-            superCategory.put("severity", severity);
-            infoObj.put("superCategory", superCategory);
-            
-            subCategories.add(infoObj);
         }
 
         this.categories = GlobalEnums.TestCategory.values();
@@ -354,5 +368,13 @@ public class IssuesAction extends UserAction {
 
     public void setVulnerableRequests(List<VulnerableRequestForTemplate> vulnerableRequests) {
         this.vulnerableRequests = vulnerableRequests;
+    }
+
+    public boolean getFetchOnlyActive() {
+        return fetchOnlyActive;
+    }
+
+    public void setFetchOnlyActive(boolean fetchOnlyActive) {
+        this.fetchOnlyActive = fetchOnlyActive;
     }
 }

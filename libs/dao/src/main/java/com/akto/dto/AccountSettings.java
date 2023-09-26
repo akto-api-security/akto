@@ -38,6 +38,10 @@ public class AccountSettings {
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
 
+    private int trafficAlertThresholdSeconds = defaultTrafficAlertThresholdSeconds;
+    public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
+    public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
+
     public AccountSettings() {
     }
 
@@ -166,5 +170,12 @@ public class AccountSettings {
     public void setUrlRegexMatchingEnabled(boolean urlRegexMatchingEnabled) {
         this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
     }
-    
+
+    public int getTrafficAlertThresholdSeconds() {
+        return trafficAlertThresholdSeconds;
+    }
+
+    public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
+        this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
+    }
 }

@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.DaoInit;
+import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
@@ -25,16 +26,19 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -58,7 +62,9 @@ public class StartTestAction extends UserAction {
     private boolean fetchCicd;
     private String triggeredBy;
     private boolean isTestRunByTestEditor;
-
+    private Map<ObjectId,TestingRunResultSummary> latestTestingRunResultSummaries;
+    private Map<String, String> sampleDataVsCurlMap;
+    private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
     private static List<ObjectId> getCicdTests(){
@@ -74,6 +80,15 @@ public class StartTestAction extends UserAction {
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
+
+        if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
+            boolean isValidUrl = Utils.isValidURL(this.overriddenTestAppUrl);
+
+            if (!isValidUrl) {
+                addActionError("The override url is invalid. Please check the url again.");
+                return null;
+            }
+        }
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null && testIdConfig == 0) {
@@ -107,7 +122,7 @@ public class StartTestAction extends UserAction {
                 return null;
         }
         if (this.selectedTests != null) {
-            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId());
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -118,6 +133,12 @@ public class StartTestAction extends UserAction {
     private List<String> selectedTests;
 
     public String startTest() {
+
+        if(this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
+            addActionError("Cannot schedule a test run in the past.");
+            return ERROR.toUpperCase();
+        }
+
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
         handleCallFromAktoGpt();
 
@@ -206,6 +227,51 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private String sortKey;
+    private int sortOrder;
+    private int limit;
+    private int skip;
+    private Map<String, List> filters;
+    private long testingRunsCount;
+
+    private ArrayList<Bson> prepareFilters() {
+        ArrayList<Bson> filterList = new ArrayList<>();
+
+        if(filters==null){
+            return filterList;
+        }
+
+        try {
+            for (Map.Entry<String, List> entry : filters.entrySet()) {
+                String key = entry.getKey();
+                List value = entry.getValue();
+
+                if (value.size() == 0)
+                    continue;
+
+                if("endTimestamp".equals(key)){
+                    List<Long> ll = value;
+                        filterList.add(Filters.gte(key, ll.get(0)));
+                        filterList.add(Filters.lte(key, ll.get(1)));
+                }
+            }
+        } catch (Exception e) {
+            return filterList;
+        }
+
+        return filterList;
+    }
+
+    private Bson prepareSort() {
+        List<String> sortFields = new ArrayList<>();
+        if(sortKey==null || "".equals(sortKey)){
+            sortKey = TestingRun.SCHEDULE_TIMESTAMP;
+        }
+        sortFields.add(sortKey);
+
+        return sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
+    }
+
     public String retrieveAllCollectionTests() {
         if (this.startTimestamp == 0) {
             this.startTimestamp = Context.now();
@@ -217,18 +283,29 @@ public class StartTestAction extends UserAction {
 
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
+        ArrayList<Bson> testingRunFilters = new ArrayList<>();
+
         if(fetchCicd){
-            testingRuns = TestingRunDao.instance.findAll(Filters.in(Constants.ID, getCicdTests()));
+            testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
         } else {
-            Bson filterQ = Filters.and(
+            Collections.addAll(testingRunFilters, 
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
                 Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
                 Filters.nin(Constants.ID,getCicdTests()),
                 Filters.ne("triggeredBy", "test_editor")
             );
-            testingRuns = TestingRunDao.instance.findAll(filterQ);
         }
-        testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
+
+        testingRunFilters.addAll(prepareFilters());
+
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
+
+        testingRuns = TestingRunDao.instance.findAll(
+                Filters.and(testingRunFilters), skip, pageLimit,
+                prepareSort());
+
+        testingRunsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(testingRunFilters));
+
         return SUCCESS.toUpperCase();
     }
 
@@ -246,11 +323,20 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId);
+        List<Bson> filterQ = new ArrayList<>();
+        filterQ.add(Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId));
+
+        if(this.startTimestamp!=0){
+            filterQ.add(Filters.gte(TestingRunResultSummary.START_TIMESTAMP, this.startTimestamp));
+        }
+
+        if(this.endTimestamp!=0){
+            filterQ.add(Filters.lte(TestingRunResultSummary.START_TIMESTAMP, this.endTimestamp));
+        }
 
         Bson sort = Sorts.descending(TestingRunResultSummary.START_TIMESTAMP) ;
 
-        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ, 0, limitForTestingRunResultSummary , sort);
+        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0, limitForTestingRunResultSummary , sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
 
         if (this.testingRun.getTestIdConfig() == 1) {
@@ -273,6 +359,38 @@ public class StartTestAction extends UserAction {
         }
         
         this.testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult( testingRunResultSummaryId);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchVulnerableTestRunResults() {
+        ObjectId testingRunResultSummaryId;
+        try {
+            testingRunResultSummaryId= new ObjectId(testingRunResultSummaryHexId);
+            Bson filters = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                    Filters.eq(TestingRunResult.VULNERABLE, true)
+            );
+            List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
+            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            for (TestingRunResult runResult: testingRunResultList) {
+                List<TestResult> testResults = new ArrayList<>();
+                for (TestResult testResult : runResult.getTestResults()) {
+                    if (testResult.isVulnerable()) {
+                        testResults.add(testResult);
+                        sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
+                        sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                    }
+                }
+                runResult.setTestResults(testResults);
+            }
+            this.testingRunResults = testingRunResultList;
+            this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+        } catch (Exception e) {
+            addActionError("Invalid test summary id");
+            return ERROR.toUpperCase();
+        }
+
 
         return SUCCESS.toUpperCase();
     }
@@ -344,6 +462,33 @@ public class StartTestAction extends UserAction {
         TestingRunDao.instance.getMCollection().updateMany(filter,Updates.set(TestingRun.STATE, State.STOPPED));
         testingRuns = TestingRunDao.instance.findAll(filter);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String stopTest() {
+        // stop only scheduled and running tests
+        Bson filter = Filters.or(
+                Filters.eq(TestingRun.STATE, State.SCHEDULED),
+                Filters.eq(TestingRun.STATE, State.RUNNING));
+        if (this.testingRunHexId != null) {
+            try {
+                ObjectId testingId = new ObjectId(this.testingRunHexId);
+                TestingRunDao.instance.updateOne(
+                        Filters.and(filter, Filters.eq(Constants.ID, testingId)),
+                        Updates.set(TestingRun.STATE, State.STOPPED));
+                return SUCCESS.toUpperCase();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            }
+        }
+
+        addActionError("Unable to stop test run");
+        return ERROR.toLowerCase();
+    }
+
+    public String fetchTestRunTableInfo() {
+        testingRuns = TestingRunDao.instance.findAll(Filters.ne("triggeredBy", "test_editor"));
+        latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries();
         return SUCCESS.toUpperCase();
     }
 
@@ -516,6 +661,78 @@ public class StartTestAction extends UserAction {
 
     public void setIsTestRunByTestEditor(boolean testRunByTestEditor) {
         isTestRunByTestEditor = testRunByTestEditor;
+    }
+
+    public void setOverriddenTestAppUrl(String overriddenTestAppUrl) {
+        this.overriddenTestAppUrl = overriddenTestAppUrl;
+    }
+
+    public String getOverriddenTestAppUrl() {
+        return overriddenTestAppUrl;
+    }
+
+    public String getSortKey() {
+        return sortKey;
+    }
+
+    public void setSortKey(String sortKey) {
+        this.sortKey = sortKey;
+    }
+
+    public int getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public int getSkip() {
+        return skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
+    public Map<String, List> getFilters() {
+        return filters;
+    }
+
+    public void setFilters(Map<String, List> filters) {
+        this.filters = filters;
+    }
+
+    public long getTestingRunsCount() {
+        return testingRunsCount;
+    }
+
+    public void setTestingRunsCount(long testingRunsCount) {
+        this.testingRunsCount = testingRunsCount;
+    }
+    public Map<ObjectId, TestingRunResultSummary> getLatestTestingRunResultSummaries() {
+        return latestTestingRunResultSummaries;
+    }
+
+    public void setLatestTestingRunResultSummaries(
+        Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries) {
+        this.latestTestingRunResultSummaries = latestTestingRunResultSummaries;
+    }
+
+    public Map<String, String> getSampleDataVsCurlMap() {
+        return sampleDataVsCurlMap;
+    }
+
+    public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
+        this.sampleDataVsCurlMap = sampleDataVsCurlMap;
     }
 
     public enum CallSource{

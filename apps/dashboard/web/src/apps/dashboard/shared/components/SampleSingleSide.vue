@@ -3,17 +3,18 @@
       <div class="d-flex" style="justify-content: space-between">
         <div class="sample-data-title">{{title}}</div>
         <div class="copy-icon">
-          <simple-menu v-if="!simpleCopy" :items="copyMenuItems">
+          <simple-menu v-if="!simpleCopy" :items="copyMenuItems" attach="passedId">
             <template v-slot:activator2>
               <v-icon
                   size=16
                   class="tray-button"
+                  id="passedId"
               >
                 $fas_copy
               </v-icon>
             </template>
           </simple-menu>
-          <v-tooltip bottom v-else>
+          <v-tooltip bottom v-else attach="#copyIcon" min-width="100">
             <template v-slot:activator='{ on, attrs }'>
               <v-icon
                   size=16
@@ -21,6 +22,7 @@
                   v-bind="attrs"
                   v-on="on"
                   @click="copyRequest"
+                  id="copyIcon"
               >
                 $fas_copy
               </v-icon>
@@ -216,6 +218,19 @@ export default {
         color: var(--themeColorDark7) 
         overflow-wrap: anywhere
 
+</style>
+
+<style scoped>
+  .copy-icon >>> .v-menu__content {
+    top: 30px !important;
+    left: 0 !important;
+  }
+  .copy-icon >>> .v-tooltip__content{
+    top: 30px !important;
+    left: unset !important;
+    margin-left: -8px !important;
+    padding-left: 8px !important;
+  }
 </style>
 
 
