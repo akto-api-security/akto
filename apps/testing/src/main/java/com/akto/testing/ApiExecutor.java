@@ -31,7 +31,7 @@ public class ApiExecutor {
         }
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
-        if (!HostDNSLookup.isRequestValid(request.url().host())) {
+        if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
 
