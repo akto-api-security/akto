@@ -60,6 +60,7 @@
                     window.RELEASE_VERSION = '${requestScope.releaseVersion}';
                     window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
                     window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
+                    window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
 
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'

@@ -31,11 +31,11 @@ public class CustomHttpRequest {
 
     public static Map<String,Object> postRequest(String url, List<NameValuePair> params) throws HttpResponseException {
         HttpPost httpPost = new HttpPost(url);
-
+        httpPost.setHeader("Accept", "application/json");
         try {
             httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
-            ;
+
         }
 
         return s(httpPost);
