@@ -58,6 +58,7 @@ public class SaveTestEditorAction extends UserAction {
     private List<SampleData> sampleDataList;
     private TestingRunIssues testingRunIssues;
     private Map<String, BasicDBObject> subCategoryMap;
+    private boolean inactive;
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -240,6 +241,28 @@ public class SaveTestEditorAction extends UserAction {
         }
     }
 
+    public String setTestInactive() {
+
+        if (originalTestId == null) {
+            addActionError("TestId cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        YamlTemplate template = YamlTemplateDao.instance.updateOne(
+                Filters.eq(Constants.ID, originalTestId),
+                Updates.combine(
+                    Updates.set(YamlTemplate.INACTIVE, inactive),
+                    Updates.set(YamlTemplate.UPDATED_AT, Context.now())
+                ));
+
+        if (template == null) {
+            addActionError("Template not found");
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     public static void main(String[] args) throws Exception {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
@@ -330,4 +353,13 @@ public class SaveTestEditorAction extends UserAction {
     public void setSubCategoryMap(Map<String, BasicDBObject> subCategoryMap) {
         this.subCategoryMap = subCategoryMap;
     }
+
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
+    }
+
 }

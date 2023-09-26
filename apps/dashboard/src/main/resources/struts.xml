@@ -215,7 +215,7 @@
                 <param name="root">code</param>
             </result>
         </action>
-        
+
         <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -223,7 +223,50 @@
             <result name="ERROR" type="json">
                 <param name="root">code</param>
             </result>
-        </action>        
+        </action>
+
+
+        <action name="signup-github" class="com.akto.action.SignupAction" method="registerViaGithub">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="api/deleteGithubSso" class="com.akto.action.user.GithubSsoAction" method="deleteGithubSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addGithubSso" class="com.akto.action.user.GithubSsoAction" method="addGithubSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchGithubSso" class="com.akto.action.user.GithubSsoAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
         <action name="api/loadContent" class="com.akto.action.AuditAction" method="loadContent">
             <interceptor-ref name="json"/>
@@ -2048,6 +2091,17 @@
         </action>
 
         <action name="api/closeLoader" class="com.akto.action.LoadersAction" method="closeLoader">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/setTestInactive" class="com.akto.action.test_editor.SaveTestEditorAction" method="setTestInactive">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
