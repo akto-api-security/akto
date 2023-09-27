@@ -1,5 +1,4 @@
 import func from "@/util/func";
-import Store from "../../store";
 import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import tranform from "../onboarding/transform"
@@ -165,7 +164,7 @@ const transform = {
         return apiCollection;
     },
     prepareEndpointForTable(x, index) {
-        const idToNameMap = func.mapCollectionIdToName(Store.getState().allCollections);
+        const idToNameMap = PersistStore.getState().collectionsMap;
         return {
             id:index,
             name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
