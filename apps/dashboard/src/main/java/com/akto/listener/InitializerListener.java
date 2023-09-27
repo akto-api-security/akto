@@ -1037,6 +1037,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        setUpTestEditorTemplatesScheduler();
                         updateGlobalAktoVersion();
                         if(isSaas){
                             try {
@@ -1108,7 +1109,7 @@ public class InitializerListener implements ServletContextListener {
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
-        loadTemplateFilesFromDirectory(backwardCompatibility);
+        //loadTemplateFilesFromDirectory(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
@@ -1199,20 +1200,23 @@ public class InitializerListener implements ServletContextListener {
     public void setUpTestEditorTemplatesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
-                Context.accountId.set(1_000_000);
-                try {
-                    updateTestEditorTemplatesFromGithub();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
-                }
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            int accountId = t.getId();
+                            updateTestEditorTemplatesFromGithub(accountId);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "test-editor-templates-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    public static void updateTestEditorTemplatesFromGithub() {   
-        logger.info("Updating test template files from Github");
+    public static void updateTestEditorTemplatesFromGithub(int accountId) {   
+        loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for account: %d", accountId), LogDb.DASHBOARD);
 
         //Get existing template sha values 
         Map<String, String> yamlTemplatesGithubFileSha = new HashMap<>();
@@ -1247,10 +1251,7 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName(), e.toString()), LogDb.DASHBOARD);
                 }
 
-
-                if (testConfig == null) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
-                } else {
+                if (testConfig != null) {
                     String id = testConfig.getId();
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
@@ -1261,7 +1262,7 @@ public class InitializerListener implements ServletContextListener {
                         Updates.combine(
                                 Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                                 Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                                Updates.setOnInsert(YamlTemplate.FILE_NAME, fileName),
+                                Updates.set(YamlTemplate.FILE_NAME, fileName),
                                 Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                 Updates.set(YamlTemplate.CONTENT, templateContent),
                                 Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
@@ -1313,7 +1314,6 @@ public class InitializerListener implements ServletContextListener {
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s", fileName), LogDb.DASHBOARD);
                 } else {
-                    //todo: Store template only if is_active is true
                     String id = testConfig.getId();
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
