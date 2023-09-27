@@ -12,6 +12,7 @@ import com.akto.dto.UserAccountEntry;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Intercom;
+import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -91,6 +92,7 @@ public class ProfileAction extends UserAction {
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("userHash", Intercom.getUserHash(user.getLogin()))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
+                .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName);
 
         for (String k: userDetails.keySet()) {
