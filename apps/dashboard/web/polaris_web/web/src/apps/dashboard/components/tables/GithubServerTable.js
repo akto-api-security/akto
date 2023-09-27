@@ -130,7 +130,7 @@ function GithubServerTable(props) {
   if (props.calenderFilter) {
     filters.push({
       key: "dateRange",
-      label: "Discovered",
+      label: props.calenderLabel || "Discovered",
       filter:
         (<DateRangePicker ranges={values.ranges}
           initialDispatch = {currDateRange} 
