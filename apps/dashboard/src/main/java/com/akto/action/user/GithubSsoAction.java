@@ -7,6 +7,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -17,6 +18,11 @@ import java.util.ArrayList;
 public class GithubSsoAction extends UserAction {
 
     public String deleteGithubSso() {
+
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
 
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
@@ -32,7 +38,7 @@ public class GithubSsoAction extends UserAction {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
                 BasicDBObject detailsObj = (BasicDBObject) obj;
                 UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.set("refreshTokens", new ArrayList<>()));
-                UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.unset("signupInfoMap.GITHUB-ankush"));
+                UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.unset("signupInfoMap.GITHUB"));
             }
         }
 
@@ -42,6 +48,11 @@ public class GithubSsoAction extends UserAction {
     private String githubClientId;
     private String githubClientSecret;
     public String addGithubSso() {
+
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
 
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
@@ -67,6 +78,12 @@ public class GithubSsoAction extends UserAction {
 
     @Override
     public String execute() throws Exception {
+
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+
         Config.GithubConfig githubConfig = (Config.GithubConfig) ConfigsDao.instance.findOne("_id", "GITHUB-ankush");
 
         if (githubConfig != null) {
