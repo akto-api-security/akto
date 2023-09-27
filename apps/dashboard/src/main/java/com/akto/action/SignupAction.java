@@ -1,10 +1,11 @@
 package com.akto.action;
 
 import com.akto.dao.*;
-import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
+import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -19,14 +20,9 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.oauth.OAuthV2AccessRequest;
@@ -36,6 +32,8 @@ import com.slack.api.methods.response.users.UsersIdentityResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
@@ -48,10 +46,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
 import static com.akto.dao.MCollection.SET;
-import static com.mongodb.client.model.Filters.all;
 import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Updates.combine;
-import static com.mongodb.client.model.Updates.set;
 
 public class SignupAction implements Action, ServletResponseAware, ServletRequestAware {
 
@@ -399,6 +394,40 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             createUserAndRedirect(email, email, signupInfo, invitedToAccountId);
         } catch (IOException e) {
             ;
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String registerViaGithub() {
+
+        GithubLogin ghLoginInstance = GithubLogin.getInstance();
+        if (ghLoginInstance == null) {
+            return ERROR.toUpperCase();
+        }
+        Config.GithubConfig githubConfig = GithubLogin.getInstance().getGithubConfig();
+        if (githubConfig == null) {
+            return ERROR.toUpperCase();
+        }
+        List<NameValuePair> params = new ArrayList<>();
+        params.add(new BasicNameValuePair("client_id", githubConfig.getClientId()));
+        params.add(new BasicNameValuePair("client_secret", githubConfig.getClientSecret()));
+        params.add(new BasicNameValuePair("code", this.code));
+        try {
+            Map<String,Object> tokenData = CustomHttpRequest.postRequest("https://github.com/login/oauth/access_token", params);
+            String accessToken = tokenData.get("access_token").toString();
+            String refreshToken = tokenData.getOrDefault("refresh_token", "").toString();
+            int refreshTokenExpiry = Integer.parseInt(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
+            Map<String,Object> userData = CustomHttpRequest.getRequest("https://api.github.com/user", "Bearer " + accessToken);
+            String company = "sso";
+            String username = userData.get("login").toString() + "@" + company;
+            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
+            shouldLogin = "true";
+            createUserAndRedirect(username, username, ghSignupInfo, 1000000);
+            code = "";
+            System.out.println("Executed registerViaGithub");
+
+        } catch (IOException e) {
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();

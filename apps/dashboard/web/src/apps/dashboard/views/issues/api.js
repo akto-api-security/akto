@@ -44,11 +44,11 @@ export default {
             data: {issueId}
         })
     },
-    fetchAllSubCategories () {
+    fetchAllSubCategories (fetchOnlyActive) {
         return request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: {}
+            data: {fetchOnlyActive}
         })
     }
 }
