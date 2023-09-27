@@ -228,6 +228,11 @@ const promotedBulkActions = (selectedDataHexIds) => {
     });
   }
 
+  const openVulnerabilityReport = () => {
+    let summaryId = selectedTestRun.testingRunResultSummaryHexId
+    window.open('/dashboard/testing/summary/' + summaryId, '_blank');
+  }
+
   return (
     <PageWithMultipleCards
     title={
@@ -266,6 +271,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
     backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => func.downloadAsCSV(testRunResults, selectedTestRun)}>Export</Button> : undefined}
+    secondaryActions={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
       components={components}
     />
   );

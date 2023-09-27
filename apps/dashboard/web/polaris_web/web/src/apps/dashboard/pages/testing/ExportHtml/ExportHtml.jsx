@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
 import { Avatar, Box, Button,Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon, Badge, List, Link } from '@shopify/polaris'
@@ -10,6 +11,7 @@ import './styles.css'
 function ExportHtml() {
     const params = useParams() ;
     const testingRunSummaryId = params.summaryId
+    const issuesFilter = params.issuesFilter
     const moreInfoSections = [
         {
             icon: InfoMinor,
@@ -101,17 +103,34 @@ function ExportHtml() {
         let vulnerableTestingRunResults = []
         let sampleDataVsCurlMap = {}
 
-        while(true){
-            let testingRunCountsFromDB = 0
-            await api.fetchVulnerableTestingRunResults(testingRunSummaryId,resultsCount).then((resp)=>{
-                vulnerableTestingRunResults = [...vulnerableTestingRunResults, ...resp.testingRunResults]
-                testingRunCountsFromDB = resp.testingRunResults.length
-                sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
-            })
-            resultsCount += 50
-            if (testingRunCountsFromDB < 50) {
-                //EOF: break as no further documents exists
-                break
+        if (testingRunSummaryId) {
+            while(true){
+                let testingRunCountsFromDB = 0
+                await api.fetchVulnerableTestingRunResults(testingRunSummaryId,resultsCount).then((resp)=>{
+                    vulnerableTestingRunResults = [...vulnerableTestingRunResults, ...resp.testingRunResults]
+                    testingRunCountsFromDB = resp.testingRunResults.length
+                    sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                })
+                resultsCount += 50
+                if (testingRunCountsFromDB < 50) {
+                    //EOF: break as no further documents exists
+                    break
+                }
+            }
+        } else if (issuesFilter) {
+            while (true) {
+                let testingRunCountsFromDB = 0
+                let filters = JSON.parse(atob(issuesFilter))
+                await issuesApi.fetchVulnerableTestingRunResultsFromIssues(filters, resultsCount).then(resp => {
+                    vulnerableTestingRunResults = [...vulnerableTestingRunResults, ...resp.testingRunResults]
+                    testingRunCountsFromDB = resp.totalIssuesCount
+                    sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                })
+                resultsCount += 50
+                if (testingRunCountsFromDB < 50) {
+                    //EOF: break as no further documents exists
+                    break
+                }
             }
         }
         setDataToCurlObj(sampleDataVsCurlMap)
@@ -307,7 +326,7 @@ function ExportHtml() {
                                 <LegacyCard sectioned title={cardTitleComponent(item)} key={index}>
                                     <LegacyCard.Section>
                                         <MoreInformationComponent
-                                            key="info"
+                                            key={index}
                                             sections={fillContent(item)}
                                             item={item}
                                             dataToCurlObj={dataToCurlObj}
@@ -349,8 +368,8 @@ function MoreInformationComponent(props) {
         <LegacyCard>
           <LegacyCard.Section>
             {
-              props.sections.map((section) => {
-                return (<LegacyCard.Subsection key={section.title}>
+              props.sections.map((section, index) => {
+                return (<LegacyCard.Subsection key={index}>
                   <VerticalStack gap="3">
                     <HorizontalStack gap="2" align="start" blockAlign='start'>
                       <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
@@ -367,8 +386,8 @@ function MoreInformationComponent(props) {
             }
           </LegacyCard.Section>
           <LegacyCard.Section>
-            {props.item.category.vulnerableTestingRunResults.map((testingRun)=> (
-                <div className="attempts-div">
+            {props.item.category.vulnerableTestingRunResults.map((testingRun, index)=> (
+                <div className="attempts-div" key={index}>
                     <div className="row-div-1">
                         <span className="api-text">
                             Vulnerable endpoint : 
@@ -377,8 +396,8 @@ function MoreInformationComponent(props) {
                             { testingRun.apiInfoKey.url }
                         </span>
                     </div>
-                    {testingRun.testResults.map((testRun) => (
-                        <div>
+                    {testingRun.testResults.map((testRun, index1) => (
+                        <div key={index1}>
                             <div className="row-div">
                                 <span className="title-name" style={{fontWeight: "500"}}>
                                     Original request

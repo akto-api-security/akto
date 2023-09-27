@@ -224,6 +224,10 @@ const router = createBrowserRouter([
       {
         path: "testing/summary/:summaryId",
         element: <ExportHtml />
+      },
+      {
+        path: "issues/summary/:issuesFilter",
+        element: <ExportHtml />
       }
     ]
   },
