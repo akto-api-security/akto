@@ -28,6 +28,8 @@ info:
     - "https://nostarch.com/black-hat-graphql Chapter 6 - Information Disclosure"
     - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
     - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   url:

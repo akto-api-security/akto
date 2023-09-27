@@ -19,18 +19,19 @@ function getOrderPriority(state){
         case "RUNNING": return 1;
         case "SCHEDULED": return 2;
         case "STOPPED": return 4;
+        case "FAIL": return 5;
         default: return 3;
     }
 }
 
-function getTestingRunType(testingRun, testingRunResultSummary){
-    if(testingRunResultSummary.metadata!=null){
+function getTestingRunType(testingRun, testingRunResultSummary, cicd){
+    if(testingRunResultSummary.metadata!=null || cicd){
         return 'CI/CD';
     }
-    if(testingRun.periodInSeconds==0){
-        return 'One-time'
+    if(testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400){
+      return 'Recurring';
     }
-    return 'Recurring';
+    return 'One-time'
 }
 
 function getTotalSeverity(countIssues){
@@ -56,8 +57,8 @@ function getRuntime(scheduleTimestamp ,endTimestamp, state){
         return "Currently running";
     }
     const currTime = Date.now();
-    if(endTimestamp === -1){
-      if(currTime > scheduleTimestamp){
+    if(endTimestamp <= 0 ){
+     if(currTime > scheduleTimestamp){
         return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
     } else {
         return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
@@ -71,7 +72,8 @@ function getAlternateTestsInfo(state){
     switch(status){
         case "RUNNING": return "Tests are still running";
         case "SCHEDULED": return "Tests have been scheduled";
-        case "STOPPED": return "Tests have been stopper";
+        case "STOPPED": return "Tests have been stopped";
+        case "FAIL": return "Test execution has failed during run";
         default: return "Information unavailable";
     }
 }
@@ -80,45 +82,115 @@ function getTestsInfo(testResultsCount, state){
     return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
 }
 
+function tagList(list, cweLink){
+
+  let ret = list?.map((tag, index) => {
+
+    let linkUrl = ""
+    if(cweLink){ 
+      let cwe = tag.split("-")
+      if(cwe[1]){
+          linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
+      }
+    }
+
+    return (
+      <Link key={index} url={linkUrl} target="_blank">
+        <Badge progress="complete" key={index}>{tag}</Badge>
+      </Link>
+    )
+  })
+  return ret;
+}
+
+function minimizeTagList(items){
+  if(items.length>2){
+
+    let ret = items.slice(0,2)
+    ret.push(`+${items.length-2} more`)
+    return ret;
+  }
+  return items;
+}
+
+function checkTestFailure(summaryState, testRunState){
+  if(testRunState=='COMPLETED' && summaryState!='COMPLETED'){
+    return true;
+  }
+  return false;
+}
+
 const transform = {
-    prepareTestRun : (data, testingRunResultSummary) => {
+    prepareDataFromSummary : (data, testRunState) => {
+      let obj={};
+      obj['testingRunResultSummaryHexId'] = data?.hexId;
+      let state = data?.state;
+      if(checkTestFailure(state, testRunState)){
+        state = 'FAIL'
+      }
+      obj['orderPriority'] = getOrderPriority(state)
+      obj['icon'] = func.getTestingRunIcon(state);
+      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['summaryState'] = getStatus(state)
+      obj['startTimestamp'] = data?.startTimestamp
+      obj['endTimestamp'] = data?.endTimestamp
+      obj['severity'] = func.getSeverity(data?.countIssues)
+      obj['severityStatus'] = func.getSeverityStatus(data?.countIssues)
+      obj['metadata'] = func.flattenObject(data?.metadata)
+      return obj;
+    },
+    prepareCountIssues : (data) => {
+      let obj={
+        'High': data['HIGH'] || 0,
+        'Medium': data['MEDIUM'] || 0,
+        'Low': data['LOW'] || 0
+      };
+      return obj;
+    },
+    prepareTestRun : (data, testingRunResultSummary, cicd) => {
       let obj={};
       if(testingRunResultSummary==null){
         testingRunResultSummary = {};
       }
       if(testingRunResultSummary.countIssues!=null){
-          testingRunResultSummary.countIssues['High'] = testingRunResultSummary.countIssues['HIGH']
-          testingRunResultSummary.countIssues['Medium'] = testingRunResultSummary.countIssues['MEDIUM']
-          testingRunResultSummary.countIssues['Low'] = testingRunResultSummary.countIssues['LOW']
-          delete testingRunResultSummary.countIssues['HIGH']
-          delete testingRunResultSummary.countIssues['MEDIUM']
-          delete testingRunResultSummary.countIssues['LOW']
+          testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
       }
+
+      let state = data.state;
+      if(checkTestFailure(testingRunResultSummary.state, state)){
+        state = 'FAIL'
+      }
+
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
-      obj['orderPriority'] = getOrderPriority(data.state)
-      obj['icon'] = func.getTestingRunIcon(data.state);
-      obj['iconColor'] = func.getTestingRunIconColor(data.state)
+      obj['orderPriority'] = getOrderPriority(state)
+      obj['icon'] = func.getTestingRunIcon(state);
+      obj['iconColor'] = func.getTestingRunIconColor(state)
       obj['name'] = data.name || "Test"
-      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, data.state)
-      obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
+      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, state)
+      obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
       obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       obj['nextUrl'] = "/dashboard/testing/"+data.hexId
+      obj['testRunState'] = data.state
+      obj['summaryState'] = state
+      obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
+      obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
+      obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       return obj;
     },
-    prepareTestRuns : (testingRuns, latestTestingRunResultSummaries) => {
+    prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd) => {
       let testRuns = []
       testingRuns.forEach((data)=>{
         let obj={};
         let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']] || {};
-        obj = transform.prepareTestRun(data, testingRunResultSummary)
+        obj = transform.prepareTestRun(data, testingRunResultSummary, cicd)
         testRuns.push(obj);
     })
     return testRuns;
@@ -141,6 +213,8 @@ const transform = {
       obj['singleTypeInfos'] = data['singleTypeInfos'] || []
       obj['vulnerable'] = data['vulnerable'] || false
       obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
+      obj['cwe'] = subCategoryMap[data.testSubType]?.cwe ? subCategoryMap[data.testSubType]?.cwe : []
+      obj['cweDisplay'] = minimizeTagList(obj['cwe'])
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
@@ -192,21 +266,24 @@ const transform = {
     moreInfoSections[1].content = (
         <HorizontalStack gap="2">
           {
-            subCategoryMap[runIssues.id.testSubCategory]?.issueTags.map((tag, index) => {
-              return (
-                <Badge progress="complete" key={index}>{tag}</Badge>
-              )
-            })
+            tagList(subCategoryMap[runIssues.id.testSubCategory]?.issueTags)
           }
         </HorizontalStack>
       )
-    moreInfoSections[3].content = (
+      moreInfoSections[2].content = (
+        <HorizontalStack gap="2">
+          {
+            tagList(subCategoryMap[runIssues.id.testSubCategory]?.cwe, true)
+          }
+        </HorizontalStack>
+      )
+      moreInfoSections[4].content = (
         <List type='bullet' spacing="extraTight">
           {
             subCategoryMap[runIssues.id?.testSubCategory]?.references.map((reference) => {
               return (
                 <List.Item key={reference}>
-                  <Link key={reference} url={reference} monochrome removeUnderline>
+                  <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
                     <Text color='subdued'>
                       {reference}
                     </Text>
@@ -217,7 +294,8 @@ const transform = {
           }
         </List>
       )
-      moreInfoSections[2].content = (
+      
+        moreInfoSections[3].content = (
           <List type='bullet'>
             {
               runIssuesArr?.map((item, index) => {

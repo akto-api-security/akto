@@ -22,6 +22,8 @@ info:
   references:
     - "https://www.onwebsecurity.com/security/unsafe-http-methods.html"
     - "https://hackerone.com/reports/83837"
+  cwe:
+    - CWE-274
 
 api_selection_filters:
   response_code:

@@ -274,6 +274,7 @@ const SampleApi = () => {
                 <TestRunResultPage
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
+                    testSubCategoryMap={testResult?.subCategoryMap}
                     testId={selectedTest.value}
                     source="editor"
                 />

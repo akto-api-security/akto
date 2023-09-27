@@ -128,9 +128,8 @@ function DateRangePicker(props) {
         setActiveDateRange(newDateRange);
       }
       function apply() {
-        const newUntil = new Date(activeDateRange.period.until).setHours(23, 59, 59, 999);
         let newPeriod = { ...activeDateRange};
-        newPeriod.period.until = new Date(newUntil);
+        newPeriod.period = {...newPeriod.period, until: new Date(new Date(newPeriod.period.until).setHours(23, 59, 59, 999))}
         props.dispatch({type: "update", period: newPeriod})
         props.setPopoverState(false);
       }

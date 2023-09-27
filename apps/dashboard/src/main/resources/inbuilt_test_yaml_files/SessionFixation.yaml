@@ -18,6 +18,8 @@ info:
   references:
     - "https://www.appsecmonkey.com/blog/session-fixation"
     - "https://hackerone.com/reports/2421"
+  cwe:
+    - CWE-384
 
 api_selection_filters:
   response_code:

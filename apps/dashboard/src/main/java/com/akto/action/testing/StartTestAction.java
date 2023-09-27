@@ -38,9 +38,11 @@ import org.bson.types.ObjectId;
 
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -67,13 +69,27 @@ public class StartTestAction extends UserAction {
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
-    private static List<ObjectId> getCicdTests(){
+    private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
                 Projections.excludeId(),
-                Projections.include("testingRunId"));
+                Projections.include(TestingRunResultSummary.TESTING_RUN_ID));
         return TestingRunResultSummariesDao.instance.findAll(
-                Filters.exists("metadata"), projections).stream().map(summary -> summary.getTestingRunId())
+                filters, projections).stream().map(summary -> summary.getTestingRunId())
                 .collect(Collectors.toList());
+    }
+
+    private static List<ObjectId> getCicdTests(){
+        return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
+    }
+
+    private static List<ObjectId> getTestsWithSeverity(List<String> severities){
+
+        List<Bson> severityFilters = new ArrayList<>();
+        for(String severity : severities){
+            severityFilters.add(Filters.gt(TestingRunResultSummary.COUNT_ISSUES + "." + severity, 0));
+        }
+
+        return getTestingRunListFromSummary(Filters.or(severityFilters));
     }
 
     private CallSource source;
@@ -247,14 +263,26 @@ public class StartTestAction extends UserAction {
                 String key = entry.getKey();
                 List value = entry.getValue();
 
-                if (value.size() == 0)
+                if (value == null || value.isEmpty())
                     continue;
 
-                if("endTimestamp".equals(key)){
-                    List<Long> ll = value;
+                switch(key){
+
+                    case "endTimestamp":
+                        List<Long> ll = Utils.castList(Long.class, value);
                         filterList.add(Filters.gte(key, ll.get(0)));
                         filterList.add(Filters.lte(key, ll.get(1)));
+                    break;
+                    
+                    case "severity":
+                        List<String> severities = Utils.castList(String.class, value);
+                        filterList.add(Filters.in(Constants.ID, getTestsWithSeverity(severities)));
+                    break;
+                    
+                    default:
+                    break;
                 }
+
             }
         } catch (Exception e) {
             return filterList;
@@ -305,6 +333,15 @@ public class StartTestAction extends UserAction {
                 Filters.and(testingRunFilters), skip, pageLimit,
                 prepareSort());
 
+        List<ObjectId> testingRunHexIds = new ArrayList<>();
+        testingRuns.forEach(
+            localTestingRun -> {
+                testingRunHexIds.add(localTestingRun.getId());
+            }
+        );
+
+        latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(testingRunHexIds);
+
         testingRunsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(testingRunFilters));
 
         return SUCCESS.toUpperCase();
@@ -340,7 +377,7 @@ public class StartTestAction extends UserAction {
         this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0, limitForTestingRunResultSummary , sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
 
-        if (this.testingRun.getTestIdConfig() == 1) {
+        if (this.testingRun!=null && this.testingRun.getTestIdConfig() == 1) {
             WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
             this.workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", workflowTestingEndpoints.getWorkflowTest().getId()));
         }
@@ -350,6 +387,8 @@ public class StartTestAction extends UserAction {
 
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
+    private boolean fetchOnlyVulnerable;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -359,7 +398,15 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        this.testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult( testingRunResultSummaryId);
+        List<Bson> testingRunResultFilters = new ArrayList<>();
+
+        if(fetchOnlyVulnerable){
+            testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+        }
+
+        testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
+
+        this.testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
 
         return SUCCESS.toUpperCase();
     }
@@ -487,9 +534,13 @@ public class StartTestAction extends UserAction {
         return ERROR.toLowerCase();
     }
 
-    public String fetchTestRunTableInfo() {
-        testingRuns = TestingRunDao.instance.findAll(Filters.ne("triggeredBy", "test_editor"));
-        latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries();
+    Map<String, Set<String>> metadataFilters; 
+
+    public String fetchMetadataFilters(){
+
+        List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
+        metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
+        
         return SUCCESS.toUpperCase();
     }
 
@@ -734,6 +785,14 @@ public class StartTestAction extends UserAction {
 
     public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
         this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+    }
+
+    public void setFetchOnlyVulnerable(boolean fetchOnlyVulnerable) {
+        this.fetchOnlyVulnerable = fetchOnlyVulnerable;
+    }
+
+    public Map<String, Set<String>> getMetadataFilters() {
+        return metadataFilters;
     }
 
     public enum CallSource{

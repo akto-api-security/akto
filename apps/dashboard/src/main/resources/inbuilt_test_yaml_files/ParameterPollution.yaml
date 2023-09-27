@@ -23,6 +23,10 @@ info:
     - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md"
     - "https://cwe.mitre.org/data/definitions/284.html"
+  cwe:
+    - CWE-88
+    - CWE-235
+
 auth:
   authenticated: true
 api_selection_filters:

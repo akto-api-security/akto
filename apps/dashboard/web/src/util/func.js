@@ -286,6 +286,10 @@ export default {
             return ret
         }
     },
+    toSentenceCase(str) {
+        if (str == null) return ""
+        return str[0].toUpperCase() + (str.length > 1 ? str.substring(1).toLowerCase() : "");
+      },
     hashCode(str) {
         var hash = 0;
         for (var i = 0; i < str.length; i++) {
@@ -753,6 +757,12 @@ export default {
         } else {
             return subCatogoryMap[runResult.testSubType].superCategory[fieldName]
         }
+    },
+
+    getRunResultCwe(runResult, subCatogoryMap) {
+        if (subCatogoryMap[runResult.testSubType]?.cwe)
+            return subCatogoryMap[runResult.testSubType].cwe
+        return [];
     },
 
     getRunResultSeverity(runResult, subCategoryMap) {
