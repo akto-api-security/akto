@@ -23,6 +23,7 @@ import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
+import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -174,6 +175,10 @@ const router = createBrowserRouter([
           {
             path: "integrations/akto_gpt",
             element: <AktoGPT />,
+          },
+          {
+            path: "integrations/github_sso",
+            element: <GithubSso />
           },
           {
             path: "integrations/slack",

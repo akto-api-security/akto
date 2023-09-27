@@ -54,6 +54,7 @@ import AktoAPIIntegration from "./AktoApiIntegration"
 import WebhookIntegration from "./webhook/WebhookIntegration";
 import func from "@/util/func";
 import AktoGptConfig from "./AktoGptConfig";
+import GithubSso from "./GithubSsoIntegration";
 
 export default {
   name: "IntegrationSelector",
@@ -63,7 +64,8 @@ export default {
     Postman,
     AktoAPIIntegration,
     WebhookIntegration,
-    AktoGptConfig
+    AktoGptConfig,
+    GithubSso
   },
   data () {
     let integrationsList = [
@@ -84,6 +86,13 @@ export default {
           connectors: [{
               name: 'Postman',
               component: Postman
+          }]
+      },
+      {
+          name: 'SSO',
+          connectors: [{
+              name: 'GitHub',
+              component: GithubSso
           }]
       },
       {

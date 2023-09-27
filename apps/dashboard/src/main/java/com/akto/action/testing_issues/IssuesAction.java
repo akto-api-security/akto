@@ -11,12 +11,16 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -199,12 +203,15 @@ public class IssuesAction extends UserAction {
         severity.put("_name",info.getSeverity());
         superCategory.put("severity", severity);
         infoObj.put("superCategory", superCategory);
+        infoObj.put(YamlTemplate.INACTIVE, testConfig.getInactive());
         return infoObj;
     }
 
+    private boolean fetchOnlyActive;
+
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true);
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
@@ -400,6 +407,14 @@ public class IssuesAction extends UserAction {
 
     public void setVulnerableRequests(List<VulnerableRequestForTemplate> vulnerableRequests) {
         this.vulnerableRequests = vulnerableRequests;
+    }
+
+    public boolean getFetchOnlyActive() {
+        return fetchOnlyActive;
+    }
+
+    public void setFetchOnlyActive(boolean fetchOnlyActive) {
+        this.fetchOnlyActive = fetchOnlyActive;
     }
 
     public List<TestingRunResult> getTestingRunResults() {
