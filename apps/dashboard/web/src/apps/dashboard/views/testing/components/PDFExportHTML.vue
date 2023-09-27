@@ -145,7 +145,8 @@
 <script>
 import obj from "@/util/obj"
 import api from '../api'
-import func from "@/util/func";
+import func from "@/util/func"
+import issuesApi from '../../issues/api'
 
 export default {
     name: "PDFExportHTML",
@@ -265,17 +266,34 @@ export default {
             let vulnerableTestingRunResults = []
             let sampleDataVsCurlMap = {}
             let skip = 0
-            while (true) {
-                let testingRunCountsFromDB = 0
-                await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaryHexId, skip).then(resp => {
-                    vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
-                    testingRunCountsFromDB = resp.testingRunResults.length
-                    sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
-                })
-                skip += 50
-                if (testingRunCountsFromDB < 50) {
-                    //EOF: break as no further documents exists
-                    break
+            if (this.testingRunResultSummaryHexId) {
+                while (true) {
+                    let testingRunCountsFromDB = 0
+                    await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaryHexId, skip).then(resp => {
+                        vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
+                        testingRunCountsFromDB = resp.testingRunResults.length
+                        sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                    })
+                    skip += 50
+                    if (testingRunCountsFromDB < 50) {
+                        //EOF: break as no further documents exists
+                        break
+                    }
+                }
+            } else if (this.issuesFilters) {
+                while (true) {
+                    let testingRunCountsFromDB = 0
+                    let filters = JSON.parse(atob(this.issuesFilters))
+                    await issuesApi.fetchVulnerableTestingRunResultsFromIssues(filters, skip).then(resp => {
+                        vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
+                        testingRunCountsFromDB = resp.totalIssuesCount
+                        sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                    })
+                    skip += 50
+                    if (testingRunCountsFromDB < 50) {
+                        //EOF: break as no further documents exists
+                        break
+                    }
                 }
             }
             this.sampleDataVsCurlMap = sampleDataVsCurlMap

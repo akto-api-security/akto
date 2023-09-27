@@ -222,7 +222,8 @@ export default {
                 filterStatus: this.$store.state.issues.filterStatus,
                 filterCollectionsId: this.$store.state.issues.filterCollectionsId,
                 filterSeverity: this.$store.state.issues.filterSeverity,
-                filterSubCategory: this.$store.state.issues.filterSubCategory1
+                filterSubCategory: this.$store.state.issues.filterSubCategory1,
+                startEpoch: this.$store.state.issues.startEpoch
             }
             let issuesFilters = JSON.stringify(obj)
             const routeData = this.$router.resolve({name: 'testing-export-html', query: {issuesFilters:btoa(issuesFilters)}});
