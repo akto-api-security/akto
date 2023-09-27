@@ -12,15 +12,11 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 public class GithubSync {
-    private static final Logger logger = LoggerFactory.getLogger(GithubSync.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
     private static final OkHttpClient client = new OkHttpClient();
 
@@ -47,8 +43,8 @@ public class GithubSync {
         try {
             Response fileResponse = client.newCall(fileRequest).execute();
 
-            if (fileResponse.code() == 404) {
-                loggerMaker.errorAndAddToDb(String.format("File %s not found in repo %s", fileName, repo), LogDb.DASHBOARD);
+            if (fileResponse.code() != 200) {
+                loggerMaker.errorAndAddToDb(String.format("Unable to retrieve file %s from repo %s", fileName, repo), LogDb.DASHBOARD);
             } else {
                 ResponseBody fileResponseBody = fileResponse.body();
                 String fileContents = fileResponseBody.string();
@@ -72,7 +68,7 @@ public class GithubSync {
         try {
             Response dirResponse = client.newCall(dirRequest).execute();
 
-            if (dirResponse.code() == 404) {
+            if (dirResponse.code() != 200) {
                 loggerMaker.errorAndAddToDb(String.format("Could not retrieve directory contents %s of repo %s", dirPath, repo), LogDb.DASHBOARD);
                 return null;
             }
