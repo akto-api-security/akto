@@ -48,6 +48,17 @@
                 <module>testing</module>
             </modules>
         </profile>
+        <profile>
+            <id>testing-cli</id>
+            <activation>
+                <file>
+                    <exists>testing-cli/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>testing-cli</module>
+            </modules>
+        </profile>
     </profiles>
 </project>
 
