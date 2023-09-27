@@ -49,7 +49,7 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
 
         if (counter == 1) {
             String[] fieldNames = {"_id.apiInfoKey.apiCollectionId", "testRunIssueStatus"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
         }
     }
