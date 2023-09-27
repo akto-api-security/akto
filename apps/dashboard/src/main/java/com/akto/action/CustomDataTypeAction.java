@@ -125,6 +125,21 @@ public class CustomDataTypeAction extends UserAction{
 
     private CustomDataType customDataType;;
 
+    private boolean checkConditionUpdate(CustomDataType existingCDT, CustomDataType newCDT) {
+        boolean ret = true;
+
+        ret &= Conditions.areEqual(existingCDT.getKeyConditions(), newCDT.getKeyConditions());
+        ret &= Conditions.areEqual(existingCDT.getValueConditions(), newCDT.getValueConditions());
+        
+        // check for operator change only if both key and value conditions are being used.
+        if(ret && (newCDT.getKeyConditions()!=null && newCDT.getValueConditions()!=null)){
+            ret &= existingCDT.getOperator() == newCDT.getOperator();
+        }
+
+        // false if all of them are true and true if any of them is false
+        return !ret;
+    }
+
     @Override
     public String execute() {
         User user = getSUser();
@@ -142,9 +157,9 @@ public class CustomDataTypeAction extends UserAction{
             addActionError("There is something wrong in the data type conditions");
             return ERROR.toUpperCase();
         }
-
+        
+        CustomDataType customDataTypeFromDb = CustomDataTypeDao.instance.findOne(Filters.eq(CustomDataType.NAME, name));
         if (this.createNew) {
-            CustomDataType customDataTypeFromDb = CustomDataTypeDao.instance.findOne(Filters.eq(CustomDataType.NAME, name));
             if (customDataTypeFromDb != null) {
                 addActionError("Data type with same name exists");
                 return ERROR.toUpperCase();
@@ -152,6 +167,13 @@ public class CustomDataTypeAction extends UserAction{
             // id is automatically set when inserting in pojo
             CustomDataTypeDao.instance.insertOne(customDataType);
         } else {
+
+            if (customDataTypeFromDb!=null && customDataTypeFromDb.getCreatorId() == 1638571050 &&
+                    checkConditionUpdate(customDataTypeFromDb, customDataType)) {
+                addActionError("Cannot update data type conditions for akto data types. Please create a new data type.");
+                return ERROR.toUpperCase();
+            }
+
             FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
             options.returnDocument(ReturnDocument.AFTER);
             options.upsert(false);
@@ -175,7 +197,7 @@ public class CustomDataTypeAction extends UserAction{
             }
         }
 
-        SingleTypeInfo.fetchCustomDataTypes();
+        SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
 
         return Action.SUCCESS.toUpperCase();
@@ -217,7 +239,7 @@ public class CustomDataTypeAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        SingleTypeInfo.fetchCustomDataTypes();
+        SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
         return Action.SUCCESS.toUpperCase();
     }

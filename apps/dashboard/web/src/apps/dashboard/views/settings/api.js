@@ -262,13 +262,14 @@ export default {
         })
     },
 
-    addApiCollectionNameMapper(regex, newName) {
+    addApiCollectionNameMapper(regex, newName, headerName) {
         return request ({
             url: '/api/addApiCollectionNameMapper',
             method: 'post',
             data: {
                 regex, 
-                newName
+                newName,
+                headerName
             }
         })
     },
@@ -286,6 +287,37 @@ export default {
     resetAllCustomAuthTypes() {
         return request({
             url: '/api/resetAllCustomAuthTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateTrafficAlertThresholdSeconds(trafficAlertThresholdSeconds) {
+        return request({
+            url: '/api/updateTrafficAlertThresholdSeconds',
+            method: 'post',
+            data: {trafficAlertThresholdSeconds}
+        })
+    },
+
+    deleteGithubSso() {
+        return request({
+            url: '/api/deleteGithubSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addGithubSso(githubClientId, githubClientSecret) {
+        return request({
+            url: '/api/addGithubSso',
+            method: 'post',
+            data: {githubClientId, githubClientSecret}
+        })
+    },
+
+    fetchGithubSso() {
+        return request({
+            url: '/api/fetchGithubSso',
             method: 'post',
             data: {}
         })

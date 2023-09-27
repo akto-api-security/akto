@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import api from '../api'
+import func from "@/util/func"
 
 
 Vue.use(Vuex)
@@ -12,6 +13,19 @@ const state = {
     cicdTestingRuns: [],
     authMechanism: null,
     testingRunResults: []
+}
+
+function addMoreItem(arr, size, link){
+    if (size > 50) {
+        arr.push({
+            id: "More button",
+            title: `See all`,
+            link: link,
+            class: "no-style",
+            active: true
+        })
+    }
+    return arr;
 }
 
 const testing = {
@@ -26,14 +40,17 @@ const testing = {
             state.pastTestingRuns = []
             state.cicdTestingRuns = []
         },
-        SAVE_DETAILS (state, {authMechanism, testingRuns}) {
+        SAVE_DETAILS (state, {authMechanism, testingRuns, testingRunsCount}) {
+            testingRuns = addMoreItem(testingRuns, testingRunsCount, "/dashboard/testing/active")
             state.authMechanism = authMechanism
             state.testingRuns = testingRuns
         },        
-        SAVE_CICD_DETAILS (state, {testingRuns}) {
+        SAVE_CICD_DETAILS (state, {testingRuns, testingRunsCount}) {
+            testingRuns = addMoreItem(testingRuns, testingRunsCount, "/dashboard/testing/cicd")
             state.cicdTestingRuns = testingRuns
         },
-        SAVE_PAST_DETAILS (state, {testingRuns}) {
+        SAVE_PAST_DETAILS (state, {testingRuns, testingRunsCount}) {
+            testingRuns = addMoreItem(testingRuns, testingRunsCount, "/dashboard/testing/inactive")
             state.pastTestingRuns = testingRuns
         },
         SAVE_TESTING_RUNS (state, {testingRuns}) {
@@ -88,6 +105,12 @@ const testing = {
         scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source} ) {
             return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
+            })
+        },
+        rerunTest({commit}, {testingRunHexId} ) {
+            return api.rerunTest(testingRunHexId).then((resp) => {
+                commit('SAVE_TESTING_RUNS', resp)
+                func.showSuccessSnackBar('Test has been scheduled for rerun')
             })
         },
         addAuthMechanism({commit}, {type, requestData, authParamData}) {

@@ -10,7 +10,17 @@
                   <img src="/public/favicon.svg" style="height: 30px;" />akto
                 </h1>
               </v-card-title>
-<!-- 
+
+              <div v-if="(isLocalDeploy && isSaas)">
+              <google-auth scope="" purpose="signin" class="ma-4">
+                <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px">
+                  <div>
+                    <img src="@/assets/logo_google.svg" alt="Google" class="logo" />
+                    <span class="text">Sign in with Google</span>
+                  </div>
+                </v-btn>
+              </google-auth>
+              <!-- 
               <div class="d-flex ma-4">
                 <div class="d-flex all-logos-container">
                   <div class="d-flex flex-column justify-space-around text">
@@ -36,23 +46,31 @@
                 </div>
               </div>
  -->
-              <!-- <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
- -->
+              <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
+            </div>
+            <div v-if="githubClientId">
+              <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px" @click="goToGithub">
+                <div>
+                  <v-icon>$githubIcon</v-icon>
+                  <span class="text">Sign in with GitHub</span>
+                </div>
+              </v-btn>
+
+              <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
+            </div>
               <div class="ma-4">
-                <login-fields
-                  @fieldsChanged="fieldsChanged"
-                  @enterPressed="login"
-                  :isSignUp ="false"
-                />
+                <login-fields @fieldsChanged="fieldsChanged" @enterPressed="login" :isSignUp="false" />
               </div>
               <v-card-actions>
-                <v-btn large tile class="sign-in__button primary" @click="login" :loading="loadingLogin" :disabled="disableButtons">
+                <v-btn large tile class="sign-in__button primary" @click="login" :loading="loadingLogin"
+                  :disabled="disableButtons">
                   <span class="ma-4">Login</span>
                 </v-btn>
-                <div class="ma-4" style="font-size: 13px">Don't have an account? <span class="primary--text clickable" @click="register" >Sign up</span></div>
+                <div class="ma-4" style="font-size: 13px">Don't have an account? <span class="primary--text clickable"
+                    @click="register">Sign up</span></div>
               </v-card-actions>
-                
-              
+
+
             </v-card>
           </v-col>
         </v-row>
@@ -62,42 +80,53 @@
 </template>
 
 <script>
-  import LoginFields from "@/apps/login/LoginFields";
-  import GoogleAuth from "@/apps/dashboard/shared/components/GoogleAuth";
-  import SlackAuth from "@/apps/dashboard/shared/components/SlackAuth";
-  export default {
-    name: 'PageLogin',
-    components: {
-      LoginFields,
-      GoogleAuth,
-      SlackAuth
+import LoginFields from "@/apps/login/LoginFields";
+import GoogleAuth from "@/apps/dashboard/shared/components/GoogleAuth";
+import SlackAuth from "@/apps/dashboard/shared/components/SlackAuth";
+export default {
+  name: 'PageLogin',
+  components: {
+    LoginFields,
+    GoogleAuth,
+    SlackAuth
+  },
+  data() {
+    return {
+      loadingLogin: false,
+      loadingSignup: false,
+      disableButtons: true,
+      formModel: null,
+      isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
+      githubClientId: window.GITHUB_CLIENT_ID
+    }
+  },
+  methods: {
+    goToGithub() {
+      window.location.href = ("https://github.com/login/oauth/authorize?client_id=" + this.githubClientId);
     },
-    data() {
-      return {
-        loadingLogin: false,
-        loadingSignup: false,
-        disableButtons: true,
-        formModel: null
-      }
+    login() {
+      this.loadingLogin = true
+      var a = this.$store.dispatch('auth/login', this.formModel).catch((e) => {
+        this.loadingLogin = false
+      })
     },
-    methods: {
-      login() {
-        this.loadingLogin = true
-        var a = this.$store.dispatch('auth/login', this.formModel).catch((e) => {
-          this.loadingLogin = false
-        })
-      },
-      register() {
-        this.$router.push('/signup')
-      },
-      fieldsChanged(formModel) {
-        if (formModel.valid) {
-          this.formModel = {...formModel}
-        }
-        this.disableButtons = !formModel.valid
+    register() {
+      this.$router.push('/signup')
+    },
+    fieldsChanged(formModel) {
+      if (formModel.valid) {
+        this.formModel = { ...formModel }
       }
+      this.disableButtons = !formModel.valid
+    }
+  },
+  async mounted() {
+    if(window.IS_SAAS && window.IS_SAAS==="true"){
+      window.location.href = "/";
     }
   }
+}
 </script>
 
 <style lang="sass" scoped>
@@ -137,7 +166,6 @@
   font-size: 16px
   font-weight: 600
   margin-left: 5px
-  color: var(--white)
 
 .page-login_title
     font-weight: 600
@@ -187,5 +215,30 @@
     background: var(--white)
     z-index: 20
     padding: 0px 8px
-  
+
+.signup-container
+    background: #FFFFFF
+    box-shadow: 0px 8px 12px rgba(0, 0, 0, 0.25)
+    border-radius: 8px
+    padding: 32px
+    color: #47466A
+    width: 450px
+    margin: auto
+    &.sign-up-third-party
+      margin-bottom: 16px
+      border: 1px solid rgba(71, 70, 106, 0.15)
+      box-sizing: border-box
+      border-radius: 4px
+      text-align: center
+      height: 56px
+      display: flex
+      flex-direction: column
+      justify-content: space-around
+      & .logo
+        height:  20px
+        vertical-align: middle
+      & .text
+        font-size: 16px
+        font-weight: 600
+        margin-left: 5px    
 </style>

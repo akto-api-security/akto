@@ -1,0 +1,41 @@
+id: WPCONFIG_AWS_KEY
+info:
+  name: AWS S3 keys Leak
+  description: "WordPress configuration file (wp-config.php) leaked, exposing AWS S3 keys and sensitive database credentials."
+  details: >
+              "This template searches for the presence of the wp-config.php file and checks for the presence of AWS S3 keys, database access credentials, and other sensitive information within the file."
+  impact: "Exposing AWS S3 keys and database credentials can result in unauthorized access, data breaches, and potential compromise of the entire system's security."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: WPCONFIG_AWS_KEY
+  severity: HIGH
+  references:
+    - https://securityboulevard.com/2021/04/understanding-and-preventing-s3-leaks/
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+wordLists:
+  urlPaths:
+    - ${urlVar}/wp-config.php-backup
+    - ${urlVar}/%c0
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlPaths}
+
+validate:
+  response_payload:
+    contains_all:
+      - 'access-key-id'
+      - 'secret-access-key'
+      - 'DB_NAME'
+      - 'DB_PASSWORD'

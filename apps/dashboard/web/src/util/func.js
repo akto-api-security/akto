@@ -157,6 +157,9 @@ export default {
         if (d.length < 2) d = '0' + d
         return y + "-" + m + "-" + d
     },
+    toHyphenatedDate(epochInMs) {
+        return this.toDateStrShort(new Date(epochInMs))
+    },
     toYMD (date) {
         var d = date.getDate();
         var m = date.getMonth() + 1; //Month from 0 to 11
@@ -165,6 +168,62 @@ export default {
     },
     prettifyShort(num) {
         return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
+    },
+    prettifyEpochWithNull(epoch, textToShowIfNull){
+        if(epoch === -1){
+            return textToShowIfNull;
+        }
+        return this.prettifyEpoch(epoch)
+    },
+    async copyToClipboard(text, onCopyBtnClickText, domElement) {
+
+            // main reason to use domElement like this instead of document.body is that execCommand works only if current
+            // component is not above normal document. For example in testing page, we show SampleSingleSide.vue in a v-dialog
+            // NOTE: Do not use navigator.clipboard because it only works for HTTPS sites
+            if (window.isSecureContext && navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: onCopyBtnClickText,
+                        color: 'green'
+                    })
+                }).catch(err => {
+                    console.warn("error in copying to clipboard")
+                });
+            } else if (window.clipboardData && window.clipboardData.setData) {
+                // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
+                window.clipboardData.setData("Text", text);
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: onCopyBtnClickText,
+                    color: 'green'
+                })
+            } else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
+                // let domElement = _this.$el;
+                var textarea = document.createElement("textarea");
+                textarea.textContent = text;
+                textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
+                domElement.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                textarea.setSelectionRange(0, 99999);        
+                try {
+                    document.execCommand("copy");  // Security exception may be thrown by some browsers.
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: onCopyBtnClickText,
+                        color: 'green'
+                    })
+                }
+                catch (ex) {
+                    // console.warn("Copy to clipboard failed.", ex);
+                    // return prompt("Copy to clipboard: Ctrl+C, Enter", text);
+                }
+                finally {
+                    domElement.removeChild(textarea);
+                }
+            }
+
     },
     prettifyEpoch(epoch) {
         var diffSeconds = (+Date.now())/1000 - epoch
@@ -595,6 +654,9 @@ export default {
 
             case "AKTOGPT":
                 return {name: '$chatGPT', color: 'rgb(16, 163, 127)'}
+            
+            case "GITHUB":
+                return {name: '$githubIcon', color: cs.getPropertyValue('--hexColor42')}
         }
     },
 
@@ -761,10 +823,48 @@ export default {
     getRunResultSeverity(runResult, subCategoryMap) {
         let testSubType = subCategoryMap[runResult.testSubType]
         if (!testSubType) {
-            return "HIGH"
+            return 3
         } else {
             let a = testSubType.superCategory["severity"]["_name"]
-            return a
+            switch(a){
+                case "HIGH": 
+                    return {title: a, value: 3}
+
+                case "MEDIUM": 
+                    return {title: a, value: 2}
+
+                case "LOW": 
+                    return {title: a, value: 1}
+
+                default:
+                    return {title: a, value: 3}
+            }
         }
-    }
+    },
+
+    convertSecondsToReadableTime(seconds) {
+        if (seconds < 60) {
+          return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+        } else if (seconds < 3600) {
+          const minutes = Math.floor(seconds / 60);
+          return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+        } else if (seconds < 86400) {
+          const hours = Math.floor(seconds / 3600);
+          const remainingMinutes = Math.floor((seconds % 3600) / 60);
+          let result = `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+          if (remainingMinutes > 0) {
+            result += ` ${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}`;
+          }
+          return result;
+        } else {
+          const days = Math.floor(seconds / 86400);
+          const remainingHours = Math.floor((seconds % 86400) / 3600);
+          let result = `${days} ${days === 1 ? 'day' : 'days'}`;
+          if (remainingHours > 0) {
+            result += ` ${remainingHours} ${remainingHours === 1 ? 'hour' : 'hours'}`;
+          }
+          return result;
+        }
+      }
+
 }

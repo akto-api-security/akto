@@ -1,0 +1,53 @@
+id: SPRING_BOOT_ENV_ACTUATOR_EXPOSED
+info:
+  name: Spring Boot Environment Actuator Exposed 
+  description: Spring Boot Environment Actuator Exposed Misconfiguration.
+  details: >
+       The Spring Boot Environment Actuator Exposed misconfiguration occurs when the Actuator endpoint, 
+       which provides access to application environment details, is accessible to unauthorized users. 
+       This misconfiguration can lead to security risks as sensitive environment information, such as 
+       configuration properties and active profiles, can be exposed. Attackers can gain insights into 
+       the application's inner workings and exploit vulnerabilities. It falls under the Security Misconfiguration
+       category with a low severity level. Proper access control and secure configuration of the Actuator 
+       endpoints are crucial to protect sensitive environment details.
+  impact: Exposing Spring Boot Environment Actuator can expose sensitive environment information, leading to potential security vulnerabilities and unauthorized access.
+  category:
+      name: SM
+      shortName: Misconfiguration
+      displayName: Security Misconfiguration (SM)
+  subCategory: Server Misconfiguration
+  severity: LOW
+  tags: 
+    - Spring Boot
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+    - "https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/actuator/env
+
+validate:
+  response_code: 
+    eq: 200
+  response_payload:
+    contains_either:
+      - "applicationConfig"
+      - "activeProfiles"
+    contains_either:
+      - "server.port"
+      - "local.server.port"
+
+        

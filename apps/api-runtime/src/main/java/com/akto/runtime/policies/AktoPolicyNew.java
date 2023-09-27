@@ -148,9 +148,10 @@ public class AktoPolicyNew {
     }
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
-        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes;
+        List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
+        policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
 
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
@@ -260,6 +261,7 @@ public class AktoPolicyNew {
             policyCatalogList.addAll(templateURLToMethods.values());
 
             for (PolicyCatalog policyCatalog: policyCatalogList) {
+                if (!policyCatalog.isSeenEarlier()) continue;
                 ApiInfo apiInfo = policyCatalog.getApiInfo();
                 if (apiInfo != null) {
                     apiInfoList.add(apiInfo);

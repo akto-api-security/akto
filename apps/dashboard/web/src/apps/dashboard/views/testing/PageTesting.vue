@@ -119,9 +119,7 @@
         <template slot="Roles">
             <test-roles title="Roles" :testRoles="testRoles">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <test-roles-config-details></test-roles-config-details>
-                    </a-card>
+                    <test-roles-config-details></test-roles-config-details>
                 </template>
             </test-roles>
         </template>
@@ -148,7 +146,6 @@
 
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
-import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestRoles from './components/test_roles/TestRoles'
@@ -175,7 +172,6 @@ export default {
     components: {
         SimpleTable,
         SensitiveChipGroup,
-        ACard,
         SampleData,
         LayoutWithTabs,
         LayoutWithLeftPane,
@@ -272,7 +268,15 @@ export default {
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
         },
-        toggleOriginalStateDb() {
+        toggleOriginalStateDb({reqData, authParamsList}) {
+            let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, authParamsList)
+            result.then((resp) => {
+                func.showSuccessSnackBar("Login Flow saved successfully!")
+                
+            }).catch((err) => {
+                console.log(err);
+            })
+
             console.log('got db state event')
             this.fetchAuthMechanismData()
         },
@@ -346,9 +350,12 @@ export default {
                             active: true
                         },
                         ...(this.testingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })
@@ -369,9 +376,12 @@ export default {
                             active: true
                         },
                         ...(this.cicdTestingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true,
                                 cicd: true
                             }
@@ -393,9 +403,12 @@ export default {
                             active: true
                         },
                         ...(this.pastTestingRuns || []).map(x => {
+                            if(x.id==="More button"){
+                                return x;
+                            }
                             return {
                                 title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })

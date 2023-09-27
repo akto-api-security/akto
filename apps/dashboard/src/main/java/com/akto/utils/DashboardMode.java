@@ -3,7 +3,7 @@ package com.akto.utils;
 import org.apache.commons.lang3.StringUtils;
 
 public enum DashboardMode {
-    LOCAL_DEPLOY, SAAS, STAIRWAY, ON_PREM;
+    LOCAL_DEPLOY, ON_PREM, STAIRWAY, SAAS;
 
     public static DashboardMode getDashboardMode(){
         String dashboardMode = System.getenv("DASHBOARD_MODE");
@@ -19,10 +19,7 @@ public enum DashboardMode {
         if("stairway".equalsIgnoreCase(dashboardMode)){
             return STAIRWAY;
         }
-        if("saas".equalsIgnoreCase(dashboardMode)){
-            return SAAS;
-        }
-        return LOCAL_DEPLOY;
+        return ON_PREM;
     }
 
     public static boolean isLocalDeployment(){
@@ -37,6 +34,6 @@ public enum DashboardMode {
 
     public static boolean isSaasDeployment(){
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();
-        return dashboardMode.equals(SAAS);
+        return dashboardMode.equals(LOCAL_DEPLOY) && "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     }
 }

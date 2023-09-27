@@ -1,6 +1,6 @@
 <template>
     <div class="pa-4">
-        <div v-if="isLocalDeploy">
+        <div v-if="isLocalDeploy && !isSaas">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
 
@@ -16,7 +16,7 @@
 
                 <div style="padding: 8px 24px 0px 24px">
                     <div v-for="(inviteCode, email)  in inviteCodes" :key="email">
-                        <div class="invitation-text">
+                        <div class="invitation-text" id="inviteCodeId">
                             <v-text-field
                                 :label="email"
                                 dense
@@ -47,7 +47,7 @@
 
 
         <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
-            <div v-if="isAdmin && !isLocalDeploy" class="email-invite-container">
+            <div v-if="isAdmin && !(isLocalDeploy && !isSaas)" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
                     :items="[]"
@@ -77,7 +77,7 @@
                         </v-chip>
                     </template>
                 </v-combobox>
-                <v-btn 
+                <v-btn
                     @click="sendInvitationEmails"
                     :disabled="!allEmails || allEmails.length == 0"
                     dark
@@ -89,17 +89,17 @@
                 >
                     Invite
                 </v-btn>
-            
+
             </div>
             <div class="team-overview-card">
                 <template v-for="user in users">
-                    <v-hover 
-                        v-slot="{ hover }" 
+                    <v-hover
+                        v-slot="{ hover }"
                         :key="user.email"
                         class="user-details d-flex justify-space-between pa-4"
                     >
                         <div style="position: relative">
-                            
+
                             <owner-name
                                     :owner-name="user.name"
                                     :owner-id="user.id"
@@ -113,11 +113,11 @@
                             <div class="user-details-type">
                                 {{user.role || '-'}}
                             </div>
-                            <actions-tray  
-                                v-if="hover && isAdmin" 
-                                class="table-row-actions" 
-                                :actions="actions || []" 
-                                :subject=user 
+                            <actions-tray
+                                v-if="hover && isAdmin"
+                                class="table-row-actions"
+                                :actions="actions || []"
+                                :subject=user
                             />
                         </div>
                     </v-hover>
@@ -134,6 +134,7 @@
     import api from "../api"
     import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
     import BannerVertical from "../../../shared/components/BannerVertical.vue"
+    import func from "@/util/func"
 
     export default {
         name: "TeamOverview",
@@ -168,6 +169,7 @@
                     }
                 ],
                 isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
+                isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
                 inviteCodes: {},
                 showInviteCodeDialog: false
             }
@@ -176,8 +178,9 @@
             this.$store.dispatch('team/getTeamData')
         },
         methods: {
-            copyInviteCode(inviteCode) {
-                this.copyToClipboard(inviteCode)
+            async copyInviteCode(inviteCode) {
+                let domElement = document.getElementById("inviteCodeId")
+                func.copyToClipboard(inviteCode, 'copied to clipboard', domElement)
             },
             inviteNewMember(email) {
                 let spec = {
@@ -193,7 +196,7 @@
 
                 let _inviteNewMember = this.inviteNewMember
                 let countEmails = 0
-                this.allEmails ? this.allEmails : []
+                this.allEmails = this.allEmails ? this.allEmails : []
                 if (this.allEmails.length == 0) return
                 for (const email of this.allEmails) {
                     if (this.usernameRules[0](email)) {
@@ -215,11 +218,13 @@
 
                     } else {
 
+                    if(!this.isLocalDeploy){
                         window._AKTO.$emit('SHOW_SNACKBAR', {
                             show: true,
                             text: `${countEmails} invitation${plural} sent successfully!`,
                             color: 'green'
                         })
+                    }
                         this.$store.dispatch('team/getTeamData')
                         this.showInviteCodeDialog = true
                     }
@@ -239,27 +244,16 @@
             removedFailure (err, user) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
-                    text: `There was an error while removing ${user.email}!`,
+                    text: `There was an error while removing the user!`,
                     color: 'red'
                 })
             },
-            copyToClipboard(text) {
-                    navigator.clipboard.writeText(text)
-                        .then(() => {
-                            window._AKTO.$emit('SHOW_SNACKBAR', {
-                                show: true,
-                                text: `Copied to clipboard`,
-                                color: 'green'
-                            })
-                        })
-                        .catch(err => console.error('Failed to copy text: ', err));
-            }
         },
         computed: {
             ...mapState('team', ['users']),
             isAdmin() {
                 return true
-            }            
+            }
         }
     }
 </script>
@@ -410,7 +404,7 @@
 </style>
 
 <style scoped>
-.invitation-text >>> .v-text-field input {
+.invitation-text>>>.v-text-field input {
     font-size: 16px !important;
 }
 </style>

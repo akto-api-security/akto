@@ -15,7 +15,6 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.testing.NucleiExecutor;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
@@ -28,9 +27,10 @@ public class SampleMessageStore {
 
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class);
-    public static Map<String, SingleTypeInfo> buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
-        Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
-        if (testingEndpoints == null) return singleTypeInfoMap;
+    private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+    private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
+    public void buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
+        if (testingEndpoints == null) return;
         TestingEndpoints.Type type = testingEndpoints.getType();
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
         try {
@@ -48,8 +48,8 @@ public class SampleMessageStore {
                 CustomTestingEndpoints customTestingEndpoints = (CustomTestingEndpoints) testingEndpoints;
                 List<ApiInfoKey> apiInfoKeys = customTestingEndpoints.getApisList();
 
-                if (apiInfoKeys.size() == 0) {
-                    return singleTypeInfoMap;
+                if (apiInfoKeys.isEmpty()) {
+                    return;
                 } else {
                     int apiCollectionId = apiInfoKeys.get(0).getApiCollectionId();
                     singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
@@ -63,24 +63,33 @@ public class SampleMessageStore {
             }
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-                singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
+                singleTypeInfos.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while building STI map: " + e, LogDb.TESTING);
         }
-
-        return singleTypeInfoMap;
     }
 
-    public static List<TestRoles> fetchTestRoles() {
+    private SampleMessageStore() {}
+
+    public static SampleMessageStore create() {
+        return new SampleMessageStore();
+    }
+
+    public static SampleMessageStore create(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap) {
+        SampleMessageStore ret = new SampleMessageStore();
+        ret.sampleDataMap = sampleDataMap;
+        return ret;
+    }
+
+    public List<TestRoles> fetchTestRoles() {
         return TestRolesDao.instance.findAll(new BasicDBObject());
     }
 
 
-    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages(Set<Integer> apiCollectionIds) {
+    public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         Bson filterQ = Filters.in("_id.apiCollectionId", apiCollectionIds);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null);
-        System.out.println("SampleDataSize " + sampleDataList.size());
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
             if (sampleData.getSamples() == null) continue;
@@ -93,15 +102,15 @@ public class SampleMessageStore {
             }
         }
 
-        return new HashMap<>(tempSampleDataMap);
+        sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
 
 
-    public static List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages) {
+    public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();
 
-        List<String> samples = sampleMessages.get(apiInfoKey);
+        List<String> samples = sampleDataMap.get(apiInfoKey);
         if (samples == null || samples.isEmpty()) return messages;
 
         for (String message: samples) {
@@ -125,6 +134,14 @@ public class SampleMessageStore {
         }
 
         return filteredMessages;
+    }
+
+    public Map<String, SingleTypeInfo> getSingleTypeInfos() {
+        return this.singleTypeInfos;
+    }
+
+    public Map<ApiInfoKey, List<String>> getSampleDataMap() {
+        return this.sampleDataMap;
     }
 
 }

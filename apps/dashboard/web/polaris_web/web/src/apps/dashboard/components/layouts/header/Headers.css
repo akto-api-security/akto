@@ -1,0 +1,11 @@
+.collapse_btn {
+    position: absolute;
+    top: 18px;
+    z-index: 1;
+    left: 20px;
+    cursor: pointer;
+}
+
+.Polaris-ActionList-SearchField {
+    display: none !important;
+}

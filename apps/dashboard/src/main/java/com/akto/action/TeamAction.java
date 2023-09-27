@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -26,12 +27,21 @@ public class TeamAction extends UserAction {
     BasicDBList users;
 
     public String fetchTeamData() {
-        List<RBAC> allRoles = RBACDao.instance.findAll(new BasicDBObject());
+        int accountId = Context.accountId.get();
+        List<RBAC> allRoles = RBACDao.instance.findAll(Filters.or(
+                Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                Filters.exists(RBAC.ACCOUNT_ID, false)
+        ));
 
         Map<Integer, RBAC> userToRBAC = new HashMap<>();
         for(RBAC rbac: allRoles) {
-            userToRBAC.put(rbac.getUserId(), rbac);
-        }   
+            if (rbac.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
+                rbac.setAccountId(1_000_000);
+            }
+            if (rbac.getAccountId() == accountId) {
+                userToRBAC.put(rbac.getUserId(), rbac);
+            }
+        }
 
         users = UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get());
         for(Object obj: users) {
@@ -41,15 +51,23 @@ public class TeamAction extends UserAction {
             userObj.append("role", status);
         }
 
-        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(new BasicDBObject());
+        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(Filters.or(
+                Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get()),
+                Filters.exists(RBAC.ACCOUNT_ID, false)
+        ));
 
         for(PendingInviteCode pendingInviteCode: pendingInviteCodes) {
-            users.add(
-                new BasicDBObject("id", pendingInviteCode.getIssuer())
-                .append("login", pendingInviteCode.getInviteeEmailId())
-                .append("name", "-")
-                .append("role", "Invitation sent")
-            );
+            if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
+                pendingInviteCode.setAccountId(1_000_000);
+            }
+            if (pendingInviteCode.getAccountId() == accountId) {
+                users.add(
+                        new BasicDBObject("id", pendingInviteCode.getIssuer())
+                                .append("login", pendingInviteCode.getInviteeEmailId())
+                                .append("name", "-")
+                                .append("role", "Invitation sent")
+                );
+            }
         }
 
         return SUCCESS.toUpperCase();
@@ -59,14 +77,19 @@ public class TeamAction extends UserAction {
     public String removeUser() {
         int currUserId = getSUser().getId();
         RBAC record = RBACDao.instance.findOne("userId", currUserId, "role", Role.ADMIN);
-        if (record == null || getSUser().getLogin().equals(email) || email == null) {
+        boolean isAdmin = RBACDao.instance.isAdmin(currUserId, Context.accountId.get());
+        if (!isAdmin) {
             return Action.ERROR.toUpperCase();
         } else {
             int accId = Context.accountId.get();
 
-            Bson findQ = Filters.eq("login", email);
-            boolean userExists = UsersDao.instance.findOne(findQ) != null;
-            
+            Bson findQ = Filters.eq(User.LOGIN, email);
+            User userDetails = UsersDao.instance.findOne(findQ);
+            boolean userExists =  userDetails != null;
+            if (userExists && userDetails.getId() == currUserId) {
+                return Action.ERROR.toUpperCase();
+            }
+
             if (userExists) {
                 UsersDao.instance.updateOne(findQ, Updates.unset("accounts."+accId));
                 return Action.SUCCESS.toUpperCase();

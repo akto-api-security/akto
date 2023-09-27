@@ -5,10 +5,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
+import com.akto.dto.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
@@ -18,26 +15,34 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
 import java.util.*;
 
 import static com.akto.parsers.TestDump2.createList;
 import static com.akto.runtime.APICatalogSync.mergeUrlsAndSave;
+import static com.akto.runtime.APICatalogSync.tryMergeURLsInCollection;
 import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
 
     public void testInitializer(){
-        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
-        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        SingleTypeInfo.aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
+        if (info == null) {
+            info = new AccountDataTypesInfo();
+        }
+        info.setAktoDataTypeMap(aktoDataTypeMap);
+        SingleTypeInfo.getAccountToDataTypesInfo().put(ACCOUNT_ID, info);
     }
     @Test
     public void testMultipleIntegerMerging() {
@@ -814,12 +819,12 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1);
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2);
 
-        mergeUrlsAndSave(1, true);
+        mergeUrlsAndSave(1, true, false);
 
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1.copy());
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2.copy());
 
-        mergeUrlsAndSave(1, true);
+        mergeUrlsAndSave(1, true, false);
 
         long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
         assertEquals(2, estimatedDocumentCount);
@@ -831,5 +836,82 @@ public class TestMergingNew extends MongoBasedTest {
         assertNotNull(sti);
 
     }
+
+    // this test checks if there are 2 urls api/books and /api/books they don't get merged
+    @Test
+    public void testMergeUrlsAndSaveSlashBug() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        ApiCollection apiCollection = new ApiCollection(1, "akto", 0, new HashSet<>(), "akto", 1);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+
+        SingleTypeInfo.ParamId paramIdHost1 = new SingleTypeInfo.ParamId(
+                "api/books", "GET", -1, true, "host", SingleTypeInfo.GENERIC, apiCollection.getId(), false
+        );
+        SingleTypeInfo singleTypeInfoHost1 = new SingleTypeInfo(
+                paramIdHost1, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0,10
+        );
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost1);
+
+        SingleTypeInfo singleTypeInfoHost2 = singleTypeInfoHost1.copy();
+        singleTypeInfoHost2.setUrl("/api/books");
+        singleTypeInfoHost2.setId(new ObjectId());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost2);
+
+        long count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        mergeUrlsAndSave(apiCollection.getId(),true, false);
+
+        count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        SingleTypeInfo sti1 = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfoHost1));
+        assertNotNull(sti1);
+
+        SingleTypeInfo sti2 = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfoHost2));
+        assertNotNull(sti2);
+    }
+
+    @Test
+    public void testMultipleParamMerge() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        ApiCollection apiCollection = new ApiCollection(1, "akto", 0, new HashSet<>(), "akto", 1);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+
+
+        SingleTypeInfo.ParamId paramIdHost1 = new SingleTypeInfo.ParamId(
+                "/v1/payments/pay_M4aF0T32RMlJGY/callback/885cfaf9b074af2a38888a0a054a6d5aa323fb10", "GET", -1, true, "host", SingleTypeInfo.GENERIC, apiCollection.getId(), false
+        );
+        SingleTypeInfo singleTypeInfoHost1 = new SingleTypeInfo(
+                paramIdHost1, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0,10
+        );
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost1);
+
+        SingleTypeInfo singleTypeInfoHost2 = singleTypeInfoHost1.copy();
+        singleTypeInfoHost2.setUrl("/v1/payments/pay_M4aAEM4AD4cLB0/callback/c04a604d75ad8693e66eab9a4ef7b00388a4e9e7");
+        singleTypeInfoHost2.setId(new ObjectId());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost2);
+
+        long count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        mergeUrlsAndSave(apiCollection.getId(),true,true);
+
+        count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(3, count); // 1 host + 2 url params
+
+        count = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+        assertEquals(count,2);
+
+        SingleTypeInfo  singleTypeInfo = SingleTypeInfoDao.instance.findOne(Filters.eq(SingleTypeInfo._PARAM, "host"));
+        assertNotNull(singleTypeInfo);
+        assertEquals(singleTypeInfo.getUrl(), "v1/payments/STRING/callback/STRING");
+    }
+
+
 
 }
