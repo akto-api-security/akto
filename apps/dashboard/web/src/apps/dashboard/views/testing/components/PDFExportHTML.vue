@@ -178,6 +178,7 @@ export default {
                 case 0: return {'backgroundColor' : "var(--hexColor35)"}
             }  
          },
+
         getResponse(message) {
             let messageJson = JSON.parse(message)
             if (messageJson['response']) {
