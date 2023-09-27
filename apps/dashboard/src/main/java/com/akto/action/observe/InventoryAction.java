@@ -1,17 +1,27 @@
 package com.akto.action.observe;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.type.URLTemplate;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.Constants;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -605,6 +615,86 @@ public class InventoryAction extends UserAction {
         response.put("subTypeCountMap", subTypeCountMap);
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String deMergeApi() {
+        if (this.url == null || this.url.length() == 0) {
+            addActionError("URL can't be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        if (this.method == null || this.method.length() == 0) {
+            addActionError("Method can't be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        Method urlMethod = null;
+        try {
+             urlMethod = Method.valueOf(method);
+        } catch (Exception e) {
+            addActionError("Invalid Method");
+            return ERROR.toUpperCase();
+        }
+
+        if (!APICatalog.isTemplateUrl(this.url)) {
+            addActionError("Only merged URLs can be de-merged");
+            return ERROR.toUpperCase();
+        }
+
+
+        SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
+        List<String> samples = sampleData.getSamples();
+
+        Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
+        SingleTypeInfoDao.instance.deleteAll(stiFilter);
+
+        Bson sampleDataFilter = SampleDataDao.filterForSampleData(apiCollectionId, url, urlMethod);
+        ApiInfoDao.instance.deleteAll(sampleDataFilter);
+        SampleDataDao.instance.deleteAll(sampleDataFilter);
+        SensitiveSampleDataDao.instance.deleteAll(sampleDataFilter);
+        TrafficInfoDao.instance.deleteAll(sampleDataFilter);
+
+        int accountId = Context.accountId.get();
+
+        List<HttpResponseParams> responses = new ArrayList<>();
+        for (String sample: samples) {
+            try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                responses.add(httpResponseParams);
+            } catch (Exception e) {
+                loggerMaker.infoAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
+
+        AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+        if (info == null) { // account created after docker run
+            info = new AccountHTTPCallParserAktoPolicyInfo();
+            HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+            info.setHttpCallParser(callParser);
+            info.setPolicy(new AktoPolicyNew(false));
+            RuntimeListener.accountHTTPParserMap.put(accountId, info);
+        }
+
+        responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
+
+        try {
+            info.getHttpCallParser().syncFunction(responses, true, false);
+        } catch (Exception e) {
+            addActionError("Error in httpCallParser : " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            info.getPolicy().main(responses, true, false);
+        } catch (Exception e){
+            addActionError("Error in aktoPolicy : " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+
+        return SUCCESS.toUpperCase();
     }
 
     public String getSortKey() {

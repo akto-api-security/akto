@@ -721,17 +721,8 @@ public class APICatalogSync {
             for (String matchedURL: matchStaticURLs) {
                 Method delMethod = Method.fromString(matchedURL.split(" ")[0]);
                 String delEndpoint = matchedURL.split(" ")[1];  
-                Bson filterQ = Filters.and(
-                    Filters.eq("apiCollectionId", apiCollectionId),
-                    Filters.eq("method", delMethod.name()),
-                    Filters.eq("url", delEndpoint)
-                );
-
-                Bson filterQSampleData = Filters.and(
-                    Filters.eq("_id.apiCollectionId", apiCollectionId),
-                    Filters.eq("_id.method", delMethod.name()),
-                    Filters.eq("_id.url", delEndpoint)
-                );
+                Bson filterQ = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, delEndpoint, delMethod);
+                Bson filterQSampleData = SampleDataDao.filterForSampleData(apiCollectionId, delEndpoint, delMethod);
 
                 if (isFirst) {
 
@@ -1235,7 +1226,7 @@ public class APICatalogSync {
                 if (gotDibs) {
                     loggerMaker.infoAndAddToDb("Got dibs", LogDb.RUNTIME);
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-                    if (backwardCompatibility.getMergeOnHostInit() == 0) {
+                    if (backwardCompatibility ==null || backwardCompatibility.getMergeOnHostInit() == 0) {
                         loggerMaker.infoAndAddToDb("Merging hosts...", LogDb.RUNTIME);
                         new MergeOnHostOnly().mergeHosts();
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
