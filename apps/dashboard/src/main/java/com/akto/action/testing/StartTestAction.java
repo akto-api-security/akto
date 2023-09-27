@@ -68,6 +68,8 @@ public class StartTestAction extends UserAction {
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private boolean fetchAll;
+    private Map<String,Long> allTestsCountMap = new HashMap<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -316,6 +318,8 @@ public class StartTestAction extends UserAction {
 
         if(fetchCicd){
             testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
+        } else if(fetchAll){
+            testingRunFilters.add(Filters.ne("triggeredBy", "test_editor"));
         } else {
             Collections.addAll(testingRunFilters, 
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
@@ -541,6 +545,34 @@ public class StartTestAction extends UserAction {
         List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
         metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
         
+        return SUCCESS.toUpperCase();
+    }
+
+    public String computeAllTestsCountMap(){
+        Map<String,Long> result = new HashMap<>();
+
+        long totalCount = TestingRunDao.instance.getMCollection().estimatedDocumentCount();
+        List<Bson> filtersForCiCd = new ArrayList<>();
+        filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
+        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
+
+        int startTime = Context.now();
+        int endTime = Context.now() + 86400;
+        List<Bson> filtersForSchedule = new ArrayList<>();
+        Collections.addAll(filtersForSchedule,
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTime),
+                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTime),
+                Filters.nin(Constants.ID,getCicdTests())
+        );
+        long scheduleCount =  TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForSchedule));
+
+        long oneTimeCount = totalCount - cicdCount - scheduleCount;
+        result.put("All", totalCount);
+        result.put("oneTime", oneTimeCount);
+        result.put("scheduled", scheduleCount);
+        result.put("cicd", cicdCount);
+
+        this.allTestsCountMap = result;
         return SUCCESS.toUpperCase();
     }
 
@@ -793,6 +825,18 @@ public class StartTestAction extends UserAction {
 
     public Map<String, Set<String>> getMetadataFilters() {
         return metadataFilters;
+    }
+
+    public boolean isFetchAll() {
+        return fetchAll;
+    }
+
+    public void setFetchAll(boolean fetchAll) {
+        this.fetchAll = fetchAll;
+    }
+
+     public Map<String, Long> getAllTestsCountMap() {
+        return allTestsCountMap;
     }
 
     public enum CallSource{
