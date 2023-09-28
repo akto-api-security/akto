@@ -13,6 +13,8 @@ info:
   severity: LOW
   references:
     - https://github.com/firebase/firebaseui-web/blob/master/demo/public/sample-config.js
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

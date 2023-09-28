@@ -89,7 +89,8 @@ export default {
         width: obj.strN,
         hideOperators: obj.boolN,
         hideListTitle: obj.boolN,
-        selectExactlyOne: obj.boolN
+        selectExactlyOne: obj.boolN,
+        listOperators: obj.arrN
     },
     data () {
         return {
@@ -105,7 +106,7 @@ export default {
             globalCheckbox: false,
             pageNumber: 1,
             pageSize: 1000,
-            operators: ['OR', 'AND', 'NOT'],
+            operators: this.listOperators || ['OR', 'AND', 'NOT'],
             selectedOperator: 'OR'
         }
     },

@@ -13,6 +13,8 @@ info:
   severity: HIGH
   references:
     - https://linux.die.net/man/5/esmtprc
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

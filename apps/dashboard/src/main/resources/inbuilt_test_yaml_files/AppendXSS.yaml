@@ -19,6 +19,9 @@ info:
   references:
     - "https://owasp.org/www-community/attacks/xss/"
     - "https://hackerone.com/reports/840759"
+  cwe:
+    - CWE-79
+
 api_selection_filters:
   method:
     contains_either:

@@ -13,6 +13,8 @@ info:
   severity: MEDIUM
   references:
     - https://ubuntu.com/security/notices/USN-982-1
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

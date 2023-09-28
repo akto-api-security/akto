@@ -13,6 +13,8 @@ info:
   severity: HIGH
   references:
     - https://www.exploit-db.com/ghdb/5986
+  cwe:
+    - CWE-16    
 
 api_selection_filters:
   response_code:
