@@ -10,9 +10,11 @@ import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
@@ -23,6 +25,8 @@ public class TrafficAction {
     String method;
     int startEpoch;
     int endEpoch;
+    int skip;
+    int limit;
 
     Map<Integer, Integer> traffic = new HashMap<>();
 
@@ -62,6 +66,11 @@ public class TrafficAction {
             Filters.lte("_id.bucketEndEpoch", 0)
         ));
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAllSampleData() {
+        sampleDataList = SampleDataDao.instance.findAll(Filters.eq(Constants.ID + "." + ApiInfoKey.API_COLLECTION_ID, apiCollectionId), skip, limit == 0 ? 50 : limit, null);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -128,6 +137,21 @@ public class TrafficAction {
 
     public Map<String,List<SingleTypeInfo.ParamId>> getSensitiveSampleData() {
         return this.sensitiveSampleData;
+    }
+
+    public int getSkip() {
+        return skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
     }
 
 }

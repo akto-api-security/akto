@@ -18,6 +18,8 @@ info:
     - HackerOne top 10
   references:
     - "https://hackerone.com/reports/210417"
+  cwe:
+    - CWE-287
 
 api_selection_filters:
   response_code:

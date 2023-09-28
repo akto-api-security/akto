@@ -1,7 +1,7 @@
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
+import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {
   Text,
-  Button} from '@shopify/polaris';
+  Card} from '@shopify/polaris';
 import {
   CircleCancelMajor,
   CalendarMinor,
@@ -12,11 +12,11 @@ import {
   ClockMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import TestingStore from "../testingStore";
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
+import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 
 /*
   {
@@ -74,10 +74,8 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'run_time_epoch' },
-  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'run_time_epoch' },
-  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
-  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity' },
+  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
+  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' }
 ];
 
 const resourceName = {
@@ -87,25 +85,23 @@ const resourceName = {
 
 let filters = [
   {
-    key: 'severityStatus',
+    key: 'severity',
     label: 'Severity',
     title: 'Severity',
-    choices: [],
-  },
-  {
-    key: 'runTypeStatus',
-    label: 'Run type',
-    title: 'Run type',
-    choices: [],
+    choices: [
+      { label: "High", value: "HIGH" }, 
+      { label: "Medium", value: "MEDIUM" },
+      { label: "Low", value: "LOW" }
+    ]
   }
 ]
 
 function disambiguateLabel(key, value) {
   switch (key) {
-    case 'severityStatus':
-      return (value).map((val) => `${val} severity`).join(', ');
-    case 'runTypeStatus':
-      return (value).map((val) => `${val}`).join(', ');
+    case 'severity':
+      return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
+    case "dateRange":
+      return value.since.toDateString() + " - " + value.until.toDateString();
     default:
       return value;
   }
@@ -124,6 +120,9 @@ function TestRunsPage() {
   const rerunTest = (hexId) =>{
     api.rerunTest(hexId).then((resp) => {
       func.setToast(true, false, "Test re-run")
+      setTimeout(() => {
+        refreshSummaries();
+      }, 2000)
     }).catch((resp) => {
       func.setToast(true, true, "Unable to re-run test")
     });
@@ -184,17 +183,9 @@ function getActions(item){
   return arr
 }
 
-const storeSetTestRuns = TestingStore(state => state.setTestRuns);
-const testRuns = TestingStore(state => state.testRuns);
 const [loading, setLoading] = useState(true);
-
-async function fetchData () {
-    await api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
-      setLoading(false)
-      let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
-      storeSetTestRuns(testRuns);
-    })
-}
+const [currentTab, setCurrentTab] = useState("onetime");
+const [updateTable, setUpdateTable] = useState(false);
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -207,44 +198,142 @@ const checkIsTestRunning = (testingRuns) => {
 }
 
 const refreshSummaries = () =>{
-  let intervalId = setInterval(()=> {
-    api.fetchTestRunTableInfo().then(({testingRuns, latestTestingRunResultSummaries}) => {
-      let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
-      storeSetTestRuns(testRuns);
-      if(!checkIsTestRunning(testRuns)){
-        clearInterval(intervalId)
-      }
-    })
-  },2000)
+  setTimeout(() => {
+    setUpdateTable(!updateTable);
+  }, 5000)
 }
 
-useEffect(()=>{
-  fetchData();
-}, [])
+function processData(testingRuns, latestTestingRunResultSummaries, cicd){
+  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd);
+  if(checkIsTestRunning(testRuns)){
+    refreshSummaries();
+  }
+  return testRuns;
+}
 
-useEffect(()=>{
-  refreshSummaries()
-},[])
+  async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
+    setLoading(true);
+    let ret = [];
+    let total = 0;
+    let now = func.timeNow()
+    let dateRange = filters['dateRange'] || false;
+    delete filters['dateRange']
+    let startTimestamp = 0;
+    let endTimestamp = func.timeNow()
+    if (dateRange) {
+      startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
+      endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000);
+      filters.endTimestamp = [startTimestamp, endTimestamp]
+    }
+
+    switch (currentTab) {
+
+      case "cicd":
+        await api.fetchTestingDetails(
+          0, 0, true, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries, true);
+          total = testingRunsCount;
+        });
+        break;
+      case "recurring":
+        await api.fetchTestingDetails(
+          0, 0, false, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
+        break;
+      case "onetime":
+        await api.fetchTestingDetails(
+          now - func.recencyPeriod, now, false, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
+        break;
+    }
+
+    // show the running tests at the top.
+    ret = ret.sort((a, b) => (b.orderPriority === 1) ?  1 : ( (a.orderPriority === 1) ? -1 : 0 ));
+    // we send the test if any summary of the test is in the filter.
+    ret = ret.filter((item) => {
+      if(filters.severity && filters.severity.length > 0){
+        return item.severityStatus.some(x => filters.severity.includes(x.toUpperCase()))
+      } 
+      return true
+    })
+
+    setLoading(false);
+    return { value: ret, total: total };
+
+  }
+
+const coreTable = (
+<GithubServerTable
+    key={updateTable}
+    pageLimit={50}
+    fetchData={fetchTableData}
+    sortOptions={sortOptions} 
+    resourceName={resourceName} 
+    filters={filters}
+    hideQueryField={true}
+    calenderFilter={true}
+    calenderLabel={"Last run"}
+    disambiguateLabel={disambiguateLabel} 
+    headers={headers}
+    getActions = {getActions}
+    hasRowActions={true}
+    loading={loading}
+    getStatus={func.getTestResultStatus}
+  />   
+)
+
+const OnetimeTable = {
+  id:  'onetime',
+  content: "One time",
+  component: (
+    coreTable
+  )
+}
+
+const CicdTable = {
+  id:  'cicd',
+  content: "CI/CD",
+  component: (
+    coreTable
+  )
+}
+
+const RecurringTable = {
+  id:  'recurring',
+  content: "Recurring",
+  component: (
+    coreTable
+  )
+}
+
+function handleCurrTab(tab) {
+  setCurrentTab(tab.id)
+}
+
+const TestTabs = (
+  <Card padding={"0"} key="tabs">
+    <LayoutWithTabs
+      key="tabs"
+      tabs={[OnetimeTable, CicdTable, RecurringTable ]}
+      currTab={handleCurrTab}
+    />
+  </Card>
+)
+
+const components = [ TestTabs]
 
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
     isFirstPage={true}
-    components={[
-      <GithubSimpleTable 
-        key="table"
-        data={testRuns} 
-        sortOptions={sortOptions} 
-        resourceName={resourceName} 
-        filters={filters}
-        disambiguateLabel={disambiguateLabel} 
-        headers={headers}
-        getActions = {getActions}
-        hasRowActions={true}
-        loading={loading}
-        getStatus={func.getTestResultStatus}
-      />
-    ]}
+    components={components}
     />
   );
 }
