@@ -16,6 +16,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.Constants;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
@@ -645,6 +646,7 @@ public class InventoryAction extends UserAction {
 
         SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
         List<String> samples = sampleData.getSamples();
+        loggerMaker.infoAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
 
         Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
         SingleTypeInfoDao.instance.deleteAll(stiFilter);
@@ -655,7 +657,7 @@ public class InventoryAction extends UserAction {
         SensitiveSampleDataDao.instance.deleteAll(sampleDataFilter);
         TrafficInfoDao.instance.deleteAll(sampleDataFilter);
 
-        int accountId = Context.accountId.get();
+        loggerMaker.infoAndAddToDb("Cleanup done", LogDb.DASHBOARD);
 
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String sample: samples) {
@@ -667,27 +669,26 @@ public class InventoryAction extends UserAction {
             }
         }
 
+        // instead of using httpCallParser and aktoPolicyNew from RuntimeListener we create a new instances of both.
+        // This was done because STIs and other collections were modified. If we used the older one it won't have the latest data
+        // And I didn't want to change them
 
-        AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
-        if (info == null) { // account created after docker run
-            info = new AccountHTTPCallParserAktoPolicyInfo();
-            HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-            info.setHttpCallParser(callParser);
-            info.setPolicy(new AktoPolicyNew(false));
-            RuntimeListener.accountHTTPParserMap.put(accountId, info);
-        }
+        loggerMaker.infoAndAddToDb("Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+        HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
 
         responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
-
+        loggerMaker.infoAndAddToDb("After filter: Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
         try {
-            info.getHttpCallParser().syncFunction(responses, true, false);
+            callParser.syncFunction(responses, true, false);
         } catch (Exception e) {
             addActionError("Error in httpCallParser : " + e.getMessage());
             return ERROR.toUpperCase();
         }
 
+        AktoPolicyNew aktoPolicyNew = new AktoPolicyNew(false);
+
         try {
-            info.getPolicy().main(responses, true, false);
+            aktoPolicyNew.main(responses, true, false);
         } catch (Exception e){
             addActionError("Error in aktoPolicy : " + e.getMessage());
             return ERROR.toUpperCase();
