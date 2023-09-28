@@ -1,16 +1,22 @@
 package com.akto.action.observe;
 
 import com.akto.MongoBasedTest;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.*;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.runtime.APICatalogSync;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Updates;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -62,5 +68,99 @@ public class TestInventoryAction extends MongoBasedTest {
         assertEquals(2, basicDBObject.size());
         assertNotNull(basicDBObject.get("url"));
         assertNotNull(basicDBObject.get("method"));
+    }
+
+    @Test
+    public void testDeMergeApi() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiInfoDao.instance.getMCollection().drop();
+        SampleDataDao.instance.getMCollection().drop();
+        SensitiveSampleDataDao.instance.getMCollection().drop();
+        TrafficInfoDao.instance.getMCollection().drop();
+
+        APICatalogSync.mergeAsyncOutside = true;
+
+        ApiCollection.useHost = true;
+
+        // populate db before bug fix
+
+        // common headers: {"host" : "akto.io"} and {"resHeader" : "1"}
+
+        // {"user": "akto"}
+        String p1 = "{ \"path\": \"/api/books/hi\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"user\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"user_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+
+        // {"name": "akto"}
+        String p2 = "{ \"path\": \"/api/books/hello\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"name\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"name_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+
+        // {"company": "akto"}
+        String p3 = "{ \"path\": \"/api/books/650d602277c31aee121e1d9b/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p4 = "{ \"path\": \"/api/books/64c8f7361d5c23180a4c855c/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+
+        // hashcode of akto.io is -932654193
+        int apiCollectionId = -932654193;
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(apiCollectionId, "akto.io", 0, new HashSet<>(), "akto.io", -932654193));
+        String url = "api/books/STRING";
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1, true, "host", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // req header
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", 200, true, "resHeader", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // resp header
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1,false, "2", SingleTypeInfo.INTEGER_32, apiCollectionId,true), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // url param
+
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1,false, "user", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // req payload
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", 200,false, "user_resp", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // resp payload
+
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1,false, "name", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // req payload
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", 200,false, "name_resp", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // resp payload
+
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1,false, "company", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // req payload
+        singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", 200,false, "company_resp", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // resp payload
+        SingleTypeInfoDao.instance.insertMany(singleTypeInfos);
+
+        ApiInfoDao.instance.insertOne(new ApiInfo(apiCollectionId, url, URLMethods.Method.POST));
+
+        List<String> samples = Arrays.asList(p1, p2, p3, p4);
+        SampleDataDao.instance.insertOne(new SampleData(new Key(apiCollectionId, url, URLMethods.Method.POST, -1, 0, 0), samples));
+
+        Map<String, Integer> mapHoursToCount = new HashMap<>();
+        mapHoursToCount.put("466214", 1);
+        TrafficInfoDao.instance.insertOne(new TrafficInfo(new Key(apiCollectionId, url, URLMethods.Method.POST, -1, 0, 0), mapHoursToCount));
+
+        InventoryAction inventoryAction = new InventoryAction();
+        inventoryAction.setUrl(url);
+        inventoryAction.setMethod("POST");
+        inventoryAction.setApiCollectionId(apiCollectionId);
+        String result = inventoryAction.deMergeApi();
+        assertEquals("SUCCESS", result);
+
+        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true);
+
+        List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
+        assertEquals(5, singleTypeInfoObjectIdList.size());
+
+        List<SingleTypeInfo> singleTypeInfoHiList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "/api/books/hi", URLMethods.Method.POST));
+        assertEquals(4, singleTypeInfoHiList.size());
+
+        List<SingleTypeInfo> singleTypeInfoHelloList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "/api/books/hello", URLMethods.Method.POST));
+        assertEquals(4, singleTypeInfoHelloList.size());
+
+        SampleData sampleDataObjectId = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
+        assertNotNull(sampleDataObjectId);
+
+        SampleData sampleDataHi = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hi", URLMethods.Method.POST));
+        assertNotNull(sampleDataHi);
+
+        SampleData sampleDataHello = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hello", URLMethods.Method.POST));
+        assertNotNull(sampleDataHello);
+
+
+        ApiInfo apiInfoObjectId = ApiInfoDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
+        assertNotNull(apiInfoObjectId);
+
+        ApiInfo apiInfoHi = ApiInfoDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hi", URLMethods.Method.POST));
+        assertNotNull(apiInfoHi);
+
+        ApiInfo apiInfoHello = ApiInfoDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hello", URLMethods.Method.POST));
+        assertNotNull(apiInfoHello);
+
     }
 }
