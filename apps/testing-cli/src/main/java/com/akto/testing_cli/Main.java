@@ -312,5 +312,8 @@ public class Main {
             String error = "Error writing to file " + filePath + " due to " + e.getMessage();
             logger.error(error);
         }
+
+        System.exit(0);
+
     }
 }
