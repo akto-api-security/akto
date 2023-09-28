@@ -1,9 +1,36 @@
 package com.akto.testing_cli;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.bson.BsonReader;
+import org.bson.Document;
+import org.bson.codecs.Codec;
+import org.bson.codecs.DecoderContext;
+import org.bson.codecs.configuration.CodecRegistry;
+import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.akto.DaoInit;
 import com.akto.dao.test_editor.TestConfigYamlParser;
-import com.akto.dto.*;
+import com.akto.dao.test_editor.TestEditorEnums.ContextOperator;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CustomAuthType;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;
@@ -15,21 +42,6 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.ColorConstants;
 import com.akto.util.VersionUtil;
-import org.bson.BsonReader;
-import org.bson.Document;
-import org.bson.codecs.Codec;
-import org.bson.codecs.DecoderContext;
-import org.bson.codecs.configuration.CodecRegistry;
-import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.InputStream;
-import java.util.*;
-import java.util.stream.Collectors;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -121,6 +133,7 @@ public class Main {
             String content = it.getString("content");
             try {
                 testConfigMap.put(subCategory, TestConfigYamlParser.parseTemplate(content));
+                testConfigMap.get(subCategory).setContent(content);
             } catch (Exception e) {
                 logger.error("Error parsing test config for subcategory: %s", subCategory);
             }
@@ -135,6 +148,24 @@ public class Main {
             logger.error("No test ids to test");
             return;
         }
+
+        testIdsList = testIdsList.stream().filter(
+            obj -> {
+                if(!testConfigMap.containsKey(obj)){
+                    String error = "Unknown test. Skipping " + obj;
+                    logger.error(error);
+                    return false;
+                }
+                String content = testConfigMap.get(obj).getContent();
+                if(content.contains(ContextOperator.ENDPOINT_IN_TRAFFIC_CONTEXT.toString().toLowerCase()) 
+                    || content.contains(ContextOperator.PARAM_CONTEXT.toString().toLowerCase())
+                    || content.contains(ContextOperator.PRIVATE_VARIABLE_CONTEXT.toString().toLowerCase())){
+                        String info = "Cannot run context tests. Skipping " + obj;
+                        logger.info(info);
+                        return false;
+                }
+                return true;
+            }).collect(Collectors.toList());
 
         List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
 
@@ -216,7 +247,21 @@ public class Main {
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, new ArrayList<>());
+        res = callDashboardApi("api/fetchCustomAuthTypes", "");
+        doc = Document.parse(res);
+        Codec<CustomAuthType> customAuthTypeCodec = codecRegistry.get(CustomAuthType.class);
+        List<Document> customAuthTypesList = doc.getList("customAuthTypes", Document.class, new ArrayList<>());
+        List<CustomAuthType> customAuthTypes = new ArrayList<>();
+        for (Document it : customAuthTypesList) {
+            ObjectId id = new ObjectId((String) it.get("hexId"));
+            it.put("_id", id);
+            CustomAuthType customAuthType = decode(customAuthTypeCodec, it);
+            if(customAuthType.isActive()){
+                customAuthTypes.add(customAuthType);
+            }
+        }
+
+        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestExecutor testExecutor = new TestExecutor();
@@ -256,10 +301,7 @@ public class Main {
         System.out.println("\n");
         testingRunResults.sort(
                 (a, b) -> {
-                    if (a.isVulnerable()) {
-                        return -1;
-                    }
-                    return 1;
+                    return a.compareTo(b);
                 });
 
         System.out.println(ColorConstants.YELLOW + "API collection: " + apiCollectionId + " "
