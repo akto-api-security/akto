@@ -25,6 +25,8 @@ info:
     - "https://web.dev/security-headers/"
     - "https://www.keycdn.com/blog/http-security-headers"
     - "https://www.invicti.com/white-papers/whitepaper-http-security-headers"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

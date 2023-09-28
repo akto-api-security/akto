@@ -13,6 +13,8 @@ info:
   severity: HIGH
   references:
     - https://madhuakula.com/content/attacking-and-auditing-docker-containers-using-opensource/attacking-docker-containers/misconfiguration.html
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

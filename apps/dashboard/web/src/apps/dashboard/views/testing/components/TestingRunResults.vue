@@ -46,6 +46,26 @@
         <div v-else>
             <div class="testing-runs-history" v-if="!isWorkflow">
                 <div class="d-flex jc-end">
+                <div  v-if=" runType==='cicd' " v-for = "(header,index) in this.metadataFilterData">
+                    <v-menu :key="index" offset-y :close-on-content-click="false"> 
+                    <template v-slot:activator="{ on, attrs }">
+                            <secondary-button 
+                            :text="header.text" 
+                            v-bind="attrs"
+                            v-on="on"
+                            :color="metadataFilters[header.value].size > 0 ? 'var(--themeColor) !important' : null">
+                            </secondary-button>
+                        </template>
+                        <filter-column
+                            :title="header.text"
+                            :typeAndItems="header.data"
+                            @clickedItem="appliedFilter(header.value, $event)" 
+                            @operatorChanged="operatorChanged(header.value, $event)"
+                            @selectedAll="selectedAll(header.value, $event)"
+                            :listOperators="['OR', 'NOT']"
+                        />
+                    </v-menu>
+                </div>
                     <date-range v-model="dateRange"/>
                 </div>
                 <stacked-chart
@@ -55,6 +75,7 @@
                     :height="250"
                     title="Test results"
                     :data="testResultsChartData()"
+                    :tooltipMetadata="getChartTooltipMetadata()"
                     :defaultChartOptions="{legend:{enabled: false}}"
                     background-color="var(--transparent)"
                     :text="true"
@@ -85,9 +106,11 @@
                     CI/CD Run Details: {{ this.currentTest.metadata }}
                 </div>
 
-                <simple-table
+                <layout-with-tabs title="" :tabs="['Vulnerable', 'All']">
+                <template slot="Vulnerable">
+                    <simple-table
                     :headers="testingRunResultsHeaders" 
-                    :items="testingRunResultsItems" 
+                    :items="vulnerableTestingRunResultsItems" 
                     name="" 
                     sortKeyDefault="vulnerable" 
                     :pageSize="10"
@@ -106,7 +129,48 @@
                         />
                     </template>
                 
+                    <template #item.cwe="{item}">
+                        <sensitive-chip-group 
+                            :sensitiveTags="item.cwe"
+                            :chipColor="getColor(2)"
+                            :hideTag="true"
+                            class="z-80"
+                        />
+                    </template>
+                    </simple-table>
+                </template>
+                <template slot="All">
+                    <simple-table
+                    :headers="testingRunResultsHeaders" 
+                    :items="testingRunResultsItems" 
+                    name="" 
+                    sortKeyDefault="vulnerable" 
+                    :pageSize="10"
+                    :sortDescDefault="true"
+                    :dense="true"
+                    @rowClicked="openDetails"
+                    >
+                    <template #item.severity="{item}">
+                        <sensitive-chip-group 
+                            :sensitiveTags="(item.severity || item.severity.value !== 0) ? getItemSeverity(item.severity.value) : []"
+                            :chipColor="getColor(item.severity.value)"
+                            :hideTag="true"
+                            class="z-80"
+                        />
+                    </template>
+
+                    <template #item.cwe="{item}">
+                        <sensitive-chip-group 
+                            :sensitiveTags="item.cwe"
+                            :chipColor="getColor(2)"
+                            :hideTag="true"
+                            class="z-80"
+                        />
+                    </template>
+
                 </simple-table>
+                </template>
+                </layout-with-tabs>
                 <div v-if="openDetailsDialog">
                     <div class="details-dialog z-80">
                         <test-results-dialog 
@@ -136,6 +200,9 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import TestResultsDialog from "./TestResultsDialog";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import FilterColumn from '../../../shared/components/FilterColumn'
+import SecondaryButton from '../../../shared/components/buttons/SecondaryButton'
+import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 
 import api from '../api'
 import issuesApi from '../../issues/api'
@@ -161,6 +228,10 @@ export default {
         SensitiveChipGroup,
         TestResultsDialog,
         WorkflowTestBuilder,
+        Spinner,
+        FilterColumn,
+        SecondaryButton,
+        LayoutWithTabs,
         Spinner
     },
     data () {
@@ -174,6 +245,7 @@ export default {
             selectedDate: +func.dayStart(endTimestamp * 1000) / 1000,
             testingRunResultSummaries: [],
             testingRunResults: [],
+            vulnerableTestingRunResults: [],
             testingRunResultsHeaders: [
                 {
                     text: "",
@@ -198,6 +270,10 @@ export default {
                 {
                     text: "Vulnerable",
                     value: "vulnerable"
+                },
+                {
+                    text: "CWE",
+                    value: "cwe"
                 }
             ],
             testingRunResult: null,
@@ -219,7 +295,17 @@ export default {
                 ["API Security matters!!!"]
             ],
             refreshSummariesInterval: null,
-            refreshTestResultsInterval : null
+            refreshTestResultsInterval : null,
+            metadataFilters:  {
+                branch: new Set(),
+                repository: new Set()
+            },
+            metadataFilterOperators: {
+                branch: "OR",
+                repository: "OR"
+            },
+            metadataFilterData: [],
+            runType: "oneTime"
         }
     },
     methods: {
@@ -268,7 +354,15 @@ export default {
             await this.$store.dispatch('testing/rerunTest', {testingRunHexId: this.testingRunHexId})
         },
         getScheduleStr() {
-            return this.isDaily ? "Running daily" : "Run once"
+
+            switch(this.runType){
+                case "cicd":
+                    return "CI/CD"
+                case "recurring":
+                    return "Running daily"
+                default:
+                    return "Run once"
+            }
         },
         toHyphenatedDate(epochInMs) {
             return func.toDateStrShort(new Date(epochInMs))
@@ -278,7 +372,27 @@ export default {
             let retM = []
             let retL = []
 
-            this.testingRunResultSummaries.forEach((x) => {
+            let items = this.testingRunResultSummaries;
+
+            items = items.filter((x) => {
+                let ret = true;
+                Object.keys(this.metadataFilters).forEach((key) => {
+                    if(this.metadataFilters[key].size > 0){
+                        switch(this.metadataFilterOperators[key]){
+                            case "AND":
+                            case "OR":
+                                ret &= (this.metadataFilters[key].has(x?.metadata?.[key]))
+                                break;
+                            case "NOT":
+                                ret &= !(this.metadataFilters[key].has(x?.metadata?.[key]))
+                        }
+                    }
+                })
+
+                return ret
+            })
+
+            items.forEach((x) => {
                 let ts = x["startTimestamp"] * 1000
                 let countIssuesMap = x["countIssues"]
 
@@ -310,6 +424,81 @@ export default {
                 }
             ]
         },
+        getChartTooltipMetadata(){
+
+            let ret = {}
+
+            this.testingRunResultSummaries.forEach((x) => {
+                let ts = x["startTimestamp"] * 1000
+
+                let dt = +func.dayStart(ts)
+                let s = +func.dayStart(this.startTimestamp*1000)
+                let e = +func.dayStart(this.endTimestamp*1000)
+                if (dt < s || dt > e) return
+
+                ret[ts] = {
+                    branch: x?.metadata?.branch,
+                    repository: x?.metadata?.repository
+                }
+            })
+
+            return ret;
+        },
+        async processMetadataFilters(){
+
+            let ret = []
+            let tmp = {
+                branch: [],
+                repository: []
+            }
+
+            let res = await api.fetchMetadataFilters()
+            tmp = res.metadataFilters
+
+            Object.keys(tmp).forEach((key) => {
+                if(tmp[key].length > 0){
+                    ret.push({
+                        text: func.toSentenceCase(key),
+                        value: key,
+                        data: {
+                            type: "STRING",
+                            values: [...tmp[key]].map((x) => {
+                                return {
+                                    title: x,
+                                    subtitle: '',
+                                    value: x
+                                }
+                            })
+                        }
+                    })
+                }
+            })
+
+            this.metadataFilterData = ret;
+        },
+        selectedAll (hValue, {items, checked}) {
+            for(var index in items) {
+                if (checked) {
+                    this.metadataFilters[hValue].add(items[index].value)
+                } else {
+                    this.metadataFilters[hValue].delete(items[index].value)
+                }
+            }
+            this.metadataFilters = {...this.metadataFilters}
+        },
+        appliedFilter (hValue, {item, checked, operator}) { 
+
+            this.metadataFilterOperators[hValue] = operator || 'OR'
+            if (checked) {
+                this.metadataFilters[hValue].add(item.value)
+            } else {
+                this.metadataFilters[hValue].delete(item.value)
+            }
+            this.metadataFilters = {...this.metadataFilters}
+        },
+        operatorChanged(hValue, {operator}) {
+            this.metadataFilterOperators[hValue] = operator || 'OR'
+        },
         dateClicked(point) {
             this.selectedDate = point / 1000
         },
@@ -317,6 +506,7 @@ export default {
 
             let st = this.startTimestamp
             let en = this.endTimestamp
+
             if(firstTime){
                 st = 0;
                 en = 0;
@@ -328,6 +518,15 @@ export default {
                     this.originalStateFromDb = resp.workflowTest
                 }
                 this.testingRunResultSummaries = resp.testingRunResultSummaries
+                if(resp.testingRun?.scheduleTimestamp > func.timeNow()){
+                    this.runType="recurring"
+                }
+                
+                this.testingRunResultSummaries.forEach((x) => {
+                    if(x.metadata){
+                        this.runType="cicd"
+                    }
+                })
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
@@ -337,7 +536,8 @@ export default {
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
                 severity: runResult["vulnerable"] ? func.getRunResultSeverity(runResult, this.subCatogoryMap) : {title: "NONE", value: 0},
                 testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
-                testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
+                testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName"),
+                cwe: func.getRunResultCwe(runResult, this.subCatogoryMap)
             }
         },
         async openDetails(row) {
@@ -367,12 +567,13 @@ export default {
     async mounted() {
         await this.$store.dispatch('issues/fetchAllSubCategories')
         await this.refreshSummaries(true)
+        await this.processMetadataFilters()
 
         if (this.testingRunResultSummaries.length !== 0) {
             this.loading = false
         } else {
             this.refreshSummariesInterval = setInterval(() => {
-                this.refreshSummaries().then(() => {
+                this.refreshSummaries(true).then(() => {
                 if (this.testingRunResultSummaries.length !== 0) {
                     this.loading = false
                     clearInterval(this.refreshSummariesInterval)
@@ -383,7 +584,7 @@ export default {
 
         this.refreshTestResultsInterval = setInterval(() => {
             if (this.currentTest && (this.currentTest.state === "SCHEDULED" || this.currentTest.state === "RUNNING")) {
-                this.refreshSummaries()
+                this.refreshSummaries(true)
             }
         }, 5000)
 
@@ -452,11 +653,18 @@ export default {
         currentTest() {
             let currentSummary = this.testingRunResultSummaries.filter(x => x.startTimestamp === this.selectedDate)[0]
             if (currentSummary) {
+                api.fetchTestingRunResults(currentSummary.hexId, true).then(resp => {
+                    this.vulnerableTestingRunResults = resp.testingRunResults
+                })
                 api.fetchTestingRunResults(currentSummary.hexId).then(resp => {
                     this.testingRunResults = resp.testingRunResults
                 })
             }
             return currentSummary
+        },
+        vulnerableTestingRunResultsItems(){
+            let result = (this.vulnerableTestingRunResults || []).map(x => this.prepareForTable(x))
+            return result.filter(x => x.vulnerable && x.testSubType && x.testSuperType)
         },
         testingRunResultsItems() {
             let result = (this.testingRunResults || []).map(x => this.prepareForTable(x))
