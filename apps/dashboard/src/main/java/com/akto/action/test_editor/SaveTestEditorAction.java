@@ -27,7 +27,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -213,7 +212,7 @@ public class SaveTestEditorAction extends UserAction {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, new ArrayList<>());
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(

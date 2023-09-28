@@ -1,6 +1,7 @@
 package com.akto.testing.yaml_tests;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
@@ -10,11 +11,11 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.log.LoggerMaker;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.StatusCodeAnalyser;
-import com.akto.log.LoggerMaker;
 
 import java.util.List;
 import java.util.Map;
@@ -22,11 +23,12 @@ import java.util.Map;
 public class YamlTestTemplate extends SecurityTestTemplate {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(YamlTestTemplate.class);
-
+    private final List<CustomAuthType> customAuthTypes;
     public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode,
                             ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth,
-                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig) {
+                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
         super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig);
+        this.customAuthTypes = customAuthTypes;
     }
 
     @Override
@@ -70,7 +72,8 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public List<TestResult>  executor() {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
-        List<TestResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId, this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig);
+        List<TestResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
+                this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }
