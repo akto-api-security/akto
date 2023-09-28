@@ -56,7 +56,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public boolean checkAuthBeforeExecution() {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
-            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig);
+            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes);
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
