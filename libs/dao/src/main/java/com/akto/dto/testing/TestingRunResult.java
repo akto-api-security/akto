@@ -12,7 +12,7 @@ import org.bson.types.ObjectId;
 import java.util.List;
 import java.util.Map;
 
-public class TestingRunResult {
+public class TestingRunResult implements Comparable<TestingRunResult> {
     private ObjectId id;
     @BsonIgnore
     private String hexId;
@@ -221,6 +221,26 @@ public class TestingRunResult {
         bld.append("\n");
 
         return bld.toString();
+    }
+
+    @Override
+    public int compareTo(TestingRunResult o) {
+
+        TestingRunResult that = o;
+
+        if (this.isVulnerable() != that.isVulnerable()) {
+            return this.isVulnerable() ? -1 : 1;
+        }
+
+        if (!this.getTestSubType().equalsIgnoreCase(that.getTestSubType())) {
+            return this.getTestSubType().compareToIgnoreCase(that.getTestSubType());
+        }
+
+        if (!this.getApiInfoKey().getUrl().equalsIgnoreCase(that.getApiInfoKey().getUrl())) {
+            return this.getApiInfoKey().getUrl().compareToIgnoreCase(that.getApiInfoKey().getUrl());
+        }
+
+        return 0;
     }
 
 }

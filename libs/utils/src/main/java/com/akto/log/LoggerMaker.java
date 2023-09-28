@@ -37,7 +37,10 @@ public class LoggerMaker  {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                updateAccountSettings();
+                String cliTestIds = System.getenv("TEST_IDS");
+                if(cliTestIds==null){
+                    updateAccountSettings();
+                }
             }
         }, 0, 2, TimeUnit.MINUTES);
     }
