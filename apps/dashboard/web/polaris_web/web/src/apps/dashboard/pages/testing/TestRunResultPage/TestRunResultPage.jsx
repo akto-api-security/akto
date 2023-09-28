@@ -104,7 +104,7 @@ function MoreInformationComponent(props) {
       <LegacyCard>
         <LegacyCard.Section>
           {
-            props.sections.map((section) => {
+            props?.sections?.map((section) => {
               return (<LegacyCard.Subsection key={section.title}>
                 <VerticalStack gap="3">
                   <HorizontalStack gap="2" align="start" blockAlign='start'>
@@ -138,7 +138,7 @@ function TestRunResultPage(props) {
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
-  const [infoState, setInfoState] = useState(moreInfoSections)
+  const [infoState, setInfoState] = useState([])
   const [fullDescription, setFullDescription] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -181,7 +181,11 @@ function TestRunResultPage(props) {
     }
     if (runIssues) {
       setIssueDetails(...[runIssues]);
-      setInfoState(await transform.fillMoreInformation(runIssues, tmp, moreInfoSections))
+      let runIssuesArr = []
+      await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
+        runIssuesArr = resp1['similarlyAffectedIssues'];
+      })
+      setInfoState(transform.fillMoreInformation(runIssues, runIssuesArr,subCategoryMap, moreInfoSections))
     } else {
       setIssueDetails(...[{}]);
     }
@@ -222,7 +226,7 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.map((result) => {
         return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
       })}
-      isNewDiff={selectedTestRunResult?.vulnerable}
+      isNewDiff={true}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
       isVulnerable={selectedTestRunResult.vulnerable}
