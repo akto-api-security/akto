@@ -24,6 +24,11 @@ info:
     - "https://cwe.mitre.org/data/definitions/284.html"
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
+  cwe:
+    - CWE-639
+    - CWE-284
+    - CWE-285
+
 auth:
   authenticated: true
 api_selection_filters:

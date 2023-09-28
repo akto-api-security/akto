@@ -22,6 +22,8 @@ info:
     - "https://www.fastly.com/blog/headers-we-dont-want"
     - "https://portswigger.net/web-security/host-header/exploiting"
     - "https://blog.yeswehack.com/yeswerhackers/http-header-exploitation/"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

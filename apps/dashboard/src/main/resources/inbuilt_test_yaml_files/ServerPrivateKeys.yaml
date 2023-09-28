@@ -14,6 +14,9 @@ info:
   references:
     - https://www.acunetix.com/blog/articles/tls-vulnerabilities-attacks-final-part/
     - https://venafi.com/blog/most-common-ssh-vulnerabilities-how-to-avoid-them/
+  cwe:
+    - CWE-200
+    - CWE-213
 
 api_selection_filters:
   response_code:
