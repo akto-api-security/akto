@@ -1,11 +1,9 @@
 package com.akto.testing_cli;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,6 +39,7 @@ import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.ColorConstants;
+import com.akto.util.VersionUtil;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -101,11 +100,7 @@ public class Main {
         String version = "";
         try (InputStream in = Main.class.getResourceAsStream("/version.txt")) {
             if (in != null) {
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
-                String imageTag = bufferedReader.readLine();
-                String buildTime = bufferedReader.readLine();
-                String aktoVersion = bufferedReader.readLine();
-                version = imageTag + " - " + buildTime + " - " + aktoVersion;
+                version = VersionUtil.getVersion(in);
             } else {
                 throw new Exception("Input stream null");
             }
@@ -243,6 +238,8 @@ public class Main {
         }
         testingRunConfig.setTestSubCategoryList(testIdsList);
 
+        Map<String, Integer> severityMap = new HashMap<>();
+        int totalVulnerabilities = 0;
         for (String testSubCategory : testingRunConfig.getTestSubCategoryList()) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             for (ApiInfo.ApiInfoKey it : apiInfoKeys) {
@@ -254,8 +251,14 @@ public class Main {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                if (testingRunResult != null)
+                if (testingRunResult != null){
                     testingRunResults.add(testingRunResult);
+                    String severity = testConfig.getInfo().getSeverity();
+                    if(testingRunResult.isVulnerable()){
+                        severityMap.put(severity, severityMap.getOrDefault(severity, 0) + 1);
+                        totalVulnerabilities++;
+                    }
+                }
             }
         }
 
@@ -270,6 +273,13 @@ public class Main {
 
         System.out.println(ColorConstants.YELLOW + "API collection: " + apiCollectionId + " "
                 + apiCollection.getDisplayName() + "\n" + ColorConstants.RESET);
+        
+        System.out.println(ColorConstants.RED + "Total vulnerabilities: " + totalVulnerabilities + "\n" + ColorConstants.RESET);
+        if(totalVulnerabilities>0){
+            for (Map.Entry<String, Integer> entry : severityMap.entrySet()) {
+            System.out.println(ColorConstants.RED + entry.getKey() + ": " + entry.getValue() + "\n" + ColorConstants.RESET);
+            }
+        }
 
         for (TestingRunResult it : testingRunResults) {
             String severity = testConfigMap.get(it.getTestSubType()).getInfo().getSeverity();
