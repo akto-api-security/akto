@@ -202,6 +202,7 @@ public class Main {
 
         boolean dataLeft = true;
         int skip = 0;
+        int limit = 50;
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         do {
             body = "{\"apiCollectionId\": \"" + apiCollectionId + "\" , \"skip\": \"" + skip + "\" }";
@@ -216,7 +217,7 @@ public class Main {
                 sampleDataMap.put(new ApiInfoKey(sampleData.getId().getApiCollectionId(), sampleData.getId().getUrl(),
                         sampleData.getId().getMethod()), sampleData.getSamples());
             }
-            if (tmp.isEmpty()) {
+            if (tmp==null || tmp.size() < limit) {
                 dataLeft = false;
             }
             skip += 50;
