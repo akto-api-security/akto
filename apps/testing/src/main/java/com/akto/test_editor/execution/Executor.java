@@ -288,7 +288,7 @@ public class Executor {
     }
 
 
-    private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey) {
+    private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {
         boolean removed = false;
         // find set of all headers and body params that didn't change
         Map<String, List<String>> originalRequestHeaders = originalRawApi.fetchReqHeaders();
@@ -300,7 +300,6 @@ public class Executor {
         Set<String> unchangedBodyKeys = bodyValuesUnchanged(originalJsonRequestBody, testJsonRequestBody);
 
         // then loop over custom auth types and hardcoded auth mechanism to see if any auth token hasn't changed
-        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         List<String> authHeaders = new ArrayList<>();
         List<String> authBodyParams = new ArrayList<>();
 
@@ -521,7 +520,7 @@ public class Executor {
                 }
 
                 // once all the replacement has been done.. .remove all the auth keys that were not impacted by the change by comparing it with initial request
-                removeAuthIfNotChanged(copy,rawApi, authHeader);
+                removeAuthIfNotChanged(copy,rawApi, authHeader, customAuthTypes);
 
                 if (modifiedAtLeastOne) {
                     return new ExecutorSingleOperationResp(true, "");
