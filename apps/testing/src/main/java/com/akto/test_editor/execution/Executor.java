@@ -459,7 +459,6 @@ public class Executor {
                 }
             case "replace_auth_header":
                 RawApi copy = rawApi.copy();
-                removeCustomAuth(rawApi, customAuthTypes);
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
                 if (authHeaders == null) {
