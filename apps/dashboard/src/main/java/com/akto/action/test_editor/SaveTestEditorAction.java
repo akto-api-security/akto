@@ -4,11 +4,13 @@ import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -27,7 +29,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -213,7 +214,8 @@ public class SaveTestEditorAction extends UserAction {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null);
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
