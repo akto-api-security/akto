@@ -8,10 +8,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.*;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.dto.type.URLTemplate;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -632,7 +630,7 @@ public class InventoryAction extends UserAction {
 
         Method urlMethod = null;
         try {
-             urlMethod = Method.valueOf(method);
+            urlMethod = Method.valueOf(method);
         } catch (Exception e) {
             addActionError("Invalid Method");
             return ERROR.toUpperCase();
@@ -660,7 +658,7 @@ public class InventoryAction extends UserAction {
         loggerMaker.infoAndAddToDb("Cleanup done", LogDb.DASHBOARD);
 
         List<HttpResponseParams> responses = new ArrayList<>();
-        for (String sample: samples) {
+        for (String sample : samples) {
             try {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                 responses.add(httpResponseParams);
@@ -669,27 +667,49 @@ public class InventoryAction extends UserAction {
             }
         }
 
-        // instead of using httpCallParser and aktoPolicyNew from RuntimeListener we create a new instances of both.
-        // This was done because STIs and other collections were modified. If we used the older one it won't have the latest data
-        // And I didn't want to change them
+        int accountId = Context.accountId.get();
+
+        AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+        if (info == null) { // account created after docker run
+            info = new AccountHTTPCallParserAktoPolicyInfo();
+            HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+            info.setHttpCallParser(callParser);
+            info.setPolicy(new AktoPolicyNew(false));
+            info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
+            RuntimeListener.accountHTTPParserMap.put(accountId, info);
+        }
+
+        // because changes were made to db and apiCatalogSync doesn't have latest data
+        info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+        info.getPolicy().buildFromDb(false);
+
+        try {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.GET);
+            if (info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId) != null) {
+                RequestTemplate requestTemplate = info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId).getTemplateURLToMethods().get(urlTemplate);
+                loggerMaker.infoAndAddToDb("Request template exists for url " + urlTemplate.getTemplateString() + " : " + ( requestTemplate != null), LogDb.DASHBOARD);
+            } else {
+                loggerMaker.infoAndAddToDb("Clean dbState for apiCollectionId: " + apiCollectionId,LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while checking requestTemplate: " + e.getMessage(), LogDb.DASHBOARD);
+        }
 
         loggerMaker.infoAndAddToDb("Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
-        HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
 
         responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
         loggerMaker.infoAndAddToDb("After filter: Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
         try {
-            callParser.syncFunction(responses, true, false);
+            info.getHttpCallParser().syncFunction(responses, true, false);
         } catch (Exception e) {
             addActionError("Error in httpCallParser : " + e.getMessage());
             return ERROR.toUpperCase();
         }
 
-        AktoPolicyNew aktoPolicyNew = new AktoPolicyNew(false);
-
         try {
-            aktoPolicyNew.main(responses, true, false);
-        } catch (Exception e){
+            info.getPolicy().main(responses, true, false);
+        } catch (Exception e) {
             addActionError("Error in aktoPolicy : " + e.getMessage());
             return ERROR.toUpperCase();
         }
