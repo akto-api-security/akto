@@ -43,7 +43,7 @@ public class TestingIssuesId {
         } else if (o instanceof TestingIssuesId) {
             TestingIssuesId id = (TestingIssuesId) o;
             return id.apiInfoKey.equals(this.apiInfoKey)
-                    && id.testSubCategory == this.testSubCategory
+                    && id.testSubCategory.equalsIgnoreCase(this.testSubCategory)
                     && id.testErrorSource == this.testErrorSource
                     && Objects.equals(id.testCategoryFromSourceConfig, this.testCategoryFromSourceConfig);
         }

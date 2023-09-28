@@ -17,6 +17,8 @@ info:
     - OWASP top 10
     - HackerOne top 10
   references:
+  cwe:
+    - CWE-307
 
 api_selection_filters:
   response_code:

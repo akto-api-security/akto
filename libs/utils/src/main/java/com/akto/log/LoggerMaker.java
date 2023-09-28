@@ -65,7 +65,7 @@ public class LoggerMaker  {
         try{
             insert(err, "error", db);
         } catch (Exception e){
-            e.printStackTrace();
+
         }
     }
 
@@ -79,7 +79,7 @@ public class LoggerMaker  {
         try{
             insert(info, "info",db);
         } catch (Exception e){
-            e.printStackTrace();
+
         }
     }
 

@@ -21,6 +21,9 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.TestExecutor;
+import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.utils.RedactSampleData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -375,7 +378,25 @@ public class Executor {
                         }
 
                         if (allSatisfied) {
-                            List<AuthParam> authParamList = authWithCond.getAuthMechanism().getAuthParams();
+                            AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
+
+                            if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+                                try {
+                                    LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authWithCond.getAuthMechanism(), null);
+                                    if (!loginFlowResponse.getSuccess())
+                                        throw new Exception(loginFlowResponse.getError());
+
+                                    authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                                } catch (Exception e) {
+                                    return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
+                                }
+                            }
+
+                            if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
+                                return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
+                            }
+
+                            List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
                             if (!authParamList.isEmpty()) {
                                 ExecutorSingleOperationResp ret = null;
                                 for (AuthParam authParam1: authParamList) {

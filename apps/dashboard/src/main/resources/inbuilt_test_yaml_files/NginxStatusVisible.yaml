@@ -19,6 +19,9 @@ info:
   references:
     - "https://www.jotform.com/answers/3159752-vulnerability-disclosure"
     - "https://www.acunetix.com/vulnerabilities/web/unrestricted-access-to-nginx-status-module/"
+  cwe:
+    - CWE-16
+
 api_selection_filters:
   response_code:
     gte: 200

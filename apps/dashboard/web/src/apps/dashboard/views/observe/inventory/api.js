@@ -375,6 +375,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    deMergeApi(apiCollectionId, url, method){
+        return request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
+        }).then((resp) => {
+            return resp
+        })
     }
 
 }
