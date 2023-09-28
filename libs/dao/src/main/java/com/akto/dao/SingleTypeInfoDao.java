@@ -91,7 +91,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return Filters.and(
                 Filters.eq("apiCollectionId", apiCollectionId),
                 Filters.eq("url", url),
-                Filters.eq("method", method)
+                Filters.eq("method", method.name())
         );
     }
 
