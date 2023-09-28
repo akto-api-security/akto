@@ -50,8 +50,8 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public class DaoInit {
 
-    public static void init(ConnectionString connectionString) {
-        ClassModel<Config> configClassModel = ClassModel.builder(Config.class).enableDiscriminator(true).build();
+    public static CodecRegistry createCodecRegistry(){
+                ClassModel<Config> configClassModel = ClassModel.builder(Config.class).enableDiscriminator(true).build();
         ClassModel<SignupInfo> signupInfoClassModel = ClassModel.builder(SignupInfo.class).enableDiscriminator(true)
                 .build();
         ClassModel<APIAuth> apiAuthClassModel = ClassModel.builder(APIAuth.class).enableDiscriminator(true).build();
@@ -231,8 +231,14 @@ public class DaoInit {
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(TrafficMetricsAlert.FilterType.class));
 
-        CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
+        return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);
+    }
+
+    public static void init(ConnectionString connectionString) {
+
+        CodecRegistry codecRegistry = createCodecRegistry();
+
         MongoClientSettings clientSettings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString)
                 .codecRegistry(codecRegistry)

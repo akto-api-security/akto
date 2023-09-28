@@ -213,7 +213,7 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.map((result) => {
         return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
       })}
-      isNewDiff={selectedTestRunResult?.vulnerable}
+      isNewDiff={true}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
       isVulnerable={selectedTestRunResult.vulnerable}
