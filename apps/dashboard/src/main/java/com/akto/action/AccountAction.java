@@ -261,9 +261,9 @@ public class AccountAction extends UserAction {
                 RuntimeListener.addSampleData();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
-                InitializerListener.updateTestEditorTemplatesFromGithub(newAccountId);
                 try {
                     InitializerListener.executePIISourceFetch();
+                    InitializerListener.updateTestEditorTemplatesFromGithub(newAccountId);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

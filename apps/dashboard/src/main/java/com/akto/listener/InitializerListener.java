@@ -982,6 +982,120 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        int accountId = t.getId();
+
+                        try {
+
+                            // Load Templates from folder when instance is initialized
+                            loggerMaker.infoAndAddToDb(String.format("Loading test template files from directory for account %d", accountId) , LogDb.DASHBOARD);
+                            Map<String, String> templates = new HashMap<>();
+
+                            // Get list of template file paths
+                            List<String> templatePaths = new ArrayList<>();
+                            try {
+                                templatePaths = convertStreamToListString(
+                                        InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
+                            } catch (Exception ex) {
+                                loggerMaker.errorAndAddToDb(
+                                        String.format("failed to read test yaml folder %s", ex.toString()),
+                                        LogDb.DASHBOARD);
+                            }
+
+                            //todo: check if test template files are store present in the code repo
+
+                            // Get templates from files
+                            for (String path : templatePaths) {
+                                try {
+                                    String templateContent = convertStreamToString(InitializerListener.class
+                                            .getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+                                    templates.put(path, templateContent);
+                                } catch (Exception ex) {
+                                    loggerMaker.errorAndAddToDb(
+                                            String.format("failed to read test yaml path %s %s", path, ex.toString()),
+                                            LogDb.DASHBOARD);
+                                }
+                            }
+
+                            for (Map.Entry<String, String> template : templates.entrySet()) {
+                                String fileName = template.getKey();
+                                String templateContent = template.getValue();
+
+                                TestConfig testConfig = null;
+
+                                try {
+                                    testConfig = TestConfigYamlParser.parseTemplate(templateContent);
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s %s",
+                                            fileName, e.toString()), LogDb.DASHBOARD);
+                                }
+
+                                if (testConfig == null) {
+                                    loggerMaker.errorAndAddToDb(
+                                            String.format("Error parsing yaml template file  %s", fileName),
+                                            LogDb.DASHBOARD);
+                                } else {
+                                    String id = testConfig.getId();
+                                    int createdAt = Context.now();
+                                    int updatedAt = Context.now();
+                                    String author = "AKTO";
+                                    String sha = "0";
+
+                                    YamlTemplateDao.instance.updateOne(
+                                        Filters.eq("_id", id),
+                                        Updates.combine(
+                                                Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                                                Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                                                Updates.set(YamlTemplate.FILE_NAME, fileName),
+                                                Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                                Updates.set(YamlTemplate.CONTENT, templateContent),
+                                                Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
+                                                Updates.set(YamlTemplate.SHA, sha)
+                                        )
+                                    );
+                                }
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(String.format("Error while loading test template files for account %d %s", accountId, e.toString()), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "test-editor-templates-scheduler");
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.LOAD_TEMPLATES_FILES_FROM_DIRECTORY, Context.now())
+            );
+        }
+    }
+
+    private static List<String> convertStreamToListString(InputStream in) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String line = null;
+        List<String> files = new ArrayList<>();
+        while ((line = reader.readLine()) != null) {
+            files.add(line);
+        }
+        in.close();
+        reader.close();
+        return files;
+    }
+
+    private static String convertStreamToString(InputStream in) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        StringBuilder stringbuilder = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            stringbuilder.append(line + "\n");
+        }
+        in.close();
+        reader.close();
+        return stringbuilder.toString();
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1037,7 +1151,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
-                        setUpTestEditorTemplatesScheduler();
+                        //setUpTestEditorTemplatesScheduler();
                         updateGlobalAktoVersion();
                         if(isSaas){
                             try {
@@ -1109,7 +1223,7 @@ public class InitializerListener implements ServletContextListener {
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
-        //loadTemplateFilesFromDirectory(backwardCompatibility);
+        loadTemplateFilesFromDirectory(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
@@ -1210,7 +1324,7 @@ public class InitializerListener implements ServletContextListener {
                             loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
                         }
                     }
-                }, "test-editor-templates-scheduler");
+                }, "update-test-editor-templates-github");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
@@ -1272,87 +1386,5 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
         }
-    }
-
-    public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
-        if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
-            //Load Templates from folder when instance is initialized
-            loggerMaker.infoAndAddToDb("Loading test template files from directory", LogDb.DASHBOARD);
-            Map<String, String> templates = new HashMap<>();
-
-            // Get list of template file paths
-            List<String> templatePaths = new ArrayList<>();
-            try {
-                templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
-            } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", ex.toString()), LogDb.DASHBOARD);
-            }
-
-            // Get templates from files
-            for (String path: templatePaths) {
-                try {
-                    String templateContent = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-                    templates.put(path, templateContent);
-                } catch (Exception ex) {
-                    loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", path, ex.toString()), LogDb.DASHBOARD);
-                }
-            }
-            
-            for (Map.Entry<String,String> template : templates.entrySet()) {
-                String fileName = template.getKey();
-                String templateContent = template.getValue();
-
-                TestConfig testConfig = null;
-
-                try {
-                    testConfig = TestConfigYamlParser.parseTemplate(templateContent);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s %s", fileName, e.toString()), LogDb.DASHBOARD);
-                }
-
-
-                if (testConfig == null) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s", fileName), LogDb.DASHBOARD);
-                } else {
-                    String id = testConfig.getId();
-                    int createdAt = Context.now();
-                    int updatedAt = Context.now();
-                    String author = "AKTO";
-                    String sha = "0";
-
-                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha, fileName);
-                    YamlTemplateDao.instance.insertOne(yamlTemplate);
-                }
-            }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                    Filters.eq("_id", backwardCompatibility.getId()),
-                    Updates.set(BackwardCompatibility.LOAD_TEMPLATES_FILES_FROM_DIRECTORY, Context.now())
-            );
-        }
-    }
-
-    private static List<String> convertStreamToListString(InputStream in) throws Exception {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        String line = null;
-        List<String> files = new ArrayList<>();
-        while ((line = reader.readLine()) != null) {
-            files.add(line);
-        }
-        in.close();
-        reader.close();
-        return files;
-    }
-
-    private static String convertStreamToString(InputStream in) throws Exception {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        StringBuilder stringbuilder = new StringBuilder();
-        String line = null;
-        while ((line = reader.readLine()) != null) {
-            stringbuilder.append(line + "\n");
-        }
-        in.close();
-        reader.close();
-        return stringbuilder.toString();
     }
 }
