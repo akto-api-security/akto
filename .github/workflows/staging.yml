@@ -4,9 +4,9 @@ name: Staging
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -92,6 +92,7 @@ jobs:
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
           IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
+          IMAGE_TAG_TESTING_CLI: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing-cli:flash' || '' }}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
@@ -101,6 +102,10 @@ jobs:
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
+          cd ../testing-cli
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG $IMAGE_TAG_TESTING_CLI . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
+
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -138,16 +143,41 @@ jobs:
         echo "Deploying branch ${{ env.GITHUB_REF }} to ${{ github.event.inputs.environment }}"
         commit_hash=`git rev-parse HEAD`
         aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
-
+      
   test:
     if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Run CI/CD tests
+
+      - uses: actions/checkout@v2
+      
+      - name: Run testsigma end to end tests
+        env:
+            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+            TESTSIGMA_TEST_PLAN_ID: 789
+            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+        run: bash ./.github/scripts/akto-testsigma.sh
+
+      - name: Run Akto CI/CD tests
         uses: akto-api-security/run-scan@v1.0.3
         with:
-          AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
+          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: ${{vars.AKTO_TEST_ID}}
-          START_TIME_DELAY: 180
+          AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+
+      - name: Check for Akto test completion
+        env:
+            AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+            AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+        run: bash ./.github/scripts/akto-cicd.sh
+
+      - name: Check Vulnerable API's
+        working-directory: ./.github/scripts
+        env:
+          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+        run: |
+          npm install axios
+          node ./vulnerable_checker.js

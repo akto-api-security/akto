@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB;
     }
 
     ConfigType configType;
@@ -296,4 +296,34 @@ public abstract class Config {
             this.apiToken = apiToken;
         }
     }
+
+    @BsonDiscriminator
+    public static class GithubConfig extends Config {
+        private String clientId;
+
+        private String clientSecret;
+        public static final String CONFIG_ID = ConfigType.GITHUB.name() + CONFIG_SALT;
+
+        public GithubConfig() {
+            this.configType = ConfigType.GITHUB;
+            this.id = CONFIG_ID;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+    }
+
 }

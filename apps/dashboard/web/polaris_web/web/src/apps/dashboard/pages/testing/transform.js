@@ -257,13 +257,13 @@ const transform = {
       }
       return []
   },
-  async fillMoreInformation(runIssues, subCategoryMap, moreInfoSections){
+  fillMoreInformation(runIssues, runIssuesArr, subCategoryMap, moreInfoSections){
     moreInfoSections[0].content = (
         <Text color='subdued'>
           {subCategoryMap[runIssues.id?.testSubCategory]?.issueImpact || "No impact found"}
         </Text>
       )
-      moreInfoSections[1].content = (
+    moreInfoSections[1].content = (
         <HorizontalStack gap="2">
           {
             tagList(subCategoryMap[runIssues.id.testSubCategory]?.issueTags)
@@ -294,12 +294,10 @@ const transform = {
           }
         </List>
       )
-      await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
-        let similarlyAffectedIssues = resp1['similarlyAffectedIssues'];
-        moreInfoSections[3].content = (
+      moreInfoSections[3].content = (
           <List type='bullet'>
             {
-              similarlyAffectedIssues.map((item, index) => {
+              runIssuesArr?.map((item, index) => {
                 return (
                   <List.Item key={index}>
                     <Text color='subdued'>
@@ -309,8 +307,7 @@ const transform = {
               })
             }
           </List>
-        )
-    })
+      )
     return moreInfoSections;
   },
 
