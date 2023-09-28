@@ -20,6 +20,10 @@ info:
   references:
     - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
     - "https://hackerone.com/reports/469803"
+  cwe:
+    - CWE-601
+    - CWE-610
+
 api_selection_filters:
   response_code:
     eq: 302

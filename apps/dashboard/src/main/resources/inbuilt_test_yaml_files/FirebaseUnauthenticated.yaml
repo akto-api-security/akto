@@ -18,6 +18,8 @@ info:
     - HackerOne top 10
   references:
     - "http://ghostlulz.com/google-exposed-firebase-database/"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

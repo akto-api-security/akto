@@ -16,6 +16,7 @@
                 @clickedItem="clickedItem({...$event, type: getType()})" 
                 @operatorChanged="operatorChanged({...$event, type: getType()})"
                 @selectedAll="selectedAll({...$event, type: getType()})"
+                :listOperators="listOperators"
             />
         </div>
         <div v-if="getType() === 'SEARCH'">
@@ -44,7 +45,8 @@ export default {
     },
     props: {
         title: obj.strR,
-        typeAndItems: obj.objR
+        typeAndItems: obj.objR,
+        listOperators: obj.arrN
     },
     methods: {
         getType() {

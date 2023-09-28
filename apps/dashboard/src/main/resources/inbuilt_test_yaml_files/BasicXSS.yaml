@@ -18,6 +18,9 @@ info:
     - HackerOne top 10
   references:
     - "https://owasp.org/www-community/attacks/xss/"
+  cwe:
+    - CWE-79
+
 api_selection_filters:
   response_code:
     gte: 200

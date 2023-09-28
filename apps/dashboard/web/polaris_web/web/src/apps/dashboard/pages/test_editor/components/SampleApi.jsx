@@ -238,7 +238,6 @@ const SampleApi = () => {
     const closeModal = () => {
         setShowTestResult(!showTestResult)
         editorSetup.setEditorTheme();
-        editorInstance.setTheme('vs')
     }
 
     const resultComponent = (
@@ -275,6 +274,7 @@ const SampleApi = () => {
                 <TestRunResultPage
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
+                    testSubCategoryMap={testResult?.subCategoryMap}
                     testId={selectedTest.value}
                     source="editor"
                 />

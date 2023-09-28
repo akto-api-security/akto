@@ -11,6 +11,7 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
@@ -36,6 +37,12 @@ public class ApiCollectionsAction extends UserAction {
             apiCollection.setUrls(new HashSet<>());
         }
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchCollection() {
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
         return Action.SUCCESS.toUpperCase();
     }
 

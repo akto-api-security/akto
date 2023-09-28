@@ -1,21 +1,18 @@
 package com.akto.action;
 
 
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.CustomDataType;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
-import com.akto.dto.User;
-import com.akto.dto.data_types.*;
+import com.akto.dto.*;
+import com.akto.dto.data_types.Conditions;
+import com.akto.dto.data_types.Predicate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.JSONUtils;
 import com.akto.utils.AktoCustomException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -23,21 +20,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
-
+import org.apache.commons.lang3.EnumUtils;
+import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.util.*;
 
-import org.apache.commons.lang3.EnumUtils;
+import static com.akto.utils.Utils.extractJsonResponse;
 
 public class CustomDataTypeAction extends UserAction{
-
+    private static LoggerMaker loggerMaker = new LoggerMaker(CustomDataTypeAction.class);
     private boolean createNew;
     private String name;
     private boolean sensitiveAlways;
@@ -581,6 +577,137 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static void bulkSingleTypeInfoDelete(List<SingleTypeInfo.ParamId> idsToDelete) {
+        ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
+        for(SingleTypeInfo.ParamId paramId: idsToDelete) {
+            String paramStr = "PII cleaner - deleting: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
+            loggerMaker.infoAndAddToDb(paramStr, LogDb.DASHBOARD);
+
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq("url", paramId.getUrl()));
+            filters.add(Filters.eq("method", paramId.getMethod()));
+            filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
+            filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
+            filters.add(Filters.eq("param", paramId.getParam()));
+            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+
+            bulkUpdatesForSingleTypeInfo.add(new DeleteOneModel<>(Filters.and(filters)));
+        }
+
+        if (!bulkUpdatesForSingleTypeInfo.isEmpty()) {
+            BulkWriteResult bwr =
+                    SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo, new BulkWriteOptions().ordered(false));
+
+            loggerMaker.infoAndAddToDb("PII cleaner - deleted " + bwr.getDeletedCount() + " from STI", LogDb.DASHBOARD);
+        }
+
+    }
+
+    private static void bulkSensitiveInvalidate(List<SingleTypeInfo.ParamId> idsToDelete) {
+        ArrayList<WriteModel<SensitiveSampleData>> bulkSensitiveInvalidateUpdates = new ArrayList<>();
+        for(SingleTypeInfo.ParamId paramId: idsToDelete) {
+            String paramStr = "PII cleaner - invalidating: " + paramId.getApiCollectionId() + ": " + paramId.getMethod() + " " + paramId.getUrl() + " > " + paramId.getParam();
+            String url = "dashboard/observe/inventory/"+paramId.getApiCollectionId()+"/"+Base64.getEncoder().encodeToString((paramId.getUrl() + " " + paramId.getMethod()).getBytes());
+            loggerMaker.infoAndAddToDb(paramStr + url, LogDb.DASHBOARD);
+
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq("_id.url", paramId.getUrl()));
+            filters.add(Filters.eq("_id.method", paramId.getMethod()));
+            filters.add(Filters.eq("_id.responseCode", paramId.getResponseCode()));
+            filters.add(Filters.eq("_id.isHeader", paramId.getIsHeader()));
+            filters.add(Filters.eq("_id.param", paramId.getParam()));
+            filters.add(Filters.eq("_id.apiCollectionId", paramId.getApiCollectionId()));
+
+            bulkSensitiveInvalidateUpdates.add(new UpdateOneModel<>(Filters.and(filters), Updates.set("invalid", true)));
+        }
+
+        if (!bulkSensitiveInvalidateUpdates.isEmpty()) {
+            BulkWriteResult bwr =
+                    SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkSensitiveInvalidateUpdates, new BulkWriteOptions().ordered(false));
+
+            loggerMaker.infoAndAddToDb("PII cleaner - modified " + bwr.getModifiedCount() + " from SSD", LogDb.DASHBOARD);
+        }
+
+    }
+
+    private static boolean isPresentInMost(String param, List<String> commonPayloads, boolean isRequest) {
+        int totalPayloads = commonPayloads.size();
+        if (totalPayloads == 0) {
+            return false;
+        }
+
+        int positiveCount = 0;
+
+        for(String commonPayload: commonPayloads) {
+            BasicDBObject commonPayloadObj = extractJsonResponse(commonPayload, isRequest);
+            if (JSONUtils.flatten(commonPayloadObj).containsKey(param)) {
+                positiveCount++;
+            }
+        }
+
+        return positiveCount >= (totalPayloads+0.5)/2;
+    }
+
+    public String resetDataType() {
+        final int BATCH_SIZE = 100;
+        int currMarker = 0;
+        Bson filterSsdQ =
+                Filters.and(
+                        Filters.eq("_id.isHeader", false),
+                        Filters.ne("inactive", true),
+                        Filters.eq("_id.subType", this.name)
+                );
+
+        MongoCursor<SensitiveSampleData> cursor = null;
+        int dataPoints = 0;
+        List<SingleTypeInfo.ParamId> idsToDelete = new ArrayList<>();
+        do {
+            idsToDelete = new ArrayList<>();
+            cursor = SensitiveSampleDataDao.instance.getMCollection().find(filterSsdQ).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
+            currMarker += BATCH_SIZE;
+            dataPoints = 0;
+            loggerMaker.infoAndAddToDb("processing batch: " + currMarker, LogDb.DASHBOARD);
+            while(cursor.hasNext()) {
+                dataPoints++;
+                SensitiveSampleData ssd = cursor.next();
+                SingleTypeInfo.ParamId ssdId = ssd.getId();
+
+                if (ssdId.getIsHeader()) {
+                    continue;
+                }
+
+                Bson filterCommonSampleData =
+                        Filters.and(
+                                Filters.eq("_id.method", ssdId.getMethod()),
+                                Filters.eq("_id.url", ssdId.getUrl()),
+                                Filters.eq("_id.apiCollectionId", ssdId.getApiCollectionId())
+                        );
+
+
+                SampleData commonSampleData = SampleDataDao.instance.findOne(filterCommonSampleData);
+
+                if (commonSampleData == null) {
+                    continue;
+                }
+
+                List<String> commonPayloads = commonSampleData.getSamples();
+
+                if (!isPresentInMost(ssdId.getParam(), commonPayloads, ssdId.getResponseCode()==-1)) {
+                    idsToDelete.add(ssdId);
+                    loggerMaker.infoAndAddToDb("deleting: " + ssdId, LogDb.DASHBOARD);
+                }
+            }
+
+            bulkSensitiveInvalidate(idsToDelete);
+            bulkSingleTypeInfoDelete(idsToDelete);
+
+        } while (dataPoints == BATCH_SIZE);
+
+
+        return SUCCESS.toUpperCase();
+
     }
 
     public void setActive(boolean active) {
