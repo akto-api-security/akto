@@ -30,7 +30,7 @@ jobs:
           node-version: '17'
       - name: Download Akto templates zip
         working-directory: ./apps/dashboard/src/main/resources
-        run: wget https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
+        run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
