@@ -1259,7 +1259,7 @@ public class InitializerListener implements ServletContextListener {
         loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for account: %d", accountId), LogDb.DASHBOARD);
 
         GithubSync githubSync = new GithubSync();
-        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "feature/migrate-yaml-templates");
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
 
         if (repoZip != null) {
             processTemplateFilesZip(repoZip);
@@ -1276,7 +1276,7 @@ public class InitializerListener implements ServletContextListener {
                     String entryName = entry.getName();
 
                     if (!entry.isDirectory()) {
-                        if (!entryName.endsWith(".yaml")) {
+                        if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
                             continue;
                         }
 
@@ -1310,11 +1310,9 @@ public class InitializerListener implements ServletContextListener {
                                     Updates.combine(
                                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                                            Updates.set(YamlTemplate.FILE_NAME, entryName),
                                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
-                                            Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-                                            Updates.set(YamlTemplate.SHA, "0")));
+                                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
                         }
                     }
 

@@ -17,22 +17,16 @@ public class YamlTemplate {
     public static final String CONTENT = "content";
     private Info info;
     public static final String INFO = "info";
-    private String sha;
-    public static final String SHA = "sha";
-    private String fileName;
-    public static final String FILE_NAME = "fileName";
     private boolean inactive;
     public static final String INACTIVE = "inactive";
 
-    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, String sha, String fileName) {
+    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
         this.id = id;
         this.createdAt = createdAt;
         this.author = author;
         this.updatedAt = updatedAt;
         this.content = content;
         this.info = info;
-        this.sha = sha;
-        this.fileName = fileName;
     }
 
     public YamlTemplate() {
@@ -84,22 +78,6 @@ public class YamlTemplate {
 
     public void setInfo(Info info) {
         this.info = info;
-    }
-
-    public String getSha() {
-        return sha;
-    }
-
-    public void setSha(String sha) {
-        this.sha = sha;
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
     }
     
     public boolean getInactive() {
