@@ -1,19 +1,19 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import {
   CircleCancelMajor,
   CalendarMinor,
   ReplayMinor,
-  NoteMinor,
-  PlayCircleMajor,
   PlayMinor,
-  ClockMinor
+  ChevronDownMinor,
+  ChevronUpMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
+import ChartypeComponent from "./ChartypeComponent";
 
 /*
   {
@@ -35,38 +35,35 @@ import func from "@/util/func"
 
 let headers = [
   {
-    text:"",
-    value:"icon",
-    itemOrder:0
+    text:"Text name",
+    title: 'Test run name',
+    value:"testName",
+    itemOrder:1,
+    itemCell:2,
   },
   {
-    text:"Text name",
-    value:"name",
-    itemOrder:1
+    text: "Number of tests",
+    title: "Number of tests",
+    value: "number_of_tests",
+    itemOrder: 3,
+    itemCell:3,
+    isText: true,
   },
   {
     text:"Severity",
     value: 'severity',
+    title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
-  },
-  {
-    text: "Number of tests",
-    value: "number_of_tests_str",
-    itemOrder: 3,
-    icon: NoteMinor,
-  },
-  {
-    text: 'Run type',
-    value: 'run_type',
-    itemOrder: 3,
-    icon: PlayCircleMajor
+    itemCell:4,
   },
   {
     text: 'Run time',
     value: 'run_time',
+    title: 'Status',
     itemOrder: 3,
-    icon: ClockMinor
+    itemCell:5,
+    isText: true,
   },
 ]
 
@@ -181,11 +178,24 @@ function getActions(item){
   return arr
 }
 
+const now = func.timeNow()
+
 const [loading, setLoading] = useState(true);
 const [currentTab, setCurrentTab] = useState("oneTime");
 const [updateTable, setUpdateTable] = useState(false);
 const [countMap, setCountMap] = useState({});
 const [selected, setSelected] = useState(1);
+const [timeStamp, setTimestamp] = useState({
+  startTimestamp: now - func.recencyPeriod,
+  endTimestamp: now
+})
+const [severityCountMap, setSeverityCountMap] = useState({
+  LOW: {text : 0, color: func.getColorForCharts("LOW")},
+  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
+  HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
+})
+const [subCategoryInfo, setSubCategoryInfo] = useState({})
+const [collapsible, setCollapsible] = useState(false)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -204,7 +214,7 @@ const refreshSummaries = () =>{
 }
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
-  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd);
+  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
   if(checkIsTestRunning(testRuns)){
     refreshSummaries();
   }
@@ -215,7 +225,6 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     setLoading(true);
     let ret = [];
     let total = 0;
-    let now = func.timeNow()
     let dateRange = filters['dateRange'] || false;
     delete filters['dateRange']
     let startTimestamp = 0;
@@ -223,6 +232,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     if (dateRange) {
       startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
       endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000);
+      setTimestamp({startTimestamp: startTimestamp, endTimestamp: endTimestamp})
       filters.endTimestamp = [startTimestamp, endTimestamp]
     }
 
@@ -283,6 +293,17 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     })
   }
 
+  const fetchSummaryInfo = async()=>{
+    await api.getSummaryInfo(timeStamp.startTimestamp, timeStamp.endTimestamp).then((resp)=>{
+      setSubCategoryInfo(transform.convertSubIntoSubcategory(resp.subcategoryInfo))
+      const copyMap = JSON.parse(JSON.stringify(severityCountMap))
+      Object.keys(resp.severityInfo).length > 0 && Object.keys(resp.severityInfo).forEach((key)=>{
+        copyMap[key].text = resp.severityInfo[key]
+      })
+      setSeverityCountMap(copyMap)
+    })
+  }
+
   const tableTabs = [
     {
         content: 'All',
@@ -316,7 +337,8 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   useEffect(()=>{
     fetchCountsMap()
-  },[])
+    fetchSummaryInfo()
+  },[timeStamp])
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -324,6 +346,31 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     setTimeout(()=>{
         setLoading(false)
     },200)
+}
+
+const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+const SummaryCardComponent = () =>{
+  let totalVulnerabilites = severityCountMap.HIGH.text + severityCountMap.MEDIUM.text +  severityCountMap.LOW.text 
+  return(
+    <LegacyCard>
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+        <HorizontalStack align="space-between">
+          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
+          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+        </HorizontalStack>
+        <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
+          <LegacyCard.Subsection>
+            <Box paddingBlockStart={3}><Divider/></Box>
+            <HorizontalGrid columns={2} gap={6}>
+              <ChartypeComponent data={subCategoryInfo} title={"Categories"}/>
+              <ChartypeComponent data={severityCountMap} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+            </HorizontalGrid>
+
+          </LegacyCard.Subsection>
+        </Collapsible>
+      </LegacyCard.Section>
+    </LegacyCard>
+  )
 }
 
 const coreTable = (
@@ -347,10 +394,13 @@ const coreTable = (
     onSelect={handleSelectedTab}
     selected={selected}
     mode={IndexFiltersMode.Default}
+    headings={headers}
+    useNewRow={true}
+    condensedHeight={true}
   />   
 )
 
-const components = [coreTable]
+const components = [<SummaryCardComponent key={collapsible}/>, coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}

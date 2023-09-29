@@ -1,11 +1,10 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import {
-  Text,
-  HorizontalStack, Badge, Link, List
-  } from '@shopify/polaris';
-  import PersistStore from "../../../main/PersistStore";
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon } from '@shopify/polaris';
+import PersistStore from "../../../main/PersistStore";
+import observeFunc from "../observe/transform";
+import TooltipText from "../../components/shared/TooltipText";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -79,7 +78,7 @@ function getAlternateTestsInfo(state){
 }
 
 function getTestsInfo(testResultsCount, state){
-    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
+    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount
 }
 
 function tagList(list, cweLink){
@@ -147,7 +146,28 @@ const transform = {
       };
       return obj;
     },
-    prepareTestRun : (data, testingRunResultSummary, cicd) => {
+    prettifyTestName: (testName, icon, iconColor)=>{
+      return(
+        <HorizontalStack gap={4}>
+          <Box><Icon source={icon} color={iconColor}/></Box>
+          <Box maxWidth="400px">
+            <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'semibold'}} />
+          </Box>
+        </HorizontalStack>
+      )
+    },
+    filterObjectByValueGreaterThanZero: (obj)=> {
+      const result = {};
+    
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key) && obj[key] > 0) {
+          result[key] = obj[key];
+        }
+      }
+    
+      return result;
+    },
+    prepareTestRun : (data, testingRunResultSummary, cicd, prettified) => {
       let obj={};
       if(testingRunResultSummary==null){
         testingRunResultSummary = {};
@@ -183,14 +203,24 @@ const transform = {
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
-      return obj;
+      if(prettified){
+        const prettifiedTest={
+          ...obj,
+          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state)),
+          number_of_tests: getTestsInfo(testingRunResultSummary?.testResultsCount, state),
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
+        }
+        return prettifiedTest
+      }else{
+        return obj
+      }
     },
-    prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd) => {
+    prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd, prettified) => {
       let testRuns = []
       testingRuns.forEach((data)=>{
         let obj={};
         let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']] || {};
-        obj = transform.prepareTestRun(data, testingRunResultSummary, cicd)
+        obj = transform.prepareTestRun(data, testingRunResultSummary, cicd, prettified)
         testRuns.push(obj);
     })
     return testRuns;
@@ -393,6 +423,27 @@ setTestMetadata () {
     PersistStore.getState().setSubCategoryMap(subCategoryMap)
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
 })
+},
+convertSubIntoSubcategory(resp){
+  let obj = {}
+  const subCategoryMap = PersistStore.getState().subCategoryMap
+  Object.keys(resp).forEach((key)=>{
+    let temp = {
+      text: resp[key],
+      color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
+    }
+    obj[subCategoryMap[key].superCategory.shortName] = temp
+
+  })
+
+  const sortedEntries = Object.entries(obj).sort(([, val1], [, val2]) => {
+    const prop1 = val1['text'];
+    const prop2 = val2['text'];
+    return prop2 - prop1 ;
+  });
+
+  return Object.fromEntries(sortedEntries);
+
 }
 
 }

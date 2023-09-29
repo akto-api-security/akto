@@ -70,6 +70,7 @@ public class StartTestAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private boolean fetchAll;
     private Map<String,Long> allTestsCountMap = new HashMap<>();
+    private Map<String, Map<String,Integer>> issuesSummaryInfoMap = new HashMap<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -576,6 +577,28 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String getIssueSummaryInfo(){
+
+        if(this.endTimestamp == 0){
+            this.endTimestamp = Context.now();
+        }
+        // issues default for 2 months
+        if(this.startTimestamp == 0){
+            this.startTimestamp = Context.now() - (60 * 24 * 60 * 60);
+        }
+
+        Map<String,Integer> totalSeveritiesCountMap = TestingRunIssuesDao.instance.getTotalSeveritiesCountMap(this.startTimestamp,this.endTimestamp);
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp);
+
+        Map<String,Map<String,Integer>> result = new HashMap<>();
+        result.put("subcategoryInfo", totalSubcategoriesCountMap);
+        result.put("severityInfo", totalSeveritiesCountMap);
+
+        this.issuesSummaryInfoMap = result;
+
+        return SUCCESS.toUpperCase();
+    }
+
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
     }
@@ -834,8 +857,12 @@ public class StartTestAction extends UserAction {
     public void setFetchAll(boolean fetchAll) {
         this.fetchAll = fetchAll;
     }
+    
+    public Map<String, Map<String, Integer>> getIssuesSummaryInfoMap() {
+        return issuesSummaryInfoMap;
+    }
 
-     public Map<String, Long> getAllTestsCountMap() {
+    public Map<String, Long> getAllTestsCountMap() {
         return allTestsCountMap;
     }
 

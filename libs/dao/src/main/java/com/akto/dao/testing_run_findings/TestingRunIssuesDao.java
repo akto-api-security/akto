@@ -48,7 +48,13 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         }
 
         if (counter == 1) {
-            String[] fieldNames = {"_id.apiInfoKey.apiCollectionId", "testRunIssueStatus"};
+            String[] fieldNames = {"_id.apiInfoKey.apiCollectionId", TestingRunIssues.TEST_RUN_ISSUES_STATUS};
+            TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            counter++;
+        }
+
+        if(counter == 2){
+            String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS};
             TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
         }
@@ -57,7 +63,7 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
         Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(Filters.eq("testRunIssueStatus", "OPEN")));
+        pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
 
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
                                                 .append("severity", "$severity") ;
@@ -85,6 +91,62 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
             }
         }
         return resultMap;
+    }
+  
+    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp){
+        List<Bson> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregates.match(Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
+                Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp),
+                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp)
+            )
+        ));
+        BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        Map<String,Integer> result = new HashMap<>();
+        MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(severitiesCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = severitiesCursor.next();
+                String subCategory = ((BasicDBObject) basicDBObject.get("_id")).getString("subCategory");
+                Integer count = basicDBObject.getInt("count");
+                result.put(subCategory, count);
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        return result;
+    }
+
+    public Map<String, Integer> getTotalSeveritiesCountMap(int startTimeStamp, int endTimeStamp){
+        List<Bson> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregates.match(Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
+                Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp),
+                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp)
+            )
+        ));
+        BasicDBObject groupedId = new BasicDBObject("severity", "$severity");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        Map<String,Integer> result = new HashMap<>();
+        MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(severitiesCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = severitiesCursor.next();
+                String severity = ((BasicDBObject) basicDBObject.get("_id")).getString("severity");
+                Integer count = basicDBObject.getInt("count");
+                result.put(severity, count);
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        return result;
     }
 
     private TestingRunIssuesDao() {}
