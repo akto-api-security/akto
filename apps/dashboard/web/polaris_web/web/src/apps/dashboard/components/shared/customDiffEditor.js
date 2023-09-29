@@ -81,7 +81,8 @@ const transform = {
         for(const key in ogFlat){
             let mainKey = '"' + key.split(".")?.pop() + '": ' 
             if(!currFlat?.hasOwnProperty(key)){
-                deletedKeys.push({header: mainKey + '"' + ogFlat[key] + '"', className: 'deleted-content'})
+                let searchKey = typeof(ogFlat[key]) === "string" ? mainKey + '"' + ogFlat[key] + '"' : mainKey + ogFlat[key]
+                deletedKeys.push({header: searchKey, className: 'deleted-content'})
                 finalUnflatObj[key] = ogFlat[key]
             }else if(!func.deepComparison(ogFlat[key],currFlat[key])){
                 let searchKey = typeof(ogFlat[key]) === "string" ? mainKey + '"' + currFlat[key] + '"' : mainKey + currFlat[key]
@@ -105,14 +106,44 @@ const transform = {
             return result;
         }, {});
 
-        return{
-            json: func.unflattenObject(finalUnflatObj),
-            headersMap: mergedObject,
-        } 
+        let ret = {};
+        ret.headersMap = mergedObject
+        ret.json = "";
+
+        let ogArr = typeof(original)==='string' ? original.split("\n") : []
+        let curArr = typeof(current)==='string' ? current.split("\n") : [] 
+
+        let retArr = []
+        for(let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))){
+            if(ogArr[i] && curArr[i]){
+                if(ogArr[i]!==curArr[i]){
+                    ret.headersMap[curArr[i]] = {className: 'updated-content', data: ogArr[i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + "->" + curArr[i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'), keyLength: -2}
+                }
+                retArr.push(curArr[i]);
+            } else if(ogArr[i]) {
+                ret.headersMap[curArr[i]] = {className:'deleted-content'};
+                retArr.push(ogArr[i]);
+            } else if(curArr[i]){
+                ret.headersMap[curArr[i]] = {className:'added-content'};
+                retArr.push(curArr[i]);
+            }
+        }
+
+        if(typeof(current)!=='string' && typeof(original)!=='string'){
+            ret.json = this.formatJson(func.unflattenObject(finalUnflatObj));
+        } else if(typeof(current)==='string' && typeof(original)==='string'){
+            ret.json = retArr.join("\n")
+        } else if(typeof(current)==='string'){
+            ret.json = retArr.join("\n") + "\n" + this.formatJson(original);
+        } else {
+            ret.json = this.formatJson(current) + "\n" + retArr.join("\n");
+        }
+
+        return ret;
     },
 
     mergeDataObjs(lineObj, jsonObj, payloadObj){
-        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + this.formatJson(payloadObj.json)
+        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + payloadObj.json
         return{
             message: finalMessage,
             firstLine: lineObj.original + "->" + lineObj.firstLine,
