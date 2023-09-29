@@ -210,7 +210,7 @@ const transform = {
     },
 
     getColor(key){
-        switch(key){
+        switch(key.toUpperCase()){
             case "HIGH" : return "bg-critical-subdued";
             case "MEDIUM": return "bg-caution-subdued";
             case "LOW": return "bg-info-subdued";

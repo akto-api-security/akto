@@ -209,11 +209,11 @@ function SingleTestRunPage() {
         setWorkflowTest(workflowTest);
       }
       let cicd = false;
-      let res = await api.fetchTestingDetails(0,0,true,"",1,0,10,{endTimestamp: [testingRun.endTimestamp, testingRun.endTimestamp]});
+      let res = await api.fetchTestingDetails(0,0,true,false,"",1,0,10,{endTimestamp: [testingRun.endTimestamp, testingRun.endTimestamp]});
       if(res.testingRuns.map(x=>x.hexId).includes(testingRun.hexId)){
         cicd = true;
       }
-      localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd);
+      localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
       if(localSelectedTestRun.orderPriority === 1 || localSelectedTestRun.orderPriority === 2){
         if(setData){
           setTimeout(() => {

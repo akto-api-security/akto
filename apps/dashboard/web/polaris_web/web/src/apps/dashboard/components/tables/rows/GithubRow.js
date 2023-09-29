@@ -146,6 +146,25 @@ function GithubRow(props) {
                         :null
                     )
                 })}
+                {hasRowActions &&
+                <IndexTable.Cell >
+                    <HorizontalStack align='end'>
+                        {
+                            <Popover
+                                active={popoverActive == data.id}
+                                activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                                autofocusTarget="first-node"
+                                onClose={togglePopoverActive(popoverActive)}
+                            >
+                                <ActionList
+                                    actionRole="menuitem"
+                                    sections={getActions(data)}
+                                />
+                            </Popover>
+                        }
+                    </HorizontalStack>
+                </IndexTable.Cell>
+                }
             </>
         )
     }

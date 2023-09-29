@@ -193,5 +193,16 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+
+    async getSummaryInfo(startTimestamp, endTimestamp){
+        return await request({
+            url: '/api/getIssueSummaryInfo',
+            method: 'post',
+            data: {
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+            }
+        })
     }
 }
