@@ -69,8 +69,10 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
 
     const checkStackState = () => {
         let intervalId = null;
+        setLoading(true)
         intervalId = setInterval(async () => {
             await api.fetchStackCreationStatus({deploymentMethod: deploymentMethod}).then((resp) => {
+                setLoading(false)
                 setStackStatus(resp.stackState.status)
                 handleStackState(resp.stackState, intervalId)
                 if(resp.aktoNLBIp && resp.aktoMongoConn){
@@ -112,6 +114,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
 
     useEffect(() => {
         fetchLBs()
+        checkStackState()
     },[])
 
     useEffect(() => {
@@ -132,10 +135,10 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const creatFargateStack = async() => {
         setLoading(true)
         setStatusText("Starting Deployment!!")
-        setInitialClicked(true)
         await api.createRuntimeStack().then((resp)=> {
-        setLoading(false)
-        checkStackState()
+            setInitialClicked(true)
+            setLoading(false)
+            checkStackState()
         })
     }
 
@@ -160,7 +163,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
             {progressBar.show ? <ProgressBar progress={progressBar.value} size='medium' /> : null }
             {/* {stackCompleteComponent} */}
             {stackStatus === "CREATE_COMPLETE" ?
-                {stackCompleteComponent}
+                stackCompleteComponent
                 : null
             }
         </VerticalStack>
@@ -194,8 +197,8 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
 
     return (
         <div className='card-items'>
-            <Text>{displayObj?.text}</Text>
-            {displayObj?.component}
+            {loading ? null : <Text>{displayObj?.text}</Text>}
+            {loading ? <SpinnerCentered /> : displayObj?.component}
         </div>
     )
 }

@@ -22,6 +22,8 @@ info:
     - HackerOne top 10
   references:
     - "https://crashtest-security.com/cors-misconfiguration/"
+  cwe:
+    - CWE-16
 
 auth:
   authenticated: true

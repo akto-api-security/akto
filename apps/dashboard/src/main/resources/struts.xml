@@ -459,6 +459,16 @@
             </result>
         </action>
 
+        <action name="api/getCollection" class="com.akto.action.ApiCollectionsAction" method="fetchCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <!--   NEVER CHANGE VALUE OF api/uploadHar (path) this is used in ApiToken     -->
         <action name="api/uploadHar" class="com.akto.action.HarAction">
             <interceptor-ref name="json"/>
@@ -764,6 +774,17 @@
             </result>
         </action>
 
+        <action name="api/resetDataType" class="com.akto.action.CustomDataTypeAction" method="resetDataType" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/saveAktoDataType" class="com.akto.action.CustomDataTypeAction" method="saveAktoDataType">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -938,19 +959,6 @@
             </result>
         </action>
 
-        <action name="api/fetchTestRunTableInfo" class="com.akto.action.testing.StartTestAction" method="fetchTestRunTableInfo">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="enumAsBean">true</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/startTest" class="com.akto.action.testing.StartTestAction" method="startTest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1028,6 +1036,17 @@
             </result>
         </action>
 
+        <action name="api/fetchAuthMechanismDataDoc" class="com.akto.action.testing.AuthMechanismAction" method="fetchAuthMechanismDataDoc">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="tools/publicApi" class="com.akto.action.growth_tools.PublicApiAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1051,6 +1070,15 @@
         </action>
 
         <action name="tools/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAllSampleData" class="com.akto.action.TrafficAction" method="fetchAllSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>
@@ -1503,6 +1531,17 @@
         </action>
 
         <action name="api/stopTest" class="com.akto.action.testing.StartTestAction" method="stopTest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchMetadataFilters" class="com.akto.action.testing.StartTestAction" method="fetchMetadataFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

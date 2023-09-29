@@ -18,6 +18,8 @@ info:
     - HackerOne top 10
   references:
     - "https://owasp.org/www-community/Improper_Error_Handling"
+  cwe:
+    - CWE-209
 
 api_selection_filters:
   method:

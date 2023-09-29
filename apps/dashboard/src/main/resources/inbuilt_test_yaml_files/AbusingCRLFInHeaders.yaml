@@ -20,6 +20,11 @@ info:
     - HackerOne top 10
   references:
     - "https://www.invicti.com/blog/web-security/crlf-http-header/"
+  cwe:
+    - CWE-93
+    - CWE-74
+    - CWE-20
+
 api_selection_filters:
   query_param:
     for_one:

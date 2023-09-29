@@ -184,6 +184,21 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 
   </details>  
   
+#### Using Testing CLI tool
+
+Run the following command to run testing CLI tool
+
+```bash
+docker run -v ./:/out  \ # needed to generate test report on host machine
+    -e TEST_IDS='JWT_NONE_ALGO REMOVE_TOKENS' \ # space separated test ids
+    -e AKTO_DASHBOARD_URL='<AKTO_DASHBOARD_URL>' \ 
+    -e AKTO_API_KEY='<AKTO_API_KEY>' \ 
+    -e API_COLLECTION_ID='123' \ # api collection id on which you want to run tests
+    -e TEST_APIS='https://demo.com/api/books https://demo.com/api/cars' \ # space separated apis from the api collection on which you want to run tests. If not present, all apis in the collection will be tested. [optional]
+    -e OVERRIDE_APP_URL='https://dummy.com' \ # If you want to test on a separate host. [optional] 
+    aktosecurity/akto-api-testing-cli
+```
+
 ### Play around
 
 1. Open `localhost:9090` in your favourite browser
