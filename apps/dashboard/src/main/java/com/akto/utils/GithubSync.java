@@ -126,6 +126,7 @@ public class GithubSync {
             HttpResponse response = httpClient.execute(httpGet);
 
             if (response.getStatusLine().getStatusCode() == 200) {
+                loggerMaker.infoAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 response.getEntity().writeTo(outputStream);
                 repoZip = outputStream.toByteArray();
