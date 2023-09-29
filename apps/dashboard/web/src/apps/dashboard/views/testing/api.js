@@ -109,12 +109,12 @@ export default {
             return resp
         })
     },
-    fetchTestingRunResults(testingRunResultSummaryHexId) {
+    fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
         return request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId, fetchOnlyVulnerable
             }
         }).then((resp) => {
             return resp
@@ -254,6 +254,15 @@ export default {
         })
     },
 
+    async fetchMetadataFilters() {
+        const resp = await request({
+            url: '/api/fetchMetadataFilters',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
+    
     setTestInactive(testId, inactive){
         return request({
             url: '/api/setTestInactive',

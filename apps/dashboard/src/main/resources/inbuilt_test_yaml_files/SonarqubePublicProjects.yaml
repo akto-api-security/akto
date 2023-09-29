@@ -13,6 +13,8 @@ info:
   severity: LOW
   references:
     - https://next.sonarqube.com/sonarqube/web_api/api/components/suggestions?internal=true
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

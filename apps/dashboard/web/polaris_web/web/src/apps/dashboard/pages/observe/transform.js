@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import Store from "../../store";
+import PersistStore from "../../../main/PersistStore";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -99,7 +99,7 @@ const transform = {
         return apiCollection;
     },
     prepareEndpointForTable(x, index) {
-        const idToNameMap = func.mapCollectionIdToName(Store.getState().allCollections);
+        const idToNameMap = PersistStore.getState().collectionsMap;
         return {
             id:index,
             name: x.param.replaceAll("#", ".").replaceAll(".$", ""),

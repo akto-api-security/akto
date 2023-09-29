@@ -4,9 +4,9 @@ name: Staging
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -95,6 +95,7 @@ jobs:
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
           IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
+          IMAGE_TAG_TESTING_CLI: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing-cli:flash' || '' }}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
@@ -104,6 +105,9 @@ jobs:
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
+          cd ../testing-cli
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG $IMAGE_TAG_TESTING_CLI . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
 
       - name: Set up JDK 11
         uses: actions/setup-java@v1
