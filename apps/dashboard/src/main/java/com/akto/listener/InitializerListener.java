@@ -991,7 +991,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
-            String resourceName = "/tests-library-master.zip";
+            String resourceName = "/test-library-master.zip.zip";
 
             loggerMaker.infoAndAddToDb("Loading template files from directory", LogDb.DASHBOARD);
 
@@ -1259,7 +1259,7 @@ public class InitializerListener implements ServletContextListener {
         loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for account: %d", accountId), LogDb.DASHBOARD);
 
         GithubSync githubSync = new GithubSync();
-        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "feature/migrate-yaml-templates");
 
         if (repoZip != null) {
             processTemplateFilesZip(repoZip);
