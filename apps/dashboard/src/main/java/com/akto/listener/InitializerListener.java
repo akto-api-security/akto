@@ -991,7 +991,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
-            String resourceName = "/test-library-master.zip.zip";
+            String resourceName = "/test-library-master.zip";
 
             loggerMaker.infoAndAddToDb("Loading template files from directory", LogDb.DASHBOARD);
 
