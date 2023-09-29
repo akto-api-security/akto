@@ -1273,9 +1273,9 @@ public class InitializerListener implements ServletContextListener {
 
                 ZipEntry entry;
                 while ((entry = zipInputStream.getNextEntry()) != null) {
-                    String entryName = entry.getName();
-
                     if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
                         if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
                             continue;
                         }
