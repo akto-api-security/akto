@@ -1,9 +1,21 @@
 package com.akto.utils;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.HttpClients;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -15,6 +27,9 @@ import okhttp3.ResponseBody;
 import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Pair;
+
+import javassist.bytecode.ByteArray;
 
 public class GithubSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
@@ -97,5 +112,33 @@ public class GithubSync {
         }
         
         return dirContents;
+    }
+
+    public byte[] syncRepo(String repo, String branch) {
+        byte[] repoZip = null;
+
+        String url = String.format("https://github.com/%s/archive/refs/heads/%s.zip", repo, branch);
+
+        HttpClient httpClient = HttpClients.createDefault();
+        HttpGet httpGet = new HttpGet(url);
+
+        try {
+            HttpResponse response = httpClient.execute(httpGet);
+
+            if (response.getStatusLine().getStatusCode() == 200) {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                response.getEntity().writeTo(outputStream);
+                repoZip = outputStream.toByteArray();
+            } else {
+                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD);
+            }
+        } catch (Exception ex) {
+            loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD);
+        } 
+        finally {
+            httpGet.releaseConnection();
+        }
+
+        return repoZip;
     }
 }
