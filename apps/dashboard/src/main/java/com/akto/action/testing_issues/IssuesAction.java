@@ -125,7 +125,8 @@ public class IssuesAction extends UserAction {
                 andFilters.add(Filters.and(
                         Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, issue.getLatestTestingRunSummaryId()),
                         Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory()),
-                        Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
+                        Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                        Filters.eq(TestingRunResult.VULNERABLE, true)
                 ));
             }
             if (issues.isEmpty()) {
