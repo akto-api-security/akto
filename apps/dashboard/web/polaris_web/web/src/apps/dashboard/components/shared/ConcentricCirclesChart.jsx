@@ -10,11 +10,11 @@ function ConcentricCirclesChart({data,title,size,subtitle}) {
     let startSize = size
     Object.keys(data).forEach((ele)=>{
         let obj = {
-            innerSize: startSize - 20,
+            innerSize: startSize - 27,
             size: startSize,
             data:[{name: ele, y: data[ele].text , color: data[ele].color}, {name: '', y: title - data[ele].text, color: '#F6F6F7'}]
         }
-        startSize -= 30
+        startSize -= 32
         seriesData.push(obj)
     })
 

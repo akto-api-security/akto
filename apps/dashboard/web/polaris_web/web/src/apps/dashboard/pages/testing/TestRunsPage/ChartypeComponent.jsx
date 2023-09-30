@@ -3,7 +3,7 @@ import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse}) {
     let tableRows = []
     Object.keys(data).forEach((key,index)=>{
         let comp = [
@@ -20,8 +20,13 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle}) {
         tableRows.push(comp)
     })
 
+    const chartData = reverse ? Object.keys(data).reverse().reduce((acc, key) => {
+        acc[key] = data[key];
+        return acc;
+      }, {}) : data
+
     const chartComponent = (
-        title === 'Categories' ? <DonutChart data={data} title="" size={210}/> : <ConcentricCirclesChart data={data} title={charTitle} size={210} subtitle={chartSubtitle} />
+        title === 'Categories' ? <DonutChart data={chartData} title="" size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (
