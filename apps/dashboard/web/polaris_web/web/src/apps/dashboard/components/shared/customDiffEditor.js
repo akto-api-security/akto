@@ -69,6 +69,23 @@ const transform = {
         }
     },
 
+    processArrayJson(input) {
+       try {
+        let parsedJson = JSON.parse(input);
+        let ret = []
+        Object.keys(parsedJson).forEach((key)=>{
+            if(!isNaN(key)){
+                ret.push(parsedJson[key])
+            }else{
+                ret.push({key: parsedJson[key]})
+            }
+        })
+        return JSON.stringify(ret, null, 2)
+       } catch (error) {
+        return input
+       }
+    },
+
     getPayloadData(original,current){
         let changedKeys = []
         let insertedKeys = []
@@ -81,7 +98,14 @@ const transform = {
         for(const key in ogFlat){
             let mainKey = '"' + key.split(".")?.pop() + '": ' 
             if(!currFlat?.hasOwnProperty(key)){
-                let searchKey = typeof(ogFlat[key]) === "string" ? mainKey + '"' + ogFlat[key] + '"' : mainKey + ogFlat[key]
+                let searchKey = "";
+                if(typeof(ogFlat[key]) === "string"){
+                    searchKey =  mainKey + '"' + ogFlat[key] + '"'
+                } else if(typeof(ogFlat[key]) === 'object'){
+                    searchKey = mainKey 
+                } else{
+                    searchKey = mainKey + ogFlat[key]
+                }
                 deletedKeys.push({header: searchKey, className: 'deleted-content'})
                 finalUnflatObj[key] = ogFlat[key]
             }else if(!func.deepComparison(ogFlat[key],currFlat[key])){
@@ -143,7 +167,7 @@ const transform = {
     },
 
     mergeDataObjs(lineObj, jsonObj, payloadObj){
-        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + payloadObj.json
+        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + this.processArrayJson(payloadObj.json)
         return{
             message: finalMessage,
             firstLine: lineObj.original + "->" + lineObj.firstLine,
