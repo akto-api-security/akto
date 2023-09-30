@@ -190,9 +190,9 @@ const [timeStamp, setTimestamp] = useState({
   endTimestamp: now
 })
 const [severityCountMap, setSeverityCountMap] = useState({
-  LOW: {text : 0, color: func.getColorForCharts("LOW")},
-  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
   HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
+  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
+  LOW: {text : 0, color: func.getColorForCharts("LOW")},
 })
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(false)
@@ -363,7 +363,7 @@ const SummaryCardComponent = () =>{
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
               <ChartypeComponent data={subCategoryInfo} title={"Categories"}/>
-              <ChartypeComponent data={severityCountMap} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
             </HorizontalGrid>
 
           </LegacyCard.Subsection>
