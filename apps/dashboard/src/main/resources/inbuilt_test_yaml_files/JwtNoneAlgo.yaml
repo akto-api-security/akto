@@ -24,6 +24,9 @@ info:
   references:
     - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
     - "https://portswigger.net/kb/issues/00200901_jwt-none-algorithm-supported"
+  cwe:
+    - CWE-287  
+
 auth:
   authenticated: true
 api_selection_filters:

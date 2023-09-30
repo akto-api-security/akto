@@ -25,6 +25,8 @@ info:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
     - "https://struts.apache.org/core-developers/development-mode"
     - "https://nvd.nist.gov/vuln/detail/CVE-2020-17530"
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

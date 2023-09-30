@@ -394,6 +394,21 @@ public class SingleTypeInfo {
         public void setIsUrlParam(boolean urlParam) {
             isUrlParam = urlParam;
         }
+
+        @Override
+        public String toString() {
+            return "ParamId{" +
+                    "url='" + url + '\'' +
+                    ", method='" + method + '\'' +
+                    ", responseCode=" + responseCode +
+                    ", isHeader=" + isHeader +
+                    ", param='" + param + '\'' +
+                    ", subType=" + subType +
+                    ", apiCollectionId=" + apiCollectionId +
+                    ", subTypeString='" + subTypeString + '\'' +
+                    ", isUrlParam=" + isUrlParam +
+                    '}';
+        }
     }
 
     public static final String _URL = "url";

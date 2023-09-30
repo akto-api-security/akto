@@ -13,6 +13,8 @@ info:
   severity: LOW
   references:
     - https://datacadamia.com/ssh/known_hosts
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

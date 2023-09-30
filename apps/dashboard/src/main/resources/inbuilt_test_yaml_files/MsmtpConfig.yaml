@@ -13,6 +13,8 @@ info:
   severity: HIGH
   references:
     - https://wiki.archlinux.org/title/Msmtp
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:
