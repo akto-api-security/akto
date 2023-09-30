@@ -128,6 +128,11 @@ public class IssuesAction extends UserAction {
                         Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
                 ));
             }
+            if (issues.isEmpty()) {
+                this.testingRunResults = new ArrayList<>();
+                this.sampleDataVsCurlMap = new HashMap<>();
+                return SUCCESS.toUpperCase();
+            }
             Bson orFilters = Filters.or(andFilters);
             this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
