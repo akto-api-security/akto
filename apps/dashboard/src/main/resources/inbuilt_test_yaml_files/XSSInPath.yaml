@@ -19,6 +19,9 @@ info:
   references:
     - "https://owasp.org/www-community/attacks/xss/"
     - "https://www.codegrazer.com/blog/7-reflected-xss.html"
+  cwe:
+    - CWE-79
+
 api_selection_filters:
   response_code:
     gte: 200

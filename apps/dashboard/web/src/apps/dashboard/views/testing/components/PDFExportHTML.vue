@@ -63,6 +63,19 @@
                                             </v-chip>
                                         </v-col>
                                     </v-row>
+                                    <v-row class="mx-0 pa-0"
+                                        :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
+                                        <v-col cols="2" class="ma-0 pa-0">
+                                            <span class="description-content">CWE</span>
+                                        </v-col>
+                                        <v-col class="my-0 mr-0 ml-7 pa-0">
+                                            <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
+                                                class="issue-summary mr-2" text-color="var(--white)" :key="index1"
+                                                v-for="(chipItem, index1) in testSubType.category.cwe">
+                                                {{ chipItem }}
+                                            </v-chip>
+                                        </v-col>
+                                    </v-row>
                                 </v-container>
                             </div>
                         </div>

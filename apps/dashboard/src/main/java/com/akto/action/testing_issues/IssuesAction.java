@@ -190,6 +190,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("issueTags", info.getTags());
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
+        infoObj.put("cwe", info.getCwe());
         infoObj.put("name", testConfig.getId());
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
