@@ -198,7 +198,7 @@ function ExportHtml() {
                     sectionLocal.content = (
                         <HorizontalStack gap="2">
                           {
-                            item.category.issueTags.map((tag, index) => {
+                            item?.category?.issueTags?.map((tag, index) => {
                               return (
                                 <Badge progress="complete" key={index}>{tag}</Badge>
                               )
@@ -235,9 +235,9 @@ function ExportHtml() {
 
     const replaceTags = (details, vulnerableRequests) => {
         let percentageMatch = 0;
-        vulnerableRequests.forEach((request) => {
+        vulnerableRequests?.forEach((request) => {
             let testRun = request['testResults']
-            testRun.forEach((runResult) => {
+            testRun?.forEach((runResult) => {
                 if (percentageMatch < runResult.percentageMatch) {
                     percentageMatch = runResult.percentageMatch
                 }
@@ -294,7 +294,7 @@ function ExportHtml() {
                                     </HorizontalStack>
                                 </div>
                             </HorizontalGrid>
-                            {Object.keys(severitiesCount).map((element, index)=>(
+                            {Object.keys(severitiesCount)?.map((element, index)=>(
                                 <HorizontalGrid columns={2} key={index}>
                                     <div style={{background: "#e8e8e8", borderRight: '2px solid white', borderBottom: (index < 2 ? "2px solid white" : "")}}>
                                         <HorizontalStack align="center">
@@ -322,7 +322,7 @@ function ExportHtml() {
                     <VerticalStack gap={4}>
                         <Text variant="headingLg" fontWeight="medium">Vulnerabilities details</Text>
                         <VerticalStack gap={3}>
-                            {vulnerableResultsMap.map((item,index)=>(
+                            {vulnerableResultsMap?.map((item,index)=>(
                                 <LegacyCard sectioned title={cardTitleComponent(item)} key={index}>
                                     <LegacyCard.Section>
                                         <MoreInformationComponent
@@ -368,7 +368,7 @@ function MoreInformationComponent(props) {
         <LegacyCard>
           <LegacyCard.Section>
             {
-              props.sections.map((section, index) => {
+              props.sections?.map((section, index) => {
                 return (<LegacyCard.Subsection key={index}>
                   <VerticalStack gap="3">
                     <HorizontalStack gap="2" align="start" blockAlign='start'>
@@ -386,7 +386,7 @@ function MoreInformationComponent(props) {
             }
           </LegacyCard.Section>
           <LegacyCard.Section>
-            {props.item.category.vulnerableTestingRunResults.map((testingRun, index)=> (
+            {props.item?.category?.vulnerableTestingRunResults?.map((testingRun, index)=> (
                 <div className="attempts-div" key={index}>
                     <div className="row-div-1">
                         <span className="api-text">
@@ -396,7 +396,7 @@ function MoreInformationComponent(props) {
                             { testingRun.apiInfoKey.url }
                         </span>
                     </div>
-                    {testingRun.testResults.map((testRun, index1) => (
+                    {testingRun?.testResults?.map((testRun, index1) => (
                         <div key={index1}>
                             <div className="row-div">
                                 <span className="title-name" style={{fontWeight: "500"}}>
