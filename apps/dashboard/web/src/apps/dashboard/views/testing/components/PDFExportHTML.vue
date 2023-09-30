@@ -236,6 +236,9 @@ export default {
 
                 let subtype = testingRun['testSubType']
                 let subCategory = this.subCatogoryMap[subtype]
+                if (!subCategory) {
+                    return
+                }
                 let severity = subCategory['superCategory']['severity']['_name']
                 let severityIndex = 0;
                 switch (severity) {
