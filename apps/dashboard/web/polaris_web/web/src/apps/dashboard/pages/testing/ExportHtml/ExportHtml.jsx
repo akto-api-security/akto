@@ -127,7 +127,7 @@ function ExportHtml() {
                     sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
                 })
                 resultsCount += 50
-                if (testingRunCountsFromDB < 50) {
+                if (testingRunCountsFromDB < 50 || resultsCount >= 1000) {
                     //EOF: break as no further documents exists
                     break
                 }

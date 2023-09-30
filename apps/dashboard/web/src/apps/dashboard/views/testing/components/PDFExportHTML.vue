@@ -304,7 +304,7 @@ export default {
                         sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
                     })
                     skip += 50
-                    if (testingRunCountsFromDB < 50) {
+                    if (testingRunCountsFromDB < 50 || skip >= 1000) {
                         //EOF: break as no further documents exists
                         break
                     }
