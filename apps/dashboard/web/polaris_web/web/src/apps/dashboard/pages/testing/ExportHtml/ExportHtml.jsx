@@ -50,6 +50,9 @@ function ExportHtml() {
         testingRunResults?.length > 0 && testingRunResults.forEach((testingRun) => {
             let subtype = testingRun?.testSubType
             let subCategory = subCategoryMap?.[subtype]
+            if (!subCategory) {
+                return
+            }
             let severity = subCategory?.superCategory?.severity?._name
             let severityIndex = 0;
             switch (severity) {
