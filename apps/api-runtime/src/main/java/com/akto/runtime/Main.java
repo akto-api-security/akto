@@ -242,6 +242,9 @@ public class Main {
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
+                if (1 == 1) {
+                    throw new Exception("some exception here");
+                }
 
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
@@ -372,6 +375,7 @@ public class Main {
             printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
+            System.exit(0);
         } finally {
             main.consumer.close();
         }
