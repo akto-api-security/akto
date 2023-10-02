@@ -6,9 +6,9 @@ name: Staging
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -109,6 +109,10 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG"
+          cd ../testing-cli
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
+
           
 
       - name: Configure AWS Credentials for ECR

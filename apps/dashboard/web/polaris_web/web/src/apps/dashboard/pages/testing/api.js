@@ -1,39 +1,44 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestRunTableInfo() {
+    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters) {
         const resp = await request({
-            url: '/api/fetchTestRunTableInfo',
+            url: '/api/retrieveAllCollectionTests',
             method: 'post',
-            data: {}
+            data: {
+                startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters
+            }
         })
         return resp
     },
-    async fetchTestingRunResultSummaries(testingRunHexId) {
+
+    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchTestingRunResultSummaries',
             method: 'post',
             data: {
-                testingRunHexId
+                testingRunHexId,
+                startTimestamp, 
+                endTimestamp
             }
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId, fetchOnlyVulnerable
             }
         })
         return resp        
     },
-    async fetchAllSubCategories () {
+    async fetchAllSubCategories (fetchOnlyActive) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: {}
+            data: {fetchOnlyActive}
         })
         return resp
     },
@@ -172,5 +177,13 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    async fetchMetadataFilters() {
+        const resp = await request({
+            url: '/api/fetchMetadataFilters',
+            method: 'post',
+            data: {}
+        })
+        return resp
     },
 }

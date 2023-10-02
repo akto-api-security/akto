@@ -21,6 +21,8 @@ import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
 
@@ -353,6 +355,42 @@ public class Utils {
         }
 
         return (PostmanCredential) thirdPartyAccess.getCredential();
+    }
+
+    public static <T> List<T> castList(Class<? extends T> clazz, Collection<?> rawCollection) {
+        List<T> result = new ArrayList<>(rawCollection.size());
+        for (Object o : rawCollection) {
+            try {
+                result.add(clazz.cast(o));
+            } catch (ClassCastException e) {
+                // skip the one that cannot be casted
+            }
+        }
+        return result;
+    }
+    
+    private static final Gson gson = new Gson();
+    public static BasicDBObject extractJsonResponse(String message, boolean isRequest) {
+        Map<String, Object> json = gson.fromJson(message, Map.class);
+
+        String respPayload = (String) json.get(isRequest ? "requestPayload" : "responsePayload");
+
+        if (respPayload == null || respPayload.isEmpty()) {
+            respPayload = "{}";
+        }
+
+        if(respPayload.startsWith("[")) {
+            respPayload = "{\"json\": "+respPayload+"}";
+        }
+
+        BasicDBObject payload;
+        try {
+            payload = BasicDBObject.parse(respPayload);
+        } catch (Exception e) {
+            payload = BasicDBObject.parse("{}");
+        }
+
+        return payload;
     }
 
 }

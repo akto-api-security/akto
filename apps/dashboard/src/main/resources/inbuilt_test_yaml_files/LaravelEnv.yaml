@@ -14,6 +14,8 @@ info:
   references:
     - https://laravel.com/docs/master/configuration#environment-configuration
     - https://stackoverflow.com/questions/38331397/how-to-protect-env-file-in-laravel
+  cwe:
+    - CWE-16
 
 api_selection_filters:
   response_code:

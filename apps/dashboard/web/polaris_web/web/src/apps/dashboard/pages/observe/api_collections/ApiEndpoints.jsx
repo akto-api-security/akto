@@ -271,7 +271,7 @@ function ApiEndpoints() {
             let blob = new Blob([openApiString], {
                 type: "application/json",
             });
-            const fileName = "open_api_" + func.getCollectionName(apiCollectionId) + ".json";
+            const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
             saveAs(blob, fileName);
 
             lastFetchedUrl = result["lastFetchedUrl"]

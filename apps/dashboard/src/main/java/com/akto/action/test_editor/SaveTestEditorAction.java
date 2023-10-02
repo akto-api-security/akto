@@ -4,11 +4,13 @@ import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -27,7 +29,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -58,6 +59,7 @@ public class SaveTestEditorAction extends UserAction {
     private List<SampleData> sampleDataList;
     private TestingRunIssues testingRunIssues;
     private Map<String, BasicDBObject> subCategoryMap;
+    private boolean inactive;
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -212,7 +214,8 @@ public class SaveTestEditorAction extends UserAction {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null);
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
@@ -238,6 +241,28 @@ public class SaveTestEditorAction extends UserAction {
         if (!file.isDirectory()) {
             files.add(file.getAbsolutePath());
         }
+    }
+
+    public String setTestInactive() {
+
+        if (originalTestId == null) {
+            addActionError("TestId cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        YamlTemplate template = YamlTemplateDao.instance.updateOne(
+                Filters.eq(Constants.ID, originalTestId),
+                Updates.combine(
+                    Updates.set(YamlTemplate.INACTIVE, inactive),
+                    Updates.set(YamlTemplate.UPDATED_AT, Context.now())
+                ));
+
+        if (template == null) {
+            addActionError("Template not found");
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     public static void main(String[] args) throws Exception {
@@ -330,4 +355,13 @@ public class SaveTestEditorAction extends UserAction {
     public void setSubCategoryMap(Map<String, BasicDBObject> subCategoryMap) {
         this.subCategoryMap = subCategoryMap;
     }
+
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
+    }
+
 }
