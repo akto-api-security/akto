@@ -211,12 +211,15 @@ public class Main {
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
+        final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 main.consumer.wakeup();
                 try {
-                    mainThread.join();
+                    if (!exceptionOnCommitSync.get()) {
+                        mainThread.join();
+                    }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e){
@@ -243,6 +246,7 @@ public class Main {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
                 if (1 == 1) {
+                    exceptionOnCommitSync.set(true);
                     throw new Exception("some exception here");
                 }
 
