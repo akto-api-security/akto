@@ -1,31 +1,17 @@
 package com.akto.runtime;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestConfigYamlParser;
-import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.runtime.policies.AktoPolicies;
 import com.akto.util.AccountTask;
 import com.google.gson.Gson;
@@ -33,13 +19,18 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     private Consumer<String, String> consumer;
@@ -215,12 +206,14 @@ public class Main {
         // executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
         long lastSyncOffset = 0;
-
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
+                if (1 == 1) {
+                    throw new Exception("some exception to be thrown here");
+                }
 
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -338,6 +331,7 @@ public class Main {
             ;
         } finally {
             main.consumer.close();
+            System.exit(0);
         }
     }
 
