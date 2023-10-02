@@ -245,10 +245,11 @@ public class Main {
             loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
-                main.consumer.commitSync();
-                if (1 == 1) {
+                try {
+                    main.consumer.commitSync();
+                } catch (Exception e) {
                     exceptionOnCommitSync.set(true);
-                    throw new Exception("some exception here");
+                    throw e;
                 }
 
                 // TODO: what happens if exception
