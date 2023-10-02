@@ -114,7 +114,7 @@ public class Main {
 
         while (true) {
             AccountTask.instance.executeTask(account -> {
-                int delta = Context.now() - 2*60;
+                int delta = Context.now() - 20*60;
 
                 Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                         Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
@@ -156,7 +156,7 @@ public class Main {
                         Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
                         TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                         List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
-                        if(!testingRunResults.isEmpty()){
+                        if(testingRunResults != null && !testingRunResults.isEmpty()){
                             TestingRunResult testingRunResult = testingRunResults.get(0);
                             if(Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA){
                                 loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
