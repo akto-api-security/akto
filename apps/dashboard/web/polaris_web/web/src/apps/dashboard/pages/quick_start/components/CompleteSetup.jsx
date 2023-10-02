@@ -23,7 +23,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const setYamlContent = QuickStartStore(state => state.setYamlContent)
 
     const isLocalDeploy = Store(state => state.isLocalDeploy)
-    // const isLocalDeploy = false
+    const isAws = Store(state => state.isAws)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -90,7 +90,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     }
 
     const fetchLBs = async() => {
-        if(!isLocalDeploy){
+        if(isAws){
             setLoading(true)
             await api.fetchLBs({deploymentMethod: deploymentMethod}).then((resp) => {
                 if (!resp.dashboardHasNecessaryRole) {
@@ -184,7 +184,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     }
 
     const displayFunc = () => {
-        if (isLocalDeploy) {
+        if (isLocalDeploy || !isAws) {
             return localDeployObj
         }
         if (hasRequiredAccess) {
