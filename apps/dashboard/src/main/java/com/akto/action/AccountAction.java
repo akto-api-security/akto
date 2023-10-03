@@ -261,11 +261,17 @@ public class AccountAction extends UserAction {
                 RuntimeListener.addSampleData();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
+
                 try {
                     InitializerListener.executePIISourceFetch();
-                    InitializerListener.updateTestEditorTemplatesFromGithub(newAccountId);
                 } catch (Exception e) {
                     e.printStackTrace();
+                }
+
+                try {
+                    InitializerListener.updateTestEditorTemplatesFromGithub(newAccountId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);
