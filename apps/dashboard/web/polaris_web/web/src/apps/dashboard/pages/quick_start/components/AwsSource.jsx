@@ -67,13 +67,15 @@ function AwsSource() {
     }
 
     const checkStackState = () => {
-      let intervalId = null;
-      intervalId = setInterval(async () => {
-        await api.fetchStackCreationStatus({deploymentMethod: DeploymentMethod}).then((resp) => {  
-            handleStackState(resp.stackState, intervalId)
-          }
-        )
-      }, 5000)
+      if(isAws){
+          let intervalId = null;
+          intervalId = setInterval(async () => {
+            await api.fetchStackCreationStatus({deploymentMethod: DeploymentMethod}).then((resp) => {
+                handleStackState(resp.stackState, intervalId)
+              }
+            )
+          }, 5000)
+      }
     }
 
     const fetchLBs = async() => {
@@ -105,6 +107,7 @@ function AwsSource() {
 
     useEffect(()=> {
       fetchLBs()
+      checkStackState()
     },[])
 
     const docsUrl = "https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy"
