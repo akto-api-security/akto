@@ -248,7 +248,6 @@ public class Main {
                 try {
                     main.consumer.commitSync();
                 } catch (Exception e) {
-                    exceptionOnCommitSync.set(true);
                     throw e;
                 }
 
@@ -378,6 +377,7 @@ public class Main {
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
+            exceptionOnCommitSync.set(true);
             printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
