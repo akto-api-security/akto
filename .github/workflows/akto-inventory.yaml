@@ -1,0 +1,15 @@
+name: Akto Inventory
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check for Akto test completion
+        env:
+            AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+        run: bash ./.github/scripts/akto-cicd.sh
