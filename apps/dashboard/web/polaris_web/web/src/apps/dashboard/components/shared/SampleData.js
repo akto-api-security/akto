@@ -26,7 +26,7 @@ function highlightPaths(highlightPathMap, ref){
 }
 
 function highlightHeaders(data, ref, getLineNumbers){
-  const diffRange = []
+  let diffRange = []
   const headerKeysMap = data.headersMap
 
   // add classname for first line only
@@ -93,7 +93,7 @@ function highlightHeaders(data, ref, getLineNumbers){
   diffRange.sort((a,b) => a.range - b.range)
   let currentRange = null
   let result = []
-
+  diffRange = Array.from(new Set(diffRange.map(i => JSON.stringify(i))), JSON.parse);
   for (const obj of diffRange) {
     if (!currentRange) {
       currentRange = { start: obj.range, end: obj.range, key: obj.key };
@@ -113,7 +113,8 @@ function highlightHeaders(data, ref, getLineNumbers){
     ref.createDecorationsCollection([{
       range: new monaco.Range(obj.start, 1, obj.end, 100),
       options: {
-        blockClassName: className
+        blockClassName: className,
+        isWholeLine: true
       }
     }])
   })

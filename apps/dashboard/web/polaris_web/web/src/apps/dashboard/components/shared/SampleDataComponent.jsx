@@ -153,6 +153,10 @@ function SampleDataComponent(props) {
                     })
             }
             if (data.originalMessage) {
+                if(items.length==2){
+                    items[0].content = "Copy attempt request as curl"
+                    items[1].content = "Copy attempt request as burp"
+                }
                 items.push({
                     content: 'Copy original request as curl',
                     onAction: () => { copyRequest(type, "CURL", data.originalMessage) },
@@ -170,6 +174,9 @@ function SampleDataComponent(props) {
                 })
             }
             if (data.originalMessage) {
+                if(items.length==1){
+                    items[0].content = "Copy attempt response"
+                }
                 items.push({
                     content: 'Copy original response',
                     onAction: () => { copyRequest(type, "RESPONSE", data.originalMessage) },

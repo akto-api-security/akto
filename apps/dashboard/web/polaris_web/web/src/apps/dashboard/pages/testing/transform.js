@@ -82,27 +82,6 @@ function getTestsInfo(testResultsCount, state){
     return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
 }
 
-function tagList(list, cweLink){
-
-  let ret = list?.map((tag, index) => {
-
-    let linkUrl = ""
-    if(cweLink){ 
-      let cwe = tag.split("-")
-      if(cwe[1]){
-          linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
-      }
-    }
-
-    return (
-      <Link key={index} url={linkUrl} target="_blank">
-        <Badge progress="complete" key={index}>{tag}</Badge>
-      </Link>
-    )
-  })
-  return ret;
-}
-
 function minimizeTagList(items){
   if(items.length>2){
 
@@ -121,6 +100,26 @@ function checkTestFailure(summaryState, testRunState){
 }
 
 const transform = {
+    tagList : (list, cweLink) => {
+
+      let ret = list?.map((tag, index) => {
+
+        let linkUrl = ""
+        if(cweLink){ 
+          let cwe = tag.split("-")
+          if(cwe[1]){
+              linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
+          }
+        }
+
+        return (
+          <Link key={index} url={linkUrl} target="_blank">
+            <Badge progress="complete" key={index}>{tag}</Badge>
+          </Link>
+        )
+      })
+      return ret;
+    },
     prepareDataFromSummary : (data, testRunState) => {
       let obj={};
       obj['testingRunResultSummaryHexId'] = data?.hexId;
@@ -266,21 +265,21 @@ const transform = {
     moreInfoSections[1].content = (
         <HorizontalStack gap="2">
           {
-            tagList(subCategoryMap[runIssues.id.testSubCategory]?.issueTags)
+            transform.tagList(subCategoryMap[runIssues.id.testSubCategory]?.issueTags)
           }
         </HorizontalStack>
       )
       moreInfoSections[2].content = (
         <HorizontalStack gap="2">
           {
-            tagList(subCategoryMap[runIssues.id.testSubCategory]?.cwe, true)
+            transform.tagList(subCategoryMap[runIssues.id.testSubCategory]?.cwe, true)
           }
         </HorizontalStack>
       )
       moreInfoSections[4].content = (
         <List type='bullet' spacing="extraTight">
           {
-            subCategoryMap[runIssues.id?.testSubCategory]?.references.map((reference) => {
+            subCategoryMap[runIssues.id?.testSubCategory]?.references?.map((reference) => {
               return (
                 <List.Item key={reference}>
                   <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
