@@ -86,7 +86,7 @@ public class TestingRun {
 
     // if u r adding anything here make sure to add to stopAllTests() method too
     public enum State {
-        SCHEDULED, RUNNING, STOPPED, COMPLETED
+        SCHEDULED, RUNNING, STOPPED, COMPLETED, FAILED
     }
 
     public ObjectId getId() {

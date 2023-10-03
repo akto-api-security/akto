@@ -158,12 +158,14 @@
 <script>
 import obj from "@/util/obj"
 import api from '../api'
-import func from "@/util/func";
+import func from "@/util/func"
+import issuesApi from '../../issues/api'
 
 export default {
     name: "PDFExportHTML",
     props: {
-        testingRunResultSummaryHexId: obj.strR
+        testingRunResultSummaryHexId: obj.strN,
+        issuesFilters: obj.strN
     },
     data() {
         return {
@@ -189,6 +191,7 @@ export default {
                 case 0: return {'backgroundColor' : "var(--hexColor35)"}
             }  
          },
+
         getResponse(message) {
             let messageJson = JSON.parse(message)
             if (messageJson['response']) {
@@ -229,11 +232,13 @@ export default {
         },
         createVulnerabilityMap(testingRunResults) {
             let categoryVsVulMap = {}
-            let sampleDataMsgList = []
             testingRunResults.forEach((testingRun) => {
 
                 let subtype = testingRun['testSubType']
                 let subCategory = this.subCatogoryMap[subtype]
+                if (!subCategory) {
+                    return
+                }
                 let severity = subCategory['superCategory']['severity']['_name']
                 let severityIndex = 0;
                 switch (severity) {
@@ -260,11 +265,6 @@ export default {
                 vulnerabilities['vulnerableTestingRunResults'] = vulnerableTestingRunResults
                 vulnerabilities['severityIndex'] = severityIndex
                 categoryVsVulMap[subtype] = vulnerabilities
-                let testResults = testingRun.testResults
-                testResults.forEach((testResult) => {
-                    sampleDataMsgList.push(testResult.message)
-                    sampleDataMsgList.push(testResult.originalMessage)
-                })
             })
             Object.keys(categoryVsVulMap).forEach((category) => {
                 let obj = categoryVsVulMap[category]
@@ -283,17 +283,34 @@ export default {
             let vulnerableTestingRunResults = []
             let sampleDataVsCurlMap = {}
             let skip = 0
-            while (true) {
-                let testingRunCountsFromDB = 0
-                await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaryHexId, skip).then(resp => {
-                    vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
-                    testingRunCountsFromDB = resp.testingRunResults.length
-                    sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
-                })
-                skip += 50
-                if (testingRunCountsFromDB < 50) {
-                    //EOF: break as no further documents exists
-                    break
+            if (this.testingRunResultSummaryHexId) {
+                while (true) {
+                    let testingRunCountsFromDB = 0
+                    await api.fetchVulnerableTestingRunResults(this.testingRunResultSummaryHexId, skip).then(resp => {
+                        vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
+                        testingRunCountsFromDB = resp.testingRunResults.length
+                        sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                    })
+                    skip += 50
+                    if (testingRunCountsFromDB < 50) {
+                        //EOF: break as no further documents exists
+                        break
+                    }
+                }
+            } else if (this.issuesFilters) {
+                while (true) {
+                    let testingRunCountsFromDB = 0
+                    let filters = JSON.parse(atob(this.issuesFilters))
+                    await issuesApi.fetchVulnerableTestingRunResultsFromIssues(filters, skip).then(resp => {
+                        vulnerableTestingRunResults = vulnerableTestingRunResults.concat(resp.testingRunResults)
+                        testingRunCountsFromDB = resp.totalIssuesCount
+                        sampleDataVsCurlMap = {...sampleDataVsCurlMap, ...resp.sampleDataVsCurlMap}
+                    })
+                    skip += 50
+                    if (testingRunCountsFromDB < 50 || skip >= 1000) {
+                        //EOF: break as no further documents exists
+                        break
+                    }
                 }
             }
             this.sampleDataVsCurlMap = sampleDataVsCurlMap
