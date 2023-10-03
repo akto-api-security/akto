@@ -130,4 +130,9 @@ async function main() {
   }
 }
 
+// Schedule the script to run at specific intervals (e.g., every 24 hours)
+
+const scheduleIntervalHours = 24; // Adjust interval as needed
+setInterval(main, scheduleIntervalHours * 60 * 60 * 1000);
+
 main()
