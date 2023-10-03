@@ -177,6 +177,8 @@ export default {
             sampleDataVsCurlMap : {}
         }
     },
+
+
     methods: {
         getTruncatedString(str) {
             if (str && str.length > 3000) {
