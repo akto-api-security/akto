@@ -121,6 +121,7 @@ jobs:
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY_PROD}}
           aws-region: us-east-1
       - name: Login to Amazon ECR
+        if: ${{ github.event.inputs.Environment == 'prod' }}
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
@@ -128,6 +129,7 @@ jobs:
           registry-type: public
 
       - name: Build, tag, and push docker image to Amazon ECR
+        if: ${{ github.event.inputs.Environment == 'prod' }}
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
