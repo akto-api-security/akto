@@ -68,25 +68,28 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         }
 
     const checkStackState = () => {
-        let intervalId = null;
-        setLoading(true)
-        intervalId = setInterval(async () => {
-            await api.fetchStackCreationStatus({deploymentMethod: deploymentMethod}).then((resp) => {
-                setLoading(false)
-                setStackStatus(resp.stackState.status)
-                handleStackState(resp.stackState, intervalId)
-                if(resp.aktoNLBIp && resp.aktoMongoConn){
-                    let yamlCopy = yaml
-                    for(let i=0; i< yaml.length; i++){
-                        let line = yamlCopy[i];
-                        line = line.replace('<AKTO_NLB_IP>', resp.aktoNLBIp);
-                        line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
-                        yamlCopy[i] = line;
+        if(isAws){
+            let intervalId = null;
+            setLoading(true)
+
+            intervalId = setInterval(async () => {
+                await api.fetchStackCreationStatus({deploymentMethod: deploymentMethod}).then((resp) => {
+                    setLoading(false)
+                    setStackStatus(resp.stackState.status)
+                    handleStackState(resp.stackState, intervalId)
+                    if(resp.aktoNLBIp && resp.aktoMongoConn){
+                        let yamlCopy = yaml
+                        for(let i=0; i< yaml.length; i++){
+                            let line = yamlCopy[i];
+                            line = line.replace('<AKTO_NLB_IP>', resp.aktoNLBIp);
+                            line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
+                            yamlCopy[i] = line;
+                        }
+                        setYaml(yaml)
                     }
-                    setYaml(yaml)
-                }
-            })
-        }, 5000)
+                })
+            }, 5000)
+        }
     }
 
     const fetchLBs = async() => {
