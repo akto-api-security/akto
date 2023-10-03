@@ -28,7 +28,7 @@ let store = (set)=>({
         set({dataTypeNames:dataTypeNames})  
     },
     isLocalDeploy: window?.DASHBOARD_MODE === "LOCAL_DEPLOY",
-    isAws: window?.CLOUD_TYPE === "GCP",
+    isAws: window?.CLOUD_TYPE !== "GCP",
 
     allRoutes: [],
     setAllRoutes:(allRoutes)=>{
