@@ -1243,6 +1243,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void saveLLmTemplates() {
         List<String> templatePaths = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("saving llm templates", LoggerMaker.LogDb.DASHBOARD);
         try {
             templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_llm_test_yaml_files"));
         } catch (Exception e) {
@@ -1285,6 +1286,7 @@ public class InitializerListener implements ServletContextListener {
                 loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
             }
         }
+        loggerMaker.infoAndAddToDb("finished saving llm templates", LoggerMaker.LogDb.DASHBOARD);
     }
 
     private static List<String> convertStreamToListString(InputStream in) throws Exception {
