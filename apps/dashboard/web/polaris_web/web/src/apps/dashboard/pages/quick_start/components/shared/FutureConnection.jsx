@@ -6,8 +6,8 @@ function FutureConnection() {
         <div className='card-items'>
             <Banner status="info" title='Coming Soon'>
                 <Text variant="headingSm" as="h4">
-                    Sorry for the inconvenience, Akto is working on the feature.
-                    Stay tune.
+                    Sorry for the inconvenience, Akto is working on this connector.
+                    Stay tuned!
                 </Text>
             </Banner>
         </div>
