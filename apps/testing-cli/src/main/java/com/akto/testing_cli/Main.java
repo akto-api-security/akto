@@ -48,6 +48,7 @@ public class Main {
 
     public static final String AKTO_DASHBOARD_URL = System.getenv("AKTO_DASHBOARD_URL");
     public static final String AKTO_API_KEY = System.getenv("AKTO_API_KEY");
+    public static final String ALL_STRING = "all";
 
     private static String callDashboardApi(String path, String body) {
 
@@ -142,8 +143,14 @@ public class Main {
         String testIds = System.getenv("TEST_IDS");
         List<String> testIdsList = new ArrayList<>();
         if (testIds != null && !testIds.isEmpty()) {
-            String[] tmp = testIds.split(" ");
-            testIdsList = Arrays.asList(tmp);
+
+            if(testIds.equalsIgnoreCase(ALL_STRING)){
+                testIdsList =  new ArrayList<>(testConfigMap.keySet()); 
+            } else {
+                String[] tmp = testIds.split(" ");
+                testIdsList = Arrays.asList(tmp);
+            }
+
         } else {
             logger.error("No test ids to test");
             return;
@@ -169,7 +176,37 @@ public class Main {
 
         List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
 
-        String apiCollectionId = System.getenv("API_COLLECTION_ID");
+        String apiCollectionName = System.getenv("API_COLLECTION_NAME");
+
+        Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
+        ApiCollection apiCollection = new ApiCollection();
+        apiCollection.setId(-1);
+
+        try {
+            res = callDashboardApi("api/getAllCollections", body);
+            doc = Document.parse(res);
+            List<Document> docList = doc.getList("apiCollections", Document.class, new ArrayList<>());
+            for(Document apiCollectionDoc: docList){
+                apiCollectionDoc.put("_id", apiCollectionDoc.get("id"));
+                Codec<ApiCollection> apiCollectionCodec = codecRegistry.get(ApiCollection.class);
+                ApiCollection temp = decode(apiCollectionCodec, apiCollectionDoc);
+                apiCollectionMap.put(temp.getId(), temp);
+                if(temp.getDisplayName().equals(apiCollectionName)){
+                    apiCollection = temp;
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Could not fetch api collection list");
+        }
+
+        String apiCollectionId = "";
+        if(apiCollection.getId()!=-1){
+            apiCollectionId = String.valueOf(apiCollection.getId());
+        } else {
+            apiCollectionId = System.getenv("API_COLLECTION_ID");
+            apiCollection = apiCollectionMap.getOrDefault(Integer.parseInt(apiCollectionId), new ApiCollection());
+        }
+        
 
         if (apiCollectionId != null && !apiCollectionId.isEmpty()) {
             body = "{\"apiCollectionId\": \"" + apiCollectionId + "\"}";
@@ -186,22 +223,6 @@ public class Main {
         } else {
             logger.error("No api collection to test");
             return;
-        }
-
-        ApiCollection apiCollection = new ApiCollection();
-        apiCollection.setName("");
-        apiCollection.setId(Integer.parseInt(apiCollectionId));
-
-        try {
-            res = callDashboardApi("api/getCollection", body);
-            doc = Document.parse(res);
-            List<Document> docList = doc.getList("apiCollections", Document.class, new ArrayList<>());
-            Document apiCollectionDoc = docList.get(0);
-            apiCollectionDoc.put("_id", apiCollectionDoc.get("id"));
-            Codec<ApiCollection> apiCollectionCodec = codecRegistry.get(ApiCollection.class);
-            apiCollection = decode(apiCollectionCodec, apiCollectionDoc);
-        } catch (Exception e) {
-            logger.error("Could not find api collection");
         }
 
         String testApis = System.getenv("TEST_APIS");
@@ -307,6 +328,8 @@ public class Main {
         System.out.println(ColorConstants.YELLOW + "API collection: " + apiCollectionId + " "
                 + apiCollection.getDisplayName() + "\n" + ColorConstants.RESET);
         
+        System.out.println("Tested " + apiInfoKeys.size() + " API" + (apiInfoKeys.size()==1 ? "" : "s") + "\n");
+        
         System.out.println(ColorConstants.RED + "Total vulnerabilities: " + totalVulnerabilities + "\n" + ColorConstants.RESET);
         if(totalVulnerabilities>0){
             for (Map.Entry<String, Integer> entry : severityMap.entrySet()) {
@@ -315,7 +338,12 @@ public class Main {
         }
 
         for (TestingRunResult it : testingRunResults) {
-            String severity = testConfigMap.get(it.getTestSubType()).getInfo().getSeverity();
+            String severity = "HIGH";
+            try {
+                severity = testConfigMap.get(it.getTestSubType()).getInfo().getSeverity();
+            } catch (Exception e){
+                severity = "HIGH";
+            }
             String output = it.toConsoleString(severity);
             System.out.println(output);
         }
