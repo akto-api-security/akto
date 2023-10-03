@@ -4,9 +4,10 @@ import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
 import { Avatar, Box, Button,Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon, Badge, List, Link } from '@shopify/polaris'
-import {FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor} from "@shopify/polaris-icons"
+import {FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor, CreditCardSecureMajor} from "@shopify/polaris-icons"
 import func from '@/util/func'
 import './styles.css'
+import transform from '../transform';
 
 function ExportHtml() {
     const params = useParams() ;
@@ -27,6 +28,11 @@ function ExportHtml() {
           icon: CollectionsMajor,
           title: "Tags",
           content: ""
+        },
+        {
+            icon: CreditCardSecureMajor,
+            title: "CWE",
+            content: ""
         },
         {
           icon: ResourcesMajor,
@@ -210,6 +216,15 @@ function ExportHtml() {
                         </HorizontalStack>
                       )
                     
+                    break;
+                case "CWE":
+                    sectionLocal.content = (
+                        <HorizontalStack gap="2">
+                            {
+                                transform.tagList(item?.category?.cwe, true)
+                            }
+                        </HorizontalStack>
+                        )
                     break;
                 case "References":
                     sectionLocal.content = (
