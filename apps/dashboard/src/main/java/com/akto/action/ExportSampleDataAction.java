@@ -316,6 +316,7 @@ public class ExportSampleDataAction extends UserAction {
     int accountId;
 
     public String insertLlmData() {
+        Context.accountId.set(accountId);
         RuntimeListener.addLlmSampleData(accountId);
         InitializerListener.saveLLmTemplates();
         return SUCCESS.toUpperCase();

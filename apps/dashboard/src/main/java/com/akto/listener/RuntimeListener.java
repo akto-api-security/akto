@@ -220,6 +220,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static void addLlmSampleData(int accountId) {
         List<String> result = new ArrayList<>();
 
+        loggerMaker.infoAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(LLM_API_COLLECTION_NAME);
         if (sameNameCollection == null){
             ApiCollection apiCollection = new ApiCollection(LLM_API_COLLECTION_ID, LLM_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, LLM_API_COLLECTION_ID);
@@ -293,6 +294,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 
 
             }
+            loggerMaker.infoAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
             Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
 
         } catch (Exception e) {
