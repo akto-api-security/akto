@@ -52,6 +52,7 @@
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
+                    window.CLOUD_TYPE = '${requestScope.cloudType}';
                     window.IS_SAAS = '${requestScope.isSaas}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
