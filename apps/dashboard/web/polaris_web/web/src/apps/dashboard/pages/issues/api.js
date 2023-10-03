@@ -8,6 +8,14 @@ export default {
             data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch}
         })
     },
+    fetchVulnerableTestingRunResultsFromIssues(filters, skip) {
+        filters['skip'] = skip
+        return request({
+            url: 'api/fetchVulnerableTestingRunResultsFromIssues',
+            method: 'post',
+            data: filters
+        })
+    },
     bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
         return request({
             url: 'api/bulkUpdateIssueStatus',
