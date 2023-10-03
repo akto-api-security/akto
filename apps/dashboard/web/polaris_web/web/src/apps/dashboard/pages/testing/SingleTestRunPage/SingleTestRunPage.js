@@ -214,7 +214,7 @@ function SingleTestRunPage() {
         cicd = true;
       }
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd);
-      if(localSelectedTestRun.orderPriority === 1 || localSelectedTestRun.orderPriority === 2){
+      if(localSelectedTestRun.orderPriority === 1){
         if(setData){
           setTimeout(() => {
             refreshSummaries();
@@ -245,7 +245,7 @@ function SingleTestRunPage() {
     let intervalId = setInterval(async() => {
       let localSelectedTestRun = await fetchData(false);
       if(localSelectedTestRun.id){
-        if(localSelectedTestRun.orderPriority !== 1 && localSelectedTestRun.orderPriority !== 2){
+        if(localSelectedTestRun.orderPriority !== 1){
           setSelectedTestRun(localSelectedTestRun);
           setTempLoading((prev) => {
             prev.running = false;
