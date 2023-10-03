@@ -131,7 +131,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                             <Box padding="5" maxWidth="65vw" background="bg-subdued">
                                 <div className="response-message">
                                     <HorizontalStack gap="6" align="start">
-                                        <Avatar name="Akto" source='akto_colored.svg' size="medium"/>     
+                                        <Avatar name="Akto" source='akto_colored.svg' size="medium"/>
                                         {loading ? <Spinner size="small" /> 
                                             : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => handleCompletion()}/>
                                         }
