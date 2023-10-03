@@ -19,6 +19,9 @@ info:
   references:
     - "https://owasp.org/www-community/attacks/xss/"
     - "https://infosecwriteups.com/all-about-file-upload-xss-c72c797aaba3"
+  cwe:
+    - CWE-79
+
 api_selection_filters:
   and:
     response_code:

@@ -8,7 +8,7 @@
                     <div class="col_1">
                         <p> 1 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         <span style="text-decoration: underline; cursor: pointer" @click="downloadBurpJar">Download</span>
                         Akto's Burp extension
                     </div>
@@ -18,7 +18,7 @@
                     <div class="col_1">
                         <p> 2 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         Open Burp and add the downloaded jar file in extension tab
                     </div>
             </div>
@@ -27,7 +27,7 @@
                     <div class="col_1">
                         <p> 3 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         Once the plugin is loaded click on "options" tab inside the plugin
                     </div>
             </div>
@@ -36,7 +36,7 @@
                     <div class="col_1">
                         <p> 4 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         Copy AKTO_IP: 
                         <span style="color: var(--themeColor)">{{ aktoIp }}</span>
                         and AKTO_TOKEN:
@@ -49,7 +49,7 @@
                     <div class="col_1">
                         <p> 5 </p>
                     </div>
-                    <div style="margin-left: 4px">
+                    <div class="info-box">
                         Start Burp proxy and browse any website. You will see traffic in 
                         <span v-if="!burpCollectionURL"> Burp collection </span>
                         <a :href="burpCollectionURL" v-else> <span style="text-decoratoin: underline; color: var(--themeColor)">Burp collection</span> </a>
@@ -167,4 +167,8 @@ export default {
     
 .row > div:first-child 
     width: 20px
+
+.info-box
+    margin-left: 4px
+    max-width: 800px
 </style>

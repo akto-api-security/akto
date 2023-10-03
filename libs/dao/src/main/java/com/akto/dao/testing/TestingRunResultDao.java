@@ -1,14 +1,18 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-
+import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.model.IndexOptions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
@@ -38,8 +42,8 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(ObjectId testRunResultSummaryId) {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId))
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
                 .projection(
                         Projections.include(
                             TestingRunResult.TEST_RUN_ID,
@@ -65,4 +69,15 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
         return testingRunResults;
     }
+
+    public void createIndicesIfAbsent() {
+        
+        String dbName = Context.accountId.get()+"";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+
+        Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
+        createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name("testRunResultSummaryId_-1__id_-1"));
+
+    }
+
 }
