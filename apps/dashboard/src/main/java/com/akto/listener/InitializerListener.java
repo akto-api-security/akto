@@ -1238,6 +1238,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void setUpTestEditorTemplatesScheduler(){
+        GithubSync githubSync = new GithubSync();
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -1245,7 +1248,8 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         try {
                             int accountId = t.getId();
-                            updateTestEditorTemplatesFromGithub(accountId);
+                            loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for account: %d", accountId), LogDb.DASHBOARD);
+                            processTemplateFilesZip(repoZip);
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
                         }
@@ -1253,17 +1257,6 @@ public class InitializerListener implements ServletContextListener {
                 }, "update-test-editor-templates-github");
             }
         }, 0, 4, TimeUnit.HOURS);
-    }
-
-    public static void updateTestEditorTemplatesFromGithub(int accountId) {   
-        loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for account: %d", accountId), LogDb.DASHBOARD);
-
-        GithubSync githubSync = new GithubSync();
-        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
-
-        if (repoZip != null) {
-            processTemplateFilesZip(repoZip);
-        } 
     }
 
     public static void processTemplateFilesZip(byte[] zipFile) {
