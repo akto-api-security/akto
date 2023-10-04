@@ -1133,7 +1133,7 @@ mapCollectionIdToHostName(apiCollections){
       default:
         return tokens.color["color-border"]
     }
-  }
+  },
 }
 
 export default func
