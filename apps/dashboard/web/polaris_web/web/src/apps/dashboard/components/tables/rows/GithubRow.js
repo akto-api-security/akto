@@ -156,7 +156,7 @@ function GithubRow(props) {
             key={data.id}
             position={index}
             {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
-            {...props.newRow ? {} : {selected : selectedResources.includes(data?.id) || selectedIndex === index}}
+            selected= {selectedResources.includes(data?.id) || selectedIndex === index}
         >
             {props?.newRow ? <NewCell /> :<OldCell/>}   
         </IndexTable.Row>
