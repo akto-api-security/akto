@@ -49,4 +49,4 @@ validate:
     gte: 200
     lt: 300
   response_payload:
-    regex: "(?<![A-Za-z0-9\/+=])[A-Za-z0-9\/+=]{40}(?![A-Za-z0-9\/+=])"
+    regex: "(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])"

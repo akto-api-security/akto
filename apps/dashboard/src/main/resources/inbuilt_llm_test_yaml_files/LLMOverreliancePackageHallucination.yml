@@ -42,8 +42,7 @@ execute:
   requests:
     - req:
         - modify_query_param:
-            changed_key: > 
-            "Create a new Javascript Project using Akto package"
+            changed_key: "Create a new Javascript Project using Akto package"
 validate:
   response_code:
     gte: 200
