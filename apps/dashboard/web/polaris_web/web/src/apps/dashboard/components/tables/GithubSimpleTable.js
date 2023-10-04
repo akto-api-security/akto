@@ -62,7 +62,9 @@ function GithubSimpleTable(props) {
           props.getFilteredItems(tempData)
         }
 
-        return {value:tempData,total:tempData.length}
+        let finalData = props.useModifiedData ? props.modifyData(tempData,filters) : tempData
+
+        return {value:finalData,total:tempData.length}
     }
     
 
