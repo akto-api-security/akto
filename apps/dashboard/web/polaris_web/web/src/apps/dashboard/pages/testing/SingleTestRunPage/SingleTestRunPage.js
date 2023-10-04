@@ -10,14 +10,10 @@ import {
   Tooltip,
   LegacyCard,
   Card,
-  Tag
+  Tag,
+  IndexFiltersMode
 } from '@shopify/polaris';
-import {
-  CircleTickMinor,
-  ArchiveMinor,
-  LinkMinor,
-  ReplayMinor
-} from '@shopify/polaris-icons';
+import { ReplayMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
@@ -33,38 +29,36 @@ import TrendChart from "./TrendChart";
 
 let headers = [
   {
-    text: "Test name",
-    value: "name",
-    itemOrder: 1,
-
+    value: "nameComp",
+    title: 'Issue name',
+    itemCell: 1,
   },
   {
-    text: 'Severity',
-    value: 'severity',
-    itemOrder: 2,
+    title: 'Severity',
+    value: 'severityComp',
+    itemCell: 2,
   },
   {
-    text: "Detected time",
-    value: "detected_time",
-    itemOrder: 3,
-    icon: CircleTickMinor,
-  },
-  {
-    text: 'Test category',
     value: 'testCategory',
-    itemOrder: 3,
-    icon: ArchiveMinor
+    title: 'Category',
+    itemCell:3,
+    isText: true,
   },
   {
-    text: 'url',
-    value: 'url',
-    itemOrder: 3,
-    icon: LinkMinor
+    title: 'CWE tags',
+    value: 'cweDisplayComp',
+    itemCell:4,
   },
   {
-    text: 'CWE',
-    value: 'cweDisplay',
-    itemOrder: 2,
+    title: 'Number of urls',
+    value: 'totalUrls',
+    itemCell: 5,
+    isText:true
+  },
+  {
+    value: "scanned_time_comp",
+    itemCell: 6,
+    title: 'Scanned',
   },
 ]
 
@@ -103,12 +97,6 @@ let filters = [
     choices: [],
   },
   {
-    key: 'apiFilter',
-    label: 'API',
-    title: 'API',
-    choices: [],
-  },
-  {
     key: 'categoryFilter',
     label: 'Category',
     title: 'Category',
@@ -126,6 +114,15 @@ let filters = [
     title: 'CWE',
     choices: [],
   },
+]
+
+let subFilters = [
+  {
+    key: 'url',
+    title: 'API',
+    choices : [],
+    parentKey: 'testFilter'
+  }
 ]
 
 const TabHeading = (type, testRunResults) => {
@@ -178,7 +175,6 @@ function SingleTestRunPage() {
 
     await fetchTestingRunResultsData(summary.hexId);
   }
-
   async function fetchTestingRunResultsData(summaryHexId){
     setLoading(false);
     setTempLoading((prev) => {
@@ -190,11 +186,12 @@ function SingleTestRunPage() {
     await api.fetchTestingRunResults(summaryHexId, true).then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    fillData(testRunResults, 'vulnerable')
+    
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
     await api.fetchTestingRunResults(summaryHexId).then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    fillData(testRunResults, 'all')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'all')
   }
 
   async function fetchData(setData) {
@@ -303,20 +300,23 @@ const promotedBulkActions = (selectedDataHexIds) => {
         return "";
     }
   }
-
   const resultTable = (
     <GithubSimpleTable
-        key="table"
+        key={"table"}
         data={showVulnerableTests ? testRunResults.vulnerable : testRunResults.all}
         sortOptions={sortOptions}
         resourceName={resourceName}
         filters={filters}
         disambiguateLabel={disambiguateLabel}
         headers={headers}
-        selectable={true}
+        selectable={false}
         promotedBulkActions={promotedBulkActions}
         loading={loading || ( showVulnerableTests ? tempLoading.vulnerable : tempLoading.all) || tempLoading.running}
         getStatus={func.getTestResultStatus}
+        mode={IndexFiltersMode.Default}
+        headings={headers}
+        useNewRow={true}
+        condensedHeight={true}
       />
   )
 

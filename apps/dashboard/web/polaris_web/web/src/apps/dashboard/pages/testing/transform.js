@@ -5,6 +5,7 @@ import { Text,HorizontalStack, Badge, Link, List, Box, Icon } from '@shopify/pol
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
+import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -103,10 +104,10 @@ function tagList(list, cweLink){
 }
 
 function minimizeTagList(items){
-  if(items.length>2){
+  if(items.length>1){
 
-    let ret = items.slice(0,2)
-    ret.push(`+${items.length-2} more`)
+    let ret = items.slice(0,1)
+    ret.push(`+${items.length-1} more`)
     return ret;
   }
   return items;
@@ -232,11 +233,10 @@ const transform = {
       obj['detected_time'] = (data['vulnerable'] ? "Detected " : "Tried ") + func.prettifyEpoch(data.endTimestamp)
       obj["endTimestamp"] = data.endTimestamp
       obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
-      obj['url'] = (data['vulnerable'] ? "Detected in " : "Tried in ") + (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
+      obj['url'] = (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
       obj['severity'] = data.vulnerable ? [func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))] : []
       obj['total_severity'] = getTotalSeverityTestRunResult(obj['severity'])
       obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0]] : []
-      obj['apiFilter'] = [(data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url]
       obj['categoryFilter'] = [obj['testCategory']]
       obj['testFilter'] = [obj['name']]
       obj['testResults'] = data['testResults'] || []
@@ -444,6 +444,75 @@ convertSubIntoSubcategory(resp){
 
   return Object.fromEntries(sortedEntries);
 
+},
+
+getCollapisbleRow(testResult){
+  return(
+    <tr className="custom-row">
+      {testResult.urls.map((ele,index)=>{
+        return(
+          <td className="custom-data">
+            <Text>{ele.url}</Text>
+          </td>
+          
+        )
+    })}
+    </tr>
+  )
+},
+
+getPrettifiedTestRunResults(testRunResults){
+  let testRunResultsObj = {}
+  testRunResults.forEach((test)=>{
+    if(testRunResultsObj.hasOwnProperty(test.name)){
+      let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[test.name].endTimestamp)
+      let urls = testRunResultsObj[test.name].urls
+      urls.push({url: test.url, nextUrl: test.nextUrl})
+      let obj = {
+        ...test,
+        urls: urls,
+        endTimestamp: endTimestamp
+      }
+      delete obj["nextUrl"]
+      delete obj["url"]
+      testRunResultsObj[test.name] = obj
+    }else{
+      let urls = [{url: test.url, nextUrl: test.nextUrl}]
+      let obj={
+        ...test,
+        urls:urls,
+      }
+      delete obj["nextUrl"]
+      delete obj["url"]
+      testRunResultsObj[test.name] = obj
+    }
+  })
+  let prettifiedResults = []
+  Object.keys(testRunResultsObj).forEach((test)=>{
+    let obj = testRunResultsObj[test]
+    let prettifiedObj = {
+      ...obj,
+      nameComp: <Box maxWidth="250px"><TooltipText tooltip={test} text={test} textProps={{fontWeight: 'semibold'}}/></Box>,
+      severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
+      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
+        {obj.cweDisplay.map((ele,index)=>{
+          return(
+            <Badge size="small" status={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
+          )
+        })}
+      </HorizontalStack> : <Text>-</Text>,
+      totalUrls: obj.urls.length,
+      scanned_time_comp: <HorizontalStack gap={3}>
+        <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>
+        <Box>
+          <Icon source={ChevronDownMinor}/>
+        </Box>
+      </HorizontalStack>,
+      collapsibleRow: this.getCollapisbleRow(obj)
+    }
+    prettifiedResults.push(prettifiedObj)
+  })
+  return prettifiedResults
 }
 
 }

@@ -26,6 +26,7 @@ function GithubRow(props) {
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
+    const [collapisbleActive, setCollapsibleActive] = useState("none")
 
     const togglePopoverActive = (index) => useCallback(
         () => setPopoverActive((prev) => {
@@ -44,7 +45,15 @@ function GithubRow(props) {
 
     function handleRowClick(data){
         setSelectedIndex(index)
-        if(onRowClick){
+        if(data?.collapsibleRow){
+            setCollapsibleActive((prev) => {
+                if(prev===data?.name){
+                    return "none";
+                } 
+                return data?.name;
+            })
+        }
+        else if(onRowClick){
             onRowClick(data);
         } else {
             nextPage(data);
@@ -61,7 +70,7 @@ function GithubRow(props) {
             }
             return {...dataObj};
         })
-    }, [dataObj])
+    }, [dataObj,collapisbleActive])
 
     function OldCell(){
         return(
@@ -147,7 +156,7 @@ function GithubRow(props) {
                     )
                 })}
                 {hasRowActions &&
-                <IndexTable.Cell >
+                <IndexTable.Cell>
                     <HorizontalStack align='end'>
                         {
                             <Popover
@@ -168,17 +177,21 @@ function GithubRow(props) {
             </>
         )
     }
-
     return (
-        <IndexTable.Row
-            id={data.id}
-            key={data.id}
-            position={index}
-            {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
-            {...props.newRow ? {} : {selected : selectedResources.includes(data?.id) || selectedIndex === index}}
-        >
-            {props?.newRow ? <NewCell /> :<OldCell/>}   
-        </IndexTable.Row>
+        <>
+            <IndexTable.Row
+                id={data.id}
+                key={data.id}
+                position={index}
+                {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
+                {...props.newRow ? {} : {selected : selectedResources.includes(data?.id) || selectedIndex === index}}
+            >
+                {props?.newRow ? <NewCell /> :<OldCell/>}   
+            </IndexTable.Row>
+            
+            {collapisbleActive === data?.name ? data.collapsibleRow : null}
+            
+        </>
     )
 
 }
