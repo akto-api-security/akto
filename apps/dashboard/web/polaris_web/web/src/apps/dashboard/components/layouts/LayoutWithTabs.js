@@ -1,11 +1,17 @@
 import {LegacyTabs} from "@shopify/polaris"
 import { useState } from "react"
+import SpinnerCentered from "../progress/SpinnerCentered"
 
 export default function LayoutWithTabs(props){
 
     const [current, setCurrent] = useState(0)
+    const [loading, setLoading] = useState(false)
     const setCurrentTab = (selected) => {
+        setLoading(true)
         setCurrent(selected)
+        setTimeout(() => {
+            setLoading(false);
+        }, 500)
         props.currTab(props.tabs[selected])
     }
 
@@ -15,7 +21,7 @@ export default function LayoutWithTabs(props){
             onSelect={setCurrentTab}
             tabs={props.tabs}
         >
-            {props.tabs[current].component }
+            {loading ? <SpinnerCentered/> : props.tabs[current].component }
         </LegacyTabs>
     )
 }

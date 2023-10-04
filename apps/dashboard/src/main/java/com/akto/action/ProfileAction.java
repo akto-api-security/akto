@@ -13,6 +13,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -93,6 +94,7 @@ public class ProfileAction extends UserAction {
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
+                .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
         if (versions.length > 2) {

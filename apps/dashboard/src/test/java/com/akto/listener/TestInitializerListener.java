@@ -115,7 +115,7 @@ public class TestInitializerListener extends MongoBasedTest {
         long count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertFalse(count > 0);
 
-        InitializerListener.saveTestEditorYaml();
+        InitializerListener.updateTestEditorTemplatesFromGithub(1);
 
         count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertTrue(count > 0);

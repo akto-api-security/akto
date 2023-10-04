@@ -31,6 +31,7 @@ public class TestConfig {
         ConfigParserResult validation, Strategy strategy) {
         
         this.id = id;
+        info.setSubCategory(id);
         this.info = info;
         this.auth = auth;
         this.apiSelectionFilters = apiSelectionFilters;

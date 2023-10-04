@@ -6,6 +6,7 @@ import {
   ResourcesMajor,
   CollectionsMajor,
   FlagMajor,
+  CreditCardSecureMajor,
   MarketingMajor} from '@shopify/polaris-icons';
 import {
   Text,
@@ -78,6 +79,11 @@ let moreInfoSections = [
     content: ""
   },
   {
+    icon: CreditCardSecureMajor,
+    title: "CWE",
+    content: ""
+  },
+  {
     icon: MarketingMajor,
     title: "API endpoints affected",
     content: ""
@@ -98,7 +104,7 @@ function MoreInformationComponent(props) {
       <LegacyCard>
         <LegacyCard.Section>
           {
-            props.sections.map((section) => {
+            props?.sections?.map((section) => {
               return (<LegacyCard.Subsection key={section.title}>
                 <VerticalStack gap="3">
                   <HorizontalStack gap="2" align="start" blockAlign='start'>
@@ -122,7 +128,7 @@ function MoreInformationComponent(props) {
 
 function TestRunResultPage(props) {
 
-  let {testingRunResult, runIssues} = props;
+  let {testingRunResult, runIssues, testSubCategoryMap} = props;
 
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
@@ -132,12 +138,15 @@ function TestRunResultPage(props) {
   const params = useParams()
   const hexId = params.hexId;
   const hexId2 = params.hexId2;
-  const [infoState, setInfoState] = useState(moreInfoSections)
+  const [infoState, setInfoState] = useState([])
   const [fullDescription, setFullDescription] = useState(false);
   const [loading, setLoading] = useState(true);
   
   function getDescriptionText(fullDescription){
-    let str = parse(subCategoryMap[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
+
+    let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
+
+    let str = parse(tmp[issueDetails.id?.testSubCategory]?.issueDetails || "No details found");
     let finalStr = ""
 
     if(typeof(str) !== 'string'){
@@ -161,15 +170,22 @@ function TestRunResultPage(props) {
   }
 
   async function setData(testingRunResult, runIssues) {
+    
+    let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
+
     if (testingRunResult) {
-      let testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, subCategoryMap, subCategoryFromSourceConfigMap)
+      let testRunResult = transform.prepareTestRunResult(hexId, testingRunResult, tmp, subCategoryFromSourceConfigMap)
       setSelectedTestRunResult(testRunResult)
     } else {
       setSelectedTestRunResult({})
     }
     if (runIssues) {
       setIssueDetails(...[runIssues]);
-      setInfoState(await transform.fillMoreInformation(runIssues, subCategoryMap, moreInfoSections))
+      let runIssuesArr = []
+      await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
+        runIssuesArr = resp1['similarlyAffectedIssues'];
+      })
+      setInfoState(transform.fillMoreInformation(runIssues, runIssuesArr,subCategoryMap, moreInfoSections))
     } else {
       setIssueDetails(...[{}]);
     }
@@ -188,13 +204,14 @@ function TestRunResultPage(props) {
           }
         }
         setData(testingRunResult, runIssues);
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 500)
     }
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
-  const components = [
-    loading ? [<SpinnerCentered key="loading" />] :
+  const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
         {
@@ -209,7 +226,7 @@ function TestRunResultPage(props) {
       sampleData={selectedTestRunResult?.testResults.map((result) => {
         return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
       })}
-      isNewDiff={selectedTestRunResult?.vulnerable}
+      isNewDiff={true}
       vulnerable={selectedTestRunResult?.vulnerable}
       heading={"Attempt"}
       isVulnerable={selectedTestRunResult.vulnerable}

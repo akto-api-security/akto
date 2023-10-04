@@ -31,6 +31,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.DailyUpdate;
@@ -44,6 +45,7 @@ import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.notifications.TrafficUpdates;
@@ -58,7 +60,12 @@ import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +84,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
 import static com.mongodb.client.model.Filters.eq;
@@ -980,6 +989,38 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
+            String resourceName = "/tests-library-master.zip";
+
+            loggerMaker.infoAndAddToDb("Loading template files from directory", LogDb.DASHBOARD);
+
+            try (InputStream is = InitializerListener.class.getResourceAsStream(resourceName);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+
+                if (is == null) {
+                    loggerMaker.errorAndAddToDb("Resource not found: " + resourceName, LogDb.DASHBOARD);
+                } else {
+                    // Read the contents of the .zip file into a byte array
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = is.read(buffer)) != -1) {
+                        baos.write(buffer, 0, bytesRead);
+                    }
+
+                    processTemplateFilesZip(baos.toByteArray());
+                }
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(String.format("Error while loading templates files from directory. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.LOAD_TEMPLATES_FILES_FROM_DIRECTORY, Context.now())
+            );
+        }
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1035,6 +1076,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
+                        setUpTestEditorTemplatesScheduler();
+                        //fetchGithubZip();
                         updateGlobalAktoVersion();
                         if(isSaas){
                             try {
@@ -1106,14 +1149,13 @@ public class InitializerListener implements ServletContextListener {
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
+        loadTemplateFilesFromDirectory(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
-
-        saveTestEditorYaml();
 
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
@@ -1195,48 +1237,92 @@ public class InitializerListener implements ServletContextListener {
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 
-    public static void saveTestEditorYaml() {
-        List<String> templatePaths = new ArrayList<>();
-        try {
-            templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", e.toString()), LogDb.DASHBOARD);
-        }
+    public void setUpTestEditorTemplatesScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            int accountId = t.getId();
+                            updateTestEditorTemplatesFromGithub(accountId);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "update-test-editor-templates-github");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
 
-        String template = null;
-        for (String path: templatePaths) {
-            try {
-                template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-                //System.out.println(template);
-                TestConfig testConfig = null;
-                try {
-                    testConfig = TestConfigYamlParser.parseTemplate(template);
-                } catch (Exception e) {
-                    logger.error("invalid parsing yaml template for file " + path, e);
+    public static void updateTestEditorTemplatesFromGithub(int accountId) {   
+        loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for account: %d", accountId), LogDb.DASHBOARD);
+
+        GithubSync githubSync = new GithubSync();
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+
+        if (repoZip != null) {
+            processTemplateFilesZip(repoZip);
+        } 
+    }
+
+    public static void processTemplateFilesZip(byte[] zipFile) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
+                        if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
+                            continue;
+                        }
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+
+                        TestConfig testConfig = null;
+
+                        try {
+                            testConfig = TestConfigYamlParser.parseTemplate(templateContent);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(
+                                    String.format("Error parsing yaml template file %s %s", entryName, e.toString()),
+                                    LogDb.DASHBOARD);
+                        }
+
+                        if (testConfig != null) {
+                            String id = testConfig.getId();
+                            int createdAt = Context.now();
+                            int updatedAt = Context.now();
+                            String author = "AKTO";
+
+                            YamlTemplateDao.instance.updateOne(
+                                    Filters.eq("_id", id),
+                                    Updates.combine(
+                                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                            Updates.set(YamlTemplate.CONTENT, templateContent),
+                                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
+                        }
+                    }
+
+                    // Close the current entry to proceed to the next one
+                    zipInputStream.closeEntry();
                 }
-
-                if (testConfig == null) {
-                    logger.error("parsed template for file is null " + path);
-                }
-
-                String id = testConfig.getId();
-
-                int createdAt = Context.now();
-                int updatedAt = Context.now();
-                String author = "AKTO";
-
-                YamlTemplateDao.instance.updateOne(
-                    Filters.eq("_id", id),
-                    Updates.combine(
-                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                            Updates.set(YamlTemplate.CONTENT, template),
-                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())
-                    )
-                );
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(
+                        String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
             }
         }
     }
@@ -1315,3 +1401,4 @@ public class InitializerListener implements ServletContextListener {
         return stringbuilder.toString();
     }
 }
+
