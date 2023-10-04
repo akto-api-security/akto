@@ -11,6 +11,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -138,7 +139,7 @@ public class Main {
                     return;
                 }
 
-
+                ObjectId summaryId = null;
                 try {
                     long timestamp = testingRun.getId().getTimestamp();
                     long seconds = Context.now() - timestamp;
@@ -172,7 +173,7 @@ public class Main {
                             TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
                         }
                     }
-                    ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
+                    summaryId = createTRRSummaryIfAbsent(testingRun, start);
                     TestExecutor testExecutor = new TestExecutor();
                     testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
@@ -195,6 +196,42 @@ public class Main {
                 TestingRunDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", testingRun.getId()),  completedUpdate
                 );
+
+                if(summaryId != null){
+                    TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(
+                        Filters.eq(TestingRunResultSummary.ID, summaryId));
+                    if(testingRunResultSummary.getState() == TestingRun.State.RUNNING
+                            || testingRunResultSummary.getState() == TestingRun.State.SCHEDULED){
+
+                        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId)
+                        );
+
+                        if(testingRunResults == null){
+                            testingRunResults = new ArrayList<>();
+                        }
+
+                        Map<String, Integer> totalCountIssues = TestExecutor.calculateCountIssues(testingRunResults);
+
+                        int totalApis = 0;
+                        try {
+                            totalApis = testingRun.getTestingEndpoints().returnApis().size();
+                        } catch (Exception e) {
+                            totalApis = 0;
+                        }
+
+                        Bson updates = Updates.combine(
+                                Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                                Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues),
+                                Updates.set(TestingRunResultSummary.TOTAL_APIS, totalApis),
+                                Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
+                            );
+
+                        TestingRunResultSummariesDao.instance.updateOne(
+                            Filters.eq(TestingRunResultSummary.ID, summaryId), updates);
+                    }
+                }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
             }, "testing");
