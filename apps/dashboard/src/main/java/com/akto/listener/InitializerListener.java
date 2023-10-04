@@ -1326,4 +1326,79 @@ public class InitializerListener implements ServletContextListener {
             }
         }
     }
+
+    public static void saveLLmTemplates() {
+        List<String> templatePaths = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("saving llm templates", LoggerMaker.LogDb.DASHBOARD);
+        try {
+            templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_llm_test_yaml_files"));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", e.toString()), LogDb.DASHBOARD);
+        }
+
+        String template = null;
+        for (String path: templatePaths) {
+            try {
+                template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_llm_test_yaml_files/" + path));
+                //System.out.println(template);
+                TestConfig testConfig = null;
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(template);
+                } catch (Exception e) {
+                    logger.error("invalid parsing yaml template for file " + path, e);
+                }
+
+                if (testConfig == null) {
+                    logger.error("parsed template for file is null " + path);
+                }
+
+                String id = testConfig.getId();
+
+                int createdAt = Context.now();
+                int updatedAt = Context.now();
+                String author = "AKTO";
+
+                YamlTemplateDao.instance.updateOne(
+                    Filters.eq("_id", id),
+                    Updates.combine(
+                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                            Updates.set(YamlTemplate.CONTENT, template),
+                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+                    )
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
+            }
+        }
+        loggerMaker.infoAndAddToDb("finished saving llm templates", LoggerMaker.LogDb.DASHBOARD);
+    }
+
+    private static List<String> convertStreamToListString(InputStream in) throws Exception {
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String line = null;
+        List<String> files = new ArrayList<>();
+        while ((line = reader.readLine()) != null) {
+            files.add(line);
+        }
+        in.close();
+        reader.close();
+        return files;
+    }
+
+    private static String convertStreamToString(InputStream in) throws Exception {
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        StringBuilder stringbuilder = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            stringbuilder.append(line + "\n");
+        }
+        in.close();
+        reader.close();
+        return stringbuilder.toString();
+    }
 }
+
