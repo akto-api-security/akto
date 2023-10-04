@@ -78,8 +78,8 @@ function disambiguateLabel(key, value) {
   switch (key) {
     case 'severityStatus':
       return (value).map((val) => `${val} severity`).join(', ');
-    case 'apiFilter':
-      return value.length + 'API' + (value.length==1 ? '' : 's')
+    case 'urlFilters':
+      return value.length + ' API' + (value.length==1 ? '' : 's')
     case 'cwe':
     case 'categoryFilter':
     case 'testFilter':
@@ -114,14 +114,11 @@ let filters = [
     title: 'CWE',
     choices: [],
   },
-]
-
-let subFilters = [
   {
-    key: 'url',
-    title: 'API',
-    choices : [],
-    parentKey: 'testFilter'
+    key: 'urlFilters',
+    choices: [],
+    label: 'API',
+    title: 'API'
   }
 ]
 
@@ -300,6 +297,25 @@ const promotedBulkActions = (selectedDataHexIds) => {
         return "";
     }
   }
+
+  const modifyData = (data, filters) =>{
+    if(filters?.urlFilters?.length > 0){
+      let filteredData = data.map(element => {
+        let filteredUrls = element.urls.filter(obj => filters.urlFilters.includes(obj.url))
+        console.log(filteredUrls)
+        return {
+          ...element,
+          urls: filteredUrls,
+          totalUrls: filteredUrls.length,
+          collapsibleRow: transform.getCollapisbleRow(filteredUrls)
+        }
+      });
+      return filteredData
+    }else{
+      return data
+    }
+  }
+  
   const resultTable = (
     <GithubSimpleTable
         key={"table"}
@@ -317,6 +333,8 @@ const promotedBulkActions = (selectedDataHexIds) => {
         headings={headers}
         useNewRow={true}
         condensedHeight={true}
+        useModifiedData={true}
+        modifyData={(data,filters) => modifyData(data,filters)}
       />
   )
 

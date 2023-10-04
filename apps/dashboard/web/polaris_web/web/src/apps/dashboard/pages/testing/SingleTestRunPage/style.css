@@ -1,3 +1,8 @@
 .filterClass .Polaris-Filters__FiltersWrapper {
     border-bottom:0
 }
+
+.custom-row{
+    display: flex;
+    flex-direction: column;
+}

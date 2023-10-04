@@ -446,10 +446,10 @@ convertSubIntoSubcategory(resp){
 
 },
 
-getCollapisbleRow(testResult){
+getCollapisbleRow(urls){
   return(
     <tr className="custom-row">
-      {testResult.urls.map((ele,index)=>{
+      {urls.map((ele,index)=>{
         return(
           <td className="custom-data">
             <Text>{ele.url}</Text>
@@ -508,7 +508,8 @@ getPrettifiedTestRunResults(testRunResults){
           <Icon source={ChevronDownMinor}/>
         </Box>
       </HorizontalStack>,
-      collapsibleRow: this.getCollapisbleRow(obj)
+      collapsibleRow: this.getCollapisbleRow(obj.urls),
+      urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)
   })
