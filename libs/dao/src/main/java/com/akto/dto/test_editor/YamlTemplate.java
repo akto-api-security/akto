@@ -20,7 +20,6 @@ public class YamlTemplate {
     private boolean inactive;
     public static final String INACTIVE = "inactive";
 
-
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
         this.id = id;
         this.createdAt = createdAt;
@@ -80,7 +79,7 @@ public class YamlTemplate {
     public void setInfo(Info info) {
         this.info = info;
     }
-
+    
     public boolean getInactive() {
         return inactive;
     }
