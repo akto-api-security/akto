@@ -16,6 +16,7 @@ public class TestingRunResultSummary {
     public static final String TESTING_RUN_ID = "testingRunId";    
     public static final String STATE = "state";    
     public static final String TEST_RESULTS_COUNT = "testResultsCount";
+    public static final String METADATA_STRING = "metadata";
 
     private ObjectId id;
     private int startTimestamp;

@@ -19,6 +19,8 @@ info:
   references:
     - "https://owasp.org/www-community/attacks/Content_Spoofing"
     - "https://infosecwriteups.com/text-based-injection-content-spoofing-96e9eb1615d8"
+  cwe:
+    - CWE-345
 
 api_selection_filters:
   url:

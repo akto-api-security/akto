@@ -2,12 +2,17 @@ package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.ColorConstants;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.List;
+import java.util.Map;
 
-public class TestingRunResult {
+public class TestingRunResult implements Comparable<TestingRunResult> {
     private ObjectId id;
     @BsonIgnore
     private String hexId;
@@ -175,4 +180,67 @@ public class TestingRunResult {
                 ", testRunResultSummaryId=" + testRunResultSummaryId +
                 '}';
     }
+
+    public String toConsoleString(String severity) {
+
+        return 
+         ColorConstants.BLUE + "API: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().toString() + "\n" +
+         ColorConstants.PURPLE + "Test: " + testSuperType + " " + testSubType + " " +
+         (vulnerable ? ColorConstants.RED : ColorConstants.GREEN) + "Vulnerable: " + vulnerable + 
+         (vulnerable ? ColorConstants.CYAN + " Severity : " + severity : "") + 
+         "\n" + ColorConstants.RESET;
+    }
+
+    public String toOutputString(){
+        StringBuilder bld = new StringBuilder();
+
+        bld.append("API: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().toString() + "\n");
+        bld.append("Test: " + testSuperType + " " + testSubType + " " + "Vulnerable: " + vulnerable + "\n");
+        for (TestResult testResult : testResults) {
+            Gson gson = new Gson();
+            Map<String, Object> json = gson.fromJson(testResult.getOriginalMessage(), new TypeToken<Map<String, Object>>(){}.getType());
+            try {
+                bld.append("Original request : " + json.get("requestHeaders") + "\n" + json.get("requestPayload") + "\n");
+                bld.append("Original response: " + json.get("responseHeaders") + "\n" + json.get("responsePayload") + "\n");
+            } catch (Exception e){
+                bld.append("Original data not found\n");
+            }
+            try {
+                json = gson.fromJson(testResult.getMessage(), new TypeToken<Map<String, Object>>(){}.getType());
+                bld.append("\nAttempted request : " + json.get("request") + "\n");
+                bld.append("\nAttempted response: " + json.get("response") + "\n");
+            } catch (Exception e) {
+                int c = 1;
+                bld.append("Attempted errors : \n");
+                for (String error : testResult.getErrors()) {
+                    bld.append("Error " + c + ": " + error + "\n");
+                    c++;
+                }
+            }
+        }
+        bld.append("\n");
+
+        return bld.toString();
+    }
+
+    @Override
+    public int compareTo(TestingRunResult o) {
+
+        TestingRunResult that = o;
+
+        if (this.isVulnerable() != that.isVulnerable()) {
+            return this.isVulnerable() ? -1 : 1;
+        }
+
+        if (!this.getTestSubType().equalsIgnoreCase(that.getTestSubType())) {
+            return this.getTestSubType().compareToIgnoreCase(that.getTestSubType());
+        }
+
+        if (!this.getApiInfoKey().getUrl().equalsIgnoreCase(that.getApiInfoKey().getUrl())) {
+            return this.getApiInfoKey().getUrl().compareToIgnoreCase(that.getApiInfoKey().getUrl());
+        }
+
+        return 0;
+    }
+
 }

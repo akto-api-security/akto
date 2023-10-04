@@ -18,6 +18,8 @@ info:
     - HackerOne top 10
   references:
     - "https://www.cobalt.io/blog/a-pentesters-guide-to-server-side-template-injection-ssti"
+  cwe:
+    - CWE-1336
 
 api_selection_filters:
   or:

@@ -27,6 +27,8 @@ info:
   references:
     - "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/02-Fingerprint_Web_Server"
     - "https://github.com/ASRG/asrg.io/issues/200"
+  cwe:
+    - CWE-209
 
 api_selection_filters:
   response_code:
