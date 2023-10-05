@@ -1,30 +1,35 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestRunTableInfo() {
+    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters) {
         const resp = await request({
-            url: '/api/fetchTestRunTableInfo',
-            method: 'post',
-            data: {}
-        })
-        return resp
-    },
-    async fetchTestingRunResultSummaries(testingRunHexId) {
-        const resp = await request({
-            url: '/api/fetchTestingRunResultSummaries',
+            url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                testingRunHexId
+                startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters
             }
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId) {
+
+    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchTestingRunResultSummaries',
+            method: 'post',
+            data: {
+                testingRunHexId,
+                startTimestamp,
+                endTimestamp
+            }
+        })
+        return resp
+    },
+    async fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId, fetchOnlyVulnerable
             }
         })
         return resp        
@@ -171,6 +176,24 @@ export default {
             data: {}
         }).then((resp) => {
             return resp
+        })
+    },
+    async fetchMetadataFilters() {
+        const resp = await request({
+            url: '/api/fetchMetadataFilters',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+        return request({
+            url: '/api/fetchVulnerableTestRunResults',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId,
+                skip
+            }
         })
     },
 }

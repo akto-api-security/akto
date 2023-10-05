@@ -12,14 +12,16 @@ import com.akto.dto.type.URLMethods;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
-import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
-import org.checkerframework.checker.units.qual.K;
 import org.junit.Test;
 
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
@@ -65,7 +67,7 @@ public class TestExecutorTest extends MongoBasedTest {
         apiCollectionSet.add(0);
         messageStore.fetchSampleMessages(apiCollectionSet);
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-        TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "");
+        TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "", new ArrayList<>());
 
         String host = TestExecutor.findHost(apiInfoKey, testingUtil.getSampleMessages(), messageStore);
         assertEquals(answer,host);

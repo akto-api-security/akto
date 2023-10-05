@@ -13,6 +13,9 @@ info:
   severity: HIGH
   references:
     - https://securityboulevard.com/2021/04/understanding-and-preventing-s3-leaks/
+  cwe:
+    - CWE-200
+    - CWE-213
 
 api_selection_filters:
   response_code:

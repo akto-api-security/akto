@@ -41,6 +41,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Main {
     private Consumer<String, String> consumer;
@@ -211,12 +212,15 @@ public class Main {
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
+        final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 main.consumer.wakeup();
                 try {
-                    mainThread.join();
+                    if (!exceptionOnCommitSync.get()) {
+                        mainThread.join();
+                    }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e){
@@ -241,7 +245,11 @@ public class Main {
             loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
-                main.consumer.commitSync();
+                try {
+                    main.consumer.commitSync();
+                } catch (Exception e) {
+                    throw e;
+                }
 
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
@@ -369,9 +377,11 @@ public class Main {
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
+            exceptionOnCommitSync.set(true);
             printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
+            System.exit(0);
         } finally {
             main.consumer.close();
         }

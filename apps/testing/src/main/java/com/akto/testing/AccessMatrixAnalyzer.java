@@ -6,11 +6,13 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
@@ -96,7 +98,8 @@ public class AccessMatrixAnalyzer {
 
             AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
             AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-            TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"");
+            List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+            TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"", customAuthTypes);
 
             BFLATest bflaTest = new BFLATest();
 

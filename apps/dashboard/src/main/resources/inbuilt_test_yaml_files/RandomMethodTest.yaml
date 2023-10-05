@@ -30,6 +30,8 @@ info:
     - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods"
     - "https://web.archive.org/web/20081116154150/http://www.aspectsecurity.com/documents/Bypassing_VBAAC_with_HTTP_Verb_Tampering.pdf"
     - "https://capec.mitre.org/data/definitions/274.html"
+  cwe:
+    - CWE-274
 
 auth:
   authenticated: true

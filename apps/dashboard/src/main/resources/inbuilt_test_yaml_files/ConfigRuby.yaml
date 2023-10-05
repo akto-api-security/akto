@@ -14,6 +14,8 @@ info:
   references:
     - https://www.broadcom.com/support/security-center/attacksignatures/detail?asid=31405
     - https://www.acunetix.com/vulnerabilities/web/ruby-on-rails-database-configuration-file/
+  cwe:
+    - CWE-538
 
 api_selection_filters:
   response_code:
