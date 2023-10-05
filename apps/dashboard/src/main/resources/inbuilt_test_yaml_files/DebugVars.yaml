@@ -1,0 +1,36 @@
+id: DEBUG_VARS
+info:
+  name: Golang expvar Information Disclosure
+  description: "Attacker can get unauthorized access of Golang expvar information."
+  details: >
+              "Golang expvar Information Disclosure refers to the vulnerability where unauthorized access to Golang expvar information is possible through the /debug/vars endpoint. This exposure can reveal sensitive details like memory statistics and command-line arguments, providing insights into the application's internal state. Attackers can leverage this information to identify vulnerabilities or gather sensitive data. Promptly addressing this vulnerability is crucial to prevent unauthorized access and protect the security of the application."
+  impact: "Disclosing Golang expvar information enables attackers to gain insights into the application's internal state, potentially aiding in identifying vulnerabilities or extracting sensitive data."
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: DEBUG_VARS
+  severity: LOW
+  references:
+    - https://hackerone.com/reports/1650035
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}/debug/vars
+
+validate:
+  response_code:
+    eq: 200
+  response_payload:
+    contains_all:
+      - '"memstats":'
+      - '"cmdline":'

@@ -5,7 +5,7 @@
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
                         <layout-with-left-pane>
-                            <search class="py-2 pr-2" placeholder="Search Tests" @changed="setSearchText" />
+                            <search class="py-2 pr-2" placeholder="Search Tests" @onKeystroke="setSearchText" />
                             <div class="tests-container">
                                 <div class="main-list-title" @click="toggleListDisplay('custom')">
                                     <v-icon size=18
@@ -121,7 +121,22 @@
                                     </v-icon>
                                 </div>
                                 <slot name="unsavedChanges" :IsEdited="IsEdited">
+                                    <span class="test-subheading">
                                     <span class="last-edited" v-if="lastEdited !== -1">last edited {{ lastEdited }}</span>
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator='{ on, attrs }'>
+                                                <v-icon 
+                                                size=16 
+                                                @click="setTestInactive"
+                                                v-bind="attrs"
+                                                v-on="on"
+                                                >
+                                                {{ testInactive ? "$fas_check" : "$fas_times" }}
+                                                </v-icon>
+                                            </template>
+                                            <span>Set as {{ testInactive ? "active" : "inactive" }}</span>
+                                        </v-tooltip>
+                                    </span>
                                 </slot>
                             </div>
                             <slot name="saveEditedTemplate" :IsEdited="IsEdited">
@@ -204,7 +219,7 @@
 
 <script>
 
-import { editor } from "monaco-editor/esm/vs/editor/editor.api"
+import { editor, KeyCode, KeyMod } from "monaco-editor/esm/vs/editor/editor.api"
 import Search from '../shared/components/inputs/Search.vue';
 import LayoutWithLeftPane from '../layouts/LayoutWithLeftPane.vue';
 import SampleData from '../shared/components/SampleData.vue';
@@ -218,6 +233,7 @@ import testingApi from "../views/testing/api"
 
 import func from "@/util/func"
 import obj from "@/util/obj"
+import editorSetup from "./editorSetup"
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -292,13 +308,30 @@ export default {
     data() {
         return {
             editorOptions: {
-                language: "yaml",
+                language: "custom_yaml",
                 minimap: { enabled: false },
                 wordWrap: true,
                 automaticLayout: true,
                 colorDecorations: true,
-                scrollBeyondLastLine: false
+                scrollBeyondLastLine: false,
+                theme: "customTheme"
             },
+            // UPDATE THIS LIST WHILE ADDING ANY NEW KEY
+            keywords: [
+                "id", "info", 
+                "name", "description", "details", "impact", "category", "shortName", "displayName", "subCategory", "severity", "tags", "references",
+                "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", "api_collection_id",
+                "regex", "eq", "neq", "gt", "gte", "lt", "lte", 
+                "key", "value", "requests", "req", "res",
+                "not_contains", "not_contains_either", "contains_jwt", "contains_all", "contains_either",
+                "for_one", "or", "and", "extract", 
+                "add_body_param", "modify_body_param", "delete_body_param", "add_query_param", "modify_query_param", "delete_query_param", 
+                "modify_url", "modify_method", "replace_body", "add_header", "modify_header", "delete_header", "remove_auth_header", "follow_redirect", "replace_auth_header", 
+                "api_selection_filters", "execute", "type", "auth", "validate", "authenticated", 
+                "private_variable_context", "param_context", "endpoint_in_traffic_context",
+                "sample_request_payload", "sample_response_payload", "sample_request_headers", "sample_response_headers", 
+                "test_request_payload", "test_response_payload", "test_request_headers", "test_response_headers",
+            ],
             textEditor: null,
             testCategories: [],
             testsObj: {},
@@ -337,6 +370,7 @@ export default {
             copyCustomObj: {},
             defaultTest: this.defaultTestId || "REMOVE_TOKENS",
             defaultTestName: null,
+            testInactive: false,
             currentCategory: '',
             allCustomTests: {},
             setTextId: {},
@@ -345,7 +379,7 @@ export default {
         }
     },
     methods: {
-        findTestLabelFromTestValue(testValue) {
+        findTestFromTestValue(testValue) {
             let aktoTest = Object.values(this.testsObj).map (x => x.all).flat().find(x=>x.value === testValue)
             let customTest = Object.values(this.customTestObj).map (x => x.all).flat().find(x=>x.value === testValue)
 
@@ -353,20 +387,45 @@ export default {
                 this.aktoToggle = true
                 this.customToggle = false
                 this.currentCategory = aktoTest.category
-                return aktoTest.label
+                return aktoTest
             }
 
             if (customTest) {
                 this.aktoToggle = false
                 this.customToggle = true
                 this.currentCategory = customTest.category
-                return customTest.label
+                return customTest
             }
 
             return null
         },
         openGithubLink() {
             return window.open("https://github.com/akto-api-security/akto/tree/master/apps/dashboard/src/main/resources/inbuilt_test_yaml_files", "_blank")
+        },
+        async setTestInactive() {
+            this.testInactive = !this.testInactive;
+            this.lastEdited = func.prettifyEpoch(Date.now()/1000);
+            await testingApi.setTestInactive(this.defaultTest, this.testInactive).then((res) => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `Test set as ${this.testInactive ? "inactive" : "active"}`,
+                    color: 'green'
+                });
+            })
+            Object.values(this.testsObj).map (x => x.all).flat().forEach((x, i) => {
+                if(x.value==this.defaultTest){
+                    x.inactive = this.testInactive
+                    this.mapTestToStamp[x.label] = this.lastEdited
+                }
+            })
+            Object.values(this.customTestObj).map (x => x.all).flat().forEach((x, i) => {
+                if(x.value==this.defaultTest){
+                    x.inactive = this.testInactive
+                    this.mapTestToStamp[x.label] = this.lastEdited
+                }
+            })
+            this.copyTestObj = JSON.parse(JSON.stringify(this.testsObj))
+            this.copyCustomObj = JSON.parse(JSON.stringify(this.customTestObj))
         },
         getFormValues(param, formValues) {
             if (param === 'choose') {
@@ -418,17 +477,16 @@ export default {
             }
             this.selectedAnonymousOption = 'Sample data'
         },
-        setMessageJson(result) {
+        setMessageJson(result, doNotUpdateAPIjson) {
             this.messageJson = result.messageJson
             this.sampleDataListForTestRun = result.sampleDataListForTestRun
         },
-        setSelectedMethod(testId) {
-            let testName = this.findTestLabelFromTestValue(testId)
-            this.changeValue(testName)
+        setSelectedMethod(testId, doNotUpdateAPIjson) {
+            let test = this.findTestFromTestValue(testId)
+            this.changeValue(test?.label ? test.label : null)
             this.defaultTest = testId
+            this.testInactive = test?.inactive ? test.inactive : null
 
-            this.selectedUrl = {}
-            this.messageJson = {}
             this.runTest = false
 
             let pathname = window.location.pathname
@@ -438,9 +496,9 @@ export default {
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
-
-            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0]) {
-
+            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId][0] && !doNotUpdateAPIjson) {
+                this.selectedUrl = {}
+                this.messageJson = {}
                 let obj = {
                     apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
                     url: this.mapRequestsToId[testId][0].url,
@@ -489,7 +547,7 @@ export default {
                         color: 'green'
                     });
                     await this.refreshTestTemplates()
-                    this.setSelectedMethod(resp.finalTestId)
+                    this.setSelectedMethod(resp.finalTestId, true)
                 })
             }
         },
@@ -519,7 +577,36 @@ export default {
             }
         },
         createEditor() {
+            editorSetup.registerLanguage()
+            editorSetup.setTokenizer()
+            editorSetup.setEditorTheme()
+            editorSetup.setAutoComplete(this.keywords)
             this.textEditor = editor.create(this.$refs.editor, this.editorOptions)
+            this.textEditor.addAction({
+                id: "giveTypingEffect",
+                label: "Give typing effect",
+                keybindings: [KeyMod.Shift | KeyCode.KeyB],
+                run: () => {
+                    this.giveTypingEffect(false, true);
+                },
+            });
+            editorSetup.findErrors(this.textEditor, this.keywords)
+        },
+        giveTypingEffect() {
+            let str = this.textEditor.getValue()
+            let prevStr = "";
+            this.textEditor.setValue(prevStr)
+            let i = 0;
+            let intI = setInterval(() => {
+                prevStr += str[i]
+                i++;
+                
+                this.textEditor.setValue(prevStr + "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                if (i == str.length) {
+                    clearInterval(intI)
+                }
+            }, 10);
+
         },
         findSuffixForNewTest(testId) {
             let aktoTests = Object.values(this.testsObj).map (x => x.all).flat().filter(x=>x.value.indexOf(testId) == 0)            
@@ -586,14 +673,16 @@ export default {
                     label: x.testName,
                     value: x.name,
                     icon: "$aktoWhite",
-                    category: x.superCategory.displayName
+                    category: x.superCategory.displayName,
+                    inactive: x.inactive
                 }
                 this.mapTestToYaml[x.testName] = x.content
                 this.mapTestToStamp[x.testName] = func.prettifyEpoch(x.updatedTs)
                 if(x.templateSource._name === "CUSTOM"){
                     let customVal = {
                         name: x._name,
-                        category: x.superCategory.name
+                        category: x.superCategory.name,
+                        inactive: x.inactive
                     }
                     this.allCustomTests[x.testName] = customVal
                     this.totalCustomTests++
@@ -762,8 +851,11 @@ export default {
             align-items: center;
         }
 
-        .last-edited {
+        .test-subheading{
             font-size: 12px;
+        }
+
+        .last-edited {
             color: var(--themeColorDark10);
         }
     }

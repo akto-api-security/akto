@@ -5,22 +5,26 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
+import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.User;
+import com.akto.dto.UserAccountEntry;
+import com.akto.listener.InitializerListener;
+import com.akto.util.Constants;
+import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Intercom;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import org.bson.internal.Base64;
+import com.mongodb.client.model.Filters;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
-import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Filters.in;
 
 public class ProfileAction extends UserAction {
 
@@ -77,14 +81,30 @@ public class ProfileAction extends UserAction {
             }
             return;
         }
+        String username = user.getLogin();
 
+        EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
+        String accountName = emailAccountName.getAccountName();
+        String dashboardVersion = accountSettings.getDashboardVersion();
+        String[] versions = dashboardVersion.split(" - ");
+        User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         userDetails.append("accounts", accounts)
-                .append("username",user.getName())
+                .append("username",username)
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
+                .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("userHash", Intercom.getUserHash(user.getLogin()))
-                .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()));
+                .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
+                .append("accountName", accountName)
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+        if (versions.length > 2) {
+            if (versions[2].contains("akto-release-version")) {
+                userDetails.append("releaseVersion", "akto-release-version");
+            } else {
+                userDetails.append("releaseVersion", versions[2]);
+            }
+        }
 
         for (String k: userDetails.keySet()) {
             request.setAttribute(k, userDetails.get(k));

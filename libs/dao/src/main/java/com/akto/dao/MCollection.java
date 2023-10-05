@@ -6,6 +6,8 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
+
+import org.bson.BsonDocument;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -21,6 +23,9 @@ import static com.mongodb.client.model.Filters.*;
 public abstract class MCollection<T> {
     private Logger logger = LoggerFactory.getLogger(getClassT());
     public static MongoClient[] clients = new MongoClient[1];
+    public static final String SET = "$set";
+    public static final String ID = "_id";
+    public static final String NAME = "name";
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
@@ -185,4 +190,53 @@ public abstract class MCollection<T> {
     public Logger getLogger() {
         return logger;
     }
+
+    public static boolean createCollectionIfAbsent(String dbName, String collName, CreateCollectionOptions options){
+        try{
+            boolean exists = false;
+            MongoDatabase db = clients[0].getDatabase(dbName);
+            for (String col: db.listCollectionNames()){
+                if (collName.equalsIgnoreCase(col)){
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists) {
+                db.createCollection(collName, options);
+                return true;
+            }
+        } catch (Exception e){
+            return false;
+        }
+        return false;
+    }
+
+    public static boolean createIndexIfAbsent(String dbName, String collName, Bson idx, IndexOptions options) {
+        try{
+            MongoDatabase db = clients[0].getDatabase(dbName);
+            
+            MongoCursor<Document> cursor = db.getCollection(collName).listIndexes().cursor();
+            List<Document> indices = new ArrayList<>();
+
+            while (cursor.hasNext()) {
+                indices.add(cursor.next());
+            }
+
+            for (Document index: indices) {
+                if (index.get(NAME).equals(options.getName())) {
+                    return true;
+                }
+            }
+
+            db.getCollection(collName).createIndex(idx, options);
+
+        } catch (Exception e){
+            return false;
+        }
+
+        return false;
+
+    }
+
 }

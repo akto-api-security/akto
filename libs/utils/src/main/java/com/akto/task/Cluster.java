@@ -16,6 +16,7 @@ import org.bson.conversions.Bson;
 public class Cluster {
     
     public static final String RUNTIME_MERGER = "runtime-merger";
+    public static final String TELEMETRY_CRON = "telemetry-cron";
 
     public static final String winnerId = UUID.randomUUID().toString();
 

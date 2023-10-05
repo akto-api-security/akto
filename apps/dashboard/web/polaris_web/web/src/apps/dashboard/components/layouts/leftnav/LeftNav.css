@@ -1,0 +1,14 @@
+.Polaris-Navigation__ItemInnerWrapper{
+    border-top: none !important;
+}
+.Polaris-Navigation__PrimaryNavigation{
+    justify-content: space-between;
+}
+
+.active .Polaris-Navigation__Item--selected::before{
+    width: 0 !important;
+}
+
+.active .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__Item--selected::before{
+    width: 0.1875rem !important;
+}

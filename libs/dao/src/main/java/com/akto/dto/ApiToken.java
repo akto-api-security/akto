@@ -7,6 +7,7 @@ import java.util.List;
 public class ApiToken {
     private int id;
     private int accountId;
+    public static final String ACCOUNT_ID = "accountId";
     private String name;
     private String key;
     public static final String KEY ="key";
@@ -22,9 +23,9 @@ public class ApiToken {
         BURP(Arrays.asList("/api/uploadHar", "/api/importInBurp", "/api/sendHealthCheck")),
         EXTERNAL_API(Collections.singletonList(FULL_STRING_ALLOWED_API)),
         SLACK(Collections.emptyList()),
-        CICD(Arrays.asList("/api/startTest", "api/retrieveAllCollectionTests", "api/fetchTestingRunResultSummaries", 
-        "api/fetchTestingRunResults","api/fetchWorkflowTestingRun","api/fetchWorkflowTestingSchedule",
-        "api/stopAllTests","api/fetchTestRunResultDetails","api/fetchIssueFromTestRunResultDetails"));
+        CICD(Arrays.asList("/api/startTest", "/api/retrieveAllCollectionTests", "/api/fetchTestingRunResultSummaries", 
+        "/api/fetchTestingRunResults","/api/fetchWorkflowTestingRun","/api/fetchWorkflowTestingSchedule",
+        "/api/stopAllTests","/api/fetchTestRunResultDetails","/api/fetchIssueFromTestRunResultDetails"));
         private final List<String> accessList;
 
         Utility(List<String> accessList) {

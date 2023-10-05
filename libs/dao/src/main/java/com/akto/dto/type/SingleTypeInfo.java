@@ -1,10 +1,5 @@
 package com.akto.dto.type;
 
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.CustomDataTypeDao;
@@ -13,6 +8,7 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.CustomDataType;
 import com.akto.types.CappedSet;
+import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
@@ -22,6 +18,11 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import static com.google.common.primitives.Longs.min;
 import static java.lang.Long.max;
 
@@ -29,11 +30,51 @@ public class SingleTypeInfo {
 
     private static final Logger logger = LoggerFactory.getLogger(SingleTypeInfo.class);
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final Map<Integer, AccountDataTypesInfo> accountToDataTypesInfo = new HashMap<>();
+    public static final Map<Integer, List<CustomAuthType>> activeCustomAuthTypes = new HashMap<>();
+
+    public static Map<String, CustomDataType> getCustomDataTypeMap(int accountId) {
+        if (accountToDataTypesInfo.containsKey(accountId)) {
+            return accountToDataTypesInfo.get(accountId).getCustomDataTypeMap();
+        } else {
+            return new HashMap<>();
+        }
+    }
+
+    public static List<CustomAuthType> getCustomAuthType (int accountId) {
+        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes.get(accountId);
+        if (customAuthTypes == null) {
+            customAuthTypes = new ArrayList<>();
+        }
+        return customAuthTypes;
+    }
+
+    public static Map<String, AktoDataType> getAktoDataTypeMap(int accountId) {
+        if (accountToDataTypesInfo.containsKey(accountId)) {
+            return accountToDataTypesInfo.get(accountId).getAktoDataTypeMap();
+        } else {
+            return new HashMap<>();
+        }
+    }
+
+    public static List<CustomDataType> getCustomDataTypesSortedBySensitivity(int accountId) {
+        if (accountToDataTypesInfo.containsKey(accountId)) {
+            return accountToDataTypesInfo.get(accountId).getCustomDataTypesSortedBySensitivity();
+        } else {
+            return new ArrayList<>();
+        }
+    }
+
+    public static Map<Integer, AccountDataTypesInfo> getAccountToDataTypesInfo () {
+        return accountToDataTypesInfo;
+    }
     public static void init() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                fetchCustomDataTypes();
-                fetchCustomAuthTypes();
+                AccountTask.instance.executeTask(t -> {
+                    fetchCustomDataTypes(t.getId());
+                    fetchCustomAuthTypes(t.getId());
+                }, "populate-data-types-info");
             }
         }, 0, 5, TimeUnit.MINUTES);
 
@@ -46,44 +87,41 @@ public class SingleTypeInfo {
         return paramList[paramList.length-1]; // choosing the last key
     }
 
-    public static void fetchCustomDataTypes() {
-        Context.accountId.set(1_000_000);
-        try {
-            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
-            Map<String, CustomDataType> newMap = new HashMap<>();
-            List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
-            List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
-            for (CustomDataType customDataType: customDataTypes) {
-                newMap.put(customDataType.getName(), customDataType);
-                if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
-                    sensitiveCustomDataType.add(customDataType);
-                } else {
-                    nonSensitiveCustomDataType.add(customDataType);
-                }
+    public static void fetchCustomDataTypes(int accountId) {
+        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+        Map<String, CustomDataType> newMap = new HashMap<>();
+        List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
+        List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
+        for (CustomDataType customDataType: customDataTypes) {
+            newMap.put(customDataType.getName(), customDataType);
+            if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
+                sensitiveCustomDataType.add(customDataType);
+            } else {
+                nonSensitiveCustomDataType.add(customDataType);
             }
-            customDataTypeMap = newMap;
-            sensitiveCustomDataType.addAll(nonSensitiveCustomDataType);
-            customDataTypesSortedBySensitivity = new ArrayList<>(sensitiveCustomDataType);
-
-            List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
-            Map<String,AktoDataType> newAktoMap = new HashMap<>();
-            for(AktoDataType aktoDataType:aktoDataTypes){
-                if(subTypeMap.containsKey(aktoDataType.getName())){
-                    newAktoMap.put(aktoDataType.getName(), aktoDataType);
-                    subTypeMap.get(aktoDataType.getName()).setSensitiveAlways(aktoDataType.getSensitiveAlways());
-                    subTypeMap.get(aktoDataType.getName()).setSensitivePosition(aktoDataType.getSensitivePosition());
-                }
-            }
-            aktoDataTypeMap = newAktoMap;
-        } catch (Exception ex) {
-            ex.printStackTrace(); // or logger would be better
         }
+
+        accountToDataTypesInfo.putIfAbsent(accountId, new AccountDataTypesInfo());
+
+        AccountDataTypesInfo info = accountToDataTypesInfo.get(accountId);
+
+        info.setCustomDataTypeMap(newMap);
+        sensitiveCustomDataType.addAll(nonSensitiveCustomDataType);
+        info.setCustomDataTypesSortedBySensitivity(new ArrayList<>(sensitiveCustomDataType));
+        List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
+        Map<String,AktoDataType> newAktoMap = new HashMap<>();
+        for(AktoDataType aktoDataType:aktoDataTypes){
+            if(subTypeMap.containsKey(aktoDataType.getName())){
+                newAktoMap.put(aktoDataType.getName(), aktoDataType);
+                subTypeMap.get(aktoDataType.getName()).setSensitiveAlways(aktoDataType.getSensitiveAlways());
+                subTypeMap.get(aktoDataType.getName()).setSensitivePosition(aktoDataType.getSensitivePosition());
+            }
+        }
+        info.setAktoDataTypeMap(newAktoMap);
     }
 
-    public static List<CustomAuthType> activeCustomAuthTypes = new ArrayList<>();
-
-    public static void fetchCustomAuthTypes() {
-        activeCustomAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+    public static void fetchCustomAuthTypes(int accountId) {
+        activeCustomAuthTypes.put(accountId, CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true));
     }
 
     public enum SuperType {
@@ -333,7 +371,7 @@ public class SingleTypeInfo {
             this.subTypeString = subTypeString;
             this.subType = subTypeMap.get(subTypeString);
             if (this.subType == null) {
-                CustomDataType customDataType = customDataTypeMap.get(subTypeString);
+                CustomDataType customDataType = getCustomDataTypeMap(Context.accountId.get()).get(subTypeString);
                 if (customDataType != null) {
                     this.subType = customDataType.toSubType();
                 } else {
@@ -427,9 +465,6 @@ public class SingleTypeInfo {
     }
 
     public static final Map<String, SubType> subTypeMap = new HashMap<>();
-    public static Map<String, CustomDataType> customDataTypeMap = new HashMap<>();
-    public static List<CustomDataType> customDataTypesSortedBySensitivity = new ArrayList<>();
-    public static Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
     static {
         subTypeMap.put("TRUE", TRUE);
         subTypeMap.put("FALSE", FALSE);
@@ -673,7 +708,7 @@ public String composeKeyWithCustomSubType(SubType s) {
         this.subTypeString = subTypeString;
         this.subType = subTypeMap.get(subTypeString);
         if (this.subType == null) {
-            CustomDataType customDataType = customDataTypeMap.get(subTypeString);
+            CustomDataType customDataType = getCustomDataTypeMap(Context.accountId.get()).get(subTypeString);
             if (customDataType != null) {
                 this.subType = customDataType.toSubType();
             } else {

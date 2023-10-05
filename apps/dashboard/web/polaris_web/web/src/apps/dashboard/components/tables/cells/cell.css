@@ -1,0 +1,10 @@
+.order1Title:hover{
+    color: #2C6ECB;
+}
+
+.big-icon .Polaris-Icon__Svg{
+    max-width: 20px !important;
+    max-height: 20px !important;
+    width: 20px !important;
+    margin-top: -1px !important;
+}

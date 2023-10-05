@@ -7,17 +7,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.testing.AccessMatrixUrlToRole;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
+import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
+import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
@@ -76,6 +80,10 @@ public final class FilterAction {
                 return evaluateParamContext(filterActionRequest);
             case "endpoint_in_traffic_context":
                 return endpointInTraffic(filterActionRequest);
+            case "include_roles_access":
+                return evaluateRolesAccessContext(filterActionRequest, true);
+            case "exclude_roles_access":
+                return evaluateRolesAccessContext(filterActionRequest, false);                
             default:
                 return new DataOperandsFilterResponse(false, null, null);
         }
@@ -168,7 +176,7 @@ public final class FilterAction {
     }
 
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
-        String url = filterActionRequest.getApiInfoKey().getUrl();
+        String url = filterActionRequest.getRawApi().getRequest().getUrl();
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
             return;
@@ -997,6 +1005,27 @@ public final class FilterAction {
         } else {
             res = singleTypeInfo == null;
         }
+        return new DataOperandsFilterResponse(res, null, null);
+    }
+
+    private DataOperandsFilterResponse evaluateRolesAccessContext(FilterActionRequest filterActionRequest, boolean include) {
+
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        Bson filterQ = Filters.eq("_id", apiInfoKey);
+        List<String> querySet = (List) filterActionRequest.getQuerySet();
+        String roleName = querySet.get(0);
+
+        AccessMatrixUrlToRole accessMatrixUrlToRole = AccessMatrixUrlToRolesDao.instance.findOne(filterQ);
+
+        List<String> rolesThatHaveAccessToApi = new ArrayList<>();
+        if (accessMatrixUrlToRole != null) {
+            rolesThatHaveAccessToApi = accessMatrixUrlToRole.getRoles();
+        }
+
+        int indexOfRole = rolesThatHaveAccessToApi.indexOf(roleName);
+
+        boolean res = include == (indexOfRole != -1);
+
         return new DataOperandsFilterResponse(res, null, null);
     }
 

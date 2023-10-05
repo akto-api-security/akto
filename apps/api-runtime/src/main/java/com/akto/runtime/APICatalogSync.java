@@ -9,16 +9,10 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
-import com.akto.dto.traffic.Key;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.TrafficRecorder;
-import com.akto.dto.type.URLStatic;
-import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.*;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
@@ -33,13 +27,16 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
-
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -66,9 +63,9 @@ public class APICatalogSync {
                 mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
             }
         } catch (Exception e) {
-            
+
         }
-        
+
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
@@ -222,21 +219,23 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
             filterQ = Filters.eq("apiCollectionId", apiCollectionId);
         } else {
-            filterQ = Filters.and(
-                Filters.eq("apiCollectionId", apiCollectionId),
-                Filters.or(Filters.eq("isHeader", false), Filters.eq("param", "host"))
-            );            
+            Bson hostFilter = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+            Bson normalFilter = Filters.and(
+                    Filters.eq("apiCollectionId", apiCollectionId),
+                    Filters.or(Filters.eq("isHeader", false), Filters.eq("param", "host"))
+            );
+            filterQ = mergeUrlsBasic ? hostFilter : normalFilter;
         }
 
         int offset = 0;
-        int limit = 1_000_000;
+        int limit = mergeUrlsBasic ? 10_000 : 1_000_000;
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
@@ -300,7 +299,7 @@ public class APICatalogSync {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled);    
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled, !mergeUrlsBasic);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -353,7 +352,7 @@ public class APICatalogSync {
     }
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(
-        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled
+        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled, boolean doBodyMatch
     ) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
@@ -393,7 +392,8 @@ public class APICatalogSync {
                     continue;
                 }
 
-                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate, urlRegexMatchingEnabled) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
+                boolean compareKeys = doBodyMatch && RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate);
+                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate, urlRegexMatchingEnabled) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || compareKeys) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();
@@ -652,6 +652,9 @@ public class APICatalogSync {
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
+            } else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
+                newTypes[i] = SuperType.STRING;
+                newTokens[i] = null;
             } else {
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
@@ -668,8 +671,8 @@ public class APICatalogSync {
     }
 
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -707,6 +710,8 @@ public class APICatalogSync {
 
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
+            String newTemplateUrl = urlTemplate.getTemplateString();
+            if (!APICatalog.isTemplateUrl(newTemplateUrl)) continue;
 
             boolean isFirst = true;
             for (String matchedURL: matchStaticURLs) {
@@ -726,7 +731,6 @@ public class APICatalogSync {
 
                 if (isFirst) {
 
-                    String newTemplateUrl = urlTemplate.getTemplateString();
                     for (int i = 0; i < urlTemplate.getTypes().length; i++) {
                         SuperType superType = urlTemplate.getTypes()[i];
                         if (superType == null) continue;
@@ -1237,17 +1241,23 @@ public class APICatalogSync {
 
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
-                        Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
-                        loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
-                                loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                                mergeUrlsAndSave(apiCollection.getId(), true, true);
+                                loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
                             }
+
+                            try {
+                                mergeUrlsAndSave(apiCollection.getId(), true, false);
+                                loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
+                            }
+
                         }
                     } catch (Exception e) {
                         String err = e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : e.getMessage() ;
@@ -1262,7 +1272,10 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
-            allParams = SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
+            Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+            allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
+            allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
@@ -1460,17 +1473,23 @@ public class APICatalogSync {
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
+        int from = 0;
+        int batch = 10000;
 
         long start = System.currentTimeMillis();
-
         if (writesForParams.size() >0) {
-            
-            BulkWriteResult res = 
-                SingleTypeInfoDao.instance.getMCollection().bulkWrite(
-                    writesForParams
-                );
+            do {
 
-                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
+                List<WriteModel<SingleTypeInfo>> slicedWrites = writesForParams.subList(from, Math.min(from + batch, writesForParams.size()));
+                from += batch;
+                BulkWriteResult res =
+                        SingleTypeInfoDao.instance.getMCollection().bulkWrite(
+                                slicedWrites,
+                                new BulkWriteOptions().ordered(true).bypassDocumentValidation(false)
+                        );
+
+                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " + res.getUpserts().size(), LogDb.RUNTIME);
+            } while (from < writesForParams.size());
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);

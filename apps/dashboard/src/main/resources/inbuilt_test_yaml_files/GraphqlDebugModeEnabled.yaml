@@ -1,0 +1,53 @@
+id: GRAPHQL_DEBUG_MODE_ENABLED
+info:
+  name: "Graphql Debug Mode Enabled"
+  description: "GraphQL debug mode enabled vulnerability exposes sensitive debug information, increasing the risk of data leakage and potential security breaches"
+  details: > 
+            GraphQL debug mode enabled vulnerability refers to a security risk that arises when the 
+            debug mode in GraphQL is left enabled in production environments. Debug mode is intended 
+            for development and debugging purposes, providing detailed error messages and stack traces 
+            to aid in troubleshooting. However, when enabled in a live production system, it can expose 
+            sensitive information to potential attackers. The detailed error messages may inadvertently 
+            disclose implementation details, internal system paths, or sensitive data, increasing the risk 
+            of data leakage and potential security breaches. To mitigate this vulnerability, it is crucial 
+            to disable debug mode in production environments and ensure that only essential error messages 
+            are exposed to clients. Regular security audits and secure coding practices should be employed to protect sensitive information.
+  impact: "Data leakage and increased security risks from GraphQL debug mode vulnerability"
+  category:
+    name: SM
+    shortName: Misconfiguration
+    displayName: Security Misconfiguration (SM)
+  subCategory: GRAPHQL_DEBUG_MODE_ENABLED
+  severity: HIGH
+  tags:
+    - GraphQL
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://nostarch.com/black-hat-graphql Chapter 6 - Information Disclosure"
+    - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
+    - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
+
+api_selection_filters:
+  url:
+    regex: graphql
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url:
+          regex_replace:
+            regex: graphql.*
+            replace_with: graphql
+      - replace_body: '{ "query": "cy8Ku20LH6V6Yc0q0pJX" }'
+
+validate:
+  response_payload:
+    contains_either:
+      - "stack" 
+      - "exception"
+
+strategy:
+  run_once: /

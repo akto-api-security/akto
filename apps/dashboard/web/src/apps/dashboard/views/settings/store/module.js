@@ -23,8 +23,9 @@ const team = {
         lastLoginTs: null,
         privateCidrList: null,
         enableDebugLogs: null,
-        filterHeaderValueMap: null,
-        apiCollectionNameMapper: null
+        filterHeaderValueMap: {},
+        apiCollectionNameMapper: null,
+        trafficAlertThresholdSeconds: null
     },
     getters: {
         getId: (state) => state.id,
@@ -41,7 +42,8 @@ const team = {
         getPrivateCidrList: (state) => state.privateCidrList,
         getEnableDebugLogs: (state) => state.enableDebugLogs,
         getFilterHeaderValueMap: (state) => state.filterHeaderValueMap,
-        getApiCollectionNameMapper: (state) => state.apiCollectionNameMapper
+        getApiCollectionNameMapper: (state) => state.apiCollectionNameMapper,
+        getTrafficAlertThresholdSeconds: (state) => state.trafficAlertThresholdSeconds
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -68,8 +70,9 @@ const team = {
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
                 state.enableDebugLogs = false
-                state.filterHeaderValueMap = null
+                state.filterHeaderValueMap = {}
                 state.apiCollectionNameMapper = null
+                state.trafficAlertThresholdSeconds = 14400
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
@@ -81,12 +84,16 @@ const team = {
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
                 state.privateCidrList = resp.accountSettings.privateCidrList
                 state.enableDebugLogs = resp.accountSettings.enableDebugLogs
-                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap
+                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap ? resp.accountSettings.filterHeaderValueMap : {}
                 state.apiCollectionNameMapper = resp.accountSettings.apiCollectionNameMapper
+                state.trafficAlertThresholdSeconds = resp.accountSettings.trafficAlertThresholdSeconds || 14400
             }
         },
         SET_USER_INFO(state, resp) {
             state.lastLoginTs = resp.lastLoginTs
+        },
+        SET_FILTER_HEADER_VALUE_MAP(state, resp) {
+            state.filterHeaderValueMap = resp.filterHeaderValueMap
         }
     },
     actions: {
@@ -163,15 +170,14 @@ const team = {
                 return resp
             })
         },
-        addFilterHeaderValueMap({commit, dispatch}, {filterHeaderValueMapKey, filterHeaderValueMapValue}) {
-            let filterHeaderValueMap = {};
-            filterHeaderValueMap[filterHeaderValueMapKey] = filterHeaderValueMapValue
-            return api.addFilterHeaderValueMap(filterHeaderValueMap).then(resp => {
+        addFilterHeaderValueMap({commit, dispatch}, updatedMap) {
+            return api.addFilterHeaderValueMap(updatedMap).then(resp => {
+                commit('SET_FILTER_HEADER_VALUE_MAP', resp)
                 return resp
             })
         },
-        addApiCollectionNameMapper({commit, dispatch}, {regex, newName}) {
-            return api.addApiCollectionNameMapper(regex, newName).then(resp => {
+        addApiCollectionNameMapper({commit, dispatch}, {regex, newName, headerName}) {
+            return api.addApiCollectionNameMapper(regex, newName, headerName).then(resp => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
                     text: "Collection replacement added successfully",
@@ -185,6 +191,11 @@ const team = {
         },
         emptyState({commit, dispatch}) {
             commit('EMPTY_STATE')
+        },
+        updateTrafficAlertThresholdSeconds({commit, dispatch, state}, val) {
+            api.updateTrafficAlertThresholdSeconds(val).then(resp => {
+                state.trafficAlertThresholdSeconds = val
+            })
         }
     }
 }

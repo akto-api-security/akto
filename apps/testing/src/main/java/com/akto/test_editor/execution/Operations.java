@@ -5,6 +5,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.graphql.GraphQLUtils;
+
+import org.json.JSONObject;
+
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
@@ -117,8 +121,32 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
+    public static ExecutorSingleOperationResp deleteGraphqlField(RawApi rawApi, String key) {
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().deleteGraphqlField(payload, key);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
+    public static ExecutorSingleOperationResp addGraphqlField(RawApi rawApi, String key, String value) {
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().addGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
+    public static ExecutorSingleOperationResp modifyGraphqlField (RawApi rawApi, String key, String value) {
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().modifyGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
     public static ExecutorSingleOperationResp modifyBodyParam(RawApi rawApi, String key, Object value) {
         BasicDBObject payload = rawApi.fetchReqPayload();
+        BasicDBObject obj = Utils.fetchJsonObjForString(value);
+        if (obj != null) {
+            value = obj;
+        }
         boolean modified = Utils.modifyValueInPayload(payload, null, key, value);
         if (!modified) {
             return new ExecutorSingleOperationResp(true, "body param not present " + key);
@@ -127,7 +155,7 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
-    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key, Object value) {
+    public static ExecutorSingleOperationResp replaceBody(RawApi rawApi, Object key) {
         rawApi.getRequest().setBody(key.toString());
         return new ExecutorSingleOperationResp(true, "");
     }

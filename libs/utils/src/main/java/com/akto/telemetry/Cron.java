@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Log;
 import com.akto.log.LoggerMaker;
+import com.akto.task.Cluster;
 import com.akto.util.AccountUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -19,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static com.akto.task.Cluster.callDibs;
 
 public class Cron {
 
@@ -39,6 +42,11 @@ public class Cron {
             }
             if (!accountSettings.isEnableTelemetry()) {
                 loggerMaker.infoAndAddToDb("Telemetry is disabled, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
+                return;
+            }
+            boolean dibs = callDibs(Cluster.TELEMETRY_CRON, 60, 60);
+            if(!dibs){
+                loggerMaker.infoAndAddToDb("Telemetry cron dibs not acquired, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
                 return;
             }
             loggerMaker.infoAndAddToDb("Running telemetry cron", LoggerMaker.LogDb.DASHBOARD);

@@ -1,25 +1,33 @@
 <template>
     <div>
-        <simple-table
+        <div class="d-flex jc-start">
+            <date-range v-model="dateRange"/>
+        </div>
+        <server-table 
+            :key="refreshTable"
             :headers="testingRunsHeaders" 
-            :items="testingRunsItems" 
             name="Active testing runs" 
-            sortKeyDefault="createdTs" 
-            :sortDescDefault="true" 
+            sortKeyDefault="endTimestamp"
+            :sortDescDefault="true"
+            :pageSize="50"
             @rowClicked="goToTestingRunSummaries"
+            :fetchParams="fetchTestingRunsItems"
+            :processParams="prepareTableItem"
+            :hideDownloadCSVIcon="true"
         >
 
-        </simple-table>
+        </server-table>
     </div>
 </template>
 
 <script>
-import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
+import DateRange from '@/apps/dashboard/shared/components/DateRange'
 import func from '@/util/func'
 import obj from '@/util/obj'
 import testing from '@/util/testing'
 
-import {mapState} from 'vuex'
+import api from '../api'
 
 export default {
     name: "TestingRunsTable",
@@ -31,41 +39,55 @@ export default {
             testingRunsHeaders: [
                 {
                     text: 'color',
-                    value: ''
+                    value: '',
+                    showFilterMenu: false
                 },
                 {
                     text: "Test name",
-                    value: "apiCollectionName"
+                    value: "apiCollectionName",
+                    sortKey: "name",
+                    showFilterMenu: false
                 },
                 {
                     text: "Endpoints",
-                    value: "endpoints"
+                    value: "endpoints",
+                    showFilterMenu: false
                 },
                 {
                     text: "Type",
-                    value: "type"
+                    value: "type",
+                    sortKey: "testingEndpoints.type",
+                    showFilterMenu: false
                 },
                 {
                     text: "Last run",
-                    value: "lastRunTs"
+                    value: "lastRunTs",
+                    sortKey: "endTimestamp",
+                    showFilterMenu: false
                 },
                 {
                     text: "Next run",
-                    value: "nextRunTs"
+                    value: "nextRunTs",
+                    showFilterMenu: false
                 },
                 {
                     text: "Started by",
-                    value: "userEmail"
+                    value: "userEmail",
+                    showFilterMenu: false
                 },
                 {
                     text: "Frequency",
-                    value: "frequency"
+                    value: "frequency",
+                    showFilterMenu: false
                 }
-            ]
+            ],
+            lastRunTs: { startTimestamp: (func.timeNow() - func.recencyPeriod), endTimestamp: func.timeNow() },
+            refreshTable: false
         }
     },
     components: {
-        SimpleTable
+        ServerTable,
+        DateRange
     },
     methods: {
         getCollectionName(testingEndpoints) {
@@ -84,7 +106,7 @@ export default {
             let days = parseInt(Math.round(run.periodInSeconds/86400))
             return {
                 apiCollectionName: run.name || this.getCollectionName(run.testingEndpoints),
-                link: run.hexId+'/results',
+                link: run.hexId,
                 endpoints: testing.getEndpoints(run.testingEndpoints),
                 type: run.testingEndpoints.type,
                 userEmail: run.userEmail,
@@ -95,21 +117,47 @@ export default {
         },
         goToTestingRunSummaries(item){
             this.$router.push(item.link)
-        }
+        },
+        async fetchTestingRunsItems(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            filters = {};
+            filters.endTimestamp = [this.lastRunTs.startTimestamp, this.lastRunTs.endTimestamp];
+            let res = {};
+            let now = func.timeNow()
+            switch (this.type) {
+                case func.testingType().cicd:
+                    res = await api.fetchTestingDetails({
+                        startTimestamp: 0, endTimestamp: 0, fetchCicd: true, sortKey, sortOrder, skip, limit, filters
+                    });
+                    break;
+                case func.testingType().active:
+                    res = await api.fetchTestingDetails({
+                        startTimestamp: 0, endTimestamp: 0, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
+                    });
+                    break;
+                case func.testingType().inactive:
+                    res = await api.fetchTestingDetails({
+                        startTimestamp: Math.min(now - func.recencyPeriod, this.lastRunTs.startTimestamp) , endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
+                    });
+                    break;
+            }
+            return { endpoints: res.testingRuns, total: res.testingRunsCount }
+        },
     },
     computed: {
-        ...mapState('testing', ['testingRuns', 'pastTestingRuns','cicdTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
                 return m
             }, {})
         },
-        testingRunsItems() {
-            switch(this.type){
-                case func.testingType().cicd: return this.cicdTestingRuns.map(run => this.prepareTableItem(run));
-                case func.testingType().active: return (this.testingRuns || []).map(run => this.prepareTableItem(run));
-                case func.testingType().inactive: return (this.pastTestingRuns || []).map(run => this.prepareTableItem(run));
+        dateRange: {
+            get () {
+                return [func.toHyphenatedDate(this.lastRunTs.startTimestamp * 1000), func.toHyphenatedDate(this.lastRunTs.endTimestamp * 1000)]
+            },
+            set(newDateRange) {
+                this.lastRunTs.startTimestamp = parseInt(func.toEpochInMs(newDateRange[0]) / 1000)
+                this.lastRunTs.endTimestamp = parseInt(func.toEpochInMs(newDateRange[1]) / 1000)
+                this.refreshTable = !this.refreshTable;
             }
         }
     }
