@@ -7,7 +7,7 @@ public enum DashboardMode {
 
     public static DashboardMode getDashboardMode(){
         String dashboardMode = System.getenv("DASHBOARD_MODE");
-        if(StringUtils.isEmpty(dashboardMode)){
+        if(StringUtils.isEmpty(dashboardMode) || "on_prem".equalsIgnoreCase(dashboardMode)){
             return ON_PREM;
         }
         if("local_deploy".equalsIgnoreCase(dashboardMode)){
