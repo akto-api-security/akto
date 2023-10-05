@@ -25,6 +25,7 @@ export default function Header() {
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const accounts = Store(state => state.accounts)
     const activeAccount = Store(state => state.activeAccount)
+    const isLocalDeploy = Store(state => state.isLocalDeploy)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
@@ -50,8 +51,15 @@ export default function Header() {
 
     const handleLogOut = async () => {
         storeAccessToken(null)
-        await api.logout()
-        navigate("/login")
+        await api.logout().then(res => {
+            if(res.logoutUrl){
+                navigate(res.logoutUrl)
+            } else {
+                navigate("/login")
+            }
+        }).catch(err => {
+            navigate("/");
+        })
     }
 
     const handleSwitchUI = async () => {
@@ -107,16 +115,20 @@ export default function Header() {
         })
     }      
 
+    const localItems = [{
+        items: accountsItems
+    },
+    {
+        items: [
+            { id: "create_account", content: 'Create account', onAction: () => setShowCreateAccount(true) }
+        ]
+    }]
+
     const userMenuMarkup = (
         <TopBar.UserMenu
-            actions={[
-                {
-                    items: accountsItems
-                },
+            actions={[ ... (isLocalDeploy ? localItems : []) , 
                 {
                     items: [
-                        { id: "create_account", content: 'Create account', onAction: () => setShowCreateAccount(true)},
-                        { id: "manage", content: 'Manage account' },
                         { id: "log-out", content: 'Log out', onAction: handleLogOut }
                     ],
                 },
