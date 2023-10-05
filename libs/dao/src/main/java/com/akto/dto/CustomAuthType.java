@@ -2,12 +2,15 @@ package com.akto.dto;
 
 import java.util.List;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.context.Context;
 
 public class CustomAuthType {
     private ObjectId id;
+    @BsonIgnore
+    private String hexId;
     public static final String NAME = "name";
     private String name;
     private List<String> headerKeys;
@@ -74,5 +77,11 @@ public class CustomAuthType {
     }
     public void setId(ObjectId id) {
         this.id = id;
+    }
+    public String getHexId() {
+        return this.id.toHexString();
+    }
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
     }
 }

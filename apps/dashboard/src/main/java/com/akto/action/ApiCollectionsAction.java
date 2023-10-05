@@ -15,11 +15,8 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveInfoInApiCollections;
-import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.type.URLMethods;
-import com.mongodb.client.MongoCursor;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.BasicDBObject;
@@ -53,6 +50,12 @@ public class ApiCollectionsAction extends UserAction {
             apiCollection.setUrls(new HashSet<>());
         }
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchCollection() {
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
         return Action.SUCCESS.toUpperCase();
     }
 

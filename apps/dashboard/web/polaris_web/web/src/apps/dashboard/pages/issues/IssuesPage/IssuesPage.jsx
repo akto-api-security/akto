@@ -7,6 +7,7 @@ import transform from "../transform";
 import func from "@/util/func";
 import { ClockMinor,DynamicSourceMinor,LinkMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
+import { Button } from "@shopify/polaris";
 
 const headers = [
     {
@@ -136,6 +137,7 @@ function IssuesPage(){
     const subCategoryMap = PersistStore(state => state.subCategoryMap);
     const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
     const [issueStatus, setIssueStatus] = useState([]);
+    const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
 
@@ -253,7 +255,14 @@ function IssuesPage(){
         let filterStatus = filters.issueStatus
         setIssueStatus(filterStatus);
         let startTimestamp = filters?.startTimestamp?.[0] || 0;
-
+        let obj = {
+            'filterStatus': filterStatus,
+            'filterCollectionsId': filterCollectionsId,
+            'filterSeverity': filterSeverity,
+            filterSubCategory: filterSubCategory,
+            startEpoch: startTimestamp
+        }
+        setIssuesFilters(obj)
         await api.fetchIssues(skip, limit,filterStatus,filterCollectionsId,filterSeverity,filterSubCategory,startTimestamp).then((res) => {
             total = res.totalIssuesCount;
             ret = transform.prepareIssues(res, subCategoryMap, subCategoryFromSourceConfigMap, apiCollectionMap);
@@ -263,6 +272,11 @@ function IssuesPage(){
         return {value:ret , total:total};
     }
 
+    const openVulnerabilityReport = () => {
+        let summaryId = btoa(JSON.stringify(issuesFilters))
+    window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+    }
+    
     return (
         <PageWithMultipleCards
             title="Issues"
@@ -286,7 +300,8 @@ function IssuesPage(){
                     getStatus={func.getTestResultStatus}
                 />
             ]}
-        />
+            primaryAction={<Button monochrome removeUnderline plain onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button>}
+            />
     )
 }
 

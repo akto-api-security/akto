@@ -45,7 +45,10 @@ const func = {
     let y = date.getFullYear();
     return m + ' ' + d + (needYear ? ' ' + y : '');
   },
-  prettifyEpoch(epoch) {
+  prettifyShort(num) {
+    return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
+  },
+prettifyEpoch(epoch) {
     let diffSeconds = (+Date.now()) / 1000 - epoch
     let sign = 1
     if (diffSeconds < 0) { sign = -1 }

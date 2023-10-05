@@ -223,7 +223,7 @@ function SingleTestRunPage() {
       if(setData){
         setSelectedTestRun(localSelectedTestRun);
       }
-      
+
       setTimeout(() => {
         setLoading(false);
       }, 500)
@@ -239,7 +239,7 @@ function SingleTestRunPage() {
     let intervalId = setInterval(async() => {
       let localSelectedTestRun = await fetchData(false);
       if(localSelectedTestRun.id){
-        if(localSelectedTestRun.orderPriority !== 1 && localSelectedTestRun.orderPriority !== 2){
+        if(localSelectedTestRun.orderPriority !== 1){
           setSelectedTestRun(localSelectedTestRun);
           setTempLoading((prev) => {
             prev.running = false;
@@ -289,7 +289,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       case "STOPPED":
         return "Test has been stopped";
       case "COMPLETED":
-        return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of 
+        return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of
         ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
       case "FAIL":
         return "Test execution has failed during run";
@@ -414,6 +414,11 @@ const promotedBulkActions = (selectedDataHexIds) => {
     });
   }
 
+  const openVulnerabilityReport = () => {
+    let summaryId = selectedTestRun.testingRunResultSummaryHexId
+    window.open('/dashboard/testing/summary/' + summaryId, '_blank');
+  }
+
   return (
     <PageWithMultipleCards
     title={
@@ -454,6 +459,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
       func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
+      secondaryActions={!workflowTest ? <Button primary onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
       components={components}
     />
   );
