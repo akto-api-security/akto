@@ -7,7 +7,10 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
+import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
+import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -28,7 +31,8 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 public class AccessMatrixTaskAction extends UserAction{
-    
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixTaskAction.class);
+
     private List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
     private List<AccessMatrixUrlToRole> accessMatrixUrlToRoles;
     private Map<String,List<ApiInfoKey>> accessMatrixRoleToUrls = new HashMap<>();
@@ -60,6 +64,21 @@ public class AccessMatrixTaskAction extends UserAction{
             frequencyInSeconds = 86400;
         }
         return true;
+    }
+
+    public String deleteAccessMatrix() {
+        loggerMaker.infoAndAddToDb("started deleting access details for: " + roleName, LoggerMaker.LogDb.DASHBOARD);
+
+        String endpointLogicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
+        Bson taskInfoFilterQ = Filters.eq(AccessMatrixTaskInfo.ENDPOINT_LOGICAL_GROUP_NAME, endpointLogicalGroupName);
+        DeleteResult deleteResult = AccessMatrixTaskInfosDao.instance.deleteAll(taskInfoFilterQ);
+        loggerMaker.infoAndAddToDb("Deleted AccessMatrixTaskInfo for: " + roleName + " : " + deleteResult, LoggerMaker.LogDb.DASHBOARD);
+
+        Bson urlToRolesUpdateQ = Updates.pull(AccessMatrixUrlToRole.ROLES, roleName);
+        UpdateResult updateResult = AccessMatrixUrlToRolesDao.instance.updateMany(Filters.empty(), urlToRolesUpdateQ);
+        loggerMaker.infoAndAddToDb("Deleted AccessMatrixUrlToRoles for: " + roleName + " : " +  updateResult, LoggerMaker.LogDb.DASHBOARD);
+
+        return SUCCESS.toUpperCase();
     }
 
     public String createMultipleAccessMatrixTasks(){

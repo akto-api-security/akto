@@ -117,7 +117,7 @@
             </div>
         </template>
         <template slot="Roles">
-            <test-roles title="Roles" :testRoles="testRoles">
+            <test-roles title="Roles" :testRoles="testRoles" @refreshRoles="refreshRoles">
                 <template #details-container="{}">
                     <test-roles-config-details></test-roles-config-details>
                 </template>
@@ -238,8 +238,11 @@ export default {
         async saveTestRoles() {
             if (this.testRoleName && this.testLogicalGroupRegex) {
                 await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
-                this.$store.dispatch('testing/loadTestRoles')
+                this.$store.dispatch('test_roles/loadTestRoles')
             }
+        },
+        refreshRoles() {
+            this.$store.dispatch('test_roles/loadTestRoles')
         },
         prepareItemForTable(x) {
             return {
