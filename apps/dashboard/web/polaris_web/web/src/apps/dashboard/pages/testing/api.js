@@ -18,7 +18,7 @@ export default {
             method: 'post',
             data: {
                 testingRunHexId,
-                startTimestamp, 
+                startTimestamp,
                 endTimestamp
             }
         })
@@ -204,5 +204,15 @@ export default {
                 endTimestamp: endTimestamp,
             }
         })
-    }
+    },
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+        return request({
+            url: '/api/fetchVulnerableTestRunResults',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId,
+                skip
+            }
+        })
+    },
 }

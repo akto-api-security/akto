@@ -1,10 +1,5 @@
 package com.akto.test_editor.auth;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -16,6 +11,10 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.CookieTransformer;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class AuthValidator {
     
@@ -69,14 +68,13 @@ public class AuthValidator {
 
     }
     
-    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig) {
+    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
 
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (String header : auth.getHeaders()) {
             headers.remove(header);
         }
 
-        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         for (CustomAuthType customAuthType : customAuthTypes) {
             List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
             for (String headerAuthKey: customAuthTypeHeaderKeys) {

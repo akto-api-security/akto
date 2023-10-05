@@ -38,10 +38,13 @@ public class BackwardCompatibility {
     public static final String ENABLE_NEW_MERGING = "enableNewMerging";
     private int enableNewMerging;
 
+    public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
+    private int loadTemplateFilesFromDirectory;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues, int enableNewMerging) {
+                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -54,6 +57,7 @@ public class BackwardCompatibility {
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
+        this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
     }
 
     public BackwardCompatibility() {
@@ -163,4 +167,11 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
     }
 
+    public int getLoadTemplateFilesFromDirectory() {
+        return loadTemplateFilesFromDirectory;
+    } 
+
+    public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
+        return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
+    } 
 }

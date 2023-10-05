@@ -83,7 +83,8 @@ const router =  new Router({
             name: 'testing-export-html',
             component: PDFExportHTML,
             props: route => ({
-                testingRunResultSummaryHexId: route.query.testingRunResultSummaryHexId
+                testingRunResultSummaryHexId: route.query.testingRunResultSummaryHexId,
+                issuesFilters: route.query.issuesFilters
             })
         },
         {
