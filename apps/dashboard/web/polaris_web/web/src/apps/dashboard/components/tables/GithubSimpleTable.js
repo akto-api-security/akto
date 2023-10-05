@@ -95,6 +95,7 @@ function GithubSimpleTable(props) {
         useNewRow={props?.useNewRow}
         condensedHeight={props?.condensedHeight}
         tableTabs={props?.tableTabs}
+        notHighlightOnselected={props.notHighlightOnselected}
     />
 
 }

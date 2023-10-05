@@ -184,6 +184,7 @@ function GithubServerTable(props) {
           setSelectedIndex={setSelectedIndex}
           newRow={props?.useNewRow}
           headings={props?.headings}
+          notHighlightOnselected={props.notHighlightOnselected}
         />
       ),
     );
