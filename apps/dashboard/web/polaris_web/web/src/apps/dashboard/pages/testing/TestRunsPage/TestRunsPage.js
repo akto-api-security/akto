@@ -400,7 +400,7 @@ const coreTable = (
   />   
 )
 
-const components = [<SummaryCardComponent key={collapsible}/>, coreTable]
+const components = [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}

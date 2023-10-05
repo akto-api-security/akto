@@ -1,7 +1,7 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon } from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack} from '@shopify/polaris';
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
@@ -448,15 +448,20 @@ convertSubIntoSubcategory(resp){
 
 getCollapisbleRow(urls){
   return(
-    <tr className="custom-row">
-      {urls.map((ele,index)=>{
-        return(
-          <td className="custom-data">
-            <Text>{ele.url}</Text>
-          </td>
-          
-        )
-    })}
+    <tr style={{background: "#EDEEEF"}}>
+      <td colSpan={6}>
+        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
+          <VerticalStack gap={2}>
+            {urls.map((ele,index)=>{
+              return(
+                <Link monochrome url={ele.nextUrl} removeUnderline key={index}>
+                  <Text variant="bodySm" color="subdued">{ele.url}</Text>
+                </Link>
+              )
+            })}
+          </VerticalStack>
+        </Box>
+      </td>
     </tr>
   )
 },
@@ -464,9 +469,10 @@ getCollapisbleRow(urls){
 getPrettifiedTestRunResults(testRunResults){
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
-    if(testRunResultsObj.hasOwnProperty(test.name)){
-      let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[test.name].endTimestamp)
-      let urls = testRunResultsObj[test.name].urls
+    const key = test.name + ': ' + test.vulnerable
+    if(testRunResultsObj.hasOwnProperty(key)){
+      let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
+      let urls = testRunResultsObj[key].urls
       urls.push({url: test.url, nextUrl: test.nextUrl})
       let obj = {
         ...test,
@@ -475,7 +481,7 @@ getPrettifiedTestRunResults(testRunResults){
       }
       delete obj["nextUrl"]
       delete obj["url"]
-      testRunResultsObj[test.name] = obj
+      testRunResultsObj[key] = obj
     }else{
       let urls = [{url: test.url, nextUrl: test.nextUrl}]
       let obj={
@@ -484,15 +490,15 @@ getPrettifiedTestRunResults(testRunResults){
       }
       delete obj["nextUrl"]
       delete obj["url"]
-      testRunResultsObj[test.name] = obj
+      testRunResultsObj[key] = obj
     }
   })
   let prettifiedResults = []
-  Object.keys(testRunResultsObj).forEach((test)=>{
-    let obj = testRunResultsObj[test]
+  Object.keys(testRunResultsObj).forEach((key)=>{
+    let obj = testRunResultsObj[key]
     let prettifiedObj = {
       ...obj,
-      nameComp: <Box maxWidth="250px"><TooltipText tooltip={test} text={test} textProps={{fontWeight: 'semibold'}}/></Box>,
+      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'semibold'}}/></Box>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
         {obj.cweDisplay.map((ele,index)=>{

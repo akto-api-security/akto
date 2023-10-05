@@ -254,12 +254,14 @@ const transform = {
 
     prettifySubtypes(sensitiveTags){
         return(
-            <HorizontalStack gap={1}>
-                {sensitiveTags.map((item,index)=>{
-                    return(index < 2 ? <Badge size="small" status="warning" key={index}>{item}</Badge> : null)
-                })}
-                {sensitiveTags.length > 2 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 2).toString() + 'more'}</Badge> : null}
-            </HorizontalStack>
+            <Box maxWidth="200px">
+                <HorizontalStack gap={1}>
+                    {sensitiveTags.map((item,index)=>{
+                        return(index < 2 ? <Badge size="small" status="warning" key={index}>{item}</Badge> : null)
+                    })}
+                    {sensitiveTags.length > 2 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 2).toString() + 'more'}</Badge> : null}
+                </HorizontalStack>
+            </Box>
         )
     },
 
@@ -298,6 +300,24 @@ const transform = {
         }
     },
 
+    getTruncatedUrl(url){
+        try {
+            const parsedURL = new URL(url)
+            return parsedURL.pathname
+        } catch (error) {
+            return url
+        }
+    },
+
+    getHostName(url){
+        try {
+            const parsedURL = new URL(url)
+            return parsedURL.hostname
+        } catch (error) {
+            return "No host"
+        }
+    },
+
     getPrettifyEndpoint(method,url, isNew){
         return(
             <HorizontalStack gap={1}>
@@ -306,12 +326,14 @@ const transform = {
                         <span style={{color: tranform.getTextColor(method), fontSize: "14px", fontWeight: 500}}>{method}</span>
                     </HorizontalStack>
                 </Box>
-                <HorizontalStack gap={6}>
-                    <Box maxWidth="240px" width="240px">
-                        <TooltipText text={url} tooltip={url} textProps={{fontWeight: "semibold"}} />
-                    </Box>
-                    {isNew ? <Badge size="small">New</Badge> : null}
-                </HorizontalStack>
+                <Box width="240px">
+                    <HorizontalStack align="space-between">
+                        <Box maxWidth={isNew ? "180px" : '220px'}>
+                            <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "semibold"}} />
+                        </Box>
+                        {isNew ? <Badge size="small">New</Badge> : null}
+                    </HorizontalStack>
+                </Box>
             </HorizontalStack>
         )
     },
@@ -361,7 +383,7 @@ const transform = {
             return{
                 ...url,
                 last_seen: url.last_seen,
-                hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : "No host"),
+                hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
                 access_type: url.access_type,
                 auth_type: url.auth_type,
                 endpointComp: this.getPrettifyEndpoint(url.method, url.endpoint, this.isNewEndpoint(url.lastSeenTs)),
