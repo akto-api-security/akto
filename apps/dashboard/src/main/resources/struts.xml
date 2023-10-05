@@ -572,6 +572,16 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+        <action name="api/deleteAccessMatrix" class="com.akto.action.testing.AccessMatrixTaskAction" method="deleteAccessMatrix">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
         <action name="api/deleteAccessMatrixTask" class="com.akto.action.testing.AccessMatrixTaskAction" method="deleteAccessMatrixTask">
             <interceptor-ref name="json"/>
@@ -1379,6 +1389,17 @@
         </action>
 
         <action name="api/addTestRoles" class="com.akto.action.testing.TestRolesAction" method="createTestRole">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteTestRole" class="com.akto.action.testing.TestRolesAction" method="deleteTestRole">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

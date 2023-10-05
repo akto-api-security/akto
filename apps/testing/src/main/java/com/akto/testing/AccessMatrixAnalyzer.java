@@ -10,6 +10,7 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -94,7 +95,9 @@ public class AccessMatrixAnalyzer {
 
             Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
-            List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+            String roleFromTask = task.getEndpointLogicalGroupName().substring(0, task.getEndpointLogicalGroupName().length()-EndpointLogicalGroup.GROUP_NAME_SUFFIX.length());
+            loggerMaker.infoAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
+            List<TestRoles> testRoles = TestRolesDao.instance.findAll(TestRoles.NAME, roleFromTask);
 
             AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
             AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
