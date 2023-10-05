@@ -670,9 +670,10 @@ public class InventoryAction extends UserAction {
         }
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-
-        Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
-        Main.changeTargetCollection(apiCollectioNameMapper, responses);
+        if (accountSettings != null) {
+            Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            Main.changeTargetCollection(apiCollectioNameMapper, responses);
+        }
 
         int accountId = Context.accountId.get();
 
