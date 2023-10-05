@@ -2,7 +2,8 @@ import {
   CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMajor
+  CircleTickMajor,
+  CircleAlertMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -43,7 +44,10 @@ const func = {
     let y = date.getFullYear();
     return m + ' ' + d + (needYear ? ' ' + y : '');
   },
-  prettifyEpoch(epoch) {
+  prettifyShort(num) {
+    return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
+  },
+prettifyEpoch(epoch) {
     let diffSeconds = (+Date.now()) / 1000 - epoch
     let sign = 1
     if (diffSeconds < 0) { sign = -1 }
@@ -177,7 +181,7 @@ const func = {
     return result;
   },
   getSeverityStatus(countIssues) {
-    if(countIssues==null){
+    if(countIssues==null || countIssues==undefined){
       return [];
     }
     return Object.keys(countIssues).filter((key) => {
@@ -190,6 +194,7 @@ const func = {
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMajor;
       case "COMPLETED": return CircleTickMajor;
+      case "FAIL": return CircleAlertMajor;
       default: return ClockMinor;
     }
   },
@@ -197,18 +202,14 @@ const func = {
     switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
+      case "FAIL":
       case "STOPPED": return "critical";
       case "COMPLETED": return "success";
       default: return "base";
     }
   },
   getSeverity(countIssues) {
-    if (countIssues == null) {
-      return []
-    }
-    return Object.keys(countIssues).filter((key) => {
-      return (countIssues[key] > 0)
-    }).map((key) => {
+    return func.getSeverityStatus(countIssues).map((key) => {
       return countIssues[key] + " " + key
     })
   },
@@ -217,6 +218,7 @@ const func = {
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
     if(localItem.includes("LOW")) return 'neutral';
+    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info';
     return "";
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
@@ -319,7 +321,9 @@ const func = {
     data.forEach((obj) => {
       localFilters.forEach((filter, index) => {
         let key = filter["key"]
-        obj[key].map((item) => filter.availableChoices.add(item));
+        obj[key]?.
+        filter(item => item!=undefined)
+        .map((item) => filter.availableChoices.add(item));
         localFilters[index] = filter
       })
     })
@@ -1044,7 +1048,25 @@ getSizeOfFile(bytes) {
   } else {
     return bytes + ' B';
   }
-}
+  },
+  getTimeTakenByTest(startTimestamp, endTimestamp){
+    const timeDiff = Math.abs(endTimestamp - startTimestamp);
+    const hours = Math.floor(timeDiff / 3600);
+    const minutes = Math.floor((timeDiff % 3600) / 60);
+    const seconds = timeDiff % 60;
+
+    let duration = '';
+    if (hours > 0) {
+        duration += hours + ` hour${hours==1 ? '' : 's'} `;
+    }
+    if (minutes > 0) {
+        duration += minutes + ` minute${minutes==1 ? '' : 's'} `;
+    }
+    if (seconds > 0 || (hours === 0 && minutes === 0)) {
+        duration += seconds + ` second${seconds==1 ? '' : 's'}`;
+    }
+    return duration.trim();
+  },
 }
 
 export default func

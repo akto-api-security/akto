@@ -23,6 +23,8 @@ info:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa2-broken-user-authentication.md"
     - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
     - "https://cwe.mitre.org/data/definitions/798.html"
+  cwe:
+    - CWE-287
 
 api_selection_filters:
   response_code:

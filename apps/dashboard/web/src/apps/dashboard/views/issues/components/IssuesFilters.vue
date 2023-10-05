@@ -32,7 +32,7 @@
                 <div>
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
-                            <v-btn class="filter-button" v-bind="attrs" v-on="on" primary>
+                            <v-btn class="filter-button mr-3" v-bind="attrs" v-on="on" primary>
                                 <span>{{ selectedTimeName }}</span>
                                 <v-icon>$fas_angle-down</v-icon>
                             </v-btn>
@@ -40,6 +40,11 @@
                         <filter-list :title="selectedTimeName" :items="selectedTime"
                             @clickedItem="clickedTimePeriod($event)" hideOperators hideListTitle selectExactlyOne/>
                     </v-menu>
+                </div>
+                <div>
+                    <v-btn class="filter-button" primary @click="exportReport">
+                        <span>Export vulnerability report</span>
+                    </v-btn>
                 </div>
             </div>
         </div>
@@ -212,6 +217,18 @@ export default {
         this.filterMenus[2].items = this.getCollections1()
     },
     methods: {
+        exportReport() {
+            let obj = {
+                filterStatus: this.$store.state.issues.filterStatus,
+                filterCollectionsId: this.$store.state.issues.filterCollectionsId,
+                filterSeverity: this.$store.state.issues.filterSeverity,
+                filterSubCategory: this.$store.state.issues.filterSubCategory1,
+                startEpoch: this.$store.state.issues.startEpoch
+            }
+            let issuesFilters = JSON.stringify(obj)
+            const routeData = this.$router.resolve({name: 'testing-export-html', query: {issuesFilters:btoa(issuesFilters)}});
+            window.open(routeData.href, '_blank');
+        },
         async bulkReopen() {
             await this.$store.dispatch("issues/bulkUpdateIssueStatus", { selectedIssueIds: this.selectedIssueIds, ignoreReason: '', selectedStatus: "OPEN" });
             this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
