@@ -15,6 +15,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.Constants;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
@@ -35,6 +36,7 @@ import org.bson.conversions.Bson;
 
 import java.net.URI;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class InventoryAction extends UserAction {
 
@@ -666,6 +668,11 @@ public class InventoryAction extends UserAction {
                 loggerMaker.infoAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
             }
         }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+        Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+        Main.changeTargetCollection(apiCollectioNameMapper, responses);
 
         int accountId = Context.accountId.get();
 
