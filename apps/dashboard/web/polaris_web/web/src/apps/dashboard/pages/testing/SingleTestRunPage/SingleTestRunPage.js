@@ -11,10 +11,8 @@ import {
   LegacyCard,
   Tag,
   IndexFiltersMode,
-  Divider,
-  Collapsible
 } from '@shopify/polaris';
-import { ReplayMinor, ChevronDownMinor, ChevronUpMinor } from '@shopify/polaris-icons';
+import { ReplayMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
@@ -459,7 +457,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
       func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
-      secondaryActions={!workflowTest ? <Button primary onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
+      secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
       components={components}
     />
   );
