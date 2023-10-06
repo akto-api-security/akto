@@ -8,6 +8,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.runtime.APICatalogSync;
@@ -81,25 +82,34 @@ public class TestInventoryAction extends MongoBasedTest {
 
         APICatalogSync.mergeAsyncOutside = true;
 
-        ApiCollection.useHost = true;
+        ApiCollection.useHost = false;
 
         // populate db before bug fix
 
         // common headers: {"host" : "akto.io"} and {"resHeader" : "1"}
 
         // {"user": "akto"}
-        String p1 = "{ \"path\": \"/api/books/hi\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"user\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"user_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p1 = "{ \"path\": \"/api/books/hi\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"user\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"user_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
 
         // {"name": "akto"}
-        String p2 = "{ \"path\": \"/api/books/hello\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"name\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"name_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p2 = "{ \"path\": \"/api/books/hello\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"name\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"name_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
 
         // {"company": "akto"}
-        String p3 = "{ \"path\": \"/api/books/650d602277c31aee121e1d9b/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
-        String p4 = "{ \"path\": \"/api/books/64c8f7361d5c23180a4c855c/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p3 = "{ \"path\": \"/api/books/650d602277c31aee121e1d9b/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
+        String p4 = "{ \"path\": \"/api/books/64c8f7361d5c23180a4c855c/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
 
-        // hashcode of akto.io is -932654193
-        int apiCollectionId = -932654193;
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(apiCollectionId, "akto.io", 0, new HashSet<>(), "akto.io", -932654193));
+        // target collection changed to prod.akto.io from akto.io
+        AccountSettings accountSettings = new AccountSettings();
+        Map<String, CollectionReplaceDetails> apiCollectionNameMapper= new HashMap<>();
+        String regex = "akto.*";
+        String newName = "prod.akto.io";
+        apiCollectionNameMapper.put(regex.hashCode()+"", new CollectionReplaceDetails(regex, newName, "host"));
+        accountSettings.setApiCollectionNameMapper(apiCollectionNameMapper);
+        AccountSettingsDao.instance.insertOne(accountSettings);
+
+        // hashcode of prod.akto.io is -184401928
+        int apiCollectionId = -184401928;
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(apiCollectionId, "akto.io", 0, new HashSet<>(), "akto.io", apiCollectionId));
         String url = "api/books/STRING";
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1, true, "host", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // req header
