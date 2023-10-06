@@ -8,8 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Check for Akto test completion
+      - name: Generate Akto OpenAPI specication file
+        working-directory: ./.github/scripts
         env:
             AKTO_DASHBOARD_URL: https://flash.staging.akto.io
             AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-        run: bash ./.github/scripts/akto-cicd.sh
+        run: |
+          npm install axios
+          node akto-inventory.js
+      - name: Archive open_api spec
+        uses: actions/upload-artifact@v3
+        with:
+          name: Akto OpenAPI Specication
+          path: ./.github/scripts/akto_open_api.json
