@@ -663,6 +663,7 @@ public class InventoryAction extends UserAction {
         for (String sample : samples) {
             try {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpResponseParams.requestParams.setApiCollectionId(apiCollectionId);
                 responses.add(httpResponseParams);
             } catch (Exception e) {
                 loggerMaker.infoAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
