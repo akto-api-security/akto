@@ -1,5 +1,6 @@
 const axios = require("axios")
 const fs = require("fs")
+const { exec } = require("child_process");
 
 const AKTO_DASHBOARD_URL = process.env.AKTO_DASHBOARD_URL
 const AKTO_API_KEY = process.env.AKTO_API_KEY
@@ -78,23 +79,34 @@ async function saveOpenAPIfile(openAPIObject) {
 }
 
 function generateAktoEndpointsSummary(processedOpenAPIObject) {
-    let sourceAktoEndpoints
+    let sourceAktoEndpoints 
 
-    const sourceData = fs.readFileSync("../../apps/dashboard/web/polaris_web/web/src", 'utf8')
-    sourceAktoEndpoints = sourceData.split('\n')
-
-    const openAPIAktoEndpoints = Object.keys(processedOpenAPIObject.paths)
-    
-    logGithubStepSummary(`Akto endpoints count (source): ${sourceAktoEndpoints.length}`)
-    logGithubStepSummary(`Akto endpoints count (OpenAPI file): ${openAPIAktoEndpoints.length}`)
-    logGithubStepSummary(`#### Endpoints missing in OpenAPI file`)
-    
-    sourceAktoEndpoints.forEach(sourceEndpoint => {
-        if (!openAPIAktoEndpoints.includes(sourceEndpoint)) {
-            logGithubStepSummary(`| ${sourceEndpoint} |`)
+    exec('cd ../../apps/dashboard/web/polaris_web/web/src; grep -r --include "*.js" "api/" . | awk -F"\'" \'/url:/ {print $2}\'', (error, stdout, stderr) => {
+        if (error) {
+            console.log(`error: ${error.message}`);
+            return;
         }
-    });
+        if (stderr) {
+            console.log(`stderr: ${stderr}`);
+            return;
+        }
+        
+        sourceAktoEndpoints = stdout.split('\n')
+        sourceAktoEndpoints.pop()
+        sourceAktoEndpoints.forEach(endpoint => console.log(endpoint))
 
+        const openAPIAktoEndpoints = Object.keys(processedOpenAPIObject.paths)
+        
+        logGithubStepSummary(`Akto endpoints count (source): ${sourceAktoEndpoints.length}`)
+        logGithubStepSummary(`Akto endpoints count (OpenAPI file): ${openAPIAktoEndpoints.length}`)
+        logGithubStepSummary(`#### Endpoints missing in OpenAPI file`)
+        
+        sourceAktoEndpoints.forEach(sourceEndpoint => {
+            if (!openAPIAktoEndpoints.includes(sourceEndpoint)) {
+                logGithubStepSummary(`| ${sourceEndpoint} |`)
+            }
+        });
+    });
 }
 
 async function main() {
