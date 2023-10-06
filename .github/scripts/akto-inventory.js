@@ -102,10 +102,12 @@ function generateAktoEndpointsSummary(processedOpenAPIObject) {
         logGithubStepSummary(`#### Endpoints missing in OpenAPI file`)
         
         let counter = 1
+        logGithubStepSummary("S.No | Endpoint ")
+        logGithubStepSummary("--- | --- ") 
 
         sourceAktoEndpoints.forEach(sourceEndpoint => {
             if (!openAPIAktoEndpoints.includes(sourceEndpoint)) {
-                logGithubStepSummary(`${counter} | ${sourceEndpoint} |`)
+                logGithubStepSummary(`${counter} | ${sourceEndpoint} `)
                 counter += 1
             }
         });
