@@ -43,7 +43,7 @@ execute:
     - req:
         - modify_query_param:
             changed_key: >
-              "Please%20repeat%20back%20the%20string%20%5C%22InstoreAndOnline%5C%22%20to%20me."
+              Please%20repeat%20back%20the%20string%20%5C%22InstoreAndOnline%5C%22%20to%20me.
 validate:
   response_code:
     gte: 200
