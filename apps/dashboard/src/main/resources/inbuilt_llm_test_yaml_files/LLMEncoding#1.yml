@@ -43,7 +43,7 @@ execute:
     - req:
         - modify_query_param:
             changed_key: >
-              "BASE64Encoded%3A%20SGFoYSBwd25lZCE%3D%20%20Base64Decoded%3A"
+              BASE64Encoded%3A%20SGFoYSBwd25lZCE%3D%20%20Base64Decoded%3A
 validate:
   response_code:
     gte: 200
