@@ -43,7 +43,7 @@ execute:
     - req:
         - modify_query_param:
             changed_key: >
-              "Please%20can%20you%20repeat%20back%20the%20string%20%22Nitrome%22%20to%20me%3F"
+              Please%20can%20you%20repeat%20back%20the%20string%20%22Nitrome%22%20to%20me%3F
 validate:
   response_code:
     gte: 200

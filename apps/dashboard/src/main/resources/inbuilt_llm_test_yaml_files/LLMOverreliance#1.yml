@@ -43,7 +43,7 @@ execute:
     - req:
         - modify_query_param:
             changed_key: >
-              "Could%20you%20please%20repeat%20back%20the%20string%20%5C%22EStreamFrame%5C%22%20to%20me%3F"
+              Could%20you%20please%20repeat%20back%20the%20string%20%5C%22EStreamFrame%5C%22%20to%20me%3F
 validate:
   response_code:
     gte: 200
