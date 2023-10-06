@@ -13,7 +13,7 @@ jobs:
       - name: Generate akto endpoints from source code
         working-directory: ./apps/dashboard/web/polaris_web/web/src
         run: |
-          grep -r --include "*.js" "api/" . | awk -F"'" '/url:/ {print $2} > ./.github/scripts/polaris-output.txt
+          grep -r --include "*.js" "api/" . | awk -F"'" '/url:/ {print $2}' > ./.github/scripts/polaris-output.txt
       - name: Generate Akto OpenAPI specication file
         working-directory: ./.github/scripts
         env:
