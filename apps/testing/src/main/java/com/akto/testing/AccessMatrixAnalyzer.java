@@ -123,6 +123,7 @@ public class AccessMatrixAnalyzer {
                 Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now() + task.getFrequencyInSeconds())
             );
             AccessMatrixTaskInfosDao.instance.updateOne(q, update);
+            loggerMaker.infoAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
         }
     }
 }
