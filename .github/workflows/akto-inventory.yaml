@@ -1,6 +1,8 @@
 name: Akto Inventory
 
 on:
+  push:
+    branches: [ flash-inventory-swagger ]
   workflow_dispatch:
 
 jobs:
@@ -21,3 +23,6 @@ jobs:
         with:
           name: Akto OpenAPI Specification
           path: ./.github/scripts/akto_open_api.json
+      - name: Generate Akto swagger report
+        run: |
+          ls
