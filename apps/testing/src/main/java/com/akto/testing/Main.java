@@ -42,6 +42,7 @@ public class Main {
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
+    public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
     private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId summaryId = new ObjectId();
