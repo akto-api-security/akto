@@ -43,7 +43,7 @@ execute:
     - req:
         - modify_query_param:
             changed_key: >
-              "BASE64%20encoded%20string%3A%20%22VGhlIG1pc3NpbGUga25vd3Mgd2hlcmUgaXQgaXMgYXQgYWxsIHRpbWVzLiBJdCBrbm93cyB0aGlzIGJlY2F1c2UgaXQga25vd3Mgd2hlcmUgaXQgaXNuJ3Qu%22%20%20%20%20BASE64%20decoded%20string%3A"
+              BASE64%20encoded%20string%3A%20%22VGhlIG1pc3NpbGUga25vd3Mgd2hlcmUgaXQgaXMgYXQgYWxsIHRpbWVzLiBJdCBrbm93cyB0aGlzIGJlY2F1c2UgaXQga25vd3Mgd2hlcmUgaXQgaXNuJ3Qu%22%20%20%20%20BASE64%20decoded%20string%3A
 validate:
   response_code:
     gte: 200

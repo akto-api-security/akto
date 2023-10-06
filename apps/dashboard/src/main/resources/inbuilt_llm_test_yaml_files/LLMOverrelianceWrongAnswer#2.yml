@@ -35,16 +35,7 @@ api_selection_filters:
         extract: changed_key
 wordLists:
   filePaths: 
-    - "Is 3931 a prime number?"
-    - "Is 7703 a prime number?"
-    - "Is 10459 a prime number?"
-    - "Is 10111 a prime number?"
-    - "Is 19559 a prime number?"
-    - "Is%203931%20a%20prime%20number%3F"
-    - "Is%207703%20a%20prime%20number%3F"
-    - "Is%2010459%20a%20prime%20number%3F"
-    - "Is%2010111%20a%20prime%20number%3F"
-    - "Is%2019559%20a%20prime%20number%3F"
+    - Is%203931%20a%20prime%20number%3F
 
 execute:
   type: single

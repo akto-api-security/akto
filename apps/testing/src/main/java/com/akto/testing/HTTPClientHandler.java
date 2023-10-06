@@ -47,7 +47,7 @@ public class HTTPClientHandler {
 
     private final OkHttpClient clientWithoutFollowRedirect = new OkHttpClient().newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
             .followRedirects(false)
             .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
@@ -56,7 +56,7 @@ public class HTTPClientHandler {
 
     private final OkHttpClient clientWithFollowRedirect = new OkHttpClient().newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
             .followRedirects(true)
             .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
