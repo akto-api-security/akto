@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Generate akto endpoints from source code
+        working-directory: ./apps/dashboard/web/polaris_web/web/src
+        run: |
+          grep -r --include "*.js" "api/" . | awk -F"'" '/url:/ {print $2} > ./.github/scripts/polaris-output.txt
       - name: Generate Akto OpenAPI specication file
         working-directory: ./.github/scripts
         env:
@@ -23,6 +27,3 @@ jobs:
         with:
           name: Akto OpenAPI Specification
           path: ./.github/scripts/akto_open_api.json
-      - name: Generate Akto swagger report
-        run: |
-          ls

@@ -1,12 +1,15 @@
 const axios = require("axios")
 const fs = require("fs")
-const { Readable } = require('stream');
 
 const AKTO_DASHBOARD_URL = process.env.AKTO_DASHBOARD_URL
 const AKTO_API_KEY = process.env.AKTO_API_KEY
 
 const headers = {
     'X-API-KEY': AKTO_API_KEY,
+}
+
+function logGithubStepSummary(message) {
+    fs.appendFileSync(GITHUB_STEP_SUMMARY, `${message}\n`);
 }
 
 function processOpenAPIfile(openAPIObject) {
@@ -73,6 +76,26 @@ async function saveOpenAPIfile(openAPIObject) {
 
 }
 
+function generateAktoEndpointsSummary(processedOpenAPIObject) {
+    let sourceAktoEndpoints
+
+    const sourceData = fs.readFileSync("./polaris-output.txt", 'utf8')
+    sourceAktoEndpoints = sourceData.split('\n')
+
+    const openAPIAktoEndpoints = Object.keys(processedOpenAPIObject.paths)
+    
+    logGithubStepSummary(`Akto endpoints count (source): ${sourceAktoEndpoints.length}`)
+    logGithubStepSummary(`Akto endpoints count (OpenAPI file): ${openAPIAktoEndpoints.length}`)
+    logGithubStepSummary(`#### Endpoints missing in OpenAPI file`)
+    
+    sourceAktoEndpoints.forEach(sourceEndpoint => {
+        if (!openAPIAktoEndpoints.includes(sourceEndpoint)) {
+            logGithubStepSummary(`| ${sourceEndpoint} |`)
+        }
+    });
+
+}
+
 async function main() {
 
     const data = {
@@ -86,6 +109,9 @@ async function main() {
             const openAPIObject = JSON.parse(generateOpenApiFileResponse.data.openAPIString)
             const processedOpenAPIObject = processOpenAPIfile(openAPIObject)
             saveOpenAPIfile(processedOpenAPIObject)
+
+            logGithubStepSummary("### Akto inventory summary")
+            generateAktoEndpointsSummary(processedOpenAPIObject)
         }
     } catch (error) {
         console.error('Error:', error.message);
