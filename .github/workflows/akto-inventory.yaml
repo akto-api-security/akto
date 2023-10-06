@@ -19,5 +19,5 @@ jobs:
       - name: Archive open_api spec
         uses: actions/upload-artifact@v3
         with:
-          name: Akto OpenAPI Specication
+          name: Akto OpenAPI Specification
           path: ./.github/scripts/akto_open_api.json
