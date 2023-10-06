@@ -1,9 +1,6 @@
 name: Akto Inventory
 
 on:
-  push:
-    branches: [ flash-inventory-swagger ]
-
   workflow_dispatch:
 
 jobs:
