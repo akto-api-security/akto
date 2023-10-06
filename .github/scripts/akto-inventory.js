@@ -79,7 +79,7 @@ async function saveOpenAPIfile(openAPIObject) {
 function generateAktoEndpointsSummary(processedOpenAPIObject) {
     let sourceAktoEndpoints
 
-    const sourceData = fs.readFileSync("./polaris-output.txt", 'utf8')
+    const sourceData = fs.readFileSync("../../apps/dashboard/web/polaris_web/web/src", 'utf8')
     sourceAktoEndpoints = sourceData.split('\n')
 
     const openAPIAktoEndpoints = Object.keys(processedOpenAPIObject.paths)
