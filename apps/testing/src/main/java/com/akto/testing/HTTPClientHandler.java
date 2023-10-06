@@ -13,7 +13,32 @@ import java.security.cert.CertificateException;
 import java.util.concurrent.TimeUnit;
 
 public class HTTPClientHandler {
-    private HTTPClientHandler() {}
+    private int readTimeout = 30;
+    private final OkHttpClient clientWithoutFollowRedirect;
+    private final OkHttpClient clientWithFollowRedirect;
+    private HTTPClientHandler(boolean isSaas) {
+        if(isSaas) {
+            readTimeout = 60;
+        }
+        clientWithoutFollowRedirect = new OkHttpClient().newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(readTimeout, TimeUnit.SECONDS)
+                .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
+                .followRedirects(false)
+                .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
+                .hostnameVerifier((hostname, session) -> true)
+                .build();
+
+        clientWithFollowRedirect = new OkHttpClient().newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(readTimeout, TimeUnit.SECONDS)
+                .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
+                .followRedirects(true)
+                .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
+                .hostnameVerifier((hostname, session) -> true)
+                .build();
+
+    }
 
     private static final TrustManager[] trustAllCerts = new TrustManager[] {
             new X509TrustManager() {
@@ -44,26 +69,13 @@ public class HTTPClientHandler {
 
     private static final SSLSocketFactory trustAllSslSocketFactory = trustAllSslContext.getSocketFactory();
 
+    public static HTTPClientHandler instance = null;
 
-    private final OkHttpClient clientWithoutFollowRedirect = new OkHttpClient().newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
-            .followRedirects(false)
-            .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
-            .hostnameVerifier((hostname, session) -> true)
-            .build();
-
-    private final OkHttpClient clientWithFollowRedirect = new OkHttpClient().newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
-            .followRedirects(true)
-            .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
-            .hostnameVerifier((hostname, session) -> true)
-            .build();
-
-    public static final HTTPClientHandler instance = new HTTPClientHandler();
+    public static void initHttpClientHandler(boolean isSaas) {
+        if (instance == null) {
+            instance = new HTTPClientHandler(isSaas);
+        }
+    }
 
     public OkHttpClient getHTTPClient (boolean followRedirect) {
         if (followRedirect) {
