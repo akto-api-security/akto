@@ -161,6 +161,7 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
+        loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
 
         return response;
     }

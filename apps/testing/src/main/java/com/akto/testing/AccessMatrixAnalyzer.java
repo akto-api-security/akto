@@ -108,6 +108,8 @@ public class AccessMatrixAnalyzer {
 
             if(endpoints!=null && !endpoints.isEmpty()){
                 for(ApiInfoKey endpoint: endpoints){
+                    loggerMaker.infoAndAddToDb("Started checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
+
                     List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(endpoint);
                     if (messages!=null){
 
@@ -115,6 +117,7 @@ public class AccessMatrixAnalyzer {
                             bflaTest.updateAllowedRoles(rawApi, endpoint, testingUtil);
                         }
                     }
+                    loggerMaker.infoAndAddToDb("Finished checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
                 }
             }
             Bson q = Filters.eq(Constants.ID, task.getId());
@@ -123,6 +126,7 @@ public class AccessMatrixAnalyzer {
                 Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now() + task.getFrequencyInSeconds())
             );
             AccessMatrixTaskInfosDao.instance.updateOne(q, update);
+            loggerMaker.infoAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
         }
     }
 }
