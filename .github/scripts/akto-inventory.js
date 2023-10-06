@@ -101,9 +101,12 @@ function generateAktoEndpointsSummary(processedOpenAPIObject) {
         logGithubStepSummary(`Akto endpoints count (OpenAPI file): ${openAPIAktoEndpoints.length}`)
         logGithubStepSummary(`#### Endpoints missing in OpenAPI file`)
         
+        let counter = 1
+
         sourceAktoEndpoints.forEach(sourceEndpoint => {
             if (!openAPIAktoEndpoints.includes(sourceEndpoint)) {
-                logGithubStepSummary(`| ${sourceEndpoint} |`)
+                logGithubStepSummary(`${counter} | ${sourceEndpoint} |`)
+                counter += 1
             }
         });
     });
