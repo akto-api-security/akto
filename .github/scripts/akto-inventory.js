@@ -78,6 +78,14 @@ async function saveOpenAPIfile(openAPIObject) {
 
 }
 
+function addSlash(endpoints) {
+    endpoints.forEach((endpoint, index) => {
+        if (!endpoint.startsWith("/")) {
+            endpoints[index] = "/" + endpoint
+         }
+    })
+}
+
 function generateAktoEndpointsSummary(processedOpenAPIObject) {
     let sourceAktoEndpoints 
 
@@ -93,9 +101,11 @@ function generateAktoEndpointsSummary(processedOpenAPIObject) {
         
         sourceAktoEndpoints = stdout.split('\n')
         sourceAktoEndpoints.pop()
-        sourceAktoEndpoints.forEach(endpoint => console.log(endpoint))
-
+        
         const openAPIAktoEndpoints = Object.keys(processedOpenAPIObject.paths)
+    
+        addSlash(sourceAktoEndpoints)
+        addSlash(openAPIAktoEndpoints)
         
         logGithubStepSummary(`Akto endpoints count (source): ${sourceAktoEndpoints.length}`)
         logGithubStepSummary(`Akto endpoints count (OpenAPI file): ${openAPIAktoEndpoints.length}`)
@@ -111,6 +121,8 @@ function generateAktoEndpointsSummary(processedOpenAPIObject) {
                 counter += 1
             }
         });
+
+        logGithubStepSummary(`Total missing: ${counter}`)
     });
 }
 
