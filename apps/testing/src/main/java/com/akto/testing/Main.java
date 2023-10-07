@@ -41,6 +41,7 @@ public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
 
     public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
 
@@ -122,7 +123,7 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(account -> {
                     AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();

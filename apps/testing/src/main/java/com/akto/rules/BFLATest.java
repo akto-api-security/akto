@@ -17,6 +17,7 @@ import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -92,7 +93,7 @@ public class BFLATest {
         Bson update = Updates.addEachToSet(AccessMatrixUrlToRole.ROLES, ret);
         UpdateOptions opts = new UpdateOptions().upsert(true);
         AccessMatrixUrlToRolesDao.instance.getMCollection().updateOne(q, update, opts);
-
+        loggerMaker.infoAndAddToDb("updated for " + apiInfoKey.getUrl() + " role: " + StringUtils.join(ret, ","), LogDb.TESTING);
         return ret;        
     }
 }
