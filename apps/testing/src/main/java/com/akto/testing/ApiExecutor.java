@@ -30,6 +30,12 @@ public class ApiExecutor {
             }
         }
 
+        boolean isSaasDeployment = "true".equals(System.getenv("IS_SAAS"));
+
+        if (HTTPClientHandler.instance == null) {
+            HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
+        }
+        
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
         if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
