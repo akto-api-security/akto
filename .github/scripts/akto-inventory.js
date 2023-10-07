@@ -122,7 +122,8 @@ function generateAktoEndpointsSummary(processedOpenAPIObject) {
             }
         });
 
-        logGithubStepSummary(`Total missing: ${counter}`)
+        logGithubStepSummary("<br/>")
+        logGithubStepSummary(`Total missing: ${counter - 1}`)
     });
 }
 
