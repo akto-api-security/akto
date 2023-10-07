@@ -442,6 +442,8 @@ public class SingleTypeInfo {
     public static final String _API_COLLECTION_ID = "apiCollectionId";
     public static final String COLLECTION_NAME = "collectionName";
     int apiCollectionId;
+    public static final String _COLLECTION_IDS = "collectionIds";
+    List<Integer> collectionIds;
     public static final String _SENSITIVE = "sensitive";
     @BsonIgnore
     boolean sensitive;
@@ -510,6 +512,7 @@ public class SingleTypeInfo {
         this.param = paramId.param;
         this.subType = paramId.subType;
         this.apiCollectionId = paramId.apiCollectionId;
+        this.collectionIds = Arrays.asList(paramId.apiCollectionId);
         this.isUrlParam = paramId.isUrlParam;
         this.examples = examples;
         this.userIds = userIds;
@@ -668,6 +671,20 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+        if(this.collectionIds == null){
+            this.collectionIds = new ArrayList<>();
+        }
+        if(!this.collectionIds.contains(apiCollectionId)){
+            this.collectionIds.add(apiCollectionId);
+        }
+    }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
     }
 
     public String getSubTypeString() {

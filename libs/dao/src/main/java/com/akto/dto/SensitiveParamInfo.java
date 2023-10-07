@@ -1,5 +1,8 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 public class SensitiveParamInfo {
@@ -13,7 +16,7 @@ public class SensitiveParamInfo {
     private boolean sensitive;
     public static final String SAMPLE_DATA_SAVED = "sampleDataSaved";
     private boolean sampleDataSaved;
-
+    List<Integer> collectionIds;
 
     public SensitiveParamInfo() {
     }
@@ -27,6 +30,7 @@ public class SensitiveParamInfo {
         this.apiCollectionId = apiCollectionId;
         this.sensitive = sensitive;
         this.sampleDataSaved = false;
+        this.collectionIds = Arrays.asList(apiCollectionId);
     }
 
     public String getUrl() {
@@ -79,6 +83,12 @@ public class SensitiveParamInfo {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+        if(this.collectionIds==null){
+            this.collectionIds = new ArrayList<>();
+        }
+        if(!this.collectionIds.contains(apiCollectionId)){
+            this.collectionIds.add(apiCollectionId);
+        }
     }
 
     public boolean isSensitive() {
@@ -125,6 +135,14 @@ public class SensitiveParamInfo {
 
     public void setSampleDataSaved(boolean sampleDataSaved) {
         this.sampleDataSaved = sampleDataSaved;
+    }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
     }
 
 }

@@ -1,5 +1,8 @@
 package com.akto.dto.traffic;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import org.bson.codecs.pojo.annotations.BsonId;
@@ -9,6 +12,7 @@ public class TrafficInfo {
     @BsonId
     Key id;
     public Map<String, Integer> mapHoursToCount;
+    List<Integer> collectionIds;
 
     public TrafficInfo() {
     }
@@ -16,6 +20,7 @@ public class TrafficInfo {
     public TrafficInfo(Key id, Map<String,Integer> mapHoursToCount) {
         this.id = id;
         this.mapHoursToCount = mapHoursToCount;
+        this.collectionIds = Arrays.asList(id.getApiCollectionId());
     }
 
     public Key getId() {
@@ -24,6 +29,12 @@ public class TrafficInfo {
 
     public void setId(Key id) {
         this.id = id;
+        if(this.collectionIds==null){
+            this.collectionIds = new ArrayList<>();
+        }
+        if(id!=null && !this.collectionIds.contains(id.getApiCollectionId())){
+            this.collectionIds.add(id.getApiCollectionId());
+        }
     }
 
     public Map<String,Integer> getMapHoursToCount() {
@@ -32,6 +43,14 @@ public class TrafficInfo {
 
     public void setMapHoursToCount(Map<String,Integer> mapHoursToCount) {
         this.mapHoursToCount = mapHoursToCount;
+    }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
     }
 
     @Override

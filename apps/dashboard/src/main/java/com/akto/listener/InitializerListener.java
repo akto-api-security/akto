@@ -5,6 +5,7 @@ import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
@@ -40,6 +41,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -54,6 +56,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.slack.api.Slack;
@@ -1021,6 +1024,46 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void useCollectionIdArray(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getUseCollectionIdArray() == 0) {
+
+            List<String> matchKey = Arrays.asList("$" + SingleTypeInfo._API_COLLECTION_ID);
+            List<String> matchKeyWithId = Arrays.asList("$" + Constants.ID + "." + SingleTypeInfo._API_COLLECTION_ID);
+
+            MongoCollection<?>[] collectionsWithKey = new MongoCollection[] {
+                    SingleTypeInfoDao.instance.getMCollection(),
+                    APISpecDao.instance.getMCollection(),
+                    SensitiveParamInfoDao.instance.getMCollection()
+            };
+
+            for (MongoCollection<?> collection : collectionsWithKey) {
+                collection.updateMany(new BasicDBObject(),
+                        Arrays.asList(
+                                Updates.set(SingleTypeInfo._COLLECTION_IDS, matchKey)));
+            }
+
+            MongoCollection<?>[] collectionsWithKeyID = new MongoCollection[] {
+                    ApiInfoDao.instance.getMCollection(),
+                    TrafficInfoDao.instance.getMCollection(),
+                    SampleDataDao.instance.getMCollection(),
+                    SensitiveSampleDataDao.instance.getMCollection(),
+                    VulnerableRequestForTemplateDao.instance.getMCollection(),
+                    FilterSampleDataDao.instance.getMCollection()
+            };
+
+            for (MongoCollection<?> collection : collectionsWithKeyID) {
+                collection.updateMany(new BasicDBObject(),
+                        Arrays.asList(
+                                Updates.set(SingleTypeInfo._COLLECTION_IDS, matchKeyWithId)));
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+            Filters.eq(Constants.ID, backwardCompatibility.getId()),
+            Updates.set(BackwardCompatibility.USE_COLLECTION_ID_ARRAY, Context.now())
+            );
+        }
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1150,6 +1193,7 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
+        useCollectionIdArray(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {

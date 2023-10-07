@@ -4,12 +4,14 @@ package com.akto.dto;
 import com.akto.types.CappedList;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class FilterSampleData {
     private FilterKey id;
     public static final String SAMPLES = "samples";
     private CappedList<String> samples;
+    List<Integer> collectionIds;
 
     public static final int cap = 10;
 
@@ -49,6 +51,7 @@ public class FilterSampleData {
     public FilterSampleData(ApiInfo.ApiInfoKey id, Integer filterId) {
         this.id = new FilterKey(id,filterId);
         this.samples = new CappedList<>(cap, true);
+        this.collectionIds = Arrays.asList(id.getApiCollectionId());
     }
 
     public void merge(FilterSampleData that) {
@@ -66,6 +69,12 @@ public class FilterSampleData {
 
     public void setId(FilterKey id) {
         this.id = id;
+        if(this.collectionIds==null){
+            this.collectionIds = new ArrayList<>();
+        }
+        if(id!=null && id.getApiInfoKey()!=null && !this.collectionIds.contains(id.getApiInfoKey().getApiCollectionId())){
+            this.collectionIds.add(id.getApiInfoKey().getApiCollectionId());
+        }
     }
 
     public CappedList<String> getSamples() {
@@ -74,5 +83,13 @@ public class FilterSampleData {
 
     public void setSamples(CappedList<String> samples) {
         this.samples = samples;
+    }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
     }
 }
