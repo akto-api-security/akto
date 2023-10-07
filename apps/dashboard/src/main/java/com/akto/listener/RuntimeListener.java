@@ -5,6 +5,7 @@ import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dto.Account;
@@ -15,6 +16,7 @@ import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
@@ -208,7 +210,15 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
                 Map<String, Object> testDataMap = (Map)json.get("testData");
             }
-            Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+            Bson filters = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, VULNERABLE_API_COLLECTION_ID);
+            List<SingleTypeInfo> params = SingleTypeInfoDao.instance.findAll(filters);
+            Set<String> urlList = new HashSet<>();
+            for (SingleTypeInfo singleTypeInfo: params) {
+                urlList.add(singleTypeInfo.getUrl());
+            }
+            if (urlList.size() > 117) {
+                Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+            }
 
         } catch (Exception e) {
             // add log
