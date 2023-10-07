@@ -8,6 +8,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
+import com.akto.utils.GithubSync;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
@@ -261,11 +262,20 @@ public class AccountAction extends UserAction {
                 RuntimeListener.addSampleData();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
-                InitializerListener.saveTestEditorYaml();
+
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {
                     e.printStackTrace();
+                }
+
+                try {
+                    GithubSync githubSync = new GithubSync();
+                    byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+                    loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
+                    InitializerListener.processTemplateFilesZip(repoZip);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);

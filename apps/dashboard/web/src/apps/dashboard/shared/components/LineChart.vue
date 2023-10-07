@@ -14,7 +14,6 @@
 import merge from "@/util/merge";
 import obj from "@/util/obj";
 import {Chart} from "highcharts-vue"
-import func from "@/util/func";
 
 export default {
   name: "LineChart",
@@ -57,7 +56,7 @@ export default {
         this.data.forEach((x,idx) => {
           let b = {
             data: x['data'],
-            color: x['color'],
+            color: this.color,
             name: x['name'],
             fillColor: this.areaFillHex ? fillColor : {},
             marker: { enabled: x['data'].length <= 2},
@@ -126,7 +125,7 @@ export default {
               },
               ...this.inputMetrics.map((x,i) => {
                 return {
-                  title: '',
+                  title: x.name,
                   visible: true,
                   opposite: true,
                   min : 0

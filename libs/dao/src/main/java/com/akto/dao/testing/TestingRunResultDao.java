@@ -43,22 +43,26 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
+        return fetchLatestTestingRunResult(filters, 10_000);
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
         MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
                 .projection(
                         Projections.include(
-                            TestingRunResult.TEST_RUN_ID,
-                            TestingRunResult.API_INFO_KEY,
-                            TestingRunResult.TEST_SUPER_TYPE,
-                            TestingRunResult.TEST_SUB_TYPE,
-                            TestingRunResult.VULNERABLE,
-                            TestingRunResult.CONFIDENCE_PERCENTAGE,
-                            TestingRunResult.START_TIMESTAMP,
-                            TestingRunResult.END_TIMESTAMP,
-                            TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
+                                TestingRunResult.TEST_RUN_ID,
+                                TestingRunResult.API_INFO_KEY,
+                                TestingRunResult.TEST_SUPER_TYPE,
+                                TestingRunResult.TEST_SUB_TYPE,
+                                TestingRunResult.VULNERABLE,
+                                TestingRunResult.CONFIDENCE_PERCENTAGE,
+                                TestingRunResult.START_TIMESTAMP,
+                                TestingRunResult.END_TIMESTAMP,
+                                TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
                         )
                 )
                 .sort(Sorts.descending("_id"))
-                .limit(10_000)
+                .limit(limit)
                 .cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {

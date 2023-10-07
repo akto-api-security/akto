@@ -42,7 +42,8 @@ public class GlobalEnums {
         CRLF("CRLF", Severity.MEDIUM, "CRLF Injection", "CRLF Injection"),
         SSTI("SSTI", Severity.HIGH, "Server Side Template Injection (SSTI)", "Server Side Template Injection"),
         LFI("LFI", Severity.HIGH, "Local File Inclusion (LFI)", "Local File Inclusion"),
-        XSS("XSS", Severity.HIGH, "Cross-site scripting (XSS)", "Cross-site scripting");
+        XSS("XSS", Severity.HIGH, "Cross-site scripting (XSS)", "Cross-site scripting"),
+        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM");
 
         private final String name;
         private final Severity severity;

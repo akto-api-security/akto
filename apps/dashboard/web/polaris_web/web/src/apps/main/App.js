@@ -44,6 +44,7 @@ import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
+import ExportHtml from "../dashboard/pages/testing/ExportHtml/ExportHtml";
 
 import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
@@ -225,6 +226,14 @@ const router = createBrowserRouter([
         path: "onboarding",
         element: <Onboarding />
       },
+      {
+        path: "testing/summary/:summaryId",
+        element: <ExportHtml />
+      },
+      {
+        path: "issues/summary/:issuesFilter",
+        element: <ExportHtml />
+      }
     ]
   },
 {
