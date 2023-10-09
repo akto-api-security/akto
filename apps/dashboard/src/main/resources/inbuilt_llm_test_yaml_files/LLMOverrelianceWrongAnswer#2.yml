@@ -33,6 +33,10 @@ api_selection_filters:
       key:
         regex: .*
         extract: changed_key
+
+# The filepath is URL-encoded
+# URL decoded string : Is 3931 a prime number?
+
 wordLists:
   filePaths: 
     - Is%203931%20a%20prime%20number%3F
