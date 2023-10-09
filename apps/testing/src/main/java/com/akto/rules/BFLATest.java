@@ -38,6 +38,15 @@ public class BFLATest {
         int statusCode = testResponse.getStatusCode();
         String originalMessage = rawApi.getOriginalMessage();
 
+        loggerMaker.infoAndAddToDb("Request: " + testRequest, LogDb.TESTING);
+        String testResponseTrimmed = testResponse.getJsonResponseBody();
+        if (testResponseTrimmed == null) {
+            testResponseTrimmed = "";
+        } else {
+            testResponseTrimmed = testResponseTrimmed.substring(0, Math.min(500, testResponseTrimmed.length()));
+        }
+        loggerMaker.infoAndAddToDb("Response: " + testResponse.getStatusCode() + " "+ testResponse.getHeaders() + " " + testResponseTrimmed, LogDb.TESTING);
+
         return new TestPlugin.ApiExecutionDetails(statusCode, 0, testResponse, originalHttpResponse, originalMessage);
     }
 
