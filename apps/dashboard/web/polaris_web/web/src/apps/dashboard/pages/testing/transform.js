@@ -1,11 +1,10 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar} from '@shopify/polaris';
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -146,12 +145,24 @@ const transform = {
       };
       return obj;
     },
-    prettifyTestName: (testName, icon, iconColor)=>{
+    prettifyTestName: (testName, icon, iconColor, state)=>{
+      let iconComp
+      switch(state){
+        case "COMPLETED":
+          iconComp = (<Avatar shape="round" size="extraSmall" source="/public/circle_tick_minor.svg" />)
+          break;
+        case "STOPPED":
+          iconComp = (<Avatar shape="round" size="extraSmall" source="/public/circle_cancel.svg" />)
+          break;
+        default:
+          iconComp = (<Box><Icon source={icon} color={iconColor}/></Box>)
+          break;
+      }
       return(
         <HorizontalStack gap={4}>
-          <Box><Icon source={icon} color={iconColor}/></Box>
+          {iconComp}
           <Box maxWidth="400px">
-            <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'semibold'}} />
+            <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
         </HorizontalStack>
       )
@@ -206,7 +217,7 @@ const transform = {
       if(prettified){
         const prettifiedTest={
           ...obj,
-          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state)),
+          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state), state),
           number_of_tests: getTestsInfo(testingRunResultSummary?.testResultsCount, state),
           severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
         }
@@ -445,16 +456,33 @@ convertSubIntoSubcategory(resp){
 
 },
 
+getUrlComp(url){
+  let arr = url.split(' ')
+  const method = arr[0]
+  const endpoint = arr[1]
+
+  return(
+    <HorizontalStack gap={1}>
+      <Box width="54px">
+        <HorizontalStack align="end">
+          <Text variant="bodyMd" color="subdued">{method}</Text>
+        </HorizontalStack>
+      </Box>
+      <Text variant="bodyMd">{endpoint}</Text>
+    </HorizontalStack>
+  )
+},
+
 getCollapisbleRow(urls){
   return(
     <tr style={{background: "#EDEEEF"}}>
-      <td colSpan={6}>
+      <td colSpan={7}>
         <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
           <VerticalStack gap={2}>
             {urls.map((ele,index)=>{
               return(
                 <Link monochrome url={ele.nextUrl} removeUnderline key={index}>
-                  <Text variant="bodySm" color="subdued">{ele.url}</Text>
+                  {this.getUrlComp(ele.url)}
                 </Link>
               )
             })}
@@ -497,7 +525,7 @@ getPrettifiedTestRunResults(testRunResults){
     let obj = testRunResultsObj[key]
     let prettifiedObj = {
       ...obj,
-      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'semibold'}}/></Box>,
+      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
         {obj.cweDisplay.map((ele,index)=>{
@@ -507,12 +535,7 @@ getPrettifiedTestRunResults(testRunResults){
         })}
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
-      scanned_time_comp: <HorizontalStack gap={3}>
-        <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>
-        <Box>
-          <Icon source={ChevronDownMinor}/>
-        </Box>
-      </HorizontalStack>,
+      scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
       collapsibleRow: this.getCollapisbleRow(obj.urls),
       urlFilters: obj.urls.map((ele) => ele.url)
     }

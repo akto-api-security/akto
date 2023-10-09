@@ -211,7 +211,7 @@ function ApiCollections() {
                     {summaryItems.map((item, index) => (
                         <Box borderInlineEndWidth={index < 2 ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
                             <VerticalStack gap="1">
-                                <Text color="subdued" variant="bodySm">
+                                <Text color="subdued" variant="headingXs">
                                     {item.title}
                                 </Text>
                                 <Text variant="bodyMd" fontWeight="semibold">

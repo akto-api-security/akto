@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
-  CircleTickMinor,
+  CircleTickMajor,
   ArchiveMinor,
   LinkMinor,
   ResourcesMajor,
@@ -49,7 +49,7 @@ const headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: CircleTickMinor,
+    icon: CircleTickMajor,
   },
   {
     text: 'Test category',

@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
+import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import tranform from "../onboarding/transform"
 import TooltipText from "../../components/shared/TooltipText";
@@ -211,9 +211,9 @@ const transform = {
 
     getColor(key){
         switch(key.toUpperCase()){
-            case "HIGH" : return "bg-critical-subdued";
-            case "MEDIUM": return "bg-caution-subdued";
-            case "LOW": return "bg-info-subdued";
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "attention";
+            case "LOW": return "info";
             default:
                 return "bg";
         }
@@ -239,11 +239,7 @@ const transform = {
                 {
                     Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
                         return(
-                            <Box borderRadius="2" background={this.getColor(key)} width="30px" key={index} paddingBlockEnd={"05"} paddingBlockStart={"05"}>
-                                <HorizontalStack align="center">
-                                    <Text variant="bodySm" color="subdued" fontWeight="regular">{severityInfo[key]}</Text>
-                                </HorizontalStack>
-                            </Box>
+                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
                         )
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
@@ -257,9 +253,9 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1}>
                     {sensitiveTags.map((item,index)=>{
-                        return(index < 2 ? <Badge size="small" status="warning" key={index}>{item}</Badge> : null)
+                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
                     })}
-                    {sensitiveTags.length > 2 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 2).toString() + 'more'}</Badge> : null}
+                    {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
                 </HorizontalStack>
             </Box>
         )
@@ -270,7 +266,7 @@ const transform = {
             return{
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
-                displayName: <TooltipText text={c.displayName} tooltip={c.displayName} />,
+                displayName: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
                 endpoints: c.endpoints,
                 riskScore: <Badge status={this.getStatus(0)} size="small">{"0"}</Badge>,
                 coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
@@ -329,7 +325,7 @@ const transform = {
                 <Box width="240px">
                     <HorizontalStack align="space-between">
                         <Box maxWidth={isNew ? "180px" : '220px'}>
-                            <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "semibold"}} />
+                            <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "medium"}} />
                         </Box>
                         {isNew ? <Badge size="small">New</Badge> : null}
                     </HorizontalStack>

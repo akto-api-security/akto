@@ -43,14 +43,14 @@ const headings = [
     {
         text: 'Access Type',
         value: 'access_type',
-        title: 'Access Type',
+        title: 'Access type',
         itemCell: 4,
         showFilter: true,
         isText: true,
     },
     {
         text: 'Auth Type',
-        title: 'Auth Type',
+        title: 'Auth type',
         value: 'auth_type',
         itemCell: 5,
         showFilter: true,
@@ -58,14 +58,14 @@ const headings = [
     },
     {
         text: 'Sensitive Params',
-        title: 'Sensitive Params',
+        title: 'Sensitive params',
         value: 'sensitiveTagsComp',
         itemCell: 6,
         showFilter: true
     },
     {
         text: 'Last Seen',
-        title: 'Last Seen',
+        title: 'Last seen',
         value: 'last_seen',
         itemCell: 7,
         isText: true,
@@ -370,7 +370,9 @@ function ApiEndpoints() {
             <Popover 
                 active={exportOpen}
                 activator={(
-                    <Button onClick={() => setExportOpen(true)}>More Actions</Button>
+                    <Button onClick={() => setExportOpen(true)} disclosure>
+                        More Actions
+                    </Button>
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setExportOpen(false) }}

@@ -12,7 +12,7 @@ import {
   Tag,
   IndexFiltersMode,
 } from '@shopify/polaris';
-import { ReplayMinor } from '@shopify/polaris-icons';
+import { RefreshMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
@@ -58,6 +58,10 @@ let headers = [
     itemCell: 6,
     title: 'Scanned',
   },
+  {
+    title: '',
+    isCollapsible: true
+  }
 ]
 
 const sortOptions = [
@@ -420,13 +424,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
   return (
     <PageWithMultipleCards
     title={
-          <VerticalStack gap="3">
+        <Box paddingBlockStart={1}>
+          <VerticalStack gap="2">
             <HorizontalStack gap="2" align="start">
               { selectedTestRun?.icon && <Box>
                 <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
               </Box>
               }
-              <Box maxWidth="50vw">
+              <Box maxWidth="35vw">
                 <TooltipText 
                   tooltip={selectedTestRun?.name} 
                   text={selectedTestRun?.name || "Test run name"} 
@@ -443,7 +448,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
                 </Badge>
                 )}
                 <Tooltip content={"Re-run test"} hoverDelay={400}>
-                  <Button icon={ReplayMinor} plain onClick={() => {rerunTest(hexId)}}/>
+                  <Button icon={RefreshMinor} plain onClick={() => {rerunTest(hexId)}}/>
                 </Tooltip>
             </HorizontalStack>
             <Text color="subdued" fontWeight="regular" variant="bodyMd">
@@ -452,6 +457,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
               }
             </Text>
           </VerticalStack>
+          </Box>
     }
     backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 

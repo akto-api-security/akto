@@ -50,6 +50,10 @@
     
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;
+
+    --p-color-bg-critical-subdued: #FED3D1 !important;
+    --p-color-bg-caution-subdued: #FFD79D !important;
+    --p-color-bg-info-subdued: #A4E8F2 !important;
 }
 
 .Polaris-Page{
@@ -58,4 +62,17 @@
 
 .Polaris-Frame__Main, .Polaris-Navigation {
     background: #F6F6F7 !important;
+}
+
+.Polaris-Tabs {
+    padding: 0 !important;
+}
+
+.Polaris-Tabs__Tab--active {
+    background: #EDEEEF !important;
+    color: #202223 !important;
+}
+
+.Polaris-Tabs .Polaris-Badge--statusSuccess{
+    background: rgba(221, 224, 228, 1) !important;
 }

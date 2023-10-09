@@ -65,6 +65,10 @@ let headers = [
     itemCell:5,
     isText: true,
   },
+  {
+    title: '',
+    isAction: true,
+  }
 ]
 
 const sortOptions = [
@@ -195,7 +199,7 @@ const [severityCountMap, setSeverityCountMap] = useState({
   LOW: {text : 0, color: func.getColorForCharts("LOW")},
 })
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
-const [collapsible, setCollapsible] = useState(false)
+const [collapsible, setCollapsible] = useState(true)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -298,7 +302,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
       setSubCategoryInfo(transform.convertSubIntoSubcategory(resp.subcategoryInfo))
       const copyMap = JSON.parse(JSON.stringify(severityCountMap))
       Object.keys(resp.severityInfo).length > 0 && Object.keys(resp.severityInfo).forEach((key)=>{
-        copyMap[key].text = resp.severityInfo[key]
+        copyMap[key].text = resp?.severityInfo[key]
       })
       setSeverityCountMap(copyMap)
     })
@@ -350,7 +354,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
-  let totalVulnerabilites = severityCountMap.HIGH.text + severityCountMap.MEDIUM.text +  severityCountMap.LOW.text 
+  let totalVulnerabilites = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
   return(
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
