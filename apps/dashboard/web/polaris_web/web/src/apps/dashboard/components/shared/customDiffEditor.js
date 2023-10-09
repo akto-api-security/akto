@@ -1,4 +1,7 @@
 import func from "@/util/func"
+import { detailedDiff }  from 'deep-object-diff';
+import { diff } from 'deep-diff';
+
 
 const transform = {
     formatJson(data){
@@ -91,6 +94,9 @@ const transform = {
         let insertedKeys = []
         let deletedKeys = []
         let finalUnflatObj = {}
+
+        const detailedDifference = diff(original, current)
+        console.log(detailedDifference)
 
         let ogFlat = func.flattenObject(original)
         let currFlat = func.flattenObject(current)
