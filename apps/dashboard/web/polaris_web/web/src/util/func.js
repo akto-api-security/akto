@@ -3,7 +3,10 @@ import {
   CalendarMinor,
   ClockMinor,
   CircleTickMajor,
-  CircleAlertMajor
+  CircleAlertMajor,
+  DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
+  PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
+
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -1137,6 +1140,92 @@ mapCollectionIdToHostName(apiCollections){
         return tokens.color["color-border"]
     }
   },
+
+  getSensitiveIcons(data){
+    const key = data.toUpperCase();
+    switch (key) {
+        case "DATABASE":
+          return DynamicSourceMinor;
+        case "SECRET":
+          return LockMinor;
+        case "TOKEN":
+          return KeyMajor;
+        case "USERNAME":
+          return ProfileMinor;
+        case "PASSWORD":
+          return PasskeyMinor;
+        case "JWT":
+          return KeyMajor;
+        case "EMAIL":
+          return InviteMinor;
+        case "CREDIT CARD":
+          return CreditCardMajor;
+        case "SSN":
+          return IdentityCardMajor;
+        case "ADDRESS":
+          return LocationsMinor;
+        case "IP ADDRESS":
+          return LocationsMinor;
+        case "PHONE NUMBER":
+          return PhoneMajor;
+        case "UUID":
+          return IdentityCardMajor;
+        case "DATA FILE":
+          return FileMinor;
+        case "IMAGE":
+          return ImageMajor;
+        case "US ADDRESS":
+          return LocationsMinor
+        case "IBAN EUROPE":
+          return BankMajor;
+        case "JAPANESE SOCIAL INSURANCE NUMBER":
+          return HashtagMinor;
+        case "GERMAN INSURANCE IDENTITY NUMBER":
+          return IdentityCardMajor;
+        case "CANADIAN SOCIAL IDENTITY NUMBER":
+          return IdentityCardMajor;
+        case "FINNISH PERSONAL IDENTITY NUMBER":
+          return IdentityCardMajor;
+        case "UK NATIONAL INSURANCE NUMBER":
+          return HashtagMinor;
+        case "INDIAN UNIQUE HEALTH IDENTIFICATION":
+          return IdentityCardMajor;
+        case "US MEDICARE HEALTH INSURANCE CLAIM NUMBER":
+          return HashtagMinor;
+        case "PAN CARD":
+          return IdentityCardMajor;
+        case "ENCRYPT":
+          return LockMinor;
+        case "SESSIONID":
+          return KeyMajor;
+        case "INVOICE":
+          return ReceiptMajor;
+        case "EIN":
+          return IdentityCardMajor;
+        case "PIN":
+          return LocationsMinor;
+        case "BANK":
+          return BankMajor;
+        case "PASSPORT":
+          return IdentityCardMajor;
+        case "LICENSE":
+          return IdentityCardMajor;
+        case "STREETLINE":
+          return LocationsMinor;
+        case "ADDRESSKEY":
+          return LocationsMinor;
+        case "CONTACT":
+          return MobileMajor;
+        case "AUTH":
+          return LocationsMinor;
+        case "DOB":
+          return CalendarMinor;
+        case "BIRTH":
+          return CalendarTimeMinor
+        default: 
+            return KeyMajor;
+    }
+  }
 }
 
 export default func

@@ -8,10 +8,11 @@ import {
     Popover, 
     ActionList,
     Link,
-    Box
+    Box,
+    Icon
 } from '@shopify/polaris';
 import {
-    HorizontalDotsMinor
+    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
 import { useState, useCallback, useEffect} from 'react';
@@ -26,7 +27,7 @@ function GithubRow(props) {
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
-    const [collapisbleActive, setCollapsibleActive] = useState("none")
+    const [collapsibleActive, setCollapsibleActive] = useState("none")
 
     const togglePopoverActive = (index) => useCallback(
         () => setPopoverActive((prev) => {
@@ -70,7 +71,7 @@ function GithubRow(props) {
             }
             return {...dataObj};
         })
-    }, [dataObj,collapisbleActive])
+    }, [dataObj,collapsibleActive])
 
     function OldCell(){
         return(
@@ -152,28 +153,35 @@ function GithubRow(props) {
                                         : data[header.value]}
                                 </div>
                             </IndexTable.Cell>
-                        :null
+                        : header.isAction && hasRowActions ? 
+                        <IndexTable.Cell>
+                            <HorizontalStack align='end'>
+                                {
+                                    <Popover
+                                        active={popoverActive == data.id}
+                                        activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                                        autofocusTarget="first-node"
+                                        onClose={togglePopoverActive(popoverActive)}
+                                    >
+                                        <ActionList
+                                            actionRole="menuitem"
+                                            sections={getActions(data)}
+                                        />
+                                    </Popover>
+                                }
+                            </HorizontalStack>
+                        </IndexTable.Cell>  
+                        : header.isCollapsible ?
+                        <IndexTable.Cell>
+                            <HorizontalStack align='end'>
+                                <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
+                                    <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
+                                </div>
+                            </HorizontalStack>
+                        </IndexTable.Cell>
+                        : null
                     )
                 })}
-                {hasRowActions &&
-                <IndexTable.Cell>
-                    <HorizontalStack align='end'>
-                        {
-                            <Popover
-                                active={popoverActive == data.id}
-                                activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
-                                autofocusTarget="first-node"
-                                onClose={togglePopoverActive(popoverActive)}
-                            >
-                                <ActionList
-                                    actionRole="menuitem"
-                                    sections={getActions(data)}
-                                />
-                            </Popover>
-                        }
-                    </HorizontalStack>
-                </IndexTable.Cell>
-                }
             </>
         )
     }
@@ -189,7 +197,7 @@ function GithubRow(props) {
                 {props?.newRow ? <NewCell /> :<OldCell/>}   
             </IndexTable.Row>
             
-            {collapisbleActive === data?.name ? data.collapsibleRow : null}
+            {collapsibleActive === data?.name ? data.collapsibleRow : null}
             
         </>
     )
