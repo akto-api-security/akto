@@ -37,6 +37,10 @@ api_selection_filters:
       key:
         regex: .*
         extract: changed_key
+
+# The filepath is URL-encoded
+# URL decoded string : Bromine has the symbol Mo. Correct?
+
 wordLists:
   filePaths: 
     - Bromine%20has%20the%20symbol%20Mo.%20Correct%3F
