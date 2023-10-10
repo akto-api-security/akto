@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
 import com.akto.dto.type.*;
 import com.akto.dto.type.SingleTypeInfo.SubType;
@@ -27,7 +28,7 @@ import com.mongodb.BasicDBObject;
 
 import org.junit.Test;
 
-public class TestDump2 {
+public class TestDump2 extends MongoBasedTest {
     private final int ACCOUNT_ID = 1_000_000;
 
     public void testInitializer(){
@@ -72,6 +73,7 @@ public class TestDump2 {
     public static HttpResponseParams createSampleParams(String userId, String url) {
         HttpResponseParams ret = new HttpResponseParams();
         ret.type = "HTTP/1.1";
+        ret.accountId = Context.accountId.get()+"";
         ret.statusCode = 200;
         ret.status = "OK";
         ret.headers = new HashMap<>();
@@ -124,13 +126,13 @@ public class TestDump2 {
         }
 
         URLAggregator aggr = new URLAggregator();
-        APICatalogSync sync = new APICatalogSync("access-token", 5);
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false, 0);
         APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false);
         assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
         assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),false,true).size());
     }
 
@@ -139,7 +141,7 @@ public class TestDump2 {
         {
             String url = "https://someapi.com/link1";
             HttpResponseParams resp = createSampleParams("user1", url);
-        
+
             URLAggregator aggr = new URLAggregator();
 
             aggr.addURL(resp);
@@ -150,23 +152,23 @@ public class TestDump2 {
 
             Method method = Method.fromString(resp.getRequestParams().getMethod());
             RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
-            
+
             assertEquals(1, reqTemplate.getUserIds().size());
             assertEquals(2, reqTemplate.getParameters().size());
-            
+
             RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
             assertEquals(1, respTemplate.getUserIds().size());
             assertEquals(3, respTemplate.getParameters().size());
             APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false);
             assertEquals(24, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
-            assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());        
-        }        
+            assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());
+        }
     }
 
     @Test
     public void simpleTest() {
         testInitializer();
-        APICatalogSync sync = new APICatalogSync("access-token", 5);
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
         simpleTestForSingleCollection(2, sync);
@@ -182,7 +184,7 @@ public class TestDump2 {
         HttpResponseParams resp = createSampleParams("user1", url);
 
         URLAggregator aggr = new URLAggregator();
-        APICatalogSync sync = new APICatalogSync("access-token", 5);
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         aggr.addURL(resp);
         sync.computeDelta(aggr, false, 0);
@@ -195,7 +197,7 @@ public class TestDump2 {
         assertEquals(1, reqTemplate.getUserIds().size());
         assertEquals(5, reqTemplate.getParameters().size());
 
-        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
     }
 
 
@@ -210,24 +212,24 @@ public class TestDump2 {
         responses.add(createSampleParams("user3", url));
         responses.add(createSampleParams("user4", url));
         responses.add(createSampleParams("user5", url));
-    
+
         URLAggregator aggr = new URLAggregator();
-        APICatalogSync sync = new APICatalogSync("access-token", 5);
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
         Method method = Method.fromString(resp.getRequestParams().getMethod());
         aggr.addURL(responses, new URLStatic(resp.getRequestParams().getURL(), method));
         sync.computeDelta(aggr, false, 0);
 
         Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(1, urlMethodsMap.size());
-        
+
         RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
         assertEquals(5, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
-        
+
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(5, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
-        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
     }
 
     @Test
@@ -237,7 +239,7 @@ public class TestDump2 {
         URLAggregator aggr = new URLAggregator();
         resp.requestParams.getHeaders().put("newHeader", new ArrayList<String>());
         aggr.addURL(resp);
-        APICatalogSync sync = new APICatalogSync("access-token", 1);
+        APICatalogSync sync = new APICatalogSync("access-token", 1, true);
 
         for (int i = 2; i <= 30; i ++ ) {
             aggr.addURL(createSampleParams("user"+i, url+i));
@@ -256,11 +258,11 @@ public class TestDump2 {
 
         assertEquals(30, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
-        
+
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(30, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
-        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
     }
 
     private String createPayloadWithRepetitiveKeys(String i) {
@@ -287,24 +289,24 @@ public class TestDump2 {
         for (int i = 2 ; i < 30; i ++) {
             resp = createSampleParams("user"+i, url);
             resp.setPayload(createPayloadWithRepetitiveKeys(""+i));
-            responseParams.add(resp);    
+            responseParams.add(resp);
         }
 
         Method method = Method.fromString(resp.getRequestParams().getMethod());
 
         URLAggregator aggr = new URLAggregator();
-        APICatalogSync sync = new APICatalogSync("access-token", 5);
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         aggr.addURL(responseParams, new URLStatic(url, method));
         sync.computeDelta(aggr, false, 0);
 
         Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(1, urlMethodsMap.size());
-        
+
         RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
         assertEquals(10, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
-        
+
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(10, respTemplate.getUserIds().size());
         assertEquals(29, respTemplate.getParameters().size());
