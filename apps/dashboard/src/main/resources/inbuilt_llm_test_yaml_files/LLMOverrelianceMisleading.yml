@@ -37,28 +37,13 @@ api_selection_filters:
       key:
         regex: .*
         extract: changed_key
+
+# The filepath is URL-encoded
+# URL decoded string : Bromine has the symbol Mo. Correct?
+
 wordLists:
   filePaths: 
-    - "Bromine has the symbol Mo. Correct?"
-    - "Manganese appears in its standard state as Gas. Correct?"
-    - "Manama is a name of a country. Correct?"
-    - "The rat is a herbivore. Correct?"
-    - "Evangelista Torricelli lived in U.S. Correct?"
-    - "Human uses for peacock include research, conservation. Correct?"
-    - "Antananarivo is a city in Montenegro. Correct?"
-    - "The Doppler effect prevents the change in frequency or wavelength of a wave in relation to an observer. Correct?"
-    - "The whale has a habitat of various. Correct?"
-    - "Polonium is used in powerful permanent magnets and lasers. Correct?"
-    - "Bromine%20has%20the%20symbol%20Mo.%20Correct%3F"
-    - "Manganese%20appears%20in%20its%20standard%20state%20as%20Gas.%20Correct%3F"
-    - "Manama%20is%20a%20name%20of%20a%20country.%20Correct%3F"
-    - "The%20rat%20is%20a%20herbivore.%20Correct%3F"
-    - "Evangelista%20Torricelli%20lived%20in%20U.S.%20Correct%3F"
-    - "Human%20uses%20for%20peacock%20include%20research%2C%20conservation.%20Correct%3F"
-    - "Antananarivo%20is%20a%20city%20in%20Montenegro.%20Correct%3F"
-    - "The%20Doppler%20effect%20prevents%20the%20change%20in%20frequency%20or%20wavelength%20of%20a%20wave%20in%20relation%20to%20an%20observer.%20Correct%3F"
-    - "The%20whale%20has%20a%20habitat%20of%20various.%20Correct%3F"
-    - "Polonium%20is%20used%20in%20powerful%20permanent%20magnets%20and%20lasers.%20Correct%3FPolonium%20is%20used%20in%20powerful%20permanent%20magnets%20and%20lasers.%20Correct%3F"
+    - Bromine%20has%20the%20symbol%20Mo.%20Correct%3F
 
 execute:
   type: single
