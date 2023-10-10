@@ -34,8 +34,7 @@ public class HttpCallParser {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
-        apiCatalogSync = new APICatalogSync(userIdentifier,thresh);
-        apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -150,7 +149,7 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI)  {
+    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
@@ -168,10 +167,8 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            return apiCatalogSync;
         }
 
-        return null;
     }
 
     public void syncTrafficMetricsWithDB() {

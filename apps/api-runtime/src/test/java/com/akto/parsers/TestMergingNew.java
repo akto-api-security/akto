@@ -440,6 +440,7 @@ public class TestMergingNew extends MongoBasedTest {
 
     public static HttpResponseParams createSampleParams(String userId, String url) {
         HttpResponseParams ret = new HttpResponseParams();
+        ret.accountId = Context.accountId.get()+"";
         ret.type = "HTTP/1.1";
         ret.statusCode = 200;
         ret.status = "OK";

@@ -86,7 +86,7 @@ public class TestDBSync extends MongoBasedTest {
         newHeader.add("hnew");
         resp.getHeaders().put("new header", newHeader);
         aggr.addURL(resp);
-        APICatalogSync sync = new APICatalogSync("access-token", 5);
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         for (int i = 2; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
@@ -199,7 +199,7 @@ public class TestDBSync extends MongoBasedTest {
     public void testInvalidMergeParameterizedURL() {
         testInitializer();
         URLAggregator aggr = new URLAggregator();
-        APICatalogSync sync = new APICatalogSync("access-token", 1);
+        APICatalogSync sync = new APICatalogSync("access-token", 1, true);
 
         for (int i = 1; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));

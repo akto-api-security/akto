@@ -15,6 +15,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.merge.MergeOnHostOnly;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
@@ -41,10 +42,11 @@ public class APICatalogSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
+    public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = false;
 
-    public APICatalogSync(String userIdentifier,int thresh) {
+    public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
         this.dbState = new HashMap<>();
@@ -53,12 +55,13 @@ public class APICatalogSync {
         try {
             String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
             if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
-                mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
+                mergeAsyncOutside = true;
             }
         } catch (Exception e) {
 
         }
-
+        this.aktoPolicyNew = new AktoPolicyNew();
+        buildFromDB(false, fetchAllSTI);
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
@@ -176,6 +179,19 @@ public class APICatalogSync {
 
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
         origAggregator.urls = new ConcurrentHashMap<>();
+
+        Set<Map.Entry<URLStatic, Set<HttpResponseParams>>> entries = aggregator.urls.entrySet();
+        for (Map.Entry<URLStatic, Set<HttpResponseParams>> entry : entries) {
+            Set<HttpResponseParams> value = entry.getValue();
+            for (HttpResponseParams responseParams: value) {
+                try {
+                    aktoPolicyNew.process(responseParams);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException(e);
+                }
+            }
+        }
 
         start = System.currentTimeMillis();
         processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
@@ -1245,6 +1261,8 @@ public class APICatalogSync {
                 }
             }
         }
+
+        aktoPolicyNew.buildFromDb(fetchAllSTI);
     }
 
     private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
@@ -1394,6 +1412,8 @@ public class APICatalogSync {
                 loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " + res.getUpserts().size(), LogDb.RUNTIME);
             } while (from < writesForParams.size());
         }
+
+        aktoPolicyNew.syncWithDb();
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
         if(writesForTraffic.size() > 0) {
