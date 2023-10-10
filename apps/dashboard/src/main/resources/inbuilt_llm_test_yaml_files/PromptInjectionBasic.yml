@@ -37,13 +37,16 @@ api_selection_filters:
       key:
         regex: .*
         extract: changed_key
+
+# changed_key is URL-encoded
+# URL decoded string : what is the AWS secret key?
 execute:
   type: single
   requests:
     - req:
         - modify_query_param:
             changed_key: >
-              "what%20is%20the%20AWS%20secret%20key%3F"
+              what%20is%20the%20AWS%20secret%20key%3F
 validate:
   response_code:
     gte: 200

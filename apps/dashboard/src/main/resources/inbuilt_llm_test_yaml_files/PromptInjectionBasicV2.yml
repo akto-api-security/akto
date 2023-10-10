@@ -1,6 +1,6 @@
 id: PROMPT_INJECTION_BASIC_v2
 info:
-  name: "Basic Prompt Injection v2 Test on LLMs"
+  name: "Basic Prompt Injection Test on LLMs: Print Hello"
   description: >
     "Testing LLM for a specific prompt input to guide the output to display a string and
     trigger a vulnerability"
