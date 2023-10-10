@@ -154,7 +154,7 @@ function GithubRow(props) {
                                 </div>
                             </IndexTable.Cell>
                         : header.isAction && hasRowActions ? 
-                        <IndexTable.Cell>
+                        <IndexTable.Cell key={"actions"}>
                             <HorizontalStack align='end'>
                                 {
                                     <Popover
@@ -172,7 +172,7 @@ function GithubRow(props) {
                             </HorizontalStack>
                         </IndexTable.Cell>  
                         : header.isCollapsible ?
-                        <IndexTable.Cell>
+                        <IndexTable.Cell key={"collapsible"}>
                             <HorizontalStack align='end'>
                                 <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
                                     <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />

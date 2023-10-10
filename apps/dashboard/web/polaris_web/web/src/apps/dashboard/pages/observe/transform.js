@@ -253,7 +253,7 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1}>
                     {sensitiveTags.map((item,index)=>{
-                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
+                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
                     })}
                     {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
                 </HorizontalStack>
