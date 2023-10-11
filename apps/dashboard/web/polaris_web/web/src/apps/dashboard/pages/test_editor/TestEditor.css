@@ -59,3 +59,11 @@
 .editor-header .Polaris-Text--root{
     max-width: 30vw;
 }
+
+.req-resp-tabs .Polaris-LegacyTabs__Title{
+    padding: 0 !important;
+} 
+
+.req-resp-tabs .Polaris-Box{
+    border: none !important;
+}
