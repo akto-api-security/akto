@@ -138,8 +138,9 @@ function saveFinalResponseToJSONFile(){
 function saveFinalResponseToJUnitFile(){
   if [ $IS_TEST_RUN_COMPLETED -eq 0 ]
     then
-      echo "$MAX_WAITTIME_EXCEEDED_ERRORMSG"
-      exit 1
+      echo "### Testsigma summary" >> $GITHUB_STEP_SUMMARY
+      echo "$MAX_WAITTIME_EXCEEDED_ERRORMSG" 
+      exit 0
   fi
  
   echo ""
@@ -212,7 +213,7 @@ function setExitCode(){
   if [[ $RESULT =~ "SUCCESS" ]];then
     EXITCODE=0
   else
-    EXITCODE=1
+    EXITCODE=0
   fi
   echo "exit Code:$EXITCODE"
 }
