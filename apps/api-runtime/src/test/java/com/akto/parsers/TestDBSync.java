@@ -93,20 +93,20 @@ public class TestDBSync extends MongoBasedTest {
         }
         sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(false, true);
+        APICatalogSync.mergeUrlsAndSave(123, true);
+        sync.buildFromDB(false, true);
 
-        assertEquals(0, sync.getDelta(0).getStrictURLToMethods().size());
-        assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
+        assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDbState(123).getTemplateURLToMethods().size());
 
-        Map.Entry<URLTemplate, RequestTemplate> entry = sync.getDelta(0).getTemplateURLToMethods().entrySet().iterator().next();
+        Map.Entry<URLTemplate, RequestTemplate> entry = sync.getDbState(123).getTemplateURLToMethods().entrySet().iterator().next();
 
         assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
         RequestTemplate reqTemplate = entry.getValue();
 
-        assertEquals(30, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.getStatusCode());
-        assertEquals(30, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
     }    
 
@@ -139,10 +139,16 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
 
-        SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
-        assertEquals(10, sd.getSamples().size());
+        APICatalogSync.mergeUrlsAndSave(123, true);
+        parser.apiCatalogSync.buildFromDB(false, true);
 
-    }  
+        SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
+        assertEquals(1, sd.getSamples().size());
+
+        parser.syncFunction(responseParams,true, true);
+        sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
+        assertEquals(10, sd.getSamples().size());
+    }
 
     @Test
     public void testAllPaths() {
@@ -208,8 +214,8 @@ public class TestDBSync extends MongoBasedTest {
         sync.syncWithDB(false, true);
 
 
-        assertEquals(30, sync.getDelta(123).getStrictURLToMethods().size());
-        assertEquals(0, sync.getDelta(123).getTemplateURLToMethods().size());
+        assertEquals(30, sync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(0, sync.getDbState(123).getTemplateURLToMethods().size());
 
         HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "payment/history");
         ArrayList<String> newHeader = new ArrayList<>();
@@ -220,9 +226,11 @@ public class TestDBSync extends MongoBasedTest {
         
         sync.computeDelta(aggr2, true, 123);
         sync.syncWithDB(false, true);
+        APICatalogSync.mergeUrlsAndSave(123, true);
+        sync.buildFromDB(false, true);
 
-        assertEquals(0, sync.getDelta(123).getStrictURLToMethods().size());
-        assertEquals(1, sync.getDelta(123).getTemplateURLToMethods().size());
+        assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDbState(123).getTemplateURLToMethods().size());
 
 
     }

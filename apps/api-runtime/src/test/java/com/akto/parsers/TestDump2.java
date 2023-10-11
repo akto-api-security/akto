@@ -232,39 +232,6 @@ public class TestDump2 extends MongoBasedTest {
         assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
     }
 
-    @Test
-    public void testParameterizedURLsTest() {
-        String url = "link/";
-        HttpResponseParams resp = createSampleParams("user1", url+1);
-        URLAggregator aggr = new URLAggregator();
-        resp.requestParams.getHeaders().put("newHeader", new ArrayList<String>());
-        aggr.addURL(resp);
-        APICatalogSync sync = new APICatalogSync("access-token", 1, true);
-
-        for (int i = 2; i <= 30; i ++ ) {
-            aggr.addURL(createSampleParams("user"+i, url+i));
-        }
-
-        sync.computeDelta(aggr, true, 0);
-
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
-
-        assertEquals(1, urlTemplateMap.size());
-
-        Map.Entry<URLTemplate, RequestTemplate> entry = urlTemplateMap.entrySet().iterator().next();
-        assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
-
-        RequestTemplate reqTemplate = entry.getValue();
-
-        assertEquals(30, reqTemplate.getUserIds().size());
-        assertEquals(2, reqTemplate.getParameters().size());
-
-        RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(30, respTemplate.getUserIds().size());
-        assertEquals(3, respTemplate.getParameters().size());
-        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
-    }
-
     private String createPayloadWithRepetitiveKeys(String i) {
         BasicDBObject ret = new BasicDBObject();
         BasicDBList list = new BasicDBList();

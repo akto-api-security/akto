@@ -44,7 +44,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    public static boolean mergeAsyncOutside = false;
+    public static boolean mergeAsyncOutside = true;
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this.thresh = thresh;
@@ -52,14 +52,6 @@ public class APICatalogSync {
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
-        try {
-            String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
-            if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
-                mergeAsyncOutside = true;
-            }
-        } catch (Exception e) {
-
-        }
         this.aktoPolicyNew = new AktoPolicyNew();
         buildFromDB(false, fetchAllSTI);
     }
@@ -1166,11 +1158,32 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
+    public static void clearValuesInDB(int apiCollectionId) {
+        System.out.println(SingleTypeInfoDao.instance.count(
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                        Filters.exists("values.elements.51", true)
+                )
+        ));
+
+        SingleTypeInfoDao.instance.updateMany(
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                        Filters.exists("values.elements.51", true)
+                ),
+                Updates.combine(
+                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(-50)),
+                        Updates.set(SingleTypeInfo._DOMAIN, SingleTypeInfo.Domain.RANGE.name()) // todo:
+                )
+        );
+    }
+
     private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
-        if (mergeAsyncOutside) {
+        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+        if (mergeAsyncOutside && instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType) ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
@@ -1216,50 +1229,6 @@ public class APICatalogSync {
 
         if (mergeAsyncOutside) {
             this.delta = new HashMap<>();
-            return;
-        }
-
-        if(calcDiff) {
-            for(int collectionId: this.dbState.keySet()) {
-                APICatalog newCatalog = this.dbState.get(collectionId);
-                Set<String> newURLs = new HashSet<>();
-                for(URLTemplate url: newCatalog.getTemplateURLToMethods().keySet()) { 
-                    newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
-                }
-                for(URLStatic url: newCatalog.getStrictURLToMethods().keySet()) { 
-                    newURLs.add(url.getUrl()+ " "+ url.getMethod().name());
-                }
-
-                Bson findQ = Filters.eq("_id", collectionId);
-
-                ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
-            }
-        } else {
-
-            for(Map.Entry<Integer, APICatalog> entry: this.dbState.entrySet()) {
-                int apiCollectionId = entry.getKey();
-                APICatalog apiCatalog = entry.getValue();
-                for(URLTemplate urlTemplate: apiCatalog.getTemplateURLToMethods().keySet()) {
-                    Iterator<Map.Entry<URLStatic, RequestTemplate>> staticURLIterator = apiCatalog.getStrictURLToMethods().entrySet().iterator();
-                    while(staticURLIterator.hasNext()){
-                        Map.Entry<URLStatic, RequestTemplate> urlXTemplate = staticURLIterator.next();
-                        URLStatic urlStatic = urlXTemplate.getKey();
-                        RequestTemplate requestTemplate = urlXTemplate.getValue();
-                        if (urlTemplate.match(urlStatic)) {
-                            if (this.delta == null) {
-                                this.delta = new HashMap<>();
-                            }
-
-                            if (this.getDelta(apiCollectionId) == null) {
-                                this.delta.put(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
-                            }
-
-                            this.getDelta(apiCollectionId).getDeletedInfo().addAll(requestTemplate.getAllTypeInfo());
-                            staticURLIterator.remove();
-                        }
-                    }
-                }
-            }
         }
 
         aktoPolicyNew.buildFromDb(fetchAllSTI);
