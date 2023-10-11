@@ -148,8 +148,8 @@ jobs:
         aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
       
   test:
-    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-    needs: deploy
+    #if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+    #needs: deploy
     runs-on: ubuntu-latest
     steps:
 
