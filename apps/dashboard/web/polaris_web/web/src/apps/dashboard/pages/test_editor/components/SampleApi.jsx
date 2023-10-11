@@ -1,6 +1,5 @@
-import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, VerticalStack} from "@shopify/polaris"
-import { tokens } from "@shopify/polaris-tokens"
-import { UpdateInventoryMajor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
+import {ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
 
@@ -122,12 +121,11 @@ const SampleApi = () => {
 
     const handleTabChange = (selectedTabIndex) => {
         setSelected(selectedTabIndex)
-
         if (sampleData) {
             if (selectedTabIndex == 0) {
-                editorInstance.setValue(JSON.stringify(sampleData.requestJson["json"], null, 2))
+                editorInstance.setValue(selectedApiEndpoint + '\n' + JSON.stringify(sampleData.requestJson["json"], null, 2))
             } else {
-                editorInstance.setValue(JSON.stringify(sampleData.responseJson["json"], null, 2))
+                editorInstance.setValue(selectedApiEndpoint + '\n' + JSON.stringify(sampleData.responseJson["json"], null, 2))
             }
         }
     }
@@ -167,7 +165,7 @@ const SampleApi = () => {
                 setSampleData({ requestJson, responseJson })
 
                 if (editorInstance) {
-                    editorInstance.setValue(JSON.stringify(requestJson["json"], null, 2))
+                    editorInstance.setValue(selectedApiEndpoint + '\n' + JSON.stringify(requestJson["json"], null, 2))
                 }
                 setTimeout(()=> {
                     setSampleDataList(sampleDataResponse.sampleDataList)
@@ -254,9 +252,19 @@ const SampleApi = () => {
     return (
         <div>
             <div className="editor-header">
-                <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
-                <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">Select Sample API</Button>
-                <Button id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                <div className="req-resp-tabs">
+                    <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
+                </div>
+                <HorizontalStack gap={2}>
+                    <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
+                        <Box maxWidth="200px">
+                            <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
+                                <Text variant="bodyMd" truncate>{copySelectedApiEndpoint}</Text>
+                            </Tooltip>
+                        </Box>
+                    </Button>
+                    <Button id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                </HorizontalStack>
             </div>
 
             <Divider />
