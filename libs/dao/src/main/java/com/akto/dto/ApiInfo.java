@@ -100,11 +100,12 @@ public class ApiInfo {
         }
 
         public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
-            return new ApiInfo.ApiInfoKey(
-                    httpResponseParams.getRequestParams().getApiCollectionId(),
-                    httpResponseParams.getRequestParams().getURL(),
-                    URLMethods.Method.fromString(httpResponseParams.getRequestParams().getMethod())
-            );
+            int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
+            String url = httpResponseParams.getRequestParams().getURL();
+            url = url.split("\\?")[0];
+            String methodStr = httpResponseParams.getRequestParams().getMethod();
+            URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+            return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
         }
 
     }
