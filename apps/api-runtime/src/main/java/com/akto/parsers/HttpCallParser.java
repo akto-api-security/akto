@@ -316,6 +316,7 @@ public class HttpCallParser {
                 filteredResponseParams.add(httpResponseParam);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in invetory",LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
