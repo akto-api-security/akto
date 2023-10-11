@@ -88,7 +88,6 @@ jobs:
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
 
       - name: Configure AWS Credentials for ECR
-        if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID_PROD}}

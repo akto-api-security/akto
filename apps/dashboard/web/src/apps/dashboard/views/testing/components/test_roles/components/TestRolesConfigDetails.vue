@@ -64,11 +64,17 @@
                 >
                 <template v-slot:add-new-row-btn="{}">
                     <div class="clickable download-csv d-flex">
-                        <secondary-button 
+                        <secondary-button
                             @click="createAccessMatrix"
                             text="Create Access Matrix"
                             color="var(--themeColor)" />
-                    </div>            
+
+                        <secondary-button
+                            @click="deleteAccessMatrix"
+                            text="Delete Access Matrix"
+                            color="var(--themeColor)" />
+
+                    </div>
                 </template>
                 </simple-table>
             </div>
@@ -282,8 +288,16 @@ export default {
                     })
                 }
         },
-        async createAccessMatrix(){
+        async createAccessMatrix() {
             await api.createMultipleAccessMatrixTasks(this.selectedRole.name || this.roleName)
+        },
+        async deleteAccessMatrix() {
+            let result = await api.deleteAccessMatrix(this.selectedRole.name || this.roleName)
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `Access details deleted successfully`,
+                color: 'green'
+            })
         },
         async analyzeApiSamples(headerNames) {
           let apiCollectionIds = this.conditionCollections.map((collectionId) => parseInt(collectionId));
