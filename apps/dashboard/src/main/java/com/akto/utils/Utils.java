@@ -323,12 +323,10 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-                info.setPolicy(new AktoPolicyNew(false));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             info.getHttpCallParser().syncFunction(responses, true, false);
-            info.getPolicy().main(responses, true, false);
         }
     }
 
