@@ -66,14 +66,14 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(15,20), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
 
 
@@ -81,21 +81,16 @@ public class TestMergingNew extends MongoBasedTest {
 
 
         assertEquals(1, urlTemplateMap.size());
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
     }
 
-    public int getStaticURLsSize1(HttpCallParser parser) {
+    public int getStaticURLsSize(HttpCallParser parser) {
         Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
 
         return urlStaticMap.size();
     }
 
-    public int getStaticURLsSize(HttpCallParser parser) {
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDelta(123).getStrictURLToMethods();
-
-        return urlStaticMap.size();
-    }
 
     @Test
     public void testmultipleUUIDForceMerge(){
@@ -125,13 +120,13 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false,true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(1, getStaticURLsSize1(parser));
+        assertEquals(1, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(1,2), false,true);
         parser.apiCatalogSync.syncWithDB(false,true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         assertEquals(1, templateURLToMethods.size());
@@ -143,7 +138,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false,true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(
@@ -184,13 +179,13 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(1, getStaticURLsSize1(parser));
+        assertEquals(1, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(1,2), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         assertEquals(1, templateURLToMethods.size());
@@ -200,7 +195,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url+"STRING"+"/received", URLMethods.Method.GET);
@@ -236,17 +231,17 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(0,23), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
-        assertEquals(23, getStaticURLsSize1(parser));
+        assertEquals(23, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(23,28), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(28,33), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
-        assertEquals(0, getStaticURLsSize1(parser));
+        assertEquals(0, getStaticURLsSize(parser));
     }
 
     @Test
@@ -599,7 +594,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.buildFromDB(false, true);
 
         // Now dbState has template URLs so urlParam values are now stored
-        assertEquals(0,getStaticURLsSize1(parser));
+        assertEquals(0,getStaticURLsSize(parser));
         testSampleSizeAndDomainOfSti(parser,1, 1, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.apiCatalogSync.syncWithDB(false, true);
@@ -615,16 +610,19 @@ public class TestMergingNew extends MongoBasedTest {
         parserNew.syncFunction(responseParams.subList(55,70), false, true);
         parserNew.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
-        parser.apiCatalogSync.buildFromDB(false, true);
+        parserNew.apiCatalogSync.buildFromDB(false, true);
         parserNew.syncFunction(responseParams.subList(70,150), false, true);
         parserNew.apiCatalogSync.syncWithDB(false, true);
         parserNew.syncFunction(responseParams.subList(150,200), false, true);
         parserNew.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
-        parser.apiCatalogSync.buildFromDB(false, true);
+        parserNew.apiCatalogSync.buildFromDB(false, true);
+
+        APICatalogSync.clearValuesInDB(123);
+        parserNew.apiCatalogSync.buildFromDB(false, true);
 
         // both now range
-        testSampleSizeAndDomainOfSti(parserNew, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
+        testSampleSizeAndDomainOfSti(parserNew, 50, 50, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.RANGE);
 
 
     }

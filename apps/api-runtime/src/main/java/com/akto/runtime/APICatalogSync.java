@@ -49,7 +49,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    public static boolean mergeAsyncOutside = false;
+    public static boolean mergeAsyncOutside = true;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -57,15 +57,6 @@ public class APICatalogSync {
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
-        try {
-            String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
-            if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
-                mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
-            }
-        } catch (Exception e) {
-
-        }
-
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
@@ -1157,11 +1148,32 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
+    public static void clearValuesInDB(int apiCollectionId) {
+        System.out.println(SingleTypeInfoDao.instance.count(
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                        Filters.exists("values.elements.51", true)
+                )
+        ));
+
+        SingleTypeInfoDao.instance.updateMany(
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                        Filters.exists("values.elements.51", true)
+                ),
+                Updates.combine(
+                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(-50)),
+                        Updates.set(SingleTypeInfo._DOMAIN, SingleTypeInfo.Domain.RANGE.name()) // todo:
+                )
+        );
+    }
+
     private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
-        if (mergeAsyncOutside) {
+        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+        if (mergeAsyncOutside && instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType) ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
