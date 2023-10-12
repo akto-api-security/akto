@@ -1,16 +1,20 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class SampleDataDao extends AccountsContextDao<SampleData> {
@@ -27,44 +31,33 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
         return SampleData.class;
     }
 
-    public void createIndicesIfAbsent() {
+    public final List<Bson> legacyIndices = Arrays.asList(
+            Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID,
+                    Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL,
+                    Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.METHOD }),
+            Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }));
 
-        boolean exists = false;
-        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
-            if (getCollName().equalsIgnoreCase(col)){
-                exists = true;
-                break;
-            }
-        };
+    public void createIndicesIfAbsent(boolean createLegacyIndices) {
 
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        String dbName = Context.accountId.get() + "";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+
+        List<Bson> indices = Arrays.asList(
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS,
+                        Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL,
+                        Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.METHOD }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }));
+
+        if (createLegacyIndices) {
+            indices.addAll(legacyIndices);
         }
-
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
-
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
-            counter++;
-        }
-
-        if (counter == 2) {
-            instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
-        }
-
+        createIndices(indices);
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,
                                                      String lastFetchedMethod, int limit, int sliceLimit) {
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.eq("_id.apiCollectionId", apiCollectionId));
-
+        filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)));
 
         if (lastFetchedUrl != null && lastFetchedMethod != null) {
             Bson f1 = Filters.gt("_id.url", lastFetchedUrl);

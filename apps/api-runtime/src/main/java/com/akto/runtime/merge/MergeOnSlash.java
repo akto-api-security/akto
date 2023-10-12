@@ -77,7 +77,7 @@
 //     }
 
 //     public void removeApiInfoDuplicates(int apiCollectionId){
-//         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId",apiCollectionId));
+//         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS,apiCollectionId));
 
 //         for(ApiInfo apiInfo:apiInfos){
 //             if(apiInfo.getId().getUrl().startsWith("/") || apiInfo.getId().getUrl().startsWith("http")){
@@ -143,7 +143,7 @@
 //     }
 
 //     public void removeTrafficInfoDuplicates(int apiCollectionId){
-//         List<TrafficInfo> trafficInfos = TrafficInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId",apiCollectionId));
+//         List<TrafficInfo> trafficInfos = TrafficInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS,apiCollectionId));
 
 //         for(TrafficInfo trafficInfo:trafficInfos){
 //             if(trafficInfo.getId().getUrl().startsWith("/") || trafficInfo.getId().getUrl().startsWith("http")){

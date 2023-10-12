@@ -93,7 +93,7 @@ public class PostmanAction extends UserAction {
         String apiName = "AKTO " + apiCollection.getDisplayName();
 
         List<SampleData> sampleData = SampleDataDao.instance.findAll(
-                Filters.eq("_id.apiCollectionId", apiCollectionId)
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))
             );
         String host =  apiCollection.getHostName();
         SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();    
@@ -103,7 +103,7 @@ public class PostmanAction extends UserAction {
         String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
         List<SensitiveSampleData> SensitiveSampleData = SensitiveSampleDataDao.instance.findAll(
-            Filters.eq("_id.apiCollectionId", apiCollectionId)
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))
         );
         SampleDataToSTI sensitiveSampleDataToSTI = new SampleDataToSTI();
         sensitiveSampleDataToSTI.setSensitiveSampleDataToSTI(SensitiveSampleData);
@@ -155,7 +155,7 @@ public class PostmanAction extends UserAction {
         String open_api_from_postman = valueNode.textValue();
 
         APISpec apiSpec = new APISpec(APISpec.Type.JSON, userId,collectionName,open_api_from_postman, apiCollectionId);
-        APISpecDao.instance.replaceOne(Filters.eq("apiCollectionId", apiCollectionId), apiSpec);
+        APISpecDao.instance.replaceOne(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)), apiSpec);
 
         return SUCCESS.toUpperCase();
     }

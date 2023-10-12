@@ -1,6 +1,7 @@
 package com.akto.runtime.merge;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +56,7 @@ public class MergeOnHostOnly {
             } catch(Exception e){
 
             }
-            ApiInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
+            ApiInfoDao.instance.getMCollection().deleteMany(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(oldId)));
         }
 
         List<SampleData> sampleDatas =  SampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
@@ -66,7 +67,7 @@ public class MergeOnHostOnly {
             } catch(Exception e){
 
             }
-            SampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
+            SampleDataDao.instance.getMCollection().deleteMany(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(oldId)));
         }
 
         List<SensitiveSampleData> sensitiveSampleDatas =  SensitiveSampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
@@ -77,7 +78,7 @@ public class MergeOnHostOnly {
             } catch(Exception e){
 
             }
-            SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
+            SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(oldId)));
         }
 
         List<TrafficInfo> trafficInfos =  TrafficInfoDao.instance.findAll("_id.apiCollectionId", oldId);
@@ -88,23 +89,23 @@ public class MergeOnHostOnly {
             } catch(Exception e){
 
             }
-            TrafficInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
+            TrafficInfoDao.instance.getMCollection().deleteMany(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(oldId)));
         }
 
-        SensitiveParamInfoDao.instance.getMCollection().deleteMany(Filters.eq("apiCollectionId", oldId));
+        SensitiveParamInfoDao.instance.getMCollection().deleteMany(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(oldId)));
         FilterSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiInfoKey.apiCollectionId", oldId));
     }
 
     public void updateSTI(int oldId, int newId){
         SingleTypeInfoDao.instance.getMCollection().updateMany(
-            Filters.eq("apiCollectionId",oldId), 
+            Filters.in(SingleTypeInfo._COLLECTION_IDS,Arrays.asList(oldId)), 
             Updates.set("apiCollectionId",newId));
     }
 
     public void deleteFromAllCollections(int apiCollectionId, List<String> urls ) {
 
         Bson filter = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.in("_id.url", urls));
 
         ApiInfoDao.instance.getMCollection().deleteMany(filter);
@@ -114,7 +115,7 @@ public class MergeOnHostOnly {
                 
         SingleTypeInfoDao.instance.getMCollection().deleteMany(
             Filters.and(
-                    Filters.eq("apiCollectionId", apiCollectionId),
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                     Filters.in("url",urls)));
     }
 

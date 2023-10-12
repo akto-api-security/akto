@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.FilterSampleData;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -33,7 +34,7 @@ public class FilterSampleDataDao extends AccountsContextDao<FilterSampleData>{
         return Filters.and(
                 Filters.eq("_id.apiInfoKey.url", apiInfoKey.getUrl()),
                 Filters.eq("_id.apiInfoKey.method", apiInfoKey.getMethod()+""),
-                Filters.eq("_id.apiInfoKey.apiCollectionId", apiInfoKey.getApiCollectionId()),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, apiInfoKey.getApiCollectionId()),
                 Filters.eq("_id.filterId", filterId)
         );
     }
@@ -42,7 +43,7 @@ public class FilterSampleDataDao extends AccountsContextDao<FilterSampleData>{
         return Filters.and(
                 Filters.eq("_id.apiInfoKey.url", apiInfoKey.getUrl()),
                 Filters.eq("_id.apiInfoKey.method", apiInfoKey.getMethod()+""),
-                Filters.eq("_id.apiInfoKey.apiCollectionId", apiInfoKey.getApiCollectionId())
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, apiInfoKey.getApiCollectionId())
         );
     }
 

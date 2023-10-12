@@ -35,7 +35,7 @@ public class ParamStateAction extends UserAction {
                 Projections.include(
                         SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD,
                         SingleTypeInfo._IS_HEADER, SingleTypeInfo._IS_URL_PARAM, SingleTypeInfo._PARAM,
-                        SingleTypeInfo._UNIQUE_COUNT, SingleTypeInfo._PUBLIC_COUNT
+                        SingleTypeInfo._UNIQUE_COUNT, SingleTypeInfo._PUBLIC_COUNT, SingleTypeInfo._COLLECTION_IDS
                 ),
                 Projections.computed(
                     computedFieldName,

@@ -10,7 +10,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,7 +24,7 @@ public class ApiInfoAction extends UserAction {
     private List<ApiInfo> apiInfoList;
     private int apiCollectionId;
     public String fetchApiInfoList() {
-        apiInfoList= ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", apiCollectionId));
+        apiInfoList= ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)));
         for (ApiInfo apiInfo: apiInfoList) {
             apiInfo.calculateActualAuth();
         }

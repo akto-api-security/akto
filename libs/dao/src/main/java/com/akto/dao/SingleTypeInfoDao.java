@@ -2,21 +2,16 @@ package com.akto.dao;
 
 import java.util.*;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -35,58 +30,30 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return SingleTypeInfo.class;
     }
 
-    public void createIndicesIfAbsent() {
+    public final List<Bson> legacyIndices = Arrays.asList(
+                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }));
 
-        boolean exists = false;
-        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
-            if (getCollName().equalsIgnoreCase(col)){
-                exists = true;
-                break;
-            }
-        };
+    public void createIndicesIfAbsent(boolean createLegacyIndices) {
 
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
-        }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
+        String dbName = Context.accountId.get() + "";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
-        if (counter == 1) {
-            String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-        }
+        List<Bson> indices = Arrays.asList(
+                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP }));
 
-        if (counter == 2) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"apiCollectionId"}));
-            counter++;
+        if (createLegacyIndices) {
+            indices.addAll(legacyIndices);
         }
-
-        if (counter == 3) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"param", "apiCollectionId"}));
-            counter++;
-        }
-
-        if (counter == 4) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID}));
-            counter++;
-        }
-
-        if (counter == 5) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE}));
-            counter++;
-        }
-
-        if (counter == 6) {
-            String[] fieldNames = {"responseCode", "subType", "timestamp",};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-        }
+        createIndices(indices);
     }
-
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
         List<Bson> filters = new ArrayList<>();
@@ -95,7 +62,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.eq(SingleTypeInfo._PARAM, "host"));
         filters.add(Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
 
-        if (useApiCollectionId) filters.add(Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId));
+        if (useApiCollectionId) filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)));
 
         return Filters.and(filters);
     }
@@ -118,7 +85,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.eq("responseCode", info.getResponseCode()));
         filters.add(Filters.eq("isHeader", info.getIsHeader()));
         filters.add(Filters.eq("param", info.getParam()));
-        filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
+        filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS,Arrays.asList(info.getApiCollectionId())));
 
         List<Boolean> urlParamQuery;
         if (info.getIsUrlParam()) {
@@ -138,7 +105,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
     public Set<String> getUniqueEndpoints(int apiCollectionId) {
-        Bson filter = Filters.eq("apiCollectionId", apiCollectionId);
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId));
         return instance.findDistinctFields("url", String.class, filter);
     }
 
@@ -227,7 +194,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.or(subTypeFilters));
 
         if (apiCollectionId != null && apiCollectionId != -1) {
-            filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)) );
         }
 
         if (url != null) {
@@ -258,7 +225,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(
                 Filters.and(
                         Filters.eq("sensitive", true),
-                        Filters.eq("apiCollectionId", apiCollectionId)
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))
                 )
         );
         for (SensitiveParamInfo sensitiveParamInfo: customSensitiveList) {
@@ -289,7 +256,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                         .append("method", "$method");
 
         if (apiCollectionId != -1) {
-            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))));
         }
 
         Bson projections = Projections.fields(
@@ -323,7 +290,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
     public List<SingleTypeInfo> fetchStiOfCollections(List<Integer> apiCollectionIds) {
-        Bson filters = Filters.in(SingleTypeInfo._API_COLLECTION_ID, apiCollectionIds);
+        Bson filters = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
         return instance.findAll(filters);
     }
 

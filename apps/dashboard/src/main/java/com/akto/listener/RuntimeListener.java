@@ -15,6 +15,7 @@ import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
@@ -273,7 +274,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
 
                     VulnerableRequestForTemplate vul = VulnerableRequestForTemplateDao.instance.findOne(
-                        Filters.eq("_id.apiCollectionId", LLM_API_COLLECTION_ID)
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(LLM_API_COLLECTION_ID))
                     );
                     if (vul == null) {
                         VulnerableRequestForTemplateDao.instance.getMCollection().insertOne(new VulnerableRequestForTemplate(apiInfoKey, testList));
@@ -285,7 +286,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                             templateIds.add(testId);
                             Bson update = Updates.set("templateIds", templateIds);
                             VulnerableRequestForTemplateDao.instance.getMCollection().updateOne(
-                                Filters.eq("_id.apiCollectionId", LLM_API_COLLECTION_ID), update, new UpdateOptions());
+                                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(LLM_API_COLLECTION_ID)), update, new UpdateOptions());
                         }
                     }
                 } catch (Exception e) {

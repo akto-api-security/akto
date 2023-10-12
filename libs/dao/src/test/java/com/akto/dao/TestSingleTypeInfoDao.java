@@ -313,7 +313,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         filters.add(Filters.eq("responseCode", info.getResponseCode()));
         filters.add(Filters.eq("isHeader", info.getIsHeader()));
         filters.add(Filters.eq("param", info.getParam()));
-        filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
+        filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(info.getApiCollectionId())));
         filters.add(Filters.eq("subType", info.getSubType().getName()));
 
         SingleTypeInfoDao.instance.updateOne(Filters.and(filters), Updates.set("count",1));

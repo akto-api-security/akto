@@ -11,6 +11,7 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
@@ -103,9 +104,9 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
-        SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));                    
+        SingleTypeInfoDao.instance.deleteAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds));
+        APISpecDao.instance.deleteAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds));
+        SensitiveParamInfoDao.instance.deleteAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds));                    
 
         return SUCCESS.toUpperCase();
     }

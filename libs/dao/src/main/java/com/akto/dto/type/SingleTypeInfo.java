@@ -12,8 +12,10 @@ import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -38,7 +38,7 @@ public class SampleMessageStore {
                 int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
                 singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
                         Filters.and(
-                                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                                 Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
                                 Filters.eq(SingleTypeInfo._IS_HEADER, false)
                         )
@@ -53,7 +53,7 @@ public class SampleMessageStore {
                     int apiCollectionId = apiInfoKeys.get(0).getApiCollectionId();
                     singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
                             Filters.and(
-                                    Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                                    Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                                     Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
                                     Filters.eq(SingleTypeInfo._IS_HEADER, false)
                             )
