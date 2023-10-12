@@ -221,7 +221,7 @@ public abstract class TestPlugin {
                                          Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
         Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfoKey.getApiCollectionId())),
             Filters.eq("url", apiInfoKey.url),
             Filters.eq("method", apiInfoKey.method.name()),
             Filters.eq("responseCode", responseCode),

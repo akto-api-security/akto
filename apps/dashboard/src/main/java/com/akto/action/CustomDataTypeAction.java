@@ -591,7 +591,7 @@ public class CustomDataTypeAction extends UserAction{
             filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
             filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
             filters.add(Filters.eq("param", paramId.getParam()));
-            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(paramId.getApiCollectionId())));
 
             bulkUpdatesForSingleTypeInfo.add(new DeleteOneModel<>(Filters.and(filters)));
         }
@@ -618,7 +618,7 @@ public class CustomDataTypeAction extends UserAction{
             filters.add(Filters.eq("_id.responseCode", paramId.getResponseCode()));
             filters.add(Filters.eq("_id.isHeader", paramId.getIsHeader()));
             filters.add(Filters.eq("_id.param", paramId.getParam()));
-            filters.add(Filters.eq("_id.apiCollectionId", paramId.getApiCollectionId()));
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(paramId.getApiCollectionId())));
 
             bulkSensitiveInvalidateUpdates.add(new UpdateOneModel<>(Filters.and(filters), Updates.set("invalid", true)));
         }
@@ -682,7 +682,7 @@ public class CustomDataTypeAction extends UserAction{
                         Filters.and(
                                 Filters.eq("_id.method", ssdId.getMethod()),
                                 Filters.eq("_id.url", ssdId.getUrl()),
-                                Filters.eq("_id.apiCollectionId", ssdId.getApiCollectionId())
+                                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(ssdId.getApiCollectionId()))
                         );
 
 

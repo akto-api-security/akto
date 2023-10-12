@@ -36,7 +36,7 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
                 Filters.eq("_id.isHeader", singleTypeInfo.getIsHeader()),
                 Filters.eq("_id.param", singleTypeInfo.getParam()),
                 Filters.eq("_id.subType", singleTypeInfo.getSubType().getName()),
-                Filters.eq("_id.apiCollectionId", singleTypeInfo.getApiCollectionId())
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(singleTypeInfo.getApiCollectionId()))
         );
     }
 

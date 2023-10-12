@@ -1,10 +1,12 @@
 package com.akto.dao;
 
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -35,13 +37,13 @@ public class SensitiveParamInfoDao extends AccountsContextDao<SensitiveParamInfo
         defaultFilters.add(Filters.eq("isHeader", isHeader));
         defaultFilters.add(Filters.eq("param", param));
         defaultFilters.add(Filters.eq("responseCode", responseCode));
-        defaultFilters.add(Filters.eq("apiCollectionId", apiCollectionId));
+        defaultFilters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)));
 
         return Filters.and(defaultFilters);
     }
 
     public Set<String> getUniqueEndpoints(int apiCollectionId) {
-        Bson filter = Filters.eq("apiCollectionId", apiCollectionId);
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId));
         return instance.findDistinctFields("url", String.class, filter);
     }
 

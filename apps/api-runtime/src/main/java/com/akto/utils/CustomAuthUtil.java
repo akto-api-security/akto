@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
@@ -26,7 +27,7 @@ public class CustomAuthUtil {
         return Filters.and(
                 Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
                 Filters.eq(SingleTypeInfo._URL,apiInfo.getId().getUrl()),
-                Filters.eq(SingleTypeInfo._API_COLLECTION_ID,apiInfo.getId().getApiCollectionId()),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS,Arrays.asList(apiInfo.getId().getApiCollectionId())),
                 Filters.eq(SingleTypeInfo._METHOD,apiInfo.getId().getMethod().name()),
                 Filters.eq(SingleTypeInfo._IS_HEADER,isHeader),
                 Filters.in(SingleTypeInfo._PARAM,params)

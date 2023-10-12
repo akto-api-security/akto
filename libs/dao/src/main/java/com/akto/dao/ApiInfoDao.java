@@ -57,7 +57,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return Filters.and(
                 Filters.eq("_id.url", url),
                 Filters.eq("_id.method", method),
-                Filters.eq("_id.apiCollectionId", apiCollectionId)
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))
         );
     }
 

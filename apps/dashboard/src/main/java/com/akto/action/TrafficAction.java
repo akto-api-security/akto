@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ public class TrafficAction {
         traffic = new HashMap<>();
         List<TrafficInfo> trafficInfoList = TrafficInfoDao.instance.findAll(Filters.and(
             Filters.eq("_id.url", url),
-            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
             Filters.eq("_id.responseCode", -1),
             Filters.eq("_id.method", method),
             Filters.gte("_id.bucketStartEpoch", startEpoch/3600/24/30),
@@ -59,7 +60,7 @@ public class TrafficAction {
         sampleDataList = new ArrayList<>();
         sampleDataList = SampleDataDao.instance.findAll(Filters.and(
             Filters.eq("_id.url", url),
-            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
             Filters.eq("_id.responseCode", -1),
             Filters.eq("_id.method", method),
             Filters.gte("_id.bucketStartEpoch", 0),
@@ -70,7 +71,7 @@ public class TrafficAction {
     }
 
     public String fetchAllSampleData() {
-        sampleDataList = SampleDataDao.instance.findAll(Filters.eq(Constants.ID + "." + ApiInfoKey.API_COLLECTION_ID, apiCollectionId), skip, limit == 0 ? 50 : limit, null);
+        sampleDataList = SampleDataDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)), skip, limit == 0 ? 50 : limit, null);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -79,7 +80,7 @@ public class TrafficAction {
         List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(
                 Filters.and(
                         Filters.eq("_id.url", url),
-                        Filters.eq("_id.apiCollectionId", apiCollectionId),
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                         Filters.eq("_id.method", method)
                 )
         );

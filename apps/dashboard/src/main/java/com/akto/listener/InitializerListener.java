@@ -247,7 +247,7 @@ public class InitializerListener implements ServletContextListener {
                         Filters.and(
                                 Filters.eq("_id.method", ssdId.getMethod()),
                                 Filters.eq("_id.url", ssdId.getUrl()),
-                                Filters.eq("_id.apiCollectionId", ssdId.getApiCollectionId())
+                                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(ssdId.getApiCollectionId()))
                         );
 
 
@@ -282,7 +282,7 @@ public class InitializerListener implements ServletContextListener {
             filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
             filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
             filters.add(Filters.eq("param", paramId.getParam()));
-            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(paramId.getApiCollectionId())));
 
             bulkSensitiveInvalidateUpdates.add(new UpdateOneModel<>(Filters.and(filters), Updates.set("invalid", true)));
         }
@@ -310,7 +310,7 @@ public class InitializerListener implements ServletContextListener {
             filters.add(Filters.eq("responseCode", paramId.getResponseCode()));
             filters.add(Filters.eq("isHeader", paramId.getIsHeader()));
             filters.add(Filters.eq("param", paramId.getParam()));
-            filters.add(Filters.eq("apiCollectionId", paramId.getApiCollectionId()));
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(paramId.getApiCollectionId())));
 
             bulkUpdatesForSingleTypeInfo.add(new DeleteOneModel<>(Filters.and(filters)));
         }
@@ -1090,6 +1090,25 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public static void deleteDeprecatedIndices(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteDeprecatedIndices() == 0) {
+
+            try {
+                SingleTypeInfoDao.instance.dropIndexes(SingleTypeInfoDao.legacyIndices);
+                ApiInfoDao.instance.dropIndexes(ApiInfoDao.legacyIndices);
+                SampleDataDao.instance.dropIndexes(SampleDataDao.legacyIndices);
+                SensitiveSampleDataDao.instance.dropIndexes(SensitiveSampleDataDao.legacyIndices);
+                loggerMaker.infoAndAddToDb("Deprecated indices dropped", LogDb.DASHBOARD);
+            } catch (Exception e) {
+                // Errors out on non-existent indices and collections.
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq(Constants.ID, backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.DELETE_DEPRECATED_INDICES, Context.now()));
+        }
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1219,14 +1238,15 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
+        deleteDeprecatedIndices(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent(true);
+        SingleTypeInfoDao.instance.createIndicesIfAbsent(false);
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
-        ApiInfoDao.instance.createIndicesIfAbsent(true);
+        ApiInfoDao.instance.createIndicesIfAbsent(false);
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();

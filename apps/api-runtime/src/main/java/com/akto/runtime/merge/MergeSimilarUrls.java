@@ -22,7 +22,7 @@ public class MergeSimilarUrls {
     
     public static void mergeSTI(String mergedUrl, Set<String> toMergeUrls, int apiCollectionId, Method method) {
         Bson stiFilter = Filters.and(
-                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq(SingleTypeInfo._METHOD, method),
                 Filters.in(SingleTypeInfo._URL,toMergeUrls) 
         );
@@ -55,7 +55,7 @@ public class MergeSimilarUrls {
 
     public static void mergeApiInfo(String mergedUrl, Set<String> toMergeUrls, int apiCollectionId, Method method) {
         Bson apiInfoFilter = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("_id.method", method.name()),
                 Filters.in("_id.url", new ArrayList<>(toMergeUrls))
         );
@@ -69,7 +69,7 @@ public class MergeSimilarUrls {
 
     public static void mergeSampleData(String mergedUrl, Set<String> toMergeUrls, int apiCollectionId, Method method){
         Bson sampleDataFilter = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("_id.method", method.name()),
                 Filters.in("_id.url", new ArrayList<>(toMergeUrls))
         );
@@ -83,7 +83,7 @@ public class MergeSimilarUrls {
 
     public static void mergeTrafficInfo(String mergedUrl, Set<String> toMergeUrls, int apiCollectionId, Method method) {
         Bson trafficFilter = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("_id.method", method.name()),
                 Filters.in("_id.url", new ArrayList<>(toMergeUrls))
         );
@@ -92,7 +92,7 @@ public class MergeSimilarUrls {
 
     public static void mergeSensitiveSampleData(String mergedUrl, Set<String> toMergeUrls, int apiCollectionId, Method method) {
         Bson sensitiveSampleDataFilter = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("_id.method", method.name()),
                 Filters.in("_id.url", new ArrayList<>(toMergeUrls))
         );
@@ -115,7 +115,7 @@ public class MergeSimilarUrls {
 
     public static void mergeSensitiveParamInfo(String mergedUrl, Set<String> toMergeUrls, int apiCollectionId, Method method) {
         Bson sensitiveParamInfoFilter = Filters.and(
-                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("method", method),
                 Filters.in("url",toMergeUrls)
         );

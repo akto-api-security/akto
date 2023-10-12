@@ -208,10 +208,10 @@ public class APICatalogSync {
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
-            filterQ = Filters.eq("apiCollectionId", apiCollectionId);
+            filterQ = Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId));
         } else {
             filterQ = Filters.and(
-                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.or(Filters.eq("isHeader", false), Filters.eq("param", "host"))
             );            
         }
@@ -660,13 +660,13 @@ public class APICatalogSync {
                 Method delMethod = Method.fromString(matchedURL.split(" ")[0]);
                 String delEndpoint = matchedURL.split(" ")[1];  
                 Bson filterQ = Filters.and(
-                    Filters.eq("apiCollectionId", apiCollectionId),
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                     Filters.eq("method", delMethod.name()),
                     Filters.eq("url", delEndpoint)
                 );
 
                 Bson filterQSampleData = Filters.and(
-                    Filters.eq("_id.apiCollectionId", apiCollectionId),
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                     Filters.eq("_id.method", delMethod.name()),
                     Filters.eq("_id.url", delEndpoint)
                 );
@@ -728,13 +728,13 @@ public class APICatalogSync {
             Method delMethod = Method.fromString(deleteStaticUrl.split(" ")[0]);
             String delEndpoint = deleteStaticUrl.split(" ")[1];  
             Bson filterQ = Filters.and(
-                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("method", delMethod.name()),
                 Filters.eq("url", delEndpoint)
             );
 
             Bson filterQSampleData = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)),
                 Filters.eq("_id.method", delMethod.name()),
                 Filters.eq("_id.url", delEndpoint)
             );
@@ -1452,3 +1452,4 @@ public class APICatalogSync {
         return this.dbState.get(apiCollectionId);
     }
 }
+

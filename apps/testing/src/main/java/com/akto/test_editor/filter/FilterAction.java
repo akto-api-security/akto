@@ -1,6 +1,7 @@
 package com.akto.test_editor.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -938,7 +939,7 @@ public final class FilterAction {
         String param = querySet.get(0).toString().trim();
 
         Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfoKey.getApiCollectionId())),
             Filters.regex("param", param),
             Filters.eq("isHeader", false)
         );
@@ -986,7 +987,7 @@ public final class FilterAction {
         Boolean shouldBePresent = (Boolean) querySet.get(0);
 
         Bson filters = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfoKey.getApiCollectionId())),
             Filters.regex("url", filterActionRequest.getTestRunRawApi().getRequest().getUrl()),
             Filters.eq("method", apiInfoKey.getMethod())
         );
@@ -1152,7 +1153,7 @@ public final class FilterAction {
         }
 
         Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfoKey.getApiCollectionId())),
             Filters.eq("url", apiInfoKey.url),
             Filters.eq("method", apiInfoKey.method.name()),
             Filters.eq("responseCode", responseCode),

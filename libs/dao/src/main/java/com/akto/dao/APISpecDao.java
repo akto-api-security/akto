@@ -1,6 +1,8 @@
 package com.akto.dao;
 
 import com.akto.dto.APISpec;
+import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.client.model.Filters;
 
 public class APISpecDao extends AccountsContextDao<APISpec> {
 
@@ -19,7 +21,7 @@ public class APISpecDao extends AccountsContextDao<APISpec> {
     }
     
     public APISpec findById(int id) {
-        return this.findOne("apiCollectionId", id);
+        return this.findOne(Filters.in(SingleTypeInfo._COLLECTION_IDS, id));
     }
 
 }

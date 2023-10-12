@@ -91,7 +91,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
         aktoPolicy.main(responseParams, httpCallParser.apiCatalogSync != null, true);
 
-        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, 0));
         Assertions.assertEquals(5,apiInfoList.size());
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(0, filterSampleDataList.size());
@@ -100,14 +100,14 @@ public class TestAktoPolicy extends MongoBasedTest {
         HttpCallParser httpCallParser1 = new HttpCallParser("user", 1, 1,1, true);
         AktoPolicyNew aktoPolicy1 = new AktoPolicyNew( true);
 
-        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
+        apiInfoList = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, 0));
         Assertions.assertEquals(5,apiInfoList.size());
 
         httpCallParser1.syncFunction(responseParams.subList(0,1), false, true);
         httpCallParser1.apiCatalogSync.syncWithDB(false, true);
         aktoPolicy1.main(responseParams.subList(0,1), httpCallParser1.apiCatalogSync != null, true);
 
-        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
+        apiInfoList = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, 0));
         Assertions.assertEquals(5,apiInfoList.size());
         filterSampleDataList = FilterSampleDataDao.instance.findAll(Filters.eq("_id.apiInfoKey.apiCollectionId", 0));
         Assertions.assertEquals(0, filterSampleDataList.size());
@@ -200,7 +200,7 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         ApiInfo apiInfo = ApiInfoDao.instance.findOne(
                 Filters.and(
-                        Filters.eq("_id.apiCollectionId", 0),
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, 0),
                         Filters.eq("_id.url", "/api/toys/INTEGER"),
                         Filters.eq("_id.method", urlStatic6.getMethod().name())
                 )

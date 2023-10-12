@@ -59,7 +59,7 @@ public class AktoPolicyNew {
             apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
-            apiInfoList =  ApiInfoDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+            apiInfoList =  ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds));
         }
 
         List<FilterSampleData> filterSampleDataList = new ArrayList<>(); // FilterSampleDataDao.instance.findAll(new BasicDBObject());

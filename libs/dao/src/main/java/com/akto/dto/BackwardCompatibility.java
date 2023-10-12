@@ -41,10 +41,14 @@ public class BackwardCompatibility {
     public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
     private int loadTemplateFilesFromDirectory;
 
+    public static final String DELETE_DEPRECATED_INDICES = "deleteDeprecatedIndices";
+    private int deleteDeprecatedIndices;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory) {
+                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory,
+                                 int deleteDeprecatedIndices) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -58,6 +62,7 @@ public class BackwardCompatibility {
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
         this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
+        this.deleteDeprecatedIndices = deleteDeprecatedIndices;
     }
 
     public BackwardCompatibility() {
@@ -174,4 +179,12 @@ public class BackwardCompatibility {
     public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
         return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
     } 
+
+    public int getDeleteDeprecatedIndices() {
+        return deleteDeprecatedIndices;
+    }
+
+    public void setDeleteDeprecatedIndices(int deleteDeprecatedIndices) {
+        this.deleteDeprecatedIndices = deleteDeprecatedIndices;
+    }
 }
