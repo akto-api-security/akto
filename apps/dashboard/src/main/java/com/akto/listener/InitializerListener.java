@@ -5,6 +5,7 @@ import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
@@ -40,6 +41,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -56,6 +58,7 @@ import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
@@ -67,6 +70,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1021,6 +1025,71 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void fillCollectionIdArray() {
+
+        List<String> matchKey = Arrays.asList(Constants.DOLLAR + SingleTypeInfo._API_COLLECTION_ID);
+        List<String> matchKeyWithId = Arrays.asList(Constants.DOLLAR + Constants.ID + Constants.DOT + SingleTypeInfo._API_COLLECTION_ID);
+
+        MCollection<?>[] collectionsWithKey = new MCollection[] {
+                SingleTypeInfoDao.instance,
+                APISpecDao.instance,
+                SensitiveParamInfoDao.instance
+        };
+
+        int LIMIT = 50_000;
+
+        for (MCollection<?> collection : collectionsWithKey) {
+            boolean doUpdate = true;
+            int c = 0;
+            int time = Context.now();
+            while (doUpdate) {
+
+                List<Bson> pipeline = new ArrayList<>();
+                pipeline.add(Aggregates.match(Filters.exists(SingleTypeInfo._COLLECTION_IDS, false)));
+                pipeline.add(Aggregates.project(Projections.include(Constants.ID)));
+                pipeline.add(Aggregates.limit(LIMIT));
+
+                MongoCursor<BasicDBObject> cursor = collection.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class).cursor();
+
+                ArrayList<ObjectId> ret = new ArrayList<>();
+
+                while (cursor.hasNext()) {
+                    BasicDBObject elem = cursor.next();
+                    ret.add((ObjectId) elem.get(Constants.ID));
+                }
+
+                UpdateResult res = collection.getMCollection().updateMany(
+                        Filters.in(Constants.ID, ret),
+                        Arrays.asList(
+                                Updates.set(SingleTypeInfo._COLLECTION_IDS, matchKey)));
+
+                if (res.getMatchedCount() == 0) {
+                    doUpdate = false;
+                }
+                loggerMaker.infoAndAddToDb("updated " + Math.min(c + LIMIT, res.getModifiedCount()) + " " + collection.getCollName(), LogDb.DASHBOARD);
+                c += LIMIT;
+            }
+            loggerMaker.infoAndAddToDb("Total time taken : " + (Context.now() - time), LogDb.DASHBOARD);
+        }
+
+        MCollection<?>[] collectionsWithKeyID = new MCollection[] {
+                ApiInfoDao.instance,
+                TrafficInfoDao.instance,
+                SampleDataDao.instance,
+                SensitiveSampleDataDao.instance,
+                VulnerableRequestForTemplateDao.instance,
+                FilterSampleDataDao.instance
+        };
+
+        for (MCollection<?> collection : collectionsWithKeyID) {
+            collection.getMCollection().updateMany(Filters.exists(SingleTypeInfo._COLLECTION_IDS, false),
+                    Arrays.asList(
+                            Updates.set(SingleTypeInfo._COLLECTION_IDS, matchKeyWithId)));
+        }
+
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1153,17 +1222,19 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        SingleTypeInfoDao.instance.createIndicesIfAbsent(true);
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
-        ApiInfoDao.instance.createIndicesIfAbsent();
+        ApiInfoDao.instance.createIndicesIfAbsent(true);
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
         TestingRunResultDao.instance.createIndicesIfAbsent();
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        fillCollectionIdArray();
+
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();

@@ -2,6 +2,8 @@ package com.akto.dto;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Util;
+
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.*;
@@ -15,7 +17,7 @@ public class ApiInfo {
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
     private Set<Set<AuthType>> allAuthTypesFound;
 
-    // this annotation makes sures that data is not stored in mongo
+    // this annotation makes sure that data is not stored in mongo
     @BsonIgnore
     private List<AuthType> actualAuthType;
 
@@ -25,6 +27,7 @@ public class ApiInfo {
     private Map<String, Integer> violations;
     public static final String LAST_SEEN = "lastSeen";
     private int lastSeen;
+    private List<Integer> collectionIds;
 
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
@@ -122,6 +125,9 @@ public class ApiInfo {
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
+        if(apiInfoKey != null){
+            this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
+        }
     }
 
     public ApiInfo(HttpResponseParams httpResponseParams) {
@@ -219,6 +225,9 @@ public class ApiInfo {
     }
 
     public void setId(ApiInfoKey id) {
+        this.collectionIds = Util.replaceElementInList(this.collectionIds, 
+        id == null ? null : id.getApiCollectionId(),
+        this.id == null ? null : this.id.getApiCollectionId());
         this.id = id;
     }
 
@@ -253,4 +262,13 @@ public class ApiInfo {
     public void setLastSeen(int lastSeen) {
         this.lastSeen = lastSeen;
     }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
+    }
+
 }

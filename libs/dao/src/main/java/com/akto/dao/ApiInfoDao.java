@@ -2,57 +2,41 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
-import com.mongodb.client.MongoCursor;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
-    public void createIndicesIfAbsent() {
+    public static final List<Bson> legacyIndices = Arrays.asList(
+                Indexes.ascending(new String[] {Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID}),
+                Indexes.ascending(new String[] {Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}));
 
-        boolean exists = false;
-        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
-            if (getCollName().equalsIgnoreCase(col)){
-                exists = true;
-                break;
-            }
-        };
+    public void createIndicesIfAbsent(boolean createLegacyIndices) {
 
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
-        }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
+        String dbName = Context.accountId.get()+"";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiCollectionId"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        List<Bson> indices = new ArrayList<>(Arrays.asList(
+                Indexes.ascending(new String[]{SingleTypeInfo._COLLECTION_IDS}),
+                Indexes.ascending(new String[]{Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}),
+                Indexes.ascending(new String[]{SingleTypeInfo._COLLECTION_IDS, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL})
+        ));
 
-        if (counter == 2) {
-            String[] fieldNames = {"_id.url"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
+        if (createLegacyIndices) {
+            indices.addAll(legacyIndices);
         }
-
-        if (counter == 3) {
-            String[] fieldNames = {"_id.apiCollectionId", "_id.url"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        createIndices(indices);
     }
 
     @Override

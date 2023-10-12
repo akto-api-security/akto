@@ -1,6 +1,7 @@
 package com.akto.runtime;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -69,6 +70,8 @@ public class PayloadAnalyzer {
                                 Bson update = Updates.inc("count", info.getCount());
 
                                 Bson updateKey = SingleTypeInfoDao.createFilters(info);
+                                update = Updates.combine(update,
+                                Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(info.getApiCollectionId())));
 
                                 bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
 
