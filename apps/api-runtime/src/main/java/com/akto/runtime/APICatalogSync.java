@@ -1158,19 +1158,10 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
-    public static void clearValuesInDB(int apiCollectionId) {
-        System.out.println(SingleTypeInfoDao.instance.count(
-                Filters.and(
-                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-                        Filters.exists("values.elements.51", true)
-                )
-        ));
-
+    public static void clearValuesInDB() {
+        String fieldName = "values.elements." + (SingleTypeInfo.VALUES_LIMIT + 1);
         SingleTypeInfoDao.instance.updateMany(
-                Filters.and(
-                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-                        Filters.exists("values.elements.51", true)
-                ),
+                Filters.exists(fieldName, true),
                 Updates.combine(
                         Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(-50)),
                         Updates.set(SingleTypeInfo._DOMAIN, SingleTypeInfo.Domain.RANGE.name()) // todo:
@@ -1182,7 +1173,6 @@ public class APICatalogSync {
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
-        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         if (mergeAsyncOutside ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
