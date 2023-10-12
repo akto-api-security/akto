@@ -124,9 +124,9 @@ const SampleApi = () => {
         if (sampleData) {
 
             if (selectedTabIndex == 0) {
-                editorInstance.setValue(sampleData?.requestJson["firstLine"] + '\n\n' + JSON.stringify(sampleData.requestJson["json"], null, 2))
+                editorInstance.setValue('\n' + sampleData?.requestJson["firstLine"] + '\n\n' + JSON.stringify(sampleData.requestJson["json"], null, 2))
             } else {
-                editorInstance.setValue(sampleData?.responseJson["firstLine"] + '\n\n' + JSON.stringify(sampleData.responseJson["json"], null, 2))
+                editorInstance.setValue('\n' + sampleData?.responseJson["firstLine"] + '\n\n' + JSON.stringify(sampleData.responseJson["json"], null, 2))
             }
         }
     }
@@ -166,7 +166,7 @@ const SampleApi = () => {
                 setSampleData({ requestJson, responseJson })
 
                 if (editorInstance) {
-                    editorInstance.setValue(requestJson["firstLine"] + '\n\n' + JSON.stringify(requestJson["json"], null, 2))
+                    editorInstance.setValue('\n' + requestJson["firstLine"] + '\n\n' + JSON.stringify(requestJson["json"], null, 2))
                 }
                 setTimeout(()=> {
                     setSampleDataList(sampleDataResponse.sampleDataList)
