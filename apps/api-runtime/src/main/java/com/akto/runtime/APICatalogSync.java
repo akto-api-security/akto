@@ -1183,14 +1183,14 @@ public class APICatalogSync {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
-        if (mergeAsyncOutside && instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType) ) {
+        if (mergeAsyncOutside ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
                 if (gotDibs) {
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-                    if (backwardCompatibility.getMergeOnHostInit() == 0) {
+                    if (backwardCompatibility == null || backwardCompatibility.getMergeOnHostInit() == 0) {
                         new MergeOnHostOnly().mergeHosts();
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
                         BackwardCompatibilityDao.instance.getMCollection().updateMany(new BasicDBObject(), update);
