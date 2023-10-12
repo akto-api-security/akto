@@ -126,27 +126,27 @@ jobs:
 #          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
 #          restore-keys: ${{ runner.os }}-m2
 #
-#  deploy:
-#    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-#    needs: build
-#    runs-on: ubuntu-latest
-#    environment: Dev
-#    permissions:
-#      id-token: write
-#      contents: read
-#    steps:
-#    - uses: actions/checkout@v2
-#    - uses: aws-actions/configure-aws-credentials@v1
-#      with:
-#        role-to-assume: ${{ secrets.IAMROLE_GITHUB }}
-#        role-session-name: GitHub-Action-Role
-#        aws-region: ${{ vars.AWS_REGION }}
-#    - name: Deploy to flash
-#      run: |
-#        echo "Deploying branch ${{ env.GITHUB_REF }} to ${{ github.event.inputs.environment }}"
-#        commit_hash=`git rev-parse HEAD`
-#        aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
-#
+  deploy:
+    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: Dev
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v2
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: ${{ secrets.IAMROLE_GITHUB }}
+        role-session-name: GitHub-Action-Role
+        aws-region: ${{ vars.AWS_REGION }}
+    - name: Deploy to flash
+      run: |
+        echo "Deploying branch ${{ env }} to ${{ github.event.inputs.environment }}"
+        commit_hash=`git rev-parse HEAD`
+        aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
+
   test:
     if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
     needs: deploy
