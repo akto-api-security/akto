@@ -619,7 +619,7 @@ public class TestMergingNew extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123,true);
         parserNew.apiCatalogSync.buildFromDB(false, true);
 
-        APICatalogSync.clearValuesInDB(123);
+        APICatalogSync.clearValuesInDB();
         parserNew.apiCatalogSync.buildFromDB(false, true);
 
         // both now range
