@@ -268,6 +268,39 @@
             </result>
         </action>
 
+        <action name="api/fetchGithubAppSecretKey" class="com.akto.action.user.GithubSsoAction" method="fetchGithubAppSecretKey">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/publishGithubComments" class="com.akto.action.user.GithubSsoAction" method="publishGithubComments">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addGithubAppSecretKey" class="com.akto.action.user.GithubSsoAction" method="addGithubAppSecretKey">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/getAPICatalog" class="com.akto.action.APICatalogAction" method="getAPICatalog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
