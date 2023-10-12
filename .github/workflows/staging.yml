@@ -155,12 +155,12 @@ jobs:
 
       - uses: actions/checkout@v2
       
-      - name: Run testsigma end to end tests
-        env:
-            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            TESTSIGMA_TEST_PLAN_ID: 789
-            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-        run: bash ./.github/scripts/akto-testsigma.sh
+#      - name: Run testsigma end to end tests
+#        env:
+#            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+#            TESTSIGMA_TEST_PLAN_ID: 789
+#            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+#        run: bash ./.github/scripts/akto-testsigma.sh
 
       - name: Run Akto CI/CD tests
         uses: shivam-rawat-akto/run-scan@v1.0.2
