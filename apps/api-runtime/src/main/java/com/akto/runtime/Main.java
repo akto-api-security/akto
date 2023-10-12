@@ -102,9 +102,9 @@ public class Main {
 
 
     public static void createIndices() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
-        SampleDataDao.instance.createIndicesIfAbsent();
+        SingleTypeInfoDao.instance.createIndicesIfAbsent(true);
+        SensitiveSampleDataDao.instance.createIndicesIfAbsent(true);
+        SampleDataDao.instance.createIndicesIfAbsent(true);
     }
 
     public static void insertRuntimeFilters() {
