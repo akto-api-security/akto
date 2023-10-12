@@ -217,6 +217,20 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
+    },
+    fetchGithubAppSecretKey() {
+        return request({
+            url: '/api/fetchGithubAppSecretKey',
+            method: 'post',
+            data: {}
+        })
+    },
+    addGithubAppSecretKey(githubAppSecretKey) {
+        return request({
+            url: '/api/addGithubAppSecretKey',
+            method: 'post',
+            data: {githubAppSecretKey}
+        })
     }
 }
 
