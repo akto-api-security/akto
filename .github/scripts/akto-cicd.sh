@@ -44,13 +44,14 @@ while true; do
     low=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.LOW // empty')
     testingRunSummaryhexId=$(echo "$response" | jq -r '.testingRunResultSummaries[0].hexId // empty')
 
-    publishGithubCommentResponse=$(curl -s "$AKTO_DASHBOARD_URL/api/fetchTestingRunResultSummaries" \
+    publishGithubCommentResponse=$(curl -s "$AKTO_DASHBOARD_URL/api/publishGithubComments" \
           --header 'content-type: application/json' \
           --header "X-API-KEY: $AKTO_API_KEY" \
           --data "{
               \"testingRunSummaryHexId\": \"$testingRunSummaryhexId\"
           }")
 
+    echo "$publishGithubCommentResponse" >> $GITHUB_STEP_SUMMARY
     echo "[Results]($AKTO_DASHBOARD_URL/dashboard/testing/$AKTO_TEST_ID/results)" >> $GITHUB_STEP_SUMMARY
     echo "HIGH: $high" >> $GITHUB_STEP_SUMMARY
     echo "MEDIUM: $medium" >> $GITHUB_STEP_SUMMARY
