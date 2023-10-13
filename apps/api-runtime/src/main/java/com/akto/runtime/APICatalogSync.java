@@ -1201,12 +1201,14 @@ public class APICatalogSync {
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
+        boolean mergingCalled = false;
         if (mergeAsyncOutside ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
                 if (gotDibs) {
+                    mergingCalled = true;
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                     if (backwardCompatibility == null || backwardCompatibility.getMergeOnHostInit() == 0) {
                         new MergeOnHostOnly().mergeHosts();
@@ -1257,7 +1259,35 @@ public class APICatalogSync {
             this.delta = new HashMap<>();
         }
 
+
+        try {
+            // fetchAllSTI check added to make sure only runs in dashboard
+            // mergingCalled check added to call this function only when merging runs and not all the time
+            if (!fetchAllSTI && mergingCalled) {
+                for(int collectionId: this.dbState.keySet()) {
+                    APICatalog newCatalog = this.dbState.get(collectionId);
+                    updateApiCollectionCount(newCatalog, collectionId);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while filling urls in apiCollection: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
         aktoPolicyNew.buildFromDb(fetchAllSTI);
+    }
+
+    public static void updateApiCollectionCount(APICatalog apiCatalog, int apiCollectionId) {
+        Set<String> newURLs = new HashSet<>();
+        for(URLTemplate url: apiCatalog.getTemplateURLToMethods().keySet()) {
+            newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
+        }
+        for(URLStatic url: apiCatalog.getStrictURLToMethods().keySet()) {
+            newURLs.add(url.getUrl()+ " "+ url.getMethod().name());
+        }
+
+        Bson findQ = Filters.eq("_id", apiCollectionId);
+
+        ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
     }
 
     private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
