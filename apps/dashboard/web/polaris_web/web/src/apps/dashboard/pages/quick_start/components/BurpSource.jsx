@@ -1,77 +1,105 @@
-import { Button, ButtonGroup, HorizontalStack, Icon, Spinner, Text, VerticalStack } from '@shopify/polaris'
-import React, { useState } from 'react'
-import { StatusActiveMajor } from "@shopify/polaris-icons"
+import { Box, Button, ButtonGroup, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import React, { useEffect, useState } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
-import func from '@/util/func'
-
+import func from "@/util/func"
+import TooltipText from "../../../components/shared/TooltipText"
+ 
 function BurpSource() {
+    const navigate = useNavigate()
+    const [burpGithubLink, setBurpGithubLink] = useState("");
+    const [aktoIp, setAktoIp] = useState("");
+    const [aktoToken, setAktoToken] = useState("");
+    const [burpCollectionURL, setBurpCollectionURL] = useState("")
 
-    const [downloadInfo, setDownloadInfo] = useState(0)
-    const [initialData, setInitialData] = useState(0)
-    const [finalData, setFinalData] = useState(0)
-
-    const downloadBurpExt = async() => {
-        setDownloadInfo(1)
-        await api.downloadBurpPluginJar().then((resp)=> {
-            let downloadTime = func.timeNow()
-
-            const href = URL.createObjectURL(resp);
-            // create "a" HTML element with href to file & click
-            const link = document.createElement('a');
-            link.href = href;
-            link.setAttribute('download', 'Akto.jar'); //or any other extension
-            document.body.appendChild(link);
-            link.click();
-            // clean up "a" element & remove ObjectURL
-            document.body.removeChild(link);
-            URL.revokeObjectURL(href);
-
-            setDownloadInfo(2)
-            setInitialData(1)
-
-            let interval = setInterval(() => {
-                api.fetchBurpPluginInfo().then((response) => {
-                let lastBootupTimestamp = response.burpPluginInfo.lastBootupTimestamp
-                if (lastBootupTimestamp > downloadTime) {
-                    setInitialData(2)
-                    setFinalData(1)
-                    if (response.burpPluginInfo.lastDataSentTimestamp > downloadTime) {
-                        clearInterval(interval)
-                        setFinalData(2)
-                    }
-                }
-            })
-            }, 5000)
+    const getGithubLink = async() => {
+        await api.fetchBurpPluginDownloadLink().then((resp) => {
+            if (resp && resp.burpGithubLink) {
+                setBurpGithubLink(resp?.burpGithubLink)
+            }
         })
     }
 
-    const navigate = useNavigate()
-    const DownloadTextComponent = ({param_value}) => {
-        switch(param_value){
-            case 1:
-                return (<Spinner size='small'/>)
-            case 2:
-                return (<div><Icon source={StatusActiveMajor} color='success'/></div>)
-            default: 
-                return null
-        }
+    const getCredentials = async() => {
+        await api.fetchBurpCredentials().then((resp) => {
+            if (!resp) return
+            setAktoIp(resp?.host)
+            setAktoToken(resp?.apiToken?.key)
+        })
+    }
+
+    const downloadBurpJar = async() => {
+        let downloadTime = func.timeNow()
+        let showBurpPluginConnectedFlag = false
+
+        await api.downloadBurpPluginJar()
+        window.open(burpGithubLink)
+
+        let interval = setInterval(() => {
+            api.fetchBurpPluginInfo().then((response) => {
+                let lastBootupTimestamp = response?.burpPluginInfo?.lastBootupTimestamp
+                if (lastBootupTimestamp > downloadTime) {
+                    if (showBurpPluginConnectedFlag) {
+                        func.setToast(true, false, "Burp plugin connected")
+                    }
+                    showBurpPluginConnectedFlag = false
+                    if (response.burpPluginInfo.lastDataSentTimestamp > downloadTime) {
+                        clearInterval(interval)
+                        setBurpCollectionURL("/dashboard/observe/inventory")
+                        func.setToast(true, false, "Data received from burp plugin")
+                    }
+                }
+            })
+        }, 2000)
+
+    }
+
+    const copyText = (text,messageText) => {
+        navigator.clipboard.writeText(text)
+        func.setToast(true, false, `${messageText} is copied to clipboard.`)
     }
 
     const steps = [
         {
-            text: "Download Akto's Burp extension.",
-            component: <div><Button size='slim' onClick={downloadBurpExt}>Download</Button></div>,
-            textComponent: <DownloadTextComponent param_value={downloadInfo}/>
+            text: "Download akto's burp extension",
+            component: <Box width='200px'><Button size="slim" onClick={downloadBurpJar}>Download</Button></Box>,
         },
         {
-            text: "Open Burp and add the downloaded jar file in extension tab.",
-            textComponent: <DownloadTextComponent param_value={initialData} />
+            text: "Open Burp and add the downloaded jar file in extension tab."
         },
         {
-            text: "Start Burp proxy and browse any website. You will see traffic in 'Burp' collection in inventory.",
-            textComponent: <DownloadTextComponent param_value={finalData} />,
-            component: finalData === 2 ? <Button plain onClick={()=> navigate("dashboard/observe/inventory")}>'Burp Collection'</Button>: null
+            text: 'Once the plugin is loaded click on "options" tab inside the plugin.'
+        },
+        {
+            text: "Copy the AKTO_IP and AKTO_TOKEN and paste in the options tab.",
+            component: (
+                <Box paddingInlineStart={2}>
+                    <VerticalStack gap={1}>
+                        <HorizontalStack gap={1}>
+                            <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
+                            <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
+                                <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
+                            </Button>
+                        </HorizontalStack>
+                        <HorizontalStack gap={1}>
+                            <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
+                            <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
+                                <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
+                            </Button>
+                        </HorizontalStack>
+                    </VerticalStack>
+                </Box>
+            )
+        },
+        {
+            text: "Start Burp proxy and browse any website.",
+            component: (
+                <HorizontalStack gap={1}>
+                    <Text variant="bodyMd">You will see traffic in</Text>
+                    {burpCollectionURL.length > 0 ? <Button plain onClick={()=> navigate(burpCollectionURL)}>Burp</Button> : <Text>Burp</Text>}
+                    <Text>collection.</Text>
+                </HorizontalStack>
+            )
         }
     ]
 
@@ -83,6 +111,11 @@ function BurpSource() {
         navigate("/dashboard/settings/integrations/burp")
     }
 
+    useEffect(()=> {
+        getGithubLink()
+        getCredentials()
+    },[])
+
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
@@ -93,14 +126,10 @@ function BurpSource() {
                 {steps.map((element,index) => (
                     <VerticalStack gap="1" key={index}>
                         <HorizontalStack gap="1" wrap={false} key={element.text}>
-                            <span>{index + 1}.</span>
-                            <span>{element.text}</span>
-                            <span>{element.textComponent}</span>
+                            <Text>{index + 1}.</Text>
+                            <Text variant="bodyMd">{element?.text}</Text>
                         </HorizontalStack>
-                        <HorizontalStack gap="3">
-                            <div/>
-                            {element.component}
-                        </HorizontalStack>
+                        {element?.component}
                     </VerticalStack>
                 ))}
             </VerticalStack>

@@ -56,8 +56,9 @@ function DropdownSearch(props) {
                     return;
                 }
                 const filterRegex = new RegExp(value, 'i');
+                const searchKey = deselectedOptions[0].searchKey ? deselectedOptions[0].searchKey : "label"
                 const resultOptions = deselectedOptions.filter((option) =>
-                    option.label.match(filterRegex),
+                    option[searchKey].match(filterRegex)
                 );
                 setOptions(resultOptions);
                 setLoading(false);
