@@ -696,6 +696,7 @@ const quickStartFunc = {
                 id: index + 1,
                 label: label,
                 value: item.label,
+                searchKey: "value",
             }
         })
 
