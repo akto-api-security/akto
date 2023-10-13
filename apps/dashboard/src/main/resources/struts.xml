@@ -268,7 +268,7 @@
             </result>
         </action>
 
-        <action name="api/fetchGithubAppSecretKey" class="com.akto.action.user.GithubSsoAction" method="fetchGithubAppSecretKey">
+        <action name="api/fetchGithubAppId" class="com.akto.action.user.GithubSsoAction" method="fetchGithubAppId">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json"/>
