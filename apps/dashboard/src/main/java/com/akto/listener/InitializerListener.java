@@ -16,6 +16,7 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -989,6 +990,45 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void mapSensitiveSTIsInApiInfo(BackwardCompatibility backwardCompatibility){
+        if (backwardCompatibility.getMapSensitiveSTIsInApiInfo() == 0) {
+            ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+
+            List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+            sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+            Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveInResponse), Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1));
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
+            BasicDBObject groupedId =  new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                                            .append("url", "$url")
+                                            .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId));
+
+            MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(stiCursor.hasNext()){
+                try {
+                    BasicDBObject basicDBObject = stiCursor.next();
+                    Bson filterQSampleData = Filters.and(
+                        Filters.eq("_id.apiCollectionId",((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId")),
+                        Filters.eq("_id.method", ((BasicDBObject) basicDBObject.get("_id")).getString("method")),
+                        Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
+                    );
+                    bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, Updates.set(ApiInfo.IS_SENSITIVE, true), new UpdateOptions()));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (bulkUpdatesForApiInfo.size() > 0) {
+                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            }
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MAP_SENSITIVE_STIS_IN_APIINFO, Context.now())
+            );
+        }
+    }
+
     public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
             String resourceName = "/tests-library-master.zip";
@@ -1150,6 +1190,7 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
+        mapSensitiveSTIsInApiInfo(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
