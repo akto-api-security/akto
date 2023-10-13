@@ -1,4 +1,3 @@
 # utils
 
-compile using
-`mvn install`
+Compile using the command - `mvn install`
