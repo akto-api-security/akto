@@ -53,7 +53,8 @@ jobs:
           node-version: '17'
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
-        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
+#        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
+        run: echo "IMAGE_TAG=akto_staging1_feature_github_comments_cicd_test" >> $GITHUB_OUTPUT
       - name: Download Akto templates zip
         working-directory: ./apps/dashboard/src/main/resources
         run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
