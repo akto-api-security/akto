@@ -231,8 +231,6 @@ public class TestApiCatalogSync extends MongoBasedTest {
         SingleTypeInfoDao.instance.insertOne(sti4);
         SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(sti4), Updates.pushEach(SingleTypeInfo._VALUES+".elements", generateRandomValuesSet(stiValueLimit+10)));
 
-        SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4));
-
         APICatalogSync.clearValuesInDB();
 
         SingleTypeInfo sti1Db = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(sti1));
