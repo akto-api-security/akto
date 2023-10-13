@@ -231,7 +231,15 @@ const settingRequests = {
             method: 'post',
             data: {githubAppSecretKey, githubAppId}
         })
+    },
+    deleteGithubAppSettings() {
+        return request({
+            url: '/api/deleteGithubAppSecretKey',
+            method: 'post',
+            data: {}
+        })
     }
+
 }
 
 export default settingRequests

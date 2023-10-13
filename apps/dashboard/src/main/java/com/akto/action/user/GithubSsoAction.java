@@ -61,21 +61,19 @@ public class GithubSsoAction extends UserAction {
     }
 
     public String fetchGithubAppId() {
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
         githubAppId = accountSettings.getGithubAppId();
         return SUCCESS.toUpperCase();
     }
 
-
+    public String deleteGithubAppSecretKey() {
+        AccountSettingsDao.instance.updateOne(generateFilter(), Updates.combine(
+                Updates.unset(AccountSettings.GITHUB_APP_ID),
+                Updates.unset(AccountSettings.GITHUB_APP_SECRET_KEY)));
+        addActionMessage("Deleted github app ID and secret key");
+        return SUCCESS.toUpperCase();
+    }
     public String publishGithubComments() {
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
         String privateKey = accountSettings.getGithubAppSecretKey();
         String githubAppId = accountSettings.getGithubAppId();
@@ -83,7 +81,7 @@ public class GithubSsoAction extends UserAction {
         try {
             Map<String, String> metaData = testingRunResultSummary.getMetadata();
             String repository = metaData.get("repository");
-            String branchName = metaData.get("branch");
+            String pullRequestId = metaData.get("pull_request_id");
             Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
             StringBuilder messageStringBuilder = new StringBuilder("Akto vulnerability report\n");
             for (String severity : countIssues.keySet()) {
@@ -114,21 +112,14 @@ public class GithubSsoAction extends UserAction {
                 addActionError("Github app doesn't have access to repository");
                 return ERROR.toUpperCase();
             }
-            List<GHPullRequest> pullRequests =  ghRepository.getPullRequests(GHIssueState.OPEN);
-            List<GHPullRequest> allMatchingPullRequests = new ArrayList<>();
-            for (GHPullRequest ghPullRequest : pullRequests) {
-                if (branchName.equals(ghPullRequest.getHead().getRef())) {
-                    allMatchingPullRequests.add(ghPullRequest);
-                }
-            }
-            if (allMatchingPullRequests.isEmpty()) {
-                addActionError("No open pull request exists for branch");
+            if (pullRequestId == null || !pullRequestId.startsWith("refs/pull/")) {
+                addActionError("Pull request id not available");
                 return ERROR.toUpperCase();
             }
-            for (GHPullRequest ghPullRequest: allMatchingPullRequests) {
-                GHIssue issue = ghRepository.getIssue(ghPullRequest.getNumber());
-                issue.comment(message);
-            }
+            String[] prArray = pullRequestId.split("/");
+            int pullRequestNumber = Integer.parseInt(prArray[2]);//  typical pr GITHUB_REF is refs/pull/662/merge
+            GHIssue issue = ghRepository.getIssue(pullRequestNumber);
+            issue.comment(message);
         } catch (Exception e) {
             addActionError("Error while publishing github comment");
             return ERROR.toUpperCase();
@@ -136,11 +127,6 @@ public class GithubSsoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
     public String addGithubAppSecretKey() {
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
         githubAppSecretKey = githubAppSecretKey.replace("-----BEGIN RSA PRIVATE KEY-----","");
         githubAppSecretKey = githubAppSecretKey.replace("-----END RSA PRIVATE KEY-----","");
         githubAppSecretKey = githubAppSecretKey.replace("\n","");

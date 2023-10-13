@@ -60,7 +60,13 @@ function Integrations() {
       source: '/public/github_icon.svg'
     }
 
-    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj]
+    let githubAppObj = {
+      id: 'github_app',
+      name: 'Github App',
+      source: '/public/github_icon.svg'
+    }
+
+    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj, githubAppObj]
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
@@ -70,12 +76,12 @@ function Integrations() {
         },
         {
             id: 'traffic',
-            content: <span>Traffic Source <Badge status='new'>1</Badge></span>,
+            content: <span>Traffic Source <Badge status='new'>2</Badge></span>,
             component: <TabsList />
         },
         {
-            id: 'manage',
-            content: <span>Api Management <Badge status='new'>1</Badge></span>,
+            id: 'reporting',
+            content: <span>Reporting<Badge status='new'>1</Badge></span>,
             component: <TabsList />
         },
         {
@@ -103,12 +109,12 @@ function Integrations() {
     const handleCurrTab = (tab) =>{
         switch (tab.id) {
             case 'traffic':
-              currObjs = [burpSuiteObj]
+              currObjs = [burpSuiteObj, postmanObj]
               setCurrentItems(currObjs)
               break;
 
-            case 'manage':
-              currObjs= [postmanObj]
+            case 'reporting':
+              currObjs= [githubAppObj]
               setCurrentItems(currObjs)
               break;
 
