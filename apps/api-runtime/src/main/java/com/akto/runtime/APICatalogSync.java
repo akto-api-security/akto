@@ -8,6 +8,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.*;
+import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
@@ -22,6 +23,7 @@ import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
@@ -1159,14 +1161,40 @@ public class APICatalogSync {
     }
 
     public static void clearValuesInDB() {
+        List<String> rangeSubTypes = new ArrayList<>();
+        rangeSubTypes.add(SingleTypeInfo.INTEGER_32.getName());
+        rangeSubTypes.add(SingleTypeInfo.INTEGER_64.getName());
+        rangeSubTypes.add(SingleTypeInfo.FLOAT.getName());
+
         String fieldName = "values.elements." + (SingleTypeInfo.VALUES_LIMIT + 1);
-        SingleTypeInfoDao.instance.updateMany(
-                Filters.exists(fieldName, true),
+        int sliceLimit = -1 * SingleTypeInfo.VALUES_LIMIT;
+
+        // range update
+        UpdateResult rangeUpdateResult = SingleTypeInfoDao.instance.updateMany(
+                Filters.and(
+                        Filters.exists(fieldName, true),
+                        Filters.in(SingleTypeInfo.SUB_TYPE, rangeSubTypes)
+                ),
                 Updates.combine(
-                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(-50)),
-                        Updates.set(SingleTypeInfo._DOMAIN, SingleTypeInfo.Domain.RANGE.name()) // todo:
+                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(sliceLimit)),
+                        Updates.set(SingleTypeInfo._DOMAIN, Domain.RANGE.name())
                 )
         );
+        loggerMaker.infoAndAddToDb("RangeUpdateResult: " + rangeUpdateResult, LogDb.RUNTIME);
+
+        // any update
+        UpdateResult anyUpdateResult = SingleTypeInfoDao.instance.updateMany(
+                Filters.and(
+                        Filters.exists(fieldName, true),
+                        Filters.nin(SingleTypeInfo.SUB_TYPE, rangeSubTypes)
+                ),
+                Updates.combine(
+                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(sliceLimit)),
+                        Updates.set(SingleTypeInfo._DOMAIN, Domain.ANY.name())
+                )
+        );
+
+        loggerMaker.infoAndAddToDb("AnyUpdateResult: " + anyUpdateResult, LogDb.RUNTIME);
     }
 
     private int lastMergeAsyncOutsideTs = 0;
@@ -1198,6 +1226,14 @@ public class APICatalogSync {
                         }
                     } catch (Exception e) {
                         ;
+                    }
+
+                    try {
+                        loggerMaker.infoAndAddToDb("Started clearing values in db ", LogDb.RUNTIME);
+                        clearValuesInDB();
+                        loggerMaker.infoAndAddToDb("Finished clearing values in db ", LogDb.RUNTIME);
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
                     }
                 }
             }
