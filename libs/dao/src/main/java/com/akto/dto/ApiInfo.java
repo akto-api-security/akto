@@ -27,6 +27,8 @@ public class ApiInfo {
     public static final String LAST_TESTED = "lastTested";
     private int lastSeen;
     private int lastTested;
+    public static final String IS_SENSITIVE = "isSensitive";
+    private boolean isSensitive;
 
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
@@ -125,6 +127,7 @@ public class ApiInfo {
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
         this.lastTested = 0 ;
+        this.isSensitive = false;
     }
 
     public ApiInfo(HttpResponseParams httpResponseParams) {
@@ -218,6 +221,7 @@ public class ApiInfo {
                 ", lastTested='" + getLastTested() + "'" +
                 ", violations='" + getViolations() + "'" +
                 ", accessTypes='" + getApiAccessTypes() + "'" +
+                ", isSensitive='" + getIsSensitive() + "'" +
                 "}";
     }
 
@@ -268,5 +272,13 @@ public class ApiInfo {
 
     public void setLastTested(int lastTested) {
         this.lastTested = lastTested;
+    }
+
+    public boolean getIsSensitive() {
+        return isSensitive;
+    }
+
+    public void setSensitive(boolean isSensitive) {
+        this.isSensitive = isSensitive;
     }
 }
