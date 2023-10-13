@@ -42,6 +42,14 @@ while true; do
     high=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.HIGH // empty')
     medium=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.MEDIUM // empty')
     low=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.LOW // empty')
+    testingRunSummaryhexId=$(echo "$response" | jq -r '.testingRunResultSummaries[0].hexId // empty')
+
+    publishGithubCommentResponse=$(curl -s "$AKTO_DASHBOARD_URL/api/fetchTestingRunResultSummaries" \
+          --header 'content-type: application/json' \
+          --header "X-API-KEY: $AKTO_API_KEY" \
+          --data "{
+              \"testingRunSummaryHexId\": \"$testingRunSummaryhexId\"
+          }")
 
     echo "[Results]($AKTO_DASHBOARD_URL/dashboard/testing/$AKTO_TEST_ID/results)" >> $GITHUB_STEP_SUMMARY
     echo "HIGH: $high" >> $GITHUB_STEP_SUMMARY

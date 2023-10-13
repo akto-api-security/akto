@@ -7,9 +7,11 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -17,12 +19,16 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+import org.bson.types.ObjectId;
 import org.kohsuke.github.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.akto.dao.AccountSettingsDao.generateFilter;
+import static com.akto.dao.MCollection.ID;
 
 public class GithubSsoAction extends UserAction {
 
@@ -54,47 +60,107 @@ public class GithubSsoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchGithubAppSecretKey() {
+    public String fetchGithubAppId() {
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
-        githubAppSecretKey = accountSettings.getGithubAppSecretKey();
+        githubAppId = accountSettings.getGithubAppId();
         return SUCCESS.toUpperCase();
     }
 
 
-    public String publishGithubComments() throws Exception {
+    public String publishGithubComments() {
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
         String privateKey = accountSettings.getGithubAppSecretKey();
-        privateKey = privateKey.replace("\n","");
-        String jwtToken = JWT.createJWT(String.valueOf(398685),privateKey, 10 * 60 * 1000);
-        GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
-        GHApp ghApp = gitHub.getApp();
-        List<GHAppInstallation> appInstallations = ghApp.listInstallations().toList();
-        GHAppInstallation appInstallation = appInstallations.get(0);
-        GHAppCreateTokenBuilder builder = appInstallation.createToken();
-        GHAppInstallationToken token = builder.create();
-        token.getToken();
-        GitHub gitHub1 =  new GitHubBuilder().withAppInstallationToken(token.getToken())
-                .build();
-        GHRepository repository = gitHub1.getInstallation().listRepositories().toList().get(4);
-        List<GHPullRequest> pullRequests =  repository.getPullRequests(GHIssueState.OPEN);
-        GHPullRequest pullRequest = pullRequests.get(0);
-        GHIssue issue = repository.getIssue(pullRequest.getNumber());
-        issue.comment("this is test message");
-        GHPullRequestReviewBuilder ghPullRequestReviewBuilder =  pullRequest.createReview();
-        System.out.println("token: "  + token.getToken());
-        System.out.println("jwt token: "  + jwtToken);
+        String githubAppId = accountSettings.getGithubAppId();
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(ID,new ObjectId(testingRunSummaryHexId)));
+        try {
+            Map<String, String> metaData = testingRunResultSummary.getMetadata();
+            String repository = metaData.get("repository");
+            String branchName = metaData.get("branch");
+            Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
+            StringBuilder messageStringBuilder = new StringBuilder("Akto vulnerability report\n");
+            for (String severity : countIssues.keySet()) {
+                messageStringBuilder.append(severity).append(" - ").append(countIssues.get(severity)).append("\n");
+            }
+            String message = messageStringBuilder.toString();
+            //JWT Token creation for github app
+            String jwtToken = JWT.createJWT(githubAppId,privateKey, 10 * 60 * 1000);
+
+            //Github app invocation
+            GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
+            GHApp ghApp = gitHub.getApp();
+
+            //Getting appInstallations
+            List<GHAppInstallation> appInstallations = ghApp.listInstallations().toList();
+            if (appInstallations.isEmpty()) {
+                addActionError("Github app was not installed");
+                return ERROR.toUpperCase();
+            }
+            GHAppInstallation appInstallation = appInstallations.get(0);
+            GHAppCreateTokenBuilder builder = appInstallation.createToken();
+            GHAppInstallationToken token = builder.create();
+            GitHub githubAccount =  new GitHubBuilder().withAppInstallationToken(token.getToken())
+                    .build();
+
+            GHRepository ghRepository = githubAccount.getRepository(repository);
+            if (ghRepository == null) {
+                addActionError("Github app doesn't have access to repository");
+                return ERROR.toUpperCase();
+            }
+            List<GHPullRequest> pullRequests =  ghRepository.getPullRequests(GHIssueState.OPEN);
+            List<GHPullRequest> allMatchingPullRequests = new ArrayList<>();
+            for (GHPullRequest ghPullRequest : pullRequests) {
+                if (branchName.equals(ghPullRequest.getHead().getRef())) {
+                    allMatchingPullRequests.add(ghPullRequest);
+                }
+            }
+            if (allMatchingPullRequests.isEmpty()) {
+                addActionError("No open pull request exists for branch");
+                return ERROR.toUpperCase();
+            }
+            for (GHPullRequest ghPullRequest: allMatchingPullRequests) {
+                GHIssue issue = ghRepository.getIssue(ghPullRequest.getNumber());
+                issue.comment(message);
+            }
+        } catch (Exception e) {
+            addActionError("Error while publishing github comment");
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
     public String addGithubAppSecretKey() {
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+
         githubAppSecretKey = githubAppSecretKey.replace("-----BEGIN RSA PRIVATE KEY-----","");
         githubAppSecretKey = githubAppSecretKey.replace("-----END RSA PRIVATE KEY-----","");
+        githubAppSecretKey = githubAppSecretKey.replace("\n","");
 
-        AccountSettingsDao.instance.updateOne(generateFilter(), Updates.set(AccountSettings.GITHUB_APP_SECRET_KEY, githubAppSecretKey));
+        try {
+            String jwtToken = JWT.createJWT(githubAppId,githubAppSecretKey, 10 * 60 * 1000);
+            GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
+            gitHub.getApp();
+        } catch (Exception e) {
+            addActionError("invalid github app Id and secret key");
+            return ERROR.toUpperCase();
+        }
+        AccountSettingsDao.instance.updateOne(generateFilter(), Updates.combine(Updates.set(AccountSettings.GITHUB_APP_SECRET_KEY, githubAppSecretKey),
+                Updates.set(AccountSettings.GITHUB_APP_ID, githubAppId)));
         return SUCCESS.toUpperCase();
     }
     private String githubClientId;
     private String githubClientSecret;
     private String githubAppSecretKey;
+    private String githubAppId;
     private String testingRunSummaryHexId;
     public String addGithubSso() {
 
@@ -168,5 +234,13 @@ public class GithubSsoAction extends UserAction {
 
     public void setTestingRunSummaryHexId(String testingRunSummaryHexId) {
         this.testingRunSummaryHexId = testingRunSummaryHexId;
+    }
+
+    public String getGithubAppId() {
+        return githubAppId;
+    }
+
+    public void setGithubAppId(String githubAppId) {
+        this.githubAppId = githubAppId;
     }
 }

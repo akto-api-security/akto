@@ -218,18 +218,18 @@ const settingRequests = {
             data: {}
         })
     },
-    fetchGithubAppSecretKey() {
+    fetchGithubAppId() {
         return request({
-            url: '/api/fetchGithubAppSecretKey',
+            url: '/api/fetchGithubAppId',
             method: 'post',
             data: {}
         })
     },
-    addGithubAppSecretKey(githubAppSecretKey) {
+    addGithubAppSecretKey(githubAppSecretKey, githubAppId) {
         return request({
             url: '/api/addGithubAppSecretKey',
             method: 'post',
-            data: {githubAppSecretKey}
+            data: {githubAppSecretKey, githubAppId}
         })
     }
 }

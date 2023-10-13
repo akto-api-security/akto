@@ -39,6 +39,8 @@ public class AccountSettings {
     private int globalRateLimit;
     public static final String GITHUB_APP_SECRET_KEY = "githubAppSecretKey";
     private String githubAppSecretKey;
+    public static final String GITHUB_APP_ID = "githubAppId";
+    private String githubAppId;
     private int trafficAlertThresholdSeconds = defaultTrafficAlertThresholdSeconds;
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
@@ -67,6 +69,14 @@ public class AccountSettings {
 
     public void setGithubAppSecretKey(String githubAppSecretKey) {
         this.githubAppSecretKey = githubAppSecretKey;
+    }
+
+    public String getGithubAppId() {
+        return githubAppId;
+    }
+
+    public void setGithubAppId(String githubAppId) {
+        this.githubAppId = githubAppId;
     }
 
     public enum SetupType {
