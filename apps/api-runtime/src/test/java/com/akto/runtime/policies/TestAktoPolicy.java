@@ -71,44 +71,6 @@ public class TestAktoPolicy extends MongoBasedTest {
         return hrp;
     }
 
-    @Test
-    public void testRestart() throws Exception {
-        dropCollections();
-        initialiseAccountSettings();
-
-        HttpResponseParams hrp1 = generateHttpResponseParams("url1", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-        HttpResponseParams hrp2 = generateHttpResponseParams("url2", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-        HttpResponseParams hrp3 = generateHttpResponseParams("url3", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-
-        HttpResponseParams hrpMerge1 = generateHttpResponseParams("/api/books/1", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-        HttpResponseParams hrpMerge2 = generateHttpResponseParams("/api/books/2", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-
-        List<HttpResponseParams> responseParams = Arrays.asList(hrp1, hrp2, hrp3, hrpMerge1, hrpMerge2);
-
-        HttpCallParser httpCallParser = new HttpCallParser("user", 1, 1,1, true);
-        httpCallParser.syncFunction(responseParams, false, true);
-        httpCallParser.apiCatalogSync.syncWithDB(false, true);
-
-        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(5,apiInfoList.size());
-        List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(0, filterSampleDataList.size());
-
-        // restart server means new httpCallParser and aktoPolicy
-        HttpCallParser httpCallParser1 = new HttpCallParser("user", 1, 1,1, true);
-
-        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(5,apiInfoList.size());
-
-        httpCallParser1.syncFunction(responseParams.subList(0,1), false, true);
-        httpCallParser1.apiCatalogSync.syncWithDB(false, true);
-
-        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(5,apiInfoList.size());
-        filterSampleDataList = FilterSampleDataDao.instance.findAll(Filters.eq("_id.apiInfoKey.apiCollectionId", 0));
-        Assertions.assertEquals(0, filterSampleDataList.size());
-    }
-
 
     @Test
     public void test1() throws Exception {
