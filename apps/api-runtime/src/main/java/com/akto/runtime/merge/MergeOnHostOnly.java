@@ -29,6 +29,7 @@ import com.akto.util.Util;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 public class MergeOnHostOnly {
@@ -109,14 +110,22 @@ public class MergeOnHostOnly {
         FilterSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiInfoKey.apiCollectionId", oldId));
     }
 
-    public void updateSTI(int oldId, int newId){
+    public void updateSTI(int oldId, int newId) {
         SingleTypeInfoDao.instance.getMCollection().updateMany(
-            Filters.eq("apiCollectionId",oldId), 
-            Updates.combine(
-                Updates.set("apiCollectionId",newId),
-                Updates.pull(SingleTypeInfo._COLLECTION_IDS, oldId),
-                Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, newId)
-            ));
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, oldId),
+                        Filters.exists(SingleTypeInfo._COLLECTION_IDS, false)),
+                Updates.set(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(newId)));
+
+        // the below query fails when collectionIds is not present, thus the above query.
+        SingleTypeInfoDao.instance.getMCollection().updateMany(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, oldId),
+                Updates.combine(
+                        Updates.set(SingleTypeInfo._API_COLLECTION_ID, newId),
+                        Updates.set("collectionIds.$[element]", newId)),
+                new UpdateOptions().arrayFilters(
+                        Arrays.asList(
+                                Filters.in("element", oldId))));
     }
 
     public void deleteFromAllCollections(int apiCollectionId, List<String> urls ) {
