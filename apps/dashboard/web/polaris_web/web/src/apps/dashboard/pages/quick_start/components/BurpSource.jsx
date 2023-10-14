@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
 import func from "@/util/func"
-import TooltipText from "../../../components/shared/TooltipText"
  
 function BurpSource() {
     const navigate = useNavigate()
