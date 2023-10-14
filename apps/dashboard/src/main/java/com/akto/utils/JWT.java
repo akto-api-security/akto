@@ -81,7 +81,6 @@ public class JWT {
 
         long nowMillis = System.currentTimeMillis();
         Date now = new Date(nowMillis);
-        java.security.Security.addProvider(new BouncyCastleProvider());
 
         //We will sign our JWT with our private key
         Key signingKey = get(Base64.getDecoder().decode(secret));
