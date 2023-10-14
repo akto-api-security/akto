@@ -23,6 +23,7 @@ function FargateSource({docsUrl,bannerTitle}) {
 
     const stackCompleteComponent = (
         <VerticalStack gap="2">
+            <div ref = {ref}/>
             <HorizontalStack gap="1">
                 <span>Add traffic sources from our docs. Click</span>
                 <a href='dashboard/observe/inventory'>here</a>
@@ -42,9 +43,7 @@ function FargateSource({docsUrl,bannerTitle}) {
             noAccessText={noAccessText}
             setupButtonText={setupButtonText}
             stackCompleteComponent={stackCompleteComponent}
-        >
-            <div ref = {ref}/>
-        </CompleteSetup>
+        />
     )
 }
 
