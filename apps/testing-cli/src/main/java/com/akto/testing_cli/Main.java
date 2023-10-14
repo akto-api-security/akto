@@ -80,6 +80,20 @@ public class Main {
         return codec.decode(bsonReader, DecoderContext.builder().build());
     }
 
+    public enum OUTPUT_LEVEL {
+        NONE, SUMMARY, DETAILED, DEBUG
+    }
+
+    static String getSeverity(Map<String, TestConfig> testConfigMap, TestingRunResult it) {
+        String severity = "HIGH";
+        try {
+            severity = testConfigMap.get(it.getTestSubType()).getInfo().getSeverity();
+        } catch (Exception e) {
+            severity = "HIGH";
+        }
+        return severity;
+    }
+
     public static void main(String[] args) {
 
         if (AKTO_DASHBOARD_URL == null || AKTO_DASHBOARD_URL.isEmpty() || AKTO_API_KEY == null
@@ -337,15 +351,30 @@ public class Main {
             }
         }
 
+        Map<String, List<ApiInfo.ApiInfoKey>> vulnerableTestToApiMap = new HashMap<>();
+
         for (TestingRunResult it : testingRunResults) {
-            String severity = "HIGH";
-            try {
-                severity = testConfigMap.get(it.getTestSubType()).getInfo().getSeverity();
-            } catch (Exception e){
-                severity = "HIGH";
+            String severity = getSeverity(testConfigMap, it);
+
+            if(it.isVulnerable()){
+                List<ApiInfo.ApiInfoKey> tmp = vulnerableTestToApiMap.getOrDefault(it.getTestSubType(), new ArrayList<>());
+                tmp.add(it.getApiInfoKey());
+                vulnerableTestToApiMap.put(it.getTestSubType(), tmp);
             }
             String output = it.toConsoleString(severity);
             System.out.println(output);
+        }
+
+        OUTPUT_LEVEL outputLevel = OUTPUT_LEVEL.SUMMARY;
+
+        try {
+            outputLevel = OUTPUT_LEVEL.valueOf(System.getenv("OUTPUT_LEVEL"));
+        } catch (Exception e){
+            logger.info("Using default output level: SUMMARY");
+        }
+
+        if(outputLevel.equals(OUTPUT_LEVEL.NONE)){
+            return;
         }
 
         String fileDir = "../out/";
@@ -363,9 +392,45 @@ public class Main {
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)))) {
             writer.write("Api collection: " + apiCollectionId + " " + apiCollection.getDisplayName() + "\n\n");
-            for (TestingRunResult it : testingRunResults) {
-                String output = it.toOutputString() + "\n ------------------------------------ \n\n";
-                writer.write(output);
+
+            if (totalVulnerabilities > 0) {
+                writer.write("Vulnerabilities: \n");
+                for (Map.Entry<String, Integer> entry : severityMap.entrySet()) {
+                    writer.write(entry.getKey() + ": " + entry.getValue() + "\n");
+                }
+                writer.write("\n");
+
+                for (Map.Entry<String, List<ApiInfo.ApiInfoKey>> entry : vulnerableTestToApiMap.entrySet()) {
+                    TestConfig testConfig = testConfigMap.getOrDefault(entry.getKey(), null);
+                    
+                    writer.write("Test ID: " + entry.getKey() + "\n");
+
+                    if(testConfig != null){
+                        writer.write("Test name: " + testConfig.getInfo().getName() + "\n");
+                        writer.write("Severity: " + testConfig.getInfo().getSeverity() + "\n");
+
+                        if(!outputLevel.equals(OUTPUT_LEVEL.SUMMARY)){
+                            writer.write("Description: " + testConfig.getInfo().getDescription() + "\n");
+                            writer.write("Impact: " + testConfig.getInfo().getImpact() + "\n\n");
+                        }
+
+                    }
+
+                    writer.write("APIs affected: \n");
+                    for(ApiInfo.ApiInfoKey apiInfoKey: entry.getValue()){
+                        writer.write(apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().toString() + "\n");
+                    }
+                    writer.write("\n ********************* \n\n");
+                }
+            }
+
+            if(outputLevel.equals(OUTPUT_LEVEL.DEBUG)){
+                writer.write("DEBUG result: \n");
+                for (TestingRunResult it : testingRunResults) {
+                    String severity = getSeverity(testConfigMap, it);
+                    String output = it.toOutputString(severity) + "\n ------------------------------------ \n\n";
+                    writer.write(output);
+                }
             }
             System.out.println("Detailed result is written to output.txt");
         } catch (Exception e) {
