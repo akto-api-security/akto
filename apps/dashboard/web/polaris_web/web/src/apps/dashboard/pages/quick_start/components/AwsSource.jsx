@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import api from '../api'
 import quickStartFunc from '../transform'
 import { Box, Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
@@ -23,6 +23,8 @@ function AwsSource() {
     const isLocalDeploy = Store(state => state.isLocalDeploy)
     // const isLocalDeploy = false
     const DeploymentMethod = "AWS_TRAFFIC_MIRRORING"
+
+    const ref = useRef(null)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -125,8 +127,7 @@ function AwsSource() {
     }
 
     const copyRequest = () => {
-      navigator.clipboard.writeText(formattedJson)
-      setToast(true, false, "Policy copied to clipboard.")
+      func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
 
     const saveFunc = async() => {
@@ -191,6 +192,7 @@ function AwsSource() {
       <div className='card-items'>
         <Text>{displayObj?.text}</Text>
         {displayObj?.component}
+        <div ref = {ref} />
       </div>
     )
 }
