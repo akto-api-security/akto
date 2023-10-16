@@ -422,6 +422,8 @@ public class Main {
                     }
                     writer.write("\n ********************* \n\n");
                 }
+            } else {
+                writer.write("No vulnerabilities found \n\n");
             }
 
             if(outputLevel.equals(OUTPUT_LEVEL.DEBUG)){
