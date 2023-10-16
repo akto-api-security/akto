@@ -376,7 +376,7 @@ public class Main {
         }
 
         if(outputLevel.equals(OUTPUT_LEVEL.NONE)){
-            return;
+            System.exit(0);
         }
 
         String fileDir = "../out/";
