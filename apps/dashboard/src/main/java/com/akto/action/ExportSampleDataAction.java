@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.DaoInit;
+import com.akto.action.test_editor.SaveTestEditorAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
@@ -8,6 +9,8 @@ import com.akto.dto.*;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -322,6 +325,15 @@ public class ExportSampleDataAction extends UserAction {
         return builder.toString();
     }
 
+    int accountId;
+
+    public String insertLlmData() {
+        Context.accountId.set(accountId);
+        RuntimeListener.addLlmSampleData(accountId);
+        InitializerListener.saveLLmTemplates();
+        return SUCCESS.toUpperCase();
+    }
+
     public String getCurlString() {
         return curlString;
     }
@@ -360,6 +372,14 @@ public class ExportSampleDataAction extends UserAction {
 
     public String getLastMethodFetched() {
         return lastMethodFetched;
+    }
+
+    public int getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
     }
 }
 

@@ -2305,7 +2305,19 @@
         <action name="api/deMergeApi" class="com.akto.action.observe.InventoryAction" method="deMergeApi">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        <action name="tools/addLLmData" class="com.akto.action.ExportSampleDataAction" method="insertLlmData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
