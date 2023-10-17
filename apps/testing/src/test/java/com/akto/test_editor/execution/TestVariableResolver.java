@@ -39,6 +39,9 @@ public class TestVariableResolver {
 
         result = VariableResolver.resolveExpression(varMap, "${var1}${var1}");
         assertEquals("user1user1", result);
+
+        result = VariableResolver.resolveExpression(varMap, "akto");
+        assertEquals("akto", result);
     }
 
 }
