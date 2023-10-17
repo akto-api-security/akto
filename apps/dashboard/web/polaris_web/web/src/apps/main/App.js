@@ -50,6 +50,7 @@ import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
+import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 
 const router = createBrowserRouter([
   {
@@ -234,7 +235,8 @@ const router = createBrowserRouter([
         path: "issues/summary/:issuesFilter",
         element: <ExportHtml />
       }
-    ]
+    ],
+    errorElement: <ErrorComponent/>
   },
 {
   path: "/login",

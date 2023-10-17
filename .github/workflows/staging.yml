@@ -52,6 +52,9 @@ jobs:
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
+      - name: Download Akto templates zip
+        working-directory: ./apps/dashboard/src/main/resources
+        run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
