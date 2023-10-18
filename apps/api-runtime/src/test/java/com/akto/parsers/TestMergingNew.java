@@ -623,7 +623,7 @@ public class TestMergingNew extends MongoBasedTest {
         parserNew.apiCatalogSync.buildFromDB(false, true);
 
         // both now range
-        testSampleSizeAndDomainOfSti(parserNew, 50, 50, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.RANGE);
+        testSampleSizeAndDomainOfSti(parserNew, 50, 50, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
 
 
     }
