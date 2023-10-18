@@ -5,9 +5,12 @@ import java.util.*;
 import javax.swing.text.html.FormSubmitEvent.MethodType;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.mortbay.util.ajax.JSON;
 
 import com.akto.DaoInit;
 import com.akto.dao.APISpecDao;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
@@ -15,10 +18,15 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveInfoInApiCollections;
+import com.akto.dto.AccountSettings.CronTimers;
 import com.akto.util.Constants;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.opensymphony.xwork2.Action;
@@ -29,6 +37,9 @@ public class ApiCollectionsAction extends UserAction {
     List<SensitiveInfoInApiCollections> sensitiveInfoInApiCollections = new ArrayList<>() ;
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
     Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
+    Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
+    int criticalEndpointsCount;
+    CronTimers timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
 
@@ -142,7 +153,76 @@ public class ApiCollectionsAction extends UserAction {
         this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
         return Action.SUCCESS.toUpperCase();
     }
+
+    public String riskScoreInfo(){
+        int oneMonthBefore = Context.now() - (60 * 60 * 24 * 30) ;
+        String computedSeverityScore = "{'$cond':[{'$gte':['$severityScore',100]},2,{'$cond':[{'$gte':['$severityScore',10]},1,{'$cond':[{'$gt':['$severityScore',0]},0.5,0]}]}]}";
+        String computedAccessTypeScore = "{ '$cond': { 'if': { '$and': [ { '$gt': [ { '$size': '$apiAccessTypes' }, 0 ] }, { '$eq': ['$apiAccessTypes.0', 'PUBLIC'] } ] }, 'then': 1, 'else': 0 } }";
+        String computedLastSeenScore = "{ '$cond': [ { '$gte': ['$lastSeen', " +  oneMonthBefore + " ] }, 1, 0 ] }";
+        String computedIsSensitiveScore = "{ '$cond': [ { '$eq': ['$isSensitive', true] }, 1, 0 ] }";
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.project(
+            Projections.fields(
+                Projections.include("_id"),
+                Projections.computed("sensitiveScore",Document.parse(computedIsSensitiveScore)),
+                Projections.computed("isNewScore",Document.parse(computedLastSeenScore)),
+                Projections.computed("accessTypeScore",Document.parse(computedAccessTypeScore)),
+                Projections.computed("severityScore",Document.parse(computedSeverityScore))
+            )
+        ));
+
+        String computedRiskScore = "{ '$add': ['$sensitiveScore', '$isNewScore', '$accessTypeScore', '$severityScore']}";
+
+        pipeline.add(
+            Aggregates.project(
+                Projections.fields(
+                    Projections.include("_id"),
+                    Projections.computed("riskScore", Document.parse(computedRiskScore))
+                )
+            )
+        );
+
+        int criticalCount = 0 ;
+        Map<Integer, Double> riskScoreMap = new HashMap<>();
+
+        MongoCursor<BasicDBObject> apiCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(apiCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = apiCursor.next();
+                double riskScore = basicDBObject.getDouble("riskScore");
+                BasicDBObject bd = (BasicDBObject) basicDBObject.get("_id");
+                Integer collectionId = bd.getInt("apiCollectionId");
+
+                if(riskScore >= 4){
+                    criticalCount++;
+                }
+
+                if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(collectionId)){
+                    riskScoreMap.put(collectionId, riskScore);
+                }else{
+                    double prev = riskScoreMap.get(collectionId);
+                    riskScore = Math.max(riskScore, prev);
+                    riskScoreMap.put(collectionId, riskScore);
+                }
+
+            } catch (Exception e) {
+                // TODO: handle exception
+                e.printStackTrace();
+            }
+        }
+
+        this.criticalEndpointsCount = criticalCount;
+        this.riskScoreOfCollectionsMap = riskScoreMap;
+        return Action.SUCCESS.toUpperCase();
+    }
     
+    public String fetchTimersInfo(){
+        CronTimers timer = AccountSettingsDao.instance.getTimersInfo();
+        this.timerInfo = timer;
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -177,6 +257,18 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getLastTrafficSeenMap() {
         return lastTrafficSeenMap;
+    }
+
+    public int getCriticalEndpointsCount() {
+        return criticalEndpointsCount;
+    }
+
+    public Map<Integer, Double> getRiskScoreOfCollectionsMap() {
+        return riskScoreOfCollectionsMap;
+    }
+
+    public CronTimers getTimerInfo() {
+        return timerInfo;
     }
 
 }

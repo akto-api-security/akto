@@ -174,6 +174,8 @@ public class DaoInit {
         ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
+        ClassModel<AccountSettings.CronTimers> cronTimersClassModel = ClassModel.builder(AccountSettings.CronTimers.class)
+                .enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
@@ -196,7 +198,7 @@ public class DaoInit {
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel).automatic(true).build());
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

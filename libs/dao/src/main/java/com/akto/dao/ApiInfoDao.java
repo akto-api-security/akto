@@ -147,8 +147,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return result;
     }
 
-    
-
     @Override
     public String getCollName() {
         return "api_info";

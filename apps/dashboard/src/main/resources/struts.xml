@@ -292,15 +292,6 @@
             </result>
         </action>
 
-        <action name="api/fetchSeverityInfoForEndpoints" class="com.akto.action.observe.InventoryAction" method="fetchLastTestedSeverityOfApisInCollection">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadRecentEndpoints" class="com.akto.action.observe.InventoryAction" method="loadRecentEndpoints">
@@ -501,6 +492,27 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getRiskScoreInfo" class="com.akto.action.ApiCollectionsAction" method="riskScoreInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getLastCalculatedInfo" class="com.akto.action.ApiCollectionsAction" method="fetchTimersInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">timerInfo</param>
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>

@@ -29,6 +29,8 @@ public class ApiInfo {
     private int lastTested;
     public static final String IS_SENSITIVE = "isSensitive";
     private boolean isSensitive;
+    public static final String SEVERITY_SCORE = "severityScore";
+    private float severityScore;
 
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
@@ -128,6 +130,7 @@ public class ApiInfo {
         this.lastSeen = Context.now();
         this.lastTested = 0 ;
         this.isSensitive = false;
+        this.severityScore = 0;
     }
 
     public ApiInfo(HttpResponseParams httpResponseParams) {
@@ -157,6 +160,8 @@ public class ApiInfo {
         if((that.lastTested != 0) && that.lastTested > this.lastTested){
             this.lastTested = that.lastTested ;
         }
+        this.isSensitive = that.isSensitive || this.isSensitive;
+        this.severityScore = this.severityScore + that.severityScore;
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -222,6 +227,7 @@ public class ApiInfo {
                 ", violations='" + getViolations() + "'" +
                 ", accessTypes='" + getApiAccessTypes() + "'" +
                 ", isSensitive='" + getIsSensitive() + "'" +
+                ", severityScore='" + getSeverityScore() + "'" +
                 "}";
     }
 
@@ -278,7 +284,15 @@ public class ApiInfo {
         return isSensitive;
     }
 
-    public void setSensitive(boolean isSensitive) {
+    public void setIsSensitive(boolean isSensitive) {
         this.isSensitive = isSensitive;
+    }
+
+    public float getSeverityScore() {
+        return severityScore;
+    }
+
+    public void setSeverityScore(float severityScore) {
+        this.severityScore = severityScore;
     }
 }
