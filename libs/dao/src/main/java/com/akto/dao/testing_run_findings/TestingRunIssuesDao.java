@@ -58,6 +58,11 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
             TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
         }
+        if(counter == 3){
+            String[] fieldNames = {TestingRunIssues.LAST_SEEN};
+            TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
+            counter++;
+        }
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){

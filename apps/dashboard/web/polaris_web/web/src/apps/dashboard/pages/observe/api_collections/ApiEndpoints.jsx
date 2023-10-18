@@ -164,10 +164,6 @@ function ApiEndpoints() {
     async function fetchData() {
         setLoading(true)
         let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
-        let severityInfoMap = {}
-        await api.getLastTestedSeverityInfo(apiCollectionId).then((resp)=>{
-            severityInfoMap = JSON.parse(JSON.stringify(resp.lastTestedSeverityMap))
-        })
         let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiCollectionData.data.apiInfoList
         let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
@@ -192,7 +188,7 @@ function ApiEndpoints() {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
-        const prettifyData = transform.prettifyEndpointsData(allEndpoints, severityInfoMap)
+        const prettifyData = transform.prettifyEndpointsData(allEndpoints)
         data['All'] = prettifyData
         data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
         data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)

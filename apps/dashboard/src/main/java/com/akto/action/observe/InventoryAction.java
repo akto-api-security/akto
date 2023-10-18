@@ -58,7 +58,6 @@ public class InventoryAction extends UserAction {
 
     private int startTimestamp = 0; 
     private int endTimestamp = 0;
-    private Map<ApiInfoKey, Float> lastTestedSeverityMap= new HashMap<>();
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -155,7 +154,7 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private float calculateRiskValueForSeverity(String severity){
+    public float calculateRiskValueForSeverity(String severity){
         float riskScore = 0 ;
         switch (severity) {
             case "HIGH":
@@ -175,48 +174,6 @@ public class InventoryAction extends UserAction {
 
         return riskScore;
     }
-
-    public String fetchLastTestedSeverityOfApisInCollection(){
-        List<Bson> pipeline = new ArrayList<>();
-        if (apiCollectionId != -1) {
-            pipeline.add(Aggregates.match(Filters.and(Filters.eq("_id.apiInfoKey.apiCollectionId", apiCollectionId), Filters.eq("testRunIssueStatus", "OPEN"))));
-        }
-
-        Map<ApiInfoKey, Float> resultMap = new HashMap<>();
-
-        MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        while(severitiesCursor.hasNext()) {
-            try {
-                BasicDBObject basicDBObject = severitiesCursor.next();
-                BasicDBObject temp = (BasicDBObject) basicDBObject.get("_id");
-                BasicDBObject apiInfo = (BasicDBObject) temp.get("apiInfoKey");
-                String severity = basicDBObject.getString("severity");
-                Float severityVal = calculateRiskValueForSeverity(severity);
-                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfoKey( 
-                        (int) apiInfo.get("apiCollectionId"),
-                        (String) apiInfo.get("url"),
-                        URLMethods.Method.fromString((String) apiInfo.get("method"))
-                );
-                if(resultMap.containsKey(apiInfoKey)){
-                    Float existingSeverity = resultMap.get(apiInfoKey);
-                    Float newSeverityVal = existingSeverity + severityVal;
-                    resultMap.put(apiInfoKey, newSeverityVal);
-                }else{
-                    resultMap.put(apiInfoKey, severityVal);
-                }
-                
-            } catch (Exception e) {
-                // TODO: handle exception
-                e.printStackTrace();
-            }
-        }
-
-        this.lastTestedSeverityMap = resultMap;
-
-        return SUCCESS.toUpperCase();
-    }
-
-
 
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
@@ -796,9 +753,5 @@ public class InventoryAction extends UserAction {
     
     public void setSubType(String subType) {
         this.subType = subType;
-    }
-
-    public Map<ApiInfoKey, Float> getLastTestedSeverityMap() {
-        return lastTestedSeverityMap;
     }
 }

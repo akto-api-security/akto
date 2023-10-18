@@ -323,6 +323,12 @@ public class AktoPolicyNew {
             // last tested
             subUpdates.add(Updates.set(ApiInfo.LAST_TESTED, apiInfo.getLastTested())) ;
 
+            // isSensitive
+            subUpdates.add(Updates.set(ApiInfo.IS_SENSITIVE, apiInfo.getIsSensitive()));
+
+            // severityScore
+            subUpdates.add(Updates.set(ApiInfo.SEVERITY_SCORE, apiInfo.getSeverityScore()));
+
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),

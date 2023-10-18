@@ -529,13 +529,19 @@ export default {
         })
     },
 
-    async getLastTestedSeverityInfo(apiCollectionId) {
+    async getRiskScoreInfo() {
         return await request({
-            url: '/api/fetchSeverityInfoForEndpoints',
+            url: '/api/getRiskScoreInfo',
             method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId
-            }
+            data: {}
         })
     },
+
+    async lastUpdatedInfo() {
+        return await request({
+            url: '/api/getLastCalculatedInfo',
+            method: 'post',
+            data: {}
+        })
+    }
 }

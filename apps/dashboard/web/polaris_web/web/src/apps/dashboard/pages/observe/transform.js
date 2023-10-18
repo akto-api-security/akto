@@ -268,11 +268,12 @@ const transform = {
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
                 endpoints: c.endpoints,
-                riskScore: <Badge status={this.getStatus(0)} size="small">{"0"}</Badge>,
+                riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
                 issuesArr: this.getIssuesList(c.severityInfo),
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,
+                riskScore: c.riskScore,
             }
         })
 
@@ -292,7 +293,7 @@ const transform = {
         })
 
         return {
-            totalEndpoints:totalUrl , totalTestedEndpoints: totalTested, totalSensitiveEndpoints: sensitiveInRes, totalCriticalEndpoints: 0
+            totalEndpoints:totalUrl , totalTestedEndpoints: totalTested, totalSensitiveEndpoints: sensitiveInRes
         }
     },
 
@@ -351,18 +352,15 @@ const transform = {
         return lastSeen > lastMonthEpoch
     },
 
-    getRiskScoreForEndpoint(url, severityInfoMap){
+    getRiskScoreForEndpoint(url){
         let riskScore = 0 
-        let apiInfoKey = url.apiCollectionId + ' ' + url.endpoint + ' ' + url.method
-        if(severityInfoMap[apiInfoKey]){
-            riskScore += this.getRiskScoreValue(severityInfoMap[apiInfoKey]);
-        }
+        riskScore += this.getRiskScoreValue(url.severityScore);
 
         if(url.access_type === "Public"){
             riskScore += 1
         }
 
-        if(url.sensitiveTags.length > 0){
+        if(url.isSensitive){
             riskScore += 1
         }
 
@@ -373,9 +371,10 @@ const transform = {
         return riskScore
     },
 
-    prettifyEndpointsData(inventoryData, severityInfoMap){
+    prettifyEndpointsData(inventoryData){
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
+            const score = this.getRiskScoreForEndpoint(url)
             return{
                 ...url,
                 last_seen: url.last_seen,
@@ -384,8 +383,8 @@ const transform = {
                 auth_type: url.auth_type,
                 endpointComp: this.getPrettifyEndpoint(url.method, url.endpoint, this.isNewEndpoint(url.lastSeenTs)),
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(this.getRiskScoreForEndpoint(url, severityInfoMap))} size="small">{this.getRiskScoreForEndpoint(url, severityInfoMap).toString()}</Badge>,
-                riskScore: this.getRiskScoreForEndpoint(url, severityInfoMap),
+                riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
+                riskScore: score,
                 isNew: this.isNewEndpoint(url.lastSeenTs)
             }
         })

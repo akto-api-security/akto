@@ -16,6 +16,7 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.AccountSettings.CronTimers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -30,6 +31,8 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.github.GithubFile;
@@ -71,6 +74,7 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -677,6 +681,46 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 15, TimeUnit.MINUTES);
     }
 
+    public void setUpSensitiveMapInApiInfoScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        CronTimers cronTimers = accountSettings.getTimers();
+                        try {
+                            mapSensitiveSTIsInApiInfo(cronTimers.getLastUpdatedSensitiveMap());
+                        } catch (Exception e) {
+                            // TODO: handle exception
+                            mapSensitiveSTIsInApiInfo(0);
+                        }
+                    }
+                }, "map-sensitiveInfo-in-ApiInfo");
+            }
+        }, 0, 30, TimeUnit.MINUTES);
+    }
+
+    public void updateSeverityScoreScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        CronTimers cronTimers = accountSettings.getTimers();
+                        try {
+                            updateSeverityScoreInApiInfo(cronTimers.getLastUpdatedIssues());
+                        } catch (Exception e) {
+                            // TODO: handle exception
+                            updateSeverityScoreInApiInfo(0);
+                        }
+                    }
+                }, "update-severity-score");
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -990,12 +1034,9 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void mapSensitiveSTIsInApiInfo(BackwardCompatibility backwardCompatibility){
-        if (backwardCompatibility.getMapSensitiveSTIsInApiInfo() == 0) {
+    private static void writeUpdates(List<String> sensitiveInResponse){
+        try {
             ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
-
-            List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-            sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
             Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveInResponse), Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1));
             List<Bson> pipeline = new ArrayList<>();
             pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
@@ -1022,10 +1063,42 @@ public class InitializerListener implements ServletContextListener {
             if (bulkUpdatesForApiInfo.size() > 0) {
                 ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
             }
-            BackwardCompatibilityDao.instance.updateOne(
-                    Filters.eq("_id", backwardCompatibility.getId()),
-                    Updates.set(BackwardCompatibility.MAP_SENSITIVE_STIS_IN_APIINFO, Context.now())
+
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set((AccountSettings.TIMERS + "."+ CronTimers.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
+                new UpdateOptions().upsert(true)
             );
+            
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
+    }
+
+    public static void mapSensitiveSTIsInApiInfo(int timeStampFilter){
+        List<String> sensitiveInResponse = new ArrayList<>();
+        if(timeStampFilter == 0){
+            sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+            sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        }else{
+            Bson filter = Filters.gte("timestamp", timeStampFilter);
+            List<AktoDataType> updatedTypes = AktoDataTypeDao.instance.findAll(filter);
+            List<CustomDataType> updaCustomDataTypes = CustomDataTypeDao.instance.findAll(filter);
+            for(AktoDataType dataType: updatedTypes){
+                if (dataType.getSensitiveAlways() || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+                    sensitiveInResponse.add(dataType.getName());
+                }
+            }
+
+            for(CustomDataType dataType: updaCustomDataTypes){
+                if (dataType.isSensitiveAlways() || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+                    sensitiveInResponse.add(dataType.getName());
+                }
+            }
+        }
+        if(sensitiveInResponse.size() > 0){
+            writeUpdates(sensitiveInResponse);
         }
     }
 
@@ -1058,6 +1131,68 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.LOAD_TEMPLATES_FILES_FROM_DIRECTORY, Context.now())
             );
+        }
+    }
+
+    public static void updateSeverityScoreInApiInfo(int timeStampFilter){
+        Bson projections = Projections.include("_id", "lastSeen");
+        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+        
+        Bson filters = Filters.gte("lastSeen", timeStampFilter);
+        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(filters, projections);
+        if(issues.size() > 0){
+            List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
+
+            for(TestingRunIssues issue: issues){
+                TestingIssuesId issueId = issue.getId();
+                ApiInfoKey apiInfoKey = issueId.getApiInfoKey();
+                updatedApiInfoKeys.add(apiInfoKey);
+            }
+
+            Bson filterQ = Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
+                Filters.in("_id.apiInfoKey", updatedApiInfoKeys)
+            );
+            try {
+                List<TestingRunIssues> updatedIssues = TestingRunIssuesDao.instance.findAll(filterQ);
+                InventoryAction inventoryAction = new InventoryAction();
+
+                Map<ApiInfoKey, Float> riskScoreMap = new HashMap<>();
+
+                for(TestingRunIssues issue: updatedIssues){
+                    String severity = issue.getSeverity().toString();
+                    Float riskScore = (Float) inventoryAction.calculateRiskValueForSeverity(severity);
+                    ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
+                    if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(apiInfoKey)){
+                        riskScoreMap.put(apiInfoKey, riskScore);
+                    }else{
+                        Float prev = riskScoreMap.get(apiInfoKey);
+                        riskScore += prev;
+                        riskScoreMap.put(apiInfoKey, riskScore);
+                    }
+                }
+                riskScoreMap.forEach((apiInfoKey, riskScore)->{
+                    Bson filter = Filters.and(
+                        Filters.eq("_id.apiCollectionId",apiInfoKey.getApiCollectionId()),
+                        Filters.eq("_id.method", apiInfoKey.getMethod()),
+                        Filters.eq("_id.url", apiInfoKey.getUrl())
+                    );
+                    bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.SEVERITY_SCORE, (float) riskScore), new UpdateOptions()));
+                });
+
+                if (bulkUpdatesForApiInfo.size() > 0) {
+                    ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+                }
+                AccountSettingsDao.instance.getMCollection().updateOne(
+                    AccountSettingsDao.generateFilter(),
+                    Updates.set(AccountSettings.TIMERS + "."+ CronTimers.LAST_UPDATED_ISSUES, Context.now()),
+                    new UpdateOptions().upsert(true)
+                );
+            } catch (Exception e) {
+                // TODO: handle exception
+                e.printStackTrace();
+            }
+            
         }
     }
 
@@ -1117,6 +1252,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
+                        setUpSensitiveMapInApiInfoScheduler();
+                        updateSeverityScoreScheduler();
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
                         if(isSaas){
@@ -1190,7 +1327,6 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
-        mapSensitiveSTIsInApiInfo(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {

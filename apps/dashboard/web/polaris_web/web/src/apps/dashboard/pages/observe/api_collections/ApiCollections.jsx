@@ -25,6 +25,11 @@ const headers = [
         itemCell: 2,
         isText: true,
     },
+    {
+        title: 'Risk score',
+        value: 'riskScoreComp',
+        itemCell: 3,
+    },
     {   
         title: 'Test coverage',
         text: 'Test coverage', 
@@ -54,6 +59,8 @@ const headers = [
 ]
 
 const sortOptions = [
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'Risky first', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Stable first', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
     { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
@@ -76,7 +83,7 @@ function convertToCollectionData(c) {
     }    
 }
 
-const convertToNewData = (collectionsArr, sensitiveInfoArr, severityInfoMap, coverageMap, trafficInfoMap) => {
+const convertToNewData = (collectionsArr, sensitiveInfoArr, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
     const sensitiveInfoMap = {} 
     sensitiveInfoArr.forEach((curr) =>{
         const { apiCollectionId, ...obj } = curr
@@ -91,6 +98,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoArr, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveSubtypesInResponse'] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
         }
     })
 
@@ -115,6 +123,12 @@ function ApiCollections() {
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
+
+    const lastFetchedInfo = PersistStore(state => state.lastFetchedInfo)
+    const lastFetchedResp = PersistStore(state => state.lastFetchedResp)
+    const setLastFetchedInfo = PersistStore(state => state.setLastFetchedInfo)
+    const setLastFetchedResp = PersistStore(state => state.setLastFetchedResp)
+
     const resetFunc = () => {
         setInventoryFlyout(false)
         setFilteredItems([])
@@ -139,16 +153,54 @@ function ApiCollections() {
         func.setToast(true, false, "API collection created successfully")
     }
 
+    async function fetchRiskScoreInfo(){
+        let obj = lastFetchedResp
+        await api.lastUpdatedInfo().then(async(resp) => {
+            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
+                await api.getRiskScoreInfo().then((res) =>{
+                    const newObj = {
+                        criticalUrls: res.criticalEndpointsCount,
+                        riskScoreMap: res.riskScoreOfCollectionsMap, 
+                    }
+                    obj = JSON.parse(JSON.stringify(newObj));
+                    setLastFetchedResp(newObj);
+                    setLastFetchedInfo({
+                        lastRiskScoreInfo: func.timeNow(),
+                        lastSensitiveInfo: func.timeNow(),
+                    })
+                })
+            }
+        })
+        return obj;
+    }
+
     async function fetchData() {
         setLoading(true)
-        let [apiCollectionsResp, sensitiveInfoResp, coverageInfoResp, severityInfoResp, trafficInfoResp] = await Promise.all([
-                api.getAllCollections(), api.getSensitiveInfoForCollections(), api.getCoverageInfoForCollections(), api.getSeverityInfoForCollections(), api.getLastTrafficSeen()
-            ])
+        let apiPromises = [
+            api.getAllCollections(),
+            api.getSensitiveInfoForCollections(),
+            api.getCoverageInfoForCollections(),
+            api.getSeverityInfoForCollections(),
+            api.getLastTrafficSeen()
+        ];
+        
+        let results = await Promise.allSettled(apiPromises);
+
+        let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
+        let sensitiveInfoResp = results[1].status === 'fulfilled' ? results[1].value : {};
+        let coverageInfoResp = results[2].status === 'fulfilled' ? results[2].value : {};
+        let severityInfoResp = results[3].status === 'fulfilled' ? results[3].value : {};
+        let trafficInfoResp = results[4].status === 'fulfilled' ? results[4].value : {};
+
         setLoading(false)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        const dataObj = convertToNewData(tmp, sensitiveInfoResp.sensitiveInfoInApiCollections, severityInfoResp.severityInfo, coverageInfoResp.testedEndpointsMaps, trafficInfoResp.lastTrafficSeenMap);
+
+        let riskScoreObj = await fetchRiskScoreInfo();
+
+        const dataObj = convertToNewData(tmp, sensitiveInfoResp?.sensitiveInfoInApiCollections, severityInfoResp?.severityInfo, coverageInfoResp?.testedEndpointsMaps, trafficInfoResp?.lastTrafficSeenMap, riskScoreObj?.riskScoreMap);
 
         const summary = transform.getSummaryData(dataObj.normal)
+        summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         setSummaryData(summary)
 
         setAllCollections(apiCollectionsResp.apiCollections || [])
@@ -190,10 +242,10 @@ function ApiCollections() {
             title: "Total APIs",
             data: summaryData.totalEndpoints,
         },
-        // {
-        //     title: "Critical APIs",
-        //     data: summaryData.totalCriticalEndpoints,
-        // },
+        {
+            title: "Critical APIs",
+            data: summaryData.totalCriticalEndpoints,
+        },
         {
             title: "Tested APIs (Coverage)",
             data: Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
@@ -207,9 +259,9 @@ function ApiCollections() {
     const summaryCard = (
         <Card padding={0} key="info">
             <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>
-                <HorizontalGrid columns={3} gap={4}>
+                <HorizontalGrid columns={4} gap={4}>
                     {summaryItems.map((item, index) => (
-                        <Box borderInlineEndWidth={index < 2 ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
+                        <Box borderInlineEndWidth={index < 3 ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
                             <VerticalStack gap="1">
                                 <Text color="subdued" variant="headingXs">
                                     {item.title}
