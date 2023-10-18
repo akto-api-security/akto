@@ -46,7 +46,11 @@ public class SensitiveFieldAction extends UserAction{
             return Action.SUCCESS.toUpperCase();
         }
 
-        Bson update = Updates.set("sensitive", sensitive);
+        Bson update = Updates.combine(
+            Updates.set("sensitive", sensitive),
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))
+        );
+
         FindOneAndUpdateOptions findOneAndUpdateOptions = new FindOneAndUpdateOptions();
         findOneAndUpdateOptions.upsert(false);
         SensitiveParamInfo param = SensitiveParamInfoDao.instance.updateOne(filter, update);
@@ -162,7 +166,10 @@ public class SensitiveFieldAction extends UserAction{
             long apiCollectionId = Long.parseLong(xObj.get("apiCollectionId").toString());
             Bson filter = SensitiveParamInfoDao.getFilters(url, method, (int) responseCode, isHeader, param, (int) apiCollectionId);
 
-            Bson bson = Updates.set("sensitive", sensitive);
+            Bson bson = Updates.combine(
+            Updates.set("sensitive", sensitive),
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))
+        );
             
             bulkUpdates.add(
                 new UpdateOneModel<>(filter, bson, new UpdateOptions().upsert(true))
