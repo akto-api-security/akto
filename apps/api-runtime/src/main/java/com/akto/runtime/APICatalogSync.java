@@ -1202,7 +1202,7 @@ public class APICatalogSync {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         boolean mergingCalled = false;
-        if (mergeAsyncOutside ) {
+        if (mergeAsyncOutside && fetchAllSTI ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
@@ -1262,12 +1262,13 @@ public class APICatalogSync {
 
         try {
             // fetchAllSTI check added to make sure only runs in dashboard
-            // mergingCalled check added to call this function only when merging runs and not all the time
-            if (!fetchAllSTI && mergingCalled) {
+            if (!fetchAllSTI) {
+                loggerMaker.infoAndAddToDb("Started running update API collection count function", LogDb.RUNTIME);
                 for(int collectionId: this.dbState.keySet()) {
                     APICatalog newCatalog = this.dbState.get(collectionId);
                     updateApiCollectionCount(newCatalog, collectionId);
                 }
+                loggerMaker.infoAndAddToDb("Finished running update API collection count function", LogDb.RUNTIME);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while filling urls in apiCollection: " + e.getMessage(), LogDb.RUNTIME);
