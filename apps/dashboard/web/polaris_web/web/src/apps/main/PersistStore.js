@@ -50,6 +50,21 @@ let persistStore = (set) => ({
     setLastFetchedResp:(lastFetchedResp)=>{
         set({lastFetchedResp: lastFetchedResp})
     },
+
+    lastFetchedSeverityResp: {},
+    setLastFetchedSeverityResp:(lastFetchedSeverityResp)=>{
+        set({lastFetchedSeverityResp: lastFetchedSeverityResp})
+    },
+
+    lastCalledSensitiveInfo: 0,
+    setLastCalledSensitiveInfo: (lastCalledSensitiveInfo)=>{
+        set({lastCalledSensitiveInfo: lastCalledSensitiveInfo})
+    },
+
+    lastFetchedSensitiveResp: [],
+    setLastFetchedSensitiveResp:(lastFetchedSensitiveResp)=>{
+        set({lastFetchedSensitiveResp: lastFetchedSensitiveResp})
+    },
 })
 
 persistStore = devtools(persistStore)
