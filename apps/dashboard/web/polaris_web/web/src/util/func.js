@@ -52,6 +52,9 @@ const func = {
     return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
   },
 prettifyEpoch(epoch) {
+    if(epoch === 0){
+      return "Never" ;
+    }
     let diffSeconds = (+Date.now()) / 1000 - epoch
     let sign = 1
     if (diffSeconds < 0) { sign = -1 }
@@ -87,7 +90,6 @@ prettifyEpoch(epoch) {
     }
 
     let plural = count <= 1 ? '' : 's'
-
     return count + ' ' + unit + plural + ' ago'
   },
 
@@ -719,8 +721,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
-              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : 0,
+              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
+              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
