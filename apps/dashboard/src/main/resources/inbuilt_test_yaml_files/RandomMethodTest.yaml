@@ -32,6 +32,9 @@ info:
     - "https://capec.mitre.org/data/definitions/274.html"
   cwe:
     - CWE-274
+  cve:
+    - CVE-2020-35239
+    - CVE-2018-19908
 
 auth:
   authenticated: true

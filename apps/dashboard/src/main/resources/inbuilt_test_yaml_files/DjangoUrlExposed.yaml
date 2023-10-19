@@ -24,6 +24,8 @@ info:
     - "https://hackerone.com/reports/1033423"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2017-12794
 
 api_selection_filters:
   response_code:

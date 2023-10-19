@@ -20,6 +20,9 @@ info:
     - "http://ghostlulz.com/google-exposed-firebase-database/"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2020-7765
+    - CVE-2021-46743
 
 api_selection_filters:
   response_code:

@@ -28,6 +28,8 @@ info:
     - "https://laravel.com/docs/10.x/deployment#debug-mode"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2021-3129
 
 api_selection_filters:
   response_code:

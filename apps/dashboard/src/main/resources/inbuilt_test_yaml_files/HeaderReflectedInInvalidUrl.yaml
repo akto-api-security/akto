@@ -19,7 +19,9 @@ info:
   references:
     - "https://hackerone.com/reports/792998"
   cwe:
-    - "CWE-16"
+    - CWE-16
+  cve:
+    - CVE-2022-37724
 
 api_selection_filters:
   response_code:

@@ -27,6 +27,8 @@ info:
   cwe:
     - CWE-728
     - CWE-388
+  cve:
+    - CVE-2020-10097
 
 api_selection_filters:
   response_code:

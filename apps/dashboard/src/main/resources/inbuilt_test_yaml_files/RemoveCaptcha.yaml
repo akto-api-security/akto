@@ -20,6 +20,8 @@ info:
     - "https://hackerone.com/reports/124173"
   cwe:
     - CWE-287
+  cve:
+    - CVE-2021-37417
 
 api_selection_filters:
   response_code:

@@ -24,6 +24,9 @@ info:
     - "https://hackerone.com/reports/109054"
   cwe:
     - CWE-274
+  cve:
+    - CVE-2022-38115
+    - CVE-2018-11039
 
 api_selection_filters:
   response_code:

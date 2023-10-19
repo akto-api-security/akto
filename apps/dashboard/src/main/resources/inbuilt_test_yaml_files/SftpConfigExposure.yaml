@@ -17,6 +17,8 @@ info:
     - https://codexns.io/products/sftp_for_sublime/settings
   cwe:
     - CWE-16
+  cve:
+    - CVE-2023-38951
 
 api_selection_filters:
   response_code:

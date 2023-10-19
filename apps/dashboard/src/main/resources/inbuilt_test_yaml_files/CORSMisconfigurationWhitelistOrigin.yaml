@@ -23,6 +23,8 @@ info:
     - "https://crashtest-security.com/cors-misconfiguration/"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2021-27786
 
 auth:
   authenticated: true

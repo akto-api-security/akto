@@ -27,6 +27,9 @@ info:
     - "https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2021-21234
+    - CVE-2023-29986
 
 api_selection_filters:
   response_code:

@@ -21,6 +21,9 @@ info:
     - "https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt"
   cwe:
     - CWE-98
+  cve:
+    - CVE-2021-39433
+    - CVE-2023-22973
 
 api_selection_filters:
   response_code:

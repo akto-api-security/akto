@@ -26,6 +26,8 @@ info:
     - "https://www.apollographql.com/blog/graphql/security/why-you-should-disable-graphql-introspection-in-production/"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2023-5192
 
 api_selection_filters:
   url:
