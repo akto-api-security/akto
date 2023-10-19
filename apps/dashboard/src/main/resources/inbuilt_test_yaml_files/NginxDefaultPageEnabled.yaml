@@ -25,6 +25,8 @@ info:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2013-0337
 
 api_selection_filters:
   response_code:

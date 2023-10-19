@@ -31,6 +31,8 @@ info:
     - "https://cwe.mitre.org/data/definitions/639.html"
   cwe:
     - CWE-937
+  cve:
+    - CVE-2022-31690
 
 api_selection_filters:
   response_code:

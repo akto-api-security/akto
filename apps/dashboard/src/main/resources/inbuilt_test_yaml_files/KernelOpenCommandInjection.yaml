@@ -19,6 +19,9 @@ info:
     - HackerOne top 10
   cwe:
     - CWE-77
+  cve:
+    - CVE-2021-31799
+
 api_selection_filters:
   or:
     - request_payload:

@@ -24,6 +24,8 @@ info:
     - "https://hackerone.com/reports/83837"
   cwe:
     - CWE-274
+  cve:
+    - CVE-2021-35233
 
 api_selection_filters:
   response_code:

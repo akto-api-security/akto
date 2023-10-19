@@ -27,6 +27,9 @@ info:
     - "https://www.invicti.com/white-papers/whitepaper-http-security-headers"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2022-41915
+    - CVE-2022-37436
 
 api_selection_filters:
   response_code:

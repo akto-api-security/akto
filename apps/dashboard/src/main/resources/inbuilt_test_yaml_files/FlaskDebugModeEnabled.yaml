@@ -28,6 +28,8 @@ info:
     - "http://ghostlulz.com/flask-rce-debug-mode/"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2015-5306
 
 api_selection_filters:
   response_code:

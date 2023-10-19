@@ -35,6 +35,8 @@ info:
     - "https://cwe.mitre.org/data/definitions/639.html"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2022-45956
 
 auth:
   authenticated: true

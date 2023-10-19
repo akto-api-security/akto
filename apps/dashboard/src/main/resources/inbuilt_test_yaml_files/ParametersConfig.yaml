@@ -14,7 +14,9 @@ info:
   references:
     - https://www.exploit-db.com/ghdb/5986
   cwe:
-    - CWE-16    
+    - CWE-16 
+  cve:
+    - CVE-2015-4050   
 
 api_selection_filters:
   response_code:

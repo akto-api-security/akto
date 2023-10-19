@@ -24,6 +24,9 @@ info:
     - CWE-93
     - CWE-74
     - CWE-20
+  cve:
+    - CVE-2020-15693
+    - CVE-2023-0040
 
 api_selection_filters:
   query_param:

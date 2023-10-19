@@ -20,6 +20,9 @@ info:
     - "https://owasp.org/www-community/Improper_Error_Handling"
   cwe:
     - CWE-209
+  cve:
+    - CVE-2020-11883
+    - CVE-2020-15652
 
 api_selection_filters:
   method:

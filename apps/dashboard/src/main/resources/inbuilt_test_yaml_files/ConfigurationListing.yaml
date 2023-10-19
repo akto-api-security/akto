@@ -15,6 +15,9 @@ info:
     - https://www.exploit-db.com/ghdb/7014 
   cwe:
     - CWE-16
+  cve:
+    - CVE-2021-1126
+    - CVE-2021-33214
 
 api_selection_filters:
   response_code:

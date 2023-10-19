@@ -28,6 +28,8 @@ info:
     - "https://beaglesecurity.com/blog/vulnerability/rails-debug-mode-enabled.html"
   cwe:
     - CWE-16
+  cve:
+    - CVE-2019-5420
 
 api_selection_filters:
   response_code:

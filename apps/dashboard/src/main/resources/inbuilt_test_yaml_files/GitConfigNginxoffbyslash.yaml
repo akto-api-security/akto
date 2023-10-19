@@ -17,6 +17,9 @@ info:
     - https://github.com/PortSwigger/nginx-alias-traversal/blob/master/off-by-slash.py
   cwe:
     - CWE-16
+  cve:
+    - CVE-2021-23017
+
 api_selection_filters:
   response_code:
     gte: 200
