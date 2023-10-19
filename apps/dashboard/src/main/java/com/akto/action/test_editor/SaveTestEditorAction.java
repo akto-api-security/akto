@@ -8,10 +8,13 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -26,6 +29,7 @@ import com.akto.store.TestingUtil;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
@@ -33,6 +37,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+
 import org.bson.types.ObjectId;
 
 import java.io.File;
@@ -40,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 
@@ -82,10 +88,51 @@ public class SaveTestEditorAction extends UserAction {
             mapper.findAndRegisterModules();
             Map<String, Object> config = mapper.readValue(content, Map.class);
             Object info = config.get("info");
-            if (info == null) {
-                addActionError("Error in template: info key absent");
+
+            // adding all fields check for info in editor
+            InfoParser parser = new InfoParser();
+            Info convertedInfo = parser.parse(info);
+            Set<String> unNecessaryFields = new HashSet<>();
+            unNecessaryFields.add("tags");
+            unNecessaryFields.add("cwe");
+            unNecessaryFields.add("references");
+            List<String> fields = new ArrayList<>();
+            boolean anyFieldNull = Arrays.stream(Info.class.getDeclaredFields()).anyMatch(field -> {
+                try {
+                    if(!unNecessaryFields.contains(field.getName())){
+                        field.setAccessible(true);
+                        if(field.get(convertedInfo) == null){
+                            fields.add(field.getName());
+                            return true;
+                        }else if(field.getName() == "category"){
+                            Category category = (Category) field.get(convertedInfo);
+                            if(category.getDisplayName() == null){
+                                fields.add("Category's displayname");
+                                return true;
+                            }else if(category.getName() == null){
+                                fields.add("Category's name");
+                                return true;
+                            }else if(category.getShortName() == null){
+                                fields.add("Category's shortname");
+                                return true;
+                            }
+                        }{
+                            return false;
+                        }
+                    }else{
+                        return false;
+                    }               
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                    return true;
+                }
+            });
+            if (info == null || anyFieldNull) {
+                String message = fields.size() > 0 ? "Error in template: " + fields.get(0) + " absent" : "Error in template: info key absent";
+                addActionError(message);
                 return ERROR.toUpperCase();
             }
+
 
             Map<String, Object> infoMap = (Map<String, Object>) info;
 
