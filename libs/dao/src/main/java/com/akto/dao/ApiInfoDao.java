@@ -66,7 +66,13 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         }
 
         if (counter == 4) {
-            String[] fieldNames = {"lastSeen"};
+            String[] fieldNames = {ApiInfo.LAST_SEEN};
+            ApiInfoDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
+            counter++;
+        }
+
+        if (counter == 5) {
+            String[] fieldNames = {ApiInfo.LAST_TESTED};
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
             counter++;
         }
