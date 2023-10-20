@@ -314,7 +314,9 @@ export default {
                 automaticLayout: true,
                 colorDecorations: true,
                 scrollBeyondLastLine: false,
-                theme: "customTheme"
+                theme: "customTheme",
+                 // Initialize a variable to track if the content has been edited.
+                IsEdited: false,
             },
             // UPDATE THIS LIST WHILE ADDING ANY NEW KEY
             keywords: [
@@ -379,6 +381,30 @@ export default {
         }
     },
     methods: {
+        created() {
+            // Load saved content from local storage or the server.
+            const savedContent = this.loadSavedContent();
+            if (savedContent) {
+                this.textEditor.setValue(savedContent);
+            }
+        },
+
+        async saveTestTemplate() {
+            if (this.IsEdited) {
+                // Save the content to local storage or the server.
+                await this.autoSave(this.textEditor.getValue());
+                this.IsEdited = false;
+            }
+        },
+
+        async autoSave(content) {
+            localStorage.setItem('testTemplate', content);
+        },
+
+        loadSavedContent() {
+            // Return the saved content if available, or null if none.
+            return localStorage.getItem('testTemplate');
+        },
         findTestFromTestValue(testValue) {
             let aktoTest = Object.values(this.testsObj).map (x => x.all).flat().find(x=>x.value === testValue)
             let customTest = Object.values(this.customTestObj).map (x => x.all).flat().find(x=>x.value === testValue)
