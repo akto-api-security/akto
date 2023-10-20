@@ -224,6 +224,10 @@ const router = createBrowserRouter([
         element: <TestEditor />
       },
       {
+        path: "test-editor",
+        element: <TestEditor />
+      },
+      {
         path: "onboarding",
         element: <Onboarding />
       },
