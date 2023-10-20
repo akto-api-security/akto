@@ -81,7 +81,14 @@ const TestEditor = () => {
         <TopBar secondaryMenu={headerComp} />
     )
 
+    const defaultId = "REMOVE_TOKENS";
+
     useEffect(() => {
+        const path = window.location.pathname;
+        const pathArr = path.split("test-editor")
+        if(pathArr[1].length < 2){
+            navigate(defaultId)
+        }
         fetchAllTests()
     }, [])
 
