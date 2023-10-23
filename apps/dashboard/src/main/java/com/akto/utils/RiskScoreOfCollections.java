@@ -37,118 +37,147 @@ import com.mongodb.client.model.WriteModel;
 
 public class RiskScoreOfCollections {
 
-    public void updateSeverityScoreInApiInfo(int timeStampFilter){
-        Bson projections = Projections.include("_id", "lastSeen");
-        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
-        
-        Bson filters = Filters.gte("lastSeen", timeStampFilter);
-        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(filters, projections);
-        if(issues.size() > 0){
-            List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
+    private List<ApiInfoKey> getUpdatedApiInfos(int timeStampFilter){
+        List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
 
-            for(TestingRunIssues issue: issues){
-                TestingIssuesId issueId = issue.getId();
-                ApiInfoKey apiInfoKey = issueId.getApiInfoKey();
-                updatedApiInfoKeys.add(apiInfoKey);
-            }
+        // get freshly updated testing run issues here
+        Bson projections = Projections.include("_id", TestingRunIssues.LAST_SEEN);
+        Bson filters = Filters.gte(TestingRunIssues.LAST_SEEN, timeStampFilter);
 
-            Bson filterQ = Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
-                Filters.in("_id.apiInfoKey", updatedApiInfoKeys)
-            );
-            try {
-                List<TestingRunIssues> updatedIssues = TestingRunIssuesDao.instance.findAll(filterQ);
-                InventoryAction inventoryAction = new InventoryAction();
-
-                Map<ApiInfoKey, Float> riskScoreMap = new HashMap<>();
-
-                for(TestingRunIssues issue: updatedIssues){
-                    String severity = issue.getSeverity().toString();
-                    Float riskScore = (Float) inventoryAction.calculateRiskValueForSeverity(severity);
-                    ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
-                    if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(apiInfoKey)){
-                        riskScoreMap.put(apiInfoKey, riskScore);
-                    }else{
-                        Float prev = riskScoreMap.get(apiInfoKey);
-                        riskScore += prev;
-                        riskScoreMap.put(apiInfoKey, riskScore);
-                    }
-                }
-                riskScoreMap.forEach((apiInfoKey, riskScore)->{
-                    Bson filter = Filters.and(
-                        Filters.eq("_id.apiCollectionId",apiInfoKey.getApiCollectionId()),
-                        Filters.eq("_id.method", apiInfoKey.getMethod()),
-                        Filters.eq("_id.url", apiInfoKey.getUrl())
-                    );
-                    bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.SEVERITY_SCORE, (float) riskScore), new UpdateOptions()));
-                });
-
-                if (bulkUpdatesForApiInfo.size() > 0) {
-                    ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
-                }
-                AccountSettingsDao.instance.getMCollection().updateOne(
-                    AccountSettingsDao.generateFilter(),
-                    Updates.set(AccountSettings.TIMERS + "."+ CronTimers.LAST_UPDATED_ISSUES, Context.now()),
-                    new UpdateOptions().upsert(true)
-                );
-            } catch (Exception e) {
-                // TODO: handle exception
-                e.printStackTrace();
-            }
-            
-        }
-    }
-
-    private static void writeUpdates(List<String> sensitiveInResponse, int timeStampFilter){
+        List<TestingRunIssues> issues = new ArrayList<>();
         try {
-            ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
-            Bson sensitiveSubTypeFilter = Filters.and(
-                Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveInResponse), 
-                Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1),
-                Filters.gte(SingleTypeInfo._TIMESTAMP, timeStampFilter)
-            );
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-            BasicDBObject groupedId =  new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                                            .append("url", "$url")
-                                            .append("method", "$method");
-            pipeline.add(Aggregates.group(groupedId));
-
-            MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-            while(stiCursor.hasNext()){
-                try {
-                    BasicDBObject basicDBObject = stiCursor.next();
-                    Bson filterQSampleData = Filters.and(
-                        Filters.eq("_id.apiCollectionId",((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId")),
-                        Filters.eq("_id.method", ((BasicDBObject) basicDBObject.get("_id")).getString("method")),
-                        Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
-                    );
-                    bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, Updates.set(ApiInfo.IS_SENSITIVE, true), new UpdateOptions()));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            if (bulkUpdatesForApiInfo.size() > 0) {
-                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
-            }
-
-            AccountSettingsDao.instance.getMCollection().updateOne(
-                AccountSettingsDao.generateFilter(),
-                Updates.set((AccountSettings.TIMERS + "."+ CronTimers.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
-                new UpdateOptions().upsert(true)
-            );
-            
+            issues = TestingRunIssuesDao.instance.findAll(filters, projections);   
         } catch (Exception e) {
-            // TODO: handle exception
             e.printStackTrace();
         }
+
+        // after getting issues, get updated apiinfokeys related to that issues only
+        if(issues == null || issues.size() == 0){
+            return updatedApiInfoKeys;
+        }
+        for(TestingRunIssues issue: issues){
+            TestingIssuesId issueId = issue.getId();
+            ApiInfoKey apiInfoKey = issueId.getApiInfoKey();
+            updatedApiInfoKeys.add(apiInfoKey);
+        }
+
+        return updatedApiInfoKeys;
+    }
+
+    private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
+        // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
+        InventoryAction inventoryAction = new InventoryAction();
+        Map<ApiInfoKey, Float> severityScoreMap = new HashMap<>();
+
+        for(TestingRunIssues issue: issues){
+            String severity = issue.getSeverity().toString();
+            Float severityScore = (Float) inventoryAction.calculateRiskValueForSeverity(severity);
+            ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
+            if(severityScoreMap.isEmpty() || !severityScoreMap.containsKey(apiInfoKey)){
+                severityScoreMap.put(apiInfoKey, severityScore);
+            }else{
+                Float prev = severityScoreMap.get(apiInfoKey);
+                severityScore += prev;
+                severityScoreMap.put(apiInfoKey, severityScore);
+            }
+        }
+
+        return severityScoreMap;
+    }
+
+    public void updateSeverityScoreInApiInfo(int timeStampFilter){
+        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+        List<ApiInfoKey> updatedApiInfoKeys = getUpdatedApiInfos(timeStampFilter) ;
+
+        if(updatedApiInfoKeys == null || updatedApiInfoKeys.size() == 0){
+            return ;
+        }
+        Bson filterQ = Filters.and(
+            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
+            Filters.in("_id.apiInfoKey", updatedApiInfoKeys)
+        );
+
+        List<TestingRunIssues> updatedIssues = new ArrayList<>();
+        try {
+            updatedIssues = TestingRunIssuesDao.instance.findAll(filterQ);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if(updatedIssues == null || updatedIssues.size() == 0){
+            return ;
+        }
+
+        Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues);
+
+        // after getting the severityScoreMap, we write that in DB
+        severityScoreMap.forEach((apiInfoKey, severityScore)->{
+            Bson filter = Filters.and(
+                Filters.eq("_id.apiCollectionId",apiInfoKey.getApiCollectionId()),
+                Filters.eq("_id.method", apiInfoKey.getMethod()),
+                Filters.eq("_id.url", apiInfoKey.getUrl())
+            );
+            bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.SEVERITY_SCORE, (float) severityScore), new UpdateOptions()));
+        });
+
+        if (bulkUpdatesForApiInfo.size() > 0) {
+            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+        }
+
+        // update the last score calculated field in account settings collection in db
+        AccountSettingsDao.instance.getMCollection().updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.RISK_SCORE_TIMERS + "."+ CronTimers.LAST_UPDATED_ISSUES, Context.now()),
+            new UpdateOptions().upsert(true)
+        );
+            
+    }
+
+    private static void writeUpdatesForSensitiveInfoInApiInfo(List<String> sensitiveInResponse, int timeStampFilter){
+        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+        
+        Bson sensitiveSubTypeFilter = Filters.and(
+            Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveInResponse), 
+            Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.gte(SingleTypeInfo._TIMESTAMP, timeStampFilter)
+        );
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
+        BasicDBObject groupedId =  new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                                        .append("url", "$url")
+                                        .append("method", "$method");
+        pipeline.add(Aggregates.group(groupedId));
+
+        MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(stiCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = stiCursor.next();
+                Bson filterQSampleData = Filters.and(
+                    Filters.eq("_id.apiCollectionId",((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId")),
+                    Filters.eq("_id.method", ((BasicDBObject) basicDBObject.get("_id")).getString("method")),
+                    Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
+                );
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, Updates.set(ApiInfo.IS_SENSITIVE, true), new UpdateOptions()));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (bulkUpdatesForApiInfo.size() > 0) {
+            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+        }
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set((AccountSettings.RISK_SCORE_TIMERS + "."+ CronTimers.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
+            new UpdateOptions().upsert(true)
+        );
     }
 
     private static void updatesForNewEndpoints(int timeStampFilter){
         List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
         sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        writeUpdates(sensitiveInResponse, timeStampFilter);
+        writeUpdatesForSensitiveInfoInApiInfo(sensitiveInResponse, timeStampFilter);
     }
 
     public void mapSensitiveSTIsInApiInfo(int timeStampFilter,int cronTime){
@@ -173,10 +202,12 @@ public class RiskScoreOfCollections {
             }
         }
         if(sensitiveInResponse.size() > 0){
-            writeUpdates(sensitiveInResponse, 0);
+            writeUpdatesForSensitiveInfoInApiInfo(sensitiveInResponse, 0);
         }
-        int filterTime = Context.now() - ((cronTime + 2) * 60) ; 
-        updatesForNewEndpoints(filterTime);
+        if(timeStampFilter != 0){
+            int filterTime = Context.now() - ((cronTime + 2) * 60) ; 
+            updatesForNewEndpoints(filterTime);
+        }
     }
 
 }

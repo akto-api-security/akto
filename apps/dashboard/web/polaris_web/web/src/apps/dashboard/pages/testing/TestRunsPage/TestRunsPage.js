@@ -312,7 +312,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     {
         content: 'All',
         index: 0,
-        badge: countMap['All']?.toString(),
+        badge: countMap['allTestRuns']?.toString(),
         onAction: ()=> {setCurrentTab('All')},
         id: 'All',
     },

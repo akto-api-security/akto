@@ -55,7 +55,7 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
     
     public CronTimers getTimersInfo(){
         AccountSettings account = instance.findOne(AccountSettingsDao.generateFilter());
-        CronTimers timerInfo = account.getTimers();
+        CronTimers timerInfo = account.getRiskScoreTimers();
         return timerInfo;
     }
 }
