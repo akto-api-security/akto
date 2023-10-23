@@ -75,7 +75,7 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertFalse(cdt.validate("_fdc", "foo"));
                     break;
                 case "INTERCOM COOKIES":
-                    assertTrue(cdt.validate("intercom-session-id-app1", "foo"));
+                    assertTrue(cdt.validate("intercom-session-app1", "foo"));
                     assertFalse(cdt.validate("interccd-id", "foo"));
                     break;
                 case "GOOGLE ADS COOKIES":
