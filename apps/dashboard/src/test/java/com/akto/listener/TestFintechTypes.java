@@ -21,7 +21,7 @@ public class TestFintechTypes extends MongoBasedTest {
 
     @Test
     public void testTypes() {
-        String fileUrl = "https://raw.githubusercontent.com/harshalkh/akto/patch-1/pii-types/fintech.json";
+        String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/develop/pii-types/fintech.json";
         PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
         piiSource.setId("Fin");
         PIISourceDao.instance.insertOne(piiSource);
