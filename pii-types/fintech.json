@@ -15,7 +15,7 @@
         {"name": "Google Ads Cookies", "regexPattern" : "(_ga|_gid)", "sensitive":true, "onKey": false, "active" : false},
         {"name": "Hotjar Cookies", "regexPattern" : "(_hjSessionUser|_hjSession|_hjUserAttributes).*", "sensitive":true, "onKey": false, "active" : false},
         {"name": "Fullstory Cookies", "regexPattern" : "(fs_uid|fs_cid)", "sensitive":true, "onKey": false, "active" : false},
-        {"name": "Mixpanel Cookies", "regexPattern" : "mp_*_mixpanel", "sensitive":true, "onKey": false, "active" : false},
+        {"name": "Mixpanel Cookies", "regexPattern" : "mp_.*_mixpanel", "sensitive":true, "onKey": false, "active" : false},
         {"name": "Appsflyer Cookies", "regexPattern" : "(af_id|afUserId)", "sensitive":true, "onKey": false, "active" : false}
     ]
 }
