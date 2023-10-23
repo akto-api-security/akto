@@ -12,5 +12,6 @@
         {"name": "US ADDRESS", "regexPattern" : "\\d{1,5}(\\s[\\w-.,]*){1,6},\\s[A-Z]{2}\\s\\d{5}\\b", "sensitive":false, "onKey": false, "active" : false}
         {"name": "AWS Secret Access Key", "regexPattern" : "^[a-zA-Z0-9/+]{43}$", "sensitive":false, "onKey": false, "active" : false}
         {"name": "AWS Secret Access ID", "regexPattern" : "^[A-Za-z0-9]{20}$", "sensitive":false, "onKey": false, "active" : false}
+        {"name": "Github Personal Access Token", "regexPattern" : "^github_pat_[a-zA-Z0-9]{74}$", "sensitive":false, "onKey": false, "active" : false}
     ]
 }
