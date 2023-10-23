@@ -91,7 +91,7 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertFalse(cdt.validate("fs_lua", "foo"));
                     break;
                 case "MIXPANEL COOKIES":
-                    assertTrue(cdt.validate("mp_*_mixpanel", "foo"));
+                    assertTrue(cdt.validate("mp_mp_mixpanel", "foo"));
                     assertFalse(cdt.validate("mixpanel", "foo"));
                     break;
                 case "APPSFLYER COOKIES":
