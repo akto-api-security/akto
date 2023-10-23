@@ -2,13 +2,7 @@ package com.akto.action;
 
 import java.util.*;
 
-import javax.swing.text.html.FormSubmitEvent.MethodType;
-
-import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.mortbay.util.ajax.JSON;
-
-import com.akto.DaoInit;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -18,17 +12,12 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveInfoInApiCollections;
 import com.akto.dto.AccountSettings.CronTimers;
 import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
-import com.mongodb.client.model.Projections;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.opensymphony.xwork2.Action;
 
 public class ApiCollectionsAction extends UserAction {
@@ -134,16 +123,19 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // required for icons and total sensitive endpoints in collections
     public String fetchSensitiveInfoInCollections(){
         this.sensitiveInfoInApiCollections = SingleTypeInfoDao.instance.getSensitiveInfoForCollections() ;
         return Action.SUCCESS.toUpperCase();
     }
 
+    // required to measure the count of total tested endpoints per collection.
     public String fetchCoverageInfoInCollections(){
         this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
         return Action.SUCCESS.toUpperCase();
     }
 
+    // required to measure the count of total issues per collection.
     public String fetchSeverityInfoInCollections(){
         this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections();
         return Action.SUCCESS.toUpperCase();
@@ -155,36 +147,9 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String riskScoreInfo(){
-        int oneMonthBefore = Context.now() - (60 * 60 * 24 * 30) ;
-        String computedSeverityScore = "{'$cond':[{'$gte':['$severityScore',100]},2,{'$cond':[{'$gte':['$severityScore',10]},1,{'$cond':[{'$gt':['$severityScore',0]},0.5,0]}]}]}";
-        String computedAccessTypeScore = "{ '$cond': { 'if': { '$and': [ { '$gt': [ { '$size': '$apiAccessTypes' }, 0 ] }, { '$in': ['PUBLIC', '$apiAccessTypes'] } ] }, 'then': 1, 'else': 0 } }";
-        String computedLastSeenScore = "{ '$cond': [ { '$gte': ['$lastSeen', " +  oneMonthBefore + " ] }, 1, 0 ] }";
-        String computedIsSensitiveScore = "{ '$cond': [ { '$eq': ['$isSensitive', true] }, 1, 0 ] }";
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.project(
-            Projections.fields(
-                Projections.include("_id"),
-                Projections.computed("sensitiveScore",Document.parse(computedIsSensitiveScore)),
-                Projections.computed("isNewScore",Document.parse(computedLastSeenScore)),
-                Projections.computed("accessTypeScore",Document.parse(computedAccessTypeScore)),
-                Projections.computed("severityScore",Document.parse(computedSeverityScore))
-            )
-        ));
-
-        String computedRiskScore = "{ '$add': ['$sensitiveScore', '$isNewScore', '$accessTypeScore', '$severityScore']}";
-
-        pipeline.add(
-            Aggregates.project(
-                Projections.fields(
-                    Projections.include("_id"),
-                    Projections.computed("riskScore", Document.parse(computedRiskScore))
-                )
-            )
-        );
-
         int criticalCount = 0 ;
         Map<Integer, Double> riskScoreMap = new HashMap<>();
+        List<Bson> pipeline = ApiInfoDao.instance.getFiltersForRiskScore();
 
         MongoCursor<BasicDBObject> apiCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(apiCursor.hasNext()){
@@ -194,10 +159,12 @@ public class ApiCollectionsAction extends UserAction {
                 BasicDBObject bd = (BasicDBObject) basicDBObject.get("_id");
                 Integer collectionId = bd.getInt("apiCollectionId");
 
+                // store count of total critical endpoints present in ApiInfo
                 if(riskScore >= 4){
                     criticalCount++;
                 }
 
+                // as for collections, risk score is max of apis in it, here we take max for collection id
                 if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(collectionId)){
                     riskScoreMap.put(collectionId, riskScore);
                 }else{

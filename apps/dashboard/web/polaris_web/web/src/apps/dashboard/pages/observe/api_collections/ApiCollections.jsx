@@ -175,8 +175,8 @@ function ApiCollections() {
             }
             if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo){
                 await api.getSeverityInfoForCollections().then((resp) => {
-                    tempSeverityObj = JSON.parse(JSON.stringify(resp.severityInfo))
-                    setLastFetchedSeverityResp(resp.severityInfo)
+                    tempSeverityObj = JSON.parse(JSON.stringify(resp))
+                    setLastFetchedSeverityResp(resp)
                 })
             }
             setLastFetchedInfo({
@@ -195,9 +195,9 @@ function ApiCollections() {
         let tempSensitveArr = lastFetchedSensitiveResp
         if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
             await api.getSensitiveInfoForCollections().then((resp) => {
-                tempSensitveArr = JSON.parse(JSON.stringify(resp.sensitiveInfoInApiCollections))
+                tempSensitveArr = JSON.parse(JSON.stringify(resp))
                 setLastCalledSensitiveInfo(func.timeNow())
-                setLastFetchedSensitiveResp(resp.sensitiveInfoInApiCollections)
+                setLastFetchedSensitiveResp(resp)
             })
         }
         return tempSensitveArr 
@@ -214,8 +214,8 @@ function ApiCollections() {
         let results = await Promise.allSettled(apiPromises);
 
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
-        let coverageInfoResp = results[1].status === 'fulfilled' ? results[1].value : {};
-        let trafficInfoResp = results[2].status === 'fulfilled' ? results[2].value : {};
+        let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
+        let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
@@ -223,10 +223,9 @@ function ApiCollections() {
         const severityObj = issuesObj.severityObj;
         const riskScoreObj = issuesObj.riskScoreObj;
         const sensitveInfoArr = await fetchSensitiveInfo();
-
         setLoading(false)
 
-        const dataObj = convertToNewData(tmp, sensitveInfoArr, severityObj, coverageInfoResp?.testedEndpointsMaps, trafficInfoResp?.lastTrafficSeenMap, riskScoreObj?.riskScoreMap);
+        const dataObj = convertToNewData(tmp, sensitveInfoArr, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
 
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;

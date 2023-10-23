@@ -4,12 +4,14 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -151,6 +153,37 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             }
         }
         return result;
+    }
+
+    public List<Bson> getFiltersForRiskScore(){
+        int oneMonthBefore = Context.now() - Constants.ONE_MONTH_TIMESTAMP;
+        String computedSeverityScore = "{'$cond':[{'$gte':['$severityScore',100]},2,{'$cond':[{'$gte':['$severityScore',10]},1,{'$cond':[{'$gt':['$severityScore',0]},0.5,0]}]}]}";
+        String computedAccessTypeScore = "{ '$cond': { 'if': { '$and': [ { '$gt': [ { '$size': '$apiAccessTypes' }, 0 ] }, { '$in': ['PUBLIC', '$apiAccessTypes'] } ] }, 'then': 1, 'else': 0 } }";
+        String computedLastSeenScore = "{ '$cond': [ { '$gte': ['$lastSeen', " +  oneMonthBefore + " ] }, 1, 0 ] }";
+        String computedIsSensitiveScore = "{ '$cond': [ { '$eq': ['$isSensitive', true] }, 1, 0 ] }";
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.project(
+            Projections.fields(
+                Projections.include("_id"),
+                Projections.computed("sensitiveScore",Document.parse(computedIsSensitiveScore)),
+                Projections.computed("isNewScore",Document.parse(computedLastSeenScore)),
+                Projections.computed("accessTypeScore",Document.parse(computedAccessTypeScore)),
+                Projections.computed("severityScore",Document.parse(computedSeverityScore))
+            )
+        ));
+
+        String computedRiskScore = "{ '$add': ['$sensitiveScore', '$isNewScore', '$accessTypeScore', '$severityScore']}";
+
+        pipeline.add(
+            Aggregates.project(
+                Projections.fields(
+                    Projections.include("_id"),
+                    Projections.computed("riskScore", Document.parse(computedRiskScore))
+                )
+            )
+        );
+        return pipeline;
     }
 
     @Override

@@ -8,11 +8,11 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse}) {
     Object.keys(data).forEach((key,index)=>{
         let comp = [
             (
-                <Box maxWidth='210px' width='210px'>
-                    <HorizontalStack gap={2} key={index}>
+                <Box width='22vw'>
+                    <div style={{display: "flex", gap: "8px", alignItems: "center"}} key={index}>
                         <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
                         <Text>{key}</Text>
-                    </HorizontalStack>
+                    </div>
                 </Box>
             ),
             <Text>{data[key]?.text}</Text>
