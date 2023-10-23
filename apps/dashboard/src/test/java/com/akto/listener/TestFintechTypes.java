@@ -28,7 +28,6 @@ public class TestFintechTypes extends MongoBasedTest {
         InitializerListener.executePIISourceFetch();
         Context.accountId.set(ACCOUNT_ID);
         for(CustomDataType cdt: CustomDataTypeDao.instance.findAll(new BasicDBObject())) {
-            System.out.println("Test="+ cdt + " ,name="+ cdt.getName());
             switch (cdt.getName().toUpperCase()) {
                 case "PAN CARD":
                     assertTrue(cdt.validate("ABCDE9458J", "foo"));
