@@ -153,7 +153,7 @@ function ApiCollections() {
                     }}
                 >
                     <Modal.Section>
-
+                    <div onKeyDown={(e) => func.handleKeyPress(e, createNewCollection)}>
                     <TextField
                         id={"new-collection-input"}
                         label="Name"
@@ -167,7 +167,7 @@ function ApiCollections() {
                         )}
                         autoFocus
                     />
-
+                    </div>
 
                     </Modal.Section>
                 </Modal>)

@@ -1067,6 +1067,13 @@ getSizeOfFile(bytes) {
     }
     return duration.trim();
   },
+  handleKeyPress (event, funcToCall) {
+    const enterKeyPressed = event.keyCode === 13;
+    if (enterKeyPressed) {
+      event.preventDefault();
+      funcToCall();
+    }
+  }
 }
 
 export default func
