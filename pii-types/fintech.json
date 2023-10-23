@@ -14,5 +14,6 @@
         {"name": "AWS Secret Access ID", "regexPattern" : "^[A-Za-z0-9]{20}$", "sensitive":false, "onKey": false, "active" : false}
         {"name": "Github Personal Access Token (Fine Grained)", "regexPattern" : "^github_pat_[a-zA-Z0-9]{74}$", "sensitive":false, "onKey": false, "active" : false}
         {"name": "Github Personal Access Token (Classic)", "regexPattern" : "^ghp_[a-zA-Z0-9]{38}$", "sensitive":false, "onKey": false, "active" : false}
+        {"name": "GCP API Access Keys", "regexPattern" : "^(?:[A-Za-z0-9-]{46})$", "sensitive":false, "onKey": false, "active" : false}
     ]
 }
