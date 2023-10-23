@@ -17,7 +17,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.AccountSettings.CronTimers;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -31,8 +30,6 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.github.GithubFile;
@@ -690,7 +687,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        CronTimers cronTimers = accountSettings.getTimers();
+                        CronTimers cronTimers = accountSettings.getRiskScoreTimers();
                         RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
                         try {
                             updateRiskScore.mapSensitiveSTIsInApiInfo(cronTimers.getLastUpdatedSensitiveMap(),cronTime);
@@ -711,7 +708,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        CronTimers cronTimers = accountSettings.getTimers();
+                        CronTimers cronTimers = accountSettings.getRiskScoreTimers();
                         RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
                         try {
                             updateRiskScore.updateSeverityScoreInApiInfo(cronTimers.getLastUpdatedIssues());
