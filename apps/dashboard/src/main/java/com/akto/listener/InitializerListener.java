@@ -16,7 +16,7 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
-import com.akto.dto.AccountSettings.CronTimers;
+import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -687,13 +687,12 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        CronTimers cronTimers = accountSettings.getRiskScoreTimers();
+                        LastCronRunInfo lastRunTimerInfo = accountSettings.getRiskScoreTimers();
                         RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
                         try {
-                            updateRiskScore.mapSensitiveSTIsInApiInfo(cronTimers.getLastUpdatedSensitiveMap(),cronTime);
+                            updateRiskScore.mapSensitiveSTIsInApiInfo(lastRunTimerInfo.getLastUpdatedSensitiveMap(),cronTime);
                         } catch (Exception e) {
-                            // TODO: handle exception
-                            updateRiskScore.mapSensitiveSTIsInApiInfo(0,cronTime);
+                           e.printStackTrace();
                         }
                     }
                 }, "map-sensitiveInfo-in-ApiInfo");
@@ -708,13 +707,12 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        CronTimers cronTimers = accountSettings.getRiskScoreTimers();
+                        LastCronRunInfo lastRunTimerInfo = accountSettings.getRiskScoreTimers();
                         RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
                         try {
-                            updateRiskScore.updateSeverityScoreInApiInfo(cronTimers.getLastUpdatedIssues());
+                            updateRiskScore.updateSeverityScoreInApiInfo(lastRunTimerInfo.getLastUpdatedIssues());
                         } catch (Exception e) {
-                            // TODO: handle exception
-                            updateRiskScore.updateSeverityScoreInApiInfo(0);
+                            e.printStackTrace();
                         }
                     }
                 }, "update-severity-score");

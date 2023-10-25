@@ -558,7 +558,7 @@ public class StartTestAction extends UserAction {
     public String computeAllTestsCountMap(){
         Map<String,Long> result = new HashMap<>();
 
-        long totalCount = TestingRunDao.instance.getMCollection().estimatedDocumentCount();
+        long totalCount = TestingRunDao.instance.getMCollection().countDocuments();
         List<Bson> filtersForCiCd = new ArrayList<>();
         filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
         long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
