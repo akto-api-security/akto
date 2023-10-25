@@ -143,8 +143,8 @@ function TrendChart(props) {
 
             let count = 0
             testingRunResultSummaries.forEach((ele)=>{
-                let obj = ele?.countIssues
-                count += (obj?.HIGH + obj?.MEDIUM + obj?.LOW)
+                let obj = Object.keys(ele.countIssues) ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
+                count += (obj.HIGH + obj.MEDIUM + obj.LOW)
             })
 
             setTotalVulnerabilites(count)
