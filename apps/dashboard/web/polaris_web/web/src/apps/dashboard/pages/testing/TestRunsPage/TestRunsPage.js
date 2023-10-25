@@ -39,14 +39,12 @@ let headers = [
     title: 'Test run name',
     value:"testName",
     itemOrder:1,
-    itemCell:2,
   },
   {
     text: "Number of tests",
     title: "Number of tests",
     value: "number_of_tests",
     itemOrder: 3,
-    itemCell:3,
     isText: true,
   },
   {
@@ -55,14 +53,12 @@ let headers = [
     title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
-    itemCell:4,
   },
   {
     text: 'Run time',
     value: 'run_time',
     title: 'Status',
     itemOrder: 3,
-    itemCell:5,
     isText: true,
   },
   {

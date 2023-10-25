@@ -16,44 +16,37 @@ const headers = [
         text: "API collection name",
         value: "displayName",
         showFilter:true,
-        itemCell: 1,
     },
     {
         title: "Total endpoints",
         text: "Total endpoints",
         value: "endpoints",
-        itemCell: 2,
         isText: true,
     },
     {
         title: 'Risk score',
         value: 'riskScoreComp',
-        itemCell: 3,
     },
     {   
         title: 'Test coverage',
         text: 'Test coverage', 
         value: 'coverage',
-        itemCell: 4,
         isText: true,
     },
     {
         title: 'Issues', 
         text: 'Issues', 
         value: 'issuesArr',
-        itemCell: 5,
     },
     {   
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
-        itemCell: 7,
     },
     {   
         title: 'Last traffic seen', 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
-        itemCell: 8,
         isText: true,
     }
 ]

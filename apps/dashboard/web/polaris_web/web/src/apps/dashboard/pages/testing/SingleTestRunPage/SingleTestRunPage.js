@@ -29,33 +29,27 @@ let headers = [
   {
     value: "nameComp",
     title: 'Issue name',
-    itemCell: 1,
   },
   {
     title: 'Severity',
     value: 'severityComp',
-    itemCell: 2,
   },
   {
     value: 'testCategory',
     title: 'Category',
-    itemCell:3,
     isText: true,
   },
   {
     title: 'CWE tags',
     value: 'cweDisplayComp',
-    itemCell:4,
   },
   {
     title: 'Number of urls',
     value: 'totalUrls',
-    itemCell: 5,
     isText:true
   },
   {
     value: "scanned_time_comp",
-    itemCell: 6,
     title: 'Scanned',
   },
   {

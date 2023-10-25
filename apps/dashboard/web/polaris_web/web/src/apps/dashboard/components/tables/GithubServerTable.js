@@ -31,7 +31,6 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
-  const [selectedIndex, setSelectedIndex] = useState(-1)
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 
@@ -180,8 +179,6 @@ function GithubServerTable(props) {
           page={props.page || 0}
           getNextUrl={props?.getNextUrl}
           onRowClick={props.onRowClick}
-          selectedIndex={selectedIndex}
-          setSelectedIndex={setSelectedIndex}
           newRow={props?.useNewRow}
           headings={props?.headings}
           notHighlightOnselected={props.notHighlightOnselected}

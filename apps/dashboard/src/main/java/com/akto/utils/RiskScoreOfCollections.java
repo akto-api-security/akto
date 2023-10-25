@@ -121,9 +121,7 @@ public class RiskScoreOfCollections {
             return ;
         }
 
-        for(ApiInfoKey apiInfoKey: updatedApiInfoKeys){
-            loggerMaker.infoAndAddToDb("Running for api info " + apiInfoKey.toString(), LogDb.DASHBOARD);
-        }
+        loggerMaker.infoAndAddToDb("Updating severity score for " + updatedApiInfoKeys.size() + " apis at timestamp " + Context.now() , LogDb.DASHBOARD);
 
         Bson filterQ = Filters.and(
             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
@@ -160,7 +158,7 @@ public class RiskScoreOfCollections {
         // update the last score calculated field in account settings collection in db
         AccountSettingsDao.instance.getMCollection().updateOne(
             AccountSettingsDao.generateFilter(),
-            Updates.set(AccountSettings.RISK_SCORE_TIMERS + "."+ LastCronRunInfo.LAST_UPDATED_ISSUES, Context.now()),
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_ISSUES, Context.now()),
             new UpdateOptions().upsert(true)
         );
             
@@ -203,7 +201,7 @@ public class RiskScoreOfCollections {
 
         AccountSettingsDao.instance.getMCollection().updateOne(
             AccountSettingsDao.generateFilter(),
-            Updates.set((AccountSettings.RISK_SCORE_TIMERS + "."+ LastCronRunInfo.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
+            Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
             new UpdateOptions().upsert(true)
         );
     }
