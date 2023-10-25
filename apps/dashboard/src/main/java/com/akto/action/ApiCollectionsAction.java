@@ -13,7 +13,9 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.SensitiveInfoInApiCollections;
-import com.akto.dto.AccountSettings.CronTimers;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
@@ -28,10 +30,10 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
     Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
     int criticalEndpointsCount;
-    CronTimers timerInfo;
+    LastCronRunInfo timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
-
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
 
     public String fetchAllCollections() {
@@ -146,10 +148,10 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String riskScoreInfo(){
+    public String fetchRiskScoreInfo(){
         int criticalCount = 0 ;
         Map<Integer, Double> riskScoreMap = new HashMap<>();
-        List<Bson> pipeline = ApiInfoDao.instance.getFiltersForRiskScore();
+        List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
 
         MongoCursor<BasicDBObject> apiCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(apiCursor.hasNext()){
@@ -174,7 +176,7 @@ public class ApiCollectionsAction extends UserAction {
                 }
 
             } catch (Exception e) {
-                // TODO: handle exception
+                loggerMaker.errorAndAddToDb("error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
                 e.printStackTrace();
             }
         }
@@ -185,8 +187,8 @@ public class ApiCollectionsAction extends UserAction {
     }
     
     public String fetchTimersInfo(){
-        CronTimers timer = AccountSettingsDao.instance.getTimersInfo();
-        this.timerInfo = timer;
+        LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
+        this.timerInfo = timeInfo;
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -234,7 +236,7 @@ public class ApiCollectionsAction extends UserAction {
         return riskScoreOfCollectionsMap;
     }
 
-    public CronTimers getTimerInfo() {
+    public LastCronRunInfo getTimerInfo() {
         return timerInfo;
     }
 

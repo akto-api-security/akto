@@ -4,20 +4,34 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
+import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -58,10 +72,30 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
     }
 
+    public TestingRunIssues generateTestResultIssue(String url, String method, Severity severity, String testSubCategory) throws Exception{
+        Bson filter = Filters.and(
+            Filters.eq("_id.url", url),
+            Filters.eq("_id.method", method)
+        );
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
+        ApiInfoKey apiInfoKey = apiInfo.getId();
+
+        TestingIssuesId testingIssuesId = new TestingIssuesId(apiInfoKey, GlobalEnums.TestErrorSource.AUTOMATED_TESTING ,testSubCategory);
+        TestingRunIssues testingRunIssues = new TestingRunIssues(testingIssuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(), new ObjectId(new Date()));
+
+        return testingRunIssues;
+    }
+
     @Test
     public void testSensitiveInfoCron () throws Exception{
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiInfoDao.instance.getMCollection().drop();
+        AktoDataTypeDao.instance.getMCollection().drop();
+        CustomDataTypeDao.instance.getMCollection().drop();
+        SampleDataDao.instance.getMCollection().drop();
+
+        InitializerListener.addAktoDataTypes(new BackwardCompatibility());
+        SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
 
         fillDBValues();
         RiskScoreOfCollections riskScoreOfCollections = new RiskScoreOfCollections();
@@ -98,16 +132,106 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         dataType = AktoDataTypeDao.instance.getMCollection().findOneAndUpdate(
             Filters.eq("name", dataType.getName()),
             Updates.combine(
-                Updates.set("sensitiveAlways",true),
+                Updates.set("sensitiveAlways",false),
                 Updates.set("sensitivePosition",new ArrayList<>()),
                 Updates.set("timestamp",Context.now())
             ),
             options
         );
+        SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
         riskScoreOfCollections.mapSensitiveSTIsInApiInfo(Context.now() - (2 * 60), 0);
         ApiInfo apiInfo4 = ApiInfoDao.instance.findOne(filter3);
-        assertEquals(true, apiInfo4.getIsSensitive());
+        assertEquals(false, apiInfo4.getIsSensitive());
+    }
 
+    @Test
+    public void testSeverityScore() throws Exception{
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiInfoDao.instance.getMCollection().drop();
+        AktoDataTypeDao.instance.getMCollection().drop();
+        CustomDataTypeDao.instance.getMCollection().drop();
+        SampleDataDao.instance.getMCollection().drop();
 
+        InitializerListener.addAktoDataTypes(new BackwardCompatibility());
+        SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
+
+        fillDBValues();
+        String url1 = "https://petstore.swagger.io/v2/store/order";
+        String method1 = "POST";
+
+        String url2 = "https://petstore.swagger.io/v2/books/1";
+        String method2 = "POST";
+
+        String url3 = "http://sampl-aktol-1exannwybqov-67928726.ap-south-1.elb.amazonaws.com/api/college/student-details";
+        String method3 = "GET";
+
+        TestingRunIssues issue1 = generateTestResultIssue(url1, "POST", GlobalEnums.Severity.HIGH, "REMOVE_TOKENS");
+        TestingRunIssues issue2 =  generateTestResultIssue(url1, "POST",GlobalEnums.Severity.LOW, "MUST_CONTAIN_RESPONSE_HEADERS");
+        TestingRunIssues issue3 = generateTestResultIssue(url3, "GET", GlobalEnums.Severity.MEDIUM, "MUST_CONTAIN_RESPONSE_HEADERS");
+        TestingRunIssues issue4 = generateTestResultIssue(url3, "GET", GlobalEnums.Severity.MEDIUM, "REMOVE_TOKENS");
+        TestingRunIssues issue5 = generateTestResultIssue(url2, "POST", GlobalEnums.Severity.LOW, "REMOVE_TOKENS");
+        TestingRunIssues issue6 = generateTestResultIssue(url2, "POST", GlobalEnums.Severity.MEDIUM, "MUST_CONTAIN_RESPONSE_HEADERS");
+
+        TestingRunIssuesDao.instance.getMCollection().drop();
+        TestingRunIssuesDao.instance.insertMany(Arrays.asList(issue1, issue2, issue3, issue4, issue5, issue6));
+
+        RiskScoreOfCollections riskScoreOfCollections = new RiskScoreOfCollections();
+        riskScoreOfCollections.updateSeverityScoreInApiInfo(0);
+
+        Bson filter1 = Filters.and(
+            Filters.in("_id.url", url1),
+            Filters.in("_id.method", method1)
+        );
+
+        Bson filter2 = Filters.and(
+            Filters.in("_id.url", url2),
+            Filters.in("_id.method", method2)
+        );
+
+        Bson filter3 = Filters.and(
+            Filters.in("_id.url", url3),
+            Filters.in("_id.method", method3)
+        );
+
+        ApiInfo apiInfo1 = ApiInfoDao.instance.findOne(filter1);
+        assertEquals((double) 101, apiInfo1.getSeverityScore(), 0);
+
+        ApiInfo apiInfo2 = ApiInfoDao.instance.findOne(filter2);
+        assertEquals((double) 11, apiInfo2.getSeverityScore(), 0);
+
+        ApiInfo apiInfo3 = ApiInfoDao.instance.findOne(filter3);
+        assertEquals((double) 20, apiInfo3.getSeverityScore(), 0);
+
+        IssuesAction issuesAction = new IssuesAction();
+        issuesAction.setIssueId(issue1.getId());
+        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
+        issuesAction.setIgnoreReason("Fixed");
+
+        String resp1 = issuesAction.updateIssueStatus();
+        assertEquals(resp1, "SUCCESS");
+
+        issuesAction.setIssueId(issue3.getId());
+        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
+        issuesAction.setIgnoreReason("Fixed");
+
+        String resp2 = issuesAction.updateIssueStatus();
+        assertEquals(resp2, "SUCCESS");
+
+        issuesAction.setIssueId(issue5.getId());
+        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
+        issuesAction.setIgnoreReason("Fixed");
+
+        String resp3 = issuesAction.updateIssueStatus();
+        assertEquals(resp3, "SUCCESS");
+        riskScoreOfCollections.updateSeverityScoreInApiInfo(0);
+
+        ApiInfo apiInfo4 = ApiInfoDao.instance.findOne(filter1);
+        assertEquals((double) 1, apiInfo4.getSeverityScore(), 0);
+
+        ApiInfo apiInfo5 = ApiInfoDao.instance.findOne(filter2);
+        assertEquals((double) 10, apiInfo5.getSeverityScore(), 0);
+
+        ApiInfo apiInfo6 = ApiInfoDao.instance.findOne(filter3);
+        assertEquals((double) 10, apiInfo6.getSeverityScore(), 0);
     }
 }

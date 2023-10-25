@@ -8,6 +8,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.*;
+import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
@@ -15,12 +16,14 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.merge.MergeOnHostOnly;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
@@ -41,24 +44,18 @@ public class APICatalogSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
+    public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    public static boolean mergeAsyncOutside = false;
+    public static boolean mergeAsyncOutside = true;
 
-    public APICatalogSync(String userIdentifier,int thresh) {
+    public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
-        try {
-            String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
-            if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
-                mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
-            }
-        } catch (Exception e) {
-
-        }
-
+        this.aktoPolicyNew = new AktoPolicyNew();
+        buildFromDB(false, fetchAllSTI);
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
@@ -176,6 +173,19 @@ public class APICatalogSync {
 
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
         origAggregator.urls = new ConcurrentHashMap<>();
+
+        Set<Map.Entry<URLStatic, Set<HttpResponseParams>>> entries = aggregator.urls.entrySet();
+        for (Map.Entry<URLStatic, Set<HttpResponseParams>> entry : entries) {
+            Set<HttpResponseParams> value = entry.getValue();
+            for (HttpResponseParams responseParams: value) {
+                try {
+                    aktoPolicyNew.process(responseParams);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException(e);
+                }
+            }
+        }
 
         start = System.currentTimeMillis();
         processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
@@ -1150,18 +1160,57 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
+    public static void clearValuesInDB() {
+        List<String> rangeSubTypes = new ArrayList<>();
+        rangeSubTypes.add(SingleTypeInfo.INTEGER_32.getName());
+        rangeSubTypes.add(SingleTypeInfo.INTEGER_64.getName());
+        rangeSubTypes.add(SingleTypeInfo.FLOAT.getName());
+
+        String fieldName = "values.elements." + (SingleTypeInfo.VALUES_LIMIT + 1);
+        int sliceLimit = -1 * SingleTypeInfo.VALUES_LIMIT;
+
+        // range update
+        UpdateResult rangeUpdateResult = SingleTypeInfoDao.instance.updateMany(
+                Filters.and(
+                        Filters.exists(fieldName, true),
+                        Filters.in(SingleTypeInfo.SUB_TYPE, rangeSubTypes)
+                ),
+                Updates.combine(
+                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(sliceLimit)),
+                        Updates.set(SingleTypeInfo._DOMAIN, Domain.RANGE.name())
+                )
+        );
+        loggerMaker.infoAndAddToDb("RangeUpdateResult: " + rangeUpdateResult, LogDb.RUNTIME);
+
+        // any update
+        UpdateResult anyUpdateResult = SingleTypeInfoDao.instance.updateMany(
+                Filters.and(
+                        Filters.exists(fieldName, true),
+                        Filters.nin(SingleTypeInfo.SUB_TYPE, rangeSubTypes)
+                ),
+                Updates.combine(
+                        Updates.pushEach("values.elements", new ArrayList<>(), new PushOptions().slice(sliceLimit)),
+                        Updates.set(SingleTypeInfo._DOMAIN, Domain.ANY.name())
+                )
+        );
+
+        loggerMaker.infoAndAddToDb("AnyUpdateResult: " + anyUpdateResult, LogDb.RUNTIME);
+    }
+
     private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
-        if (mergeAsyncOutside) {
+        boolean mergingCalled = false;
+        if (mergeAsyncOutside && fetchAllSTI ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
                 if (gotDibs) {
+                    mergingCalled = true;
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-                    if (backwardCompatibility.getMergeOnHostInit() == 0) {
+                    if (backwardCompatibility == null || backwardCompatibility.getMergeOnHostInit() == 0) {
                         new MergeOnHostOnly().mergeHosts();
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
                         BackwardCompatibilityDao.instance.getMCollection().updateMany(new BasicDBObject(), update);
@@ -1179,6 +1228,14 @@ public class APICatalogSync {
                         }
                     } catch (Exception e) {
                         ;
+                    }
+
+                    try {
+                        loggerMaker.infoAndAddToDb("Started clearing values in db ", LogDb.RUNTIME);
+                        clearValuesInDB();
+                        loggerMaker.infoAndAddToDb("Finished clearing values in db ", LogDb.RUNTIME);
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
                     }
                 }
             }
@@ -1200,51 +1257,38 @@ public class APICatalogSync {
 
         if (mergeAsyncOutside) {
             this.delta = new HashMap<>();
-            return;
         }
 
-        if(calcDiff) {
-            for(int collectionId: this.dbState.keySet()) {
-                APICatalog newCatalog = this.dbState.get(collectionId);
-                Set<String> newURLs = new HashSet<>();
-                for(URLTemplate url: newCatalog.getTemplateURLToMethods().keySet()) { 
-                    newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
-                }
-                for(URLStatic url: newCatalog.getStrictURLToMethods().keySet()) { 
-                    newURLs.add(url.getUrl()+ " "+ url.getMethod().name());
-                }
 
-                Bson findQ = Filters.eq("_id", collectionId);
-
-                ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
+        try {
+            // fetchAllSTI check added to make sure only runs in dashboard
+            if (!fetchAllSTI) {
+                loggerMaker.infoAndAddToDb("Started running update API collection count function", LogDb.RUNTIME);
+                for(int collectionId: this.dbState.keySet()) {
+                    APICatalog newCatalog = this.dbState.get(collectionId);
+                    updateApiCollectionCount(newCatalog, collectionId);
+                }
+                loggerMaker.infoAndAddToDb("Finished running update API collection count function", LogDb.RUNTIME);
             }
-        } else {
-
-            for(Map.Entry<Integer, APICatalog> entry: this.dbState.entrySet()) {
-                int apiCollectionId = entry.getKey();
-                APICatalog apiCatalog = entry.getValue();
-                for(URLTemplate urlTemplate: apiCatalog.getTemplateURLToMethods().keySet()) {
-                    Iterator<Map.Entry<URLStatic, RequestTemplate>> staticURLIterator = apiCatalog.getStrictURLToMethods().entrySet().iterator();
-                    while(staticURLIterator.hasNext()){
-                        Map.Entry<URLStatic, RequestTemplate> urlXTemplate = staticURLIterator.next();
-                        URLStatic urlStatic = urlXTemplate.getKey();
-                        RequestTemplate requestTemplate = urlXTemplate.getValue();
-                        if (urlTemplate.match(urlStatic)) {
-                            if (this.delta == null) {
-                                this.delta = new HashMap<>();
-                            }
-
-                            if (this.getDelta(apiCollectionId) == null) {
-                                this.delta.put(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
-                            }
-
-                            this.getDelta(apiCollectionId).getDeletedInfo().addAll(requestTemplate.getAllTypeInfo());
-                            staticURLIterator.remove();
-                        }
-                    }
-                }
-            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while filling urls in apiCollection: " + e.getMessage(), LogDb.RUNTIME);
         }
+
+        aktoPolicyNew.buildFromDb(fetchAllSTI);
+    }
+
+    public static void updateApiCollectionCount(APICatalog apiCatalog, int apiCollectionId) {
+        Set<String> newURLs = new HashSet<>();
+        for(URLTemplate url: apiCatalog.getTemplateURLToMethods().keySet()) {
+            newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
+        }
+        for(URLStatic url: apiCatalog.getStrictURLToMethods().keySet()) {
+            newURLs.add(url.getUrl()+ " "+ url.getMethod().name());
+        }
+
+        Bson findQ = Filters.eq("_id", apiCollectionId);
+
+        ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
     }
 
     private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
@@ -1394,6 +1438,8 @@ public class APICatalogSync {
                 loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " + res.getUpserts().size(), LogDb.RUNTIME);
             } while (from < writesForParams.size());
         }
+
+        aktoPolicyNew.syncWithDb();
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
         if(writesForTraffic.size() > 0) {

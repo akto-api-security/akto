@@ -2,7 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.AccountSettings.CronTimers;
+import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.util.VersionUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -53,9 +53,9 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
         );
     }
     
-    public CronTimers getTimersInfo(){
+    public LastCronRunInfo getLastCronRunInfo(){
         AccountSettings account = instance.findOne(AccountSettingsDao.generateFilter());
-        CronTimers timerInfo = account.getRiskScoreTimers();
+        LastCronRunInfo timerInfo = account.getRiskScoreTimers();
         return timerInfo;
     }
 }

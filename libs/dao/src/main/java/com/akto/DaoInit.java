@@ -174,7 +174,7 @@ public class DaoInit {
         ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
-        ClassModel<AccountSettings.CronTimers> cronTimersClassModel = ClassModel.builder(AccountSettings.CronTimers.class)
+        ClassModel<AccountSettings.LastCronRunInfo> cronTimersClassModel = ClassModel.builder(AccountSettings.LastCronRunInfo.class)
                 .enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
