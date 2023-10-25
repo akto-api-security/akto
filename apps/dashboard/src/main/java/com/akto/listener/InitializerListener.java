@@ -49,7 +49,8 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
-import com.akto.utils.RiskScoreOfCollections;
+import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.crons.UpdateSeverityScoreInApiInfo;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -103,6 +104,8 @@ public class InitializerListener implements ServletContextListener {
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     public static String aktoVersion;
     public static boolean connectedToMongo = false;
+    UpdateSeverityScoreInApiInfo updateSeverityScoreInApiInfo = new UpdateSeverityScoreInApiInfo();
+    UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -679,55 +682,6 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 15, TimeUnit.MINUTES);
     }
 
-    public void setUpSensitiveMapInApiInfoScheduler() {
-        int cronTime = 15;
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        LastCronRunInfo lastRunTimerInfo = accountSettings.getRiskScoreTimers();
-                        RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
-                        try {
-                            if(lastRunTimerInfo == null){
-                                updateRiskScore.mapSensitiveSTIsInApiInfo(0, cronTime);
-                            }else{
-                                updateRiskScore.mapSensitiveSTIsInApiInfo(lastRunTimerInfo.getLastUpdatedSensitiveMap(),cronTime);
-                            }
-                        } catch (Exception e) {
-                           e.printStackTrace();
-                        }
-                    }
-                }, "map-sensitiveInfo-in-ApiInfo");
-            }
-        }, 0, cronTime, TimeUnit.MINUTES);
-    }
-
-    public void updateSeverityScoreScheduler() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        LastCronRunInfo lastRunTimerInfo = accountSettings.getRiskScoreTimers();
-                        RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
-                        try {
-                            if(lastRunTimerInfo == null){
-                                updateRiskScore.updateSeverityScoreInApiInfo(0);
-                            }else{
-                                updateRiskScore.updateSeverityScoreInApiInfo(lastRunTimerInfo.getLastUpdatedIssues());
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }, "update-severity-score");
-            }
-        }, 0, 5, TimeUnit.MINUTES);
-    }
-
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -1128,8 +1082,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
-                        setUpSensitiveMapInApiInfoScheduler();
-                        updateSeverityScoreScheduler();
+                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        updateSeverityScoreInApiInfo.updateSeverityScoreScheduler();
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
                         if(isSaas){

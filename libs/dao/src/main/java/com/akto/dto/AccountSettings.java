@@ -42,8 +42,8 @@ public class AccountSettings {
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
 
-    public static final String RISK_SCORE_TIMERS = "riskScoreTimers";
-    private LastCronRunInfo riskScoreTimers; 
+    public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
+    private LastCronRunInfo lastUpdatedCronInfo; 
 
     public static class LastCronRunInfo{
         public static final String LAST_UPDATED_ISSUES = "lastUpdatedIssues";
@@ -209,11 +209,11 @@ public class AccountSettings {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
     }
 
-    public LastCronRunInfo getRiskScoreTimers() {
-        return riskScoreTimers;
+    public LastCronRunInfo getLastUpdatedCronInfo() {
+        return lastUpdatedCronInfo;
     }
 
-    public void setRiskScoreTimers(LastCronRunInfo riskScoreTimers) {
-        this.riskScoreTimers = riskScoreTimers;
+    public void setLastUpdatedCronInfo(LastCronRunInfo lastUpdatedCronInfo) {
+        this.lastUpdatedCronInfo = lastUpdatedCronInfo;
     }
 }

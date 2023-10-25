@@ -55,7 +55,7 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
     
     public LastCronRunInfo getLastCronRunInfo(){
         AccountSettings account = instance.findOne(AccountSettingsDao.generateFilter());
-        LastCronRunInfo timerInfo = account.getRiskScoreTimers();
+        LastCronRunInfo timerInfo = account.getLastUpdatedCronInfo();
         return timerInfo;
     }
 }

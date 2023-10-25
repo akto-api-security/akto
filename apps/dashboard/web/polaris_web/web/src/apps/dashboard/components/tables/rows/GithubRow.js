@@ -23,7 +23,7 @@ import TooltipText from '../../shared/TooltipText';
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, selectedIndex, setSelectedIndex, headings } = props;
+    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings } = props;
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
@@ -45,7 +45,6 @@ function GithubRow(props) {
     }
 
     function handleRowClick(data){
-        setSelectedIndex(index)
         if(data?.collapsibleRow){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
@@ -143,14 +142,21 @@ function GithubRow(props) {
             <>
                 {headings.map((header) =>{
                     return(
-                        header.itemCell ? 
+                        header?.value ?
                             <IndexTable.Cell key={header.title}>
-                                <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
-                                    {header.isText ? 
-                                        <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
-                                            <TooltipText text={data[header.value]} tooltip={data[header.value]} />
-                                        </Box>
-                                        : data[header.value]}
+                                <div className='linkClass'>
+                                    <Link
+                                        dataPrimaryLink
+                                        monochrome
+                                        removeUnderline
+                                        onClick={() => (handleRowClick(data))}
+                                    >
+                                        {header.isText ?
+                                            <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
+                                                <TooltipText text={data[header.value]} tooltip={data[header.value]} />
+                                            </Box>
+                                            : data[header.value]}
+                                    </Link>
                                 </div>
                             </IndexTable.Cell>
                         : header.isAction && hasRowActions ? 
@@ -192,7 +198,7 @@ function GithubRow(props) {
                 key={data.id}
                 position={index}
                 {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
-                {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id) || selectedIndex === index}}
+                {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id)}}
             >
                 {props?.newRow ? <NewCell /> :<OldCell/>}   
             </IndexTable.Row>
