@@ -690,7 +690,11 @@ public class InitializerListener implements ServletContextListener {
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getRiskScoreTimers();
                         RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
                         try {
-                            updateRiskScore.mapSensitiveSTIsInApiInfo(lastRunTimerInfo.getLastUpdatedSensitiveMap(),cronTime);
+                            if(lastRunTimerInfo == null){
+                                updateRiskScore.mapSensitiveSTIsInApiInfo(0, cronTime);
+                            }else{
+                                updateRiskScore.mapSensitiveSTIsInApiInfo(lastRunTimerInfo.getLastUpdatedSensitiveMap(),cronTime);
+                            }
                         } catch (Exception e) {
                            e.printStackTrace();
                         }
@@ -710,7 +714,11 @@ public class InitializerListener implements ServletContextListener {
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getRiskScoreTimers();
                         RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
                         try {
-                            updateRiskScore.updateSeverityScoreInApiInfo(lastRunTimerInfo.getLastUpdatedIssues());
+                            if(lastRunTimerInfo == null){
+                                updateRiskScore.updateSeverityScoreInApiInfo(0);
+                            }else{
+                                updateRiskScore.updateSeverityScoreInApiInfo(lastRunTimerInfo.getLastUpdatedIssues());
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
