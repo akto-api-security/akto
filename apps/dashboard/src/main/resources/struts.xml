@@ -502,7 +502,7 @@
             </result>
         </action>
 
-        <action name="api/getRiskScoreInfo" class="com.akto.action.ApiCollectionsAction" method="riskScoreInfo">
+        <action name="api/getRiskScoreInfo" class="com.akto.action.ApiCollectionsAction" method="fetchRiskScoreInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">

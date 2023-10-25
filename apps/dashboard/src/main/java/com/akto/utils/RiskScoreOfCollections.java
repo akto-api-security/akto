@@ -17,15 +17,18 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.AccountSettings.CronTimers;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
@@ -36,6 +39,7 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 public class RiskScoreOfCollections {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class);
 
     private List<ApiInfoKey> getUpdatedApiInfos(int timeStampFilter){
         List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
@@ -85,6 +89,30 @@ public class RiskScoreOfCollections {
         return severityScoreMap;
     }
 
+    private static boolean checkForSensitive(List<String> subTypes){
+        boolean isSensitive = false;
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        Map<String, CustomDataType> customDataTypeMap = SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get());
+
+        for(String subTypeName : subTypes){
+            if(aktoDataTypeMap.containsKey(subTypeName)){
+                AktoDataType dataType = aktoDataTypeMap.get(subTypeName);
+                if(dataType.getSensitiveAlways() || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)){
+                    isSensitive = true;
+                    break;
+                }
+            }else if(customDataTypeMap.containsKey(subTypeName)){
+                CustomDataType dataType = customDataTypeMap.get(subTypeName);
+                if(dataType.isSensitiveAlways() || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)){
+                    isSensitive = true;
+                    break;
+                }
+            }
+        }
+
+        return isSensitive;
+    }
+    
     public void updateSeverityScoreInApiInfo(int timeStampFilter){
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
         List<ApiInfoKey> updatedApiInfoKeys = getUpdatedApiInfos(timeStampFilter) ;
@@ -92,6 +120,11 @@ public class RiskScoreOfCollections {
         if(updatedApiInfoKeys == null || updatedApiInfoKeys.size() == 0){
             return ;
         }
+
+        for(ApiInfoKey apiInfoKey: updatedApiInfoKeys){
+            loggerMaker.infoAndAddToDb("Running for api info " + apiInfoKey.toString(), LogDb.DASHBOARD);
+        }
+
         Bson filterQ = Filters.and(
             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
             Filters.in("_id.apiInfoKey", updatedApiInfoKeys)
@@ -127,17 +160,17 @@ public class RiskScoreOfCollections {
         // update the last score calculated field in account settings collection in db
         AccountSettingsDao.instance.getMCollection().updateOne(
             AccountSettingsDao.generateFilter(),
-            Updates.set(AccountSettings.RISK_SCORE_TIMERS + "."+ CronTimers.LAST_UPDATED_ISSUES, Context.now()),
+            Updates.set(AccountSettings.RISK_SCORE_TIMERS + "."+ LastCronRunInfo.LAST_UPDATED_ISSUES, Context.now()),
             new UpdateOptions().upsert(true)
         );
             
     }
 
-    private static void writeUpdatesForSensitiveInfoInApiInfo(List<String> sensitiveInResponse, int timeStampFilter){
+    private static void writeUpdatesForSensitiveInfoInApiInfo(List<String> updatedDataTypes, int timeStampFilter){
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
         
         Bson sensitiveSubTypeFilter = Filters.and(
-            Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveInResponse), 
+            Filters.in(SingleTypeInfo.SUB_TYPE,updatedDataTypes), 
             Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1),
             Filters.gte(SingleTypeInfo._TIMESTAMP, timeStampFilter)
         );
@@ -146,18 +179,19 @@ public class RiskScoreOfCollections {
         BasicDBObject groupedId =  new BasicDBObject("apiCollectionId", "$apiCollectionId")
                                         .append("url", "$url")
                                         .append("method", "$method");
-        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
 
         MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(stiCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = stiCursor.next();
+                boolean isSensitive = checkForSensitive((List<String>) basicDBObject.get("subTypes"));
                 Bson filterQSampleData = Filters.and(
                     Filters.eq("_id.apiCollectionId",((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId")),
                     Filters.eq("_id.method", ((BasicDBObject) basicDBObject.get("_id")).getString("method")),
                     Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
                 );
-                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, Updates.set(ApiInfo.IS_SENSITIVE, true), new UpdateOptions()));
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, Updates.set(ApiInfo.IS_SENSITIVE, isSensitive), new UpdateOptions()));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -169,7 +203,7 @@ public class RiskScoreOfCollections {
 
         AccountSettingsDao.instance.getMCollection().updateOne(
             AccountSettingsDao.generateFilter(),
-            Updates.set((AccountSettings.RISK_SCORE_TIMERS + "."+ CronTimers.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
+            Updates.set((AccountSettings.RISK_SCORE_TIMERS + "."+ LastCronRunInfo.LAST_UPDATED_SENSITIVE_MAP), Context.now()),
             new UpdateOptions().upsert(true)
         );
     }
@@ -190,15 +224,11 @@ public class RiskScoreOfCollections {
             List<AktoDataType> updatedTypes = AktoDataTypeDao.instance.findAll(filter);
             List<CustomDataType> updaCustomDataTypes = CustomDataTypeDao.instance.findAll(filter);
             for(AktoDataType dataType: updatedTypes){
-                if (dataType.getSensitiveAlways() || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
-                    sensitiveInResponse.add(dataType.getName());
-                }
+                sensitiveInResponse.add(dataType.getName());
             }
 
             for(CustomDataType dataType: updaCustomDataTypes){
-                if (dataType.isSensitiveAlways() || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || dataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
-                    sensitiveInResponse.add(dataType.getName());
-                }
+                sensitiveInResponse.add(dataType.getName());
             }
         }
         if(sensitiveInResponse.size() > 0){
