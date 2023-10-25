@@ -80,7 +80,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         }
     }
 
-    private boolean hasApiHitTest(List<TestingRunResult> testingRunResults){
+    private boolean hasTestRunSuccessfullyOnApi(List<TestingRunResult> testingRunResults){
         for(TestingRunResult result : testingRunResults){
             List<TestResult> testResults = result.getTestResults() ;
             for(TestResult singleTestResult : testResults){
@@ -94,7 +94,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     }
 
     public void updateLastTestedField(List<TestingRunResult> testingRunResults, ApiInfo.ApiInfoKey apiInfoKey){
-        if(hasApiHitTest(testingRunResults)){
+        if(hasTestRunSuccessfullyOnApi(testingRunResults)){
             UpdateOptions updateOptions = new UpdateOptions();
             updateOptions.upsert(true);
             instance.getMCollection().updateOne(
@@ -155,7 +155,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return result;
     }
 
-    public List<Bson> getFiltersForRiskScore(){
+    public List<Bson> buildRiskScorePipeline(){
         int oneMonthBefore = Context.now() - Constants.ONE_MONTH_TIMESTAMP;
         String computedSeverityScore = "{'$cond':[{'$gte':['$severityScore',100]},2,{'$cond':[{'$gte':['$severityScore',10]},1,{'$cond':[{'$gt':['$severityScore',0]},0.5,0]}]}]}";
         String computedAccessTypeScore = "{ '$cond': { 'if': { '$and': [ { '$gt': [ { '$size': '$apiAccessTypes' }, 0 ] }, { '$in': ['PUBLIC', '$apiAccessTypes'] } ] }, 'then': 1, 'else': 0 } }";

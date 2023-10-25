@@ -127,7 +127,7 @@ public class SampleDataToSTI {
         parse.setAggregatorMap(aggregatorMap);
         parse.aggregate(filteredResponseParams);
         aggregatorMap = parse.getAggregatorMap();
-        parse.apiCatalogSync = new APICatalogSync("0",0);
+        parse.apiCatalogSync = new APICatalogSync("0",0, true);
         for (int apiCollectionId : aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
             parse.apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
