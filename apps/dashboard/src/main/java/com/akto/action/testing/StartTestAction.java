@@ -36,13 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -202,7 +196,8 @@ public class StartTestAction extends UserAction {
             if(metadata!=null){
                 summary.setMetadata(metadata);
             }
-            TestingRunResultSummariesDao.instance.insertOne(summary);
+            testingRunResultSummaryHexId = Objects.requireNonNull(TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId())
+                    .asObjectId().getValue().toHexString();
         }
         
         this.startTimestamp = 0;

@@ -2,6 +2,7 @@ package com.akto.action.user;
 
 import com.akto.DaoInit;
 import com.akto.action.UserAction;
+import com.akto.action.testing.StartTestAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.RBACDao;
@@ -11,7 +12,9 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.log.LoggerMaker;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -24,6 +27,7 @@ import org.kohsuke.github.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +35,7 @@ import static com.akto.dao.AccountSettingsDao.generateFilter;
 import static com.akto.dao.MCollection.ID;
 
 public class GithubSsoAction extends UserAction {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
     public String deleteGithubSso() {
 
@@ -73,6 +78,53 @@ public class GithubSsoAction extends UserAction {
         addActionMessage("Deleted github app ID and secret key");
         return SUCCESS.toUpperCase();
     }
+
+    public String updateGithubStatus() {
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
+        String privateKey = accountSettings.getGithubAppSecretKey();
+        String githubAppId = accountSettings.getGithubAppId();
+        String jwtToken;
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(ID,new ObjectId(testingRunSummaryHexId)));
+        try {
+            Map<String, String> metaData = testingRunResultSummary.getMetadata();
+            String repository = metaData.get("repository");
+            String commitSHA = metaData.get("commit_sha");
+            jwtToken = JWT.createJWT(githubAppId,privateKey, 10 * 60 * 1000);
+            GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
+            GHApp ghApp = gitHub.getApp();
+
+            //Getting appInstallations
+            List<GHAppInstallation> appInstallations = ghApp.listInstallations().toList();
+            if (appInstallations.isEmpty()) {
+                addActionError("Github app was not installed");
+                return ERROR.toUpperCase();
+            }
+
+            GHAppInstallation appInstallation = appInstallations.get(0);
+            GHAppCreateTokenBuilder builder = appInstallation.createToken();
+            GHAppInstallationToken token = builder.create();
+            GitHub githubAccount =  new GitHubBuilder().withAppInstallationToken(token.getToken())
+                    .build();
+
+            GHRepository ghRepository = githubAccount.getRepository(repository);
+            if (ghRepository == null) {
+                addActionError("Github app doesn't have access to repository");
+                return ERROR.toUpperCase();
+            }
+            GHCheckRunBuilder ghCheckRunBuilder = ghRepository.createCheckRun("Akto Security Checks", commitSHA);
+            ghCheckRunBuilder.withStatus(GHCheckRun.Status.IN_PROGRESS)
+                    .withStartedAt(new Date())
+                    .add(new GHCheckRunBuilder.Output("Akto CI/CD test running", ""))
+                    .create();
+        } catch (Exception e) {
+            addActionError("Error while publishing github checks");
+            loggerMaker.errorAndAddToDb("Github checks error : " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+
+
+        return SUCCESS.toUpperCase();
+    }
     public String publishGithubComments() {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
         String privateKey = accountSettings.getGithubAppSecretKey();
@@ -82,10 +134,17 @@ public class GithubSsoAction extends UserAction {
             Map<String, String> metaData = testingRunResultSummary.getMetadata();
             String repository = metaData.get("repository");
             String pullRequestId = metaData.get("pull_request_id");
-            Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
-            StringBuilder messageStringBuilder = new StringBuilder("Akto vulnerability report\n");
-            for (String severity : countIssues.keySet()) {
-                messageStringBuilder.append(severity).append(" - ").append(countIssues.get(severity)).append("\n");
+            String commitSHA = metaData.get("commit_sha");
+            boolean isCompleted = testingRunResultSummary.getState() == TestingRun.State.COMPLETED;
+            StringBuilder messageStringBuilder = new StringBuilder();
+            if (isCompleted) {
+                Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
+                messageStringBuilder.append("Akto vulnerability report\n");
+                for (String severity : countIssues.keySet()) {
+                    messageStringBuilder.append(severity).append(" - ").append(countIssues.get(severity)).append("\n");
+                }
+            } else {
+                messageStringBuilder.append("Akto CI/CD test is currently in ").append(testingRunResultSummary.getState().name()).append(" state");
             }
             String message = messageStringBuilder.toString();
             //JWT Token creation for github app
@@ -120,6 +179,32 @@ public class GithubSsoAction extends UserAction {
             int pullRequestNumber = Integer.parseInt(prArray[2]);//  typical pr GITHUB_REF is refs/pull/662/merge
             GHIssue issue = ghRepository.getIssue(pullRequestNumber);
             issue.comment(message);
+
+            List<GHCheckRun> checkRunList = ghRepository.getCheckRuns(commitSHA).toList();
+            GHCheckRun ghCheckRun = null;
+            for (GHCheckRun checkRun : checkRunList) {
+                if ("Akto Security Checks".equals(checkRun.getName())) {
+                    ghCheckRun = checkRun;
+                    break;
+                }
+            }
+            if (ghCheckRun != null) {
+                if (isCompleted) {
+                    ghCheckRun.update()
+                            .withStatus(GHCheckRun.Status.COMPLETED)
+                            .withConclusion(GHCheckRun.Conclusion.SUCCESS)
+                            .withCompletedAt(new Date())
+                            .add(new GHCheckRunBuilder.Output("Akto Vulnerability report", "Conclusion").withText(message))
+                            .create();
+                } else {
+                    ghCheckRun.update()
+                            .withStatus(GHCheckRun.Status.COMPLETED)
+                            .withConclusion(GHCheckRun.Conclusion.TIMED_OUT)
+                            .withCompletedAt(new Date())
+                            .add(new GHCheckRunBuilder.Output("Akto Vulnerability report", "Conclusion").withText(message))
+                            .create();
+                }
+            }
         } catch (Exception e) {
             addActionError("Error while publishing github comment");
             return ERROR.toUpperCase();
