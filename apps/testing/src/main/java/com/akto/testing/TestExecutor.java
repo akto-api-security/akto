@@ -244,7 +244,18 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
 
-        Map<String, Integer> totalCountIssues = calculateCountIssues(testingRunResults);
+        Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put("HIGH", 0);
+        totalCountIssues.put("MEDIUM", 0);
+        totalCountIssues.put("LOW", 0);
+
+        for (TestingRunResult testingRunResult: testingRunResults) {
+            if (testingRunResult.isVulnerable()) {
+                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
+                int initialCount = totalCountIssues.get(severity);
+                totalCountIssues.put(severity, initialCount + 1);
+            }
+        }
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
@@ -267,26 +278,6 @@ public class TestExecutor {
         } catch (Exception e){
         }
         return severity;
-    }
-
-    public static Map<String, Integer> calculateCountIssues(List<TestingRunResult> testingRunResults){
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put("HIGH", 0);
-        totalCountIssues.put("MEDIUM", 0);
-        totalCountIssues.put("LOW", 0);
-
-        if(testingRunResults == null){
-            return totalCountIssues;
-        }
-
-        for (TestingRunResult testingRunResult : testingRunResults) {
-            if (testingRunResult.isVulnerable()) {
-                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.get(severity);
-                totalCountIssues.put(severity, initialCount + 1);
-            }
-        }
-        return totalCountIssues;
     }
 
     public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore) throws URISyntaxException {
