@@ -15,6 +15,7 @@ info:
     - https://www.exploit-db.com/ghdb/5986
   cwe:
     - CWE-16 
+    - CWE-200
   cve:
     - CVE-2015-4050   
 

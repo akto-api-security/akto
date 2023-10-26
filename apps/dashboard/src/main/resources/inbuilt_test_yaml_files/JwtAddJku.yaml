@@ -29,6 +29,7 @@ info:
     - "https://portswigger.net/web-security/jwt/lab-jwt-authentication-bypass-via-jku-header-injection"
   cwe:
     - CWE-287
+    - CWE-295
   cve:
     - CVE-2018-0114
 

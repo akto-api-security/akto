@@ -26,6 +26,7 @@ info:
     - "https://portswigger.net/kb/issues/00200901_jwt-none-algorithm-supported"
   cwe:
     - CWE-287
+    - CWE-347
   cve:
     - CVE-2022-23540
     - CVE-2015-9235  

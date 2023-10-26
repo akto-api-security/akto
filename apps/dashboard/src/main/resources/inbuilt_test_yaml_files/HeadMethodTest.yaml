@@ -34,7 +34,7 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
   cwe:
-    - CWE-16
+    - CWE-284
   cve:
     - CVE-2022-45956
 

@@ -25,8 +25,9 @@ info:
     - "https://owasp.org/www-community/Improper_Error_Handling"
     - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/08-Testing_for_Error_Handling/01-Testing_For_Improper_Error_Handling"
   cwe:
-    - CWE-728
-    - CWE-388
+    - CWE-209
+    - CWE-200
+    - CWE-22
   cve:
     - CVE-2020-10097
 

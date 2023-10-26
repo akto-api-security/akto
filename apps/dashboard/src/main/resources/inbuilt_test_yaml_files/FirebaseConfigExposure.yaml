@@ -15,6 +15,7 @@ info:
     - https://github.com/firebase/firebaseui-web/blob/master/demo/public/sample-config.js
   cwe:
     - CWE-16
+    - CWE-200
   cve:
     - CVE-2020-7765
     - CVE-2021-46743

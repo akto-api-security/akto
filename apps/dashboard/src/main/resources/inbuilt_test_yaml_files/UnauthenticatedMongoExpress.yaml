@@ -14,7 +14,7 @@ info:
   references:
     - https://www.exploit-db.com/ghdb/5684
   cwe:
-    - CWE-16
+    - CWE-306
   cve:
     - CVE-2020-7925
     - CVE-2021-21422

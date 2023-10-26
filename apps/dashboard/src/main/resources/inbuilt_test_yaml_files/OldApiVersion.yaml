@@ -31,6 +31,8 @@ info:
     - "https://cwe.mitre.org/data/definitions/639.html"
   cwe:
     - CWE-937
+    - CWE-285
+    - CWE-862
   cve:
     - CVE-2022-31690
 

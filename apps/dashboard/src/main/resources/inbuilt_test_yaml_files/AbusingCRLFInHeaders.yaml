@@ -24,6 +24,7 @@ info:
     - CWE-93
     - CWE-74
     - CWE-20
+    - CWE-113
   cve:
     - CVE-2020-15693
     - CVE-2023-0040

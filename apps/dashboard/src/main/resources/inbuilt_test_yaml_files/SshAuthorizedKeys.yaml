@@ -15,6 +15,7 @@ info:
     - https://www.ssh.com/academy/ssh/authorized-key
   cwe:
     - CWE-16
+    - CWE-200
   cve:
     - CVE-2023-43619
     - CVE-2022-29154
