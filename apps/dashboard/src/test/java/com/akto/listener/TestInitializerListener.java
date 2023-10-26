@@ -17,6 +17,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
 
 import com.akto.util.enums.GlobalEnums;
+import com.akto.utils.GithubSync;
 import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -115,7 +116,10 @@ public class TestInitializerListener extends MongoBasedTest {
         long count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertFalse(count > 0);
 
-        InitializerListener.updateTestEditorTemplatesFromGithub(1);
+        GithubSync githubSync = new GithubSync();
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+
+        InitializerListener.processTemplateFilesZip(repoZip);
 
         count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertTrue(count > 0);

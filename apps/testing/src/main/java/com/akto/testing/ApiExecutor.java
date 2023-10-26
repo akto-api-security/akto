@@ -25,11 +25,22 @@ public class ApiExecutor {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
+            boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
+                if(rateLimitHit){
+                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                }
+                rateLimitHit = false;
                 Thread.sleep(1000);
             }
         }
 
+        boolean isSaasDeployment = "true".equals(System.getenv("IS_SAAS"));
+
+        if (HTTPClientHandler.instance == null) {
+            HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
+        }
+        
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
         if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
