@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -56,8 +56,9 @@ function DropdownSearch(props) {
                     return;
                 }
                 const filterRegex = new RegExp(value, 'i');
+                const searchKey = dropdownSearchKey ? dropdownSearchKey : "label"
                 const resultOptions = deselectedOptions.filter((option) =>
-                    option.label.match(filterRegex),
+                    option[searchKey].match(filterRegex)
                 );
                 setOptions(resultOptions);
                 setLoading(false);
