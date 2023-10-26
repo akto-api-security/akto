@@ -211,6 +211,18 @@ function TestRunResultPage(props) {
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
+  const testErrorComponent = (
+    <LegacyCard title="Errors" sectioned key="test-errors">
+      {
+        selectedTestRunResult?.errors?.map((error, i) => {
+          return (
+            <Text key={i}>{error}</Text>
+          )
+        })
+      }
+    </LegacyCard>
+  )
+
   const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
@@ -220,6 +232,7 @@ function TestRunResultPage(props) {
         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
+    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
     selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}
