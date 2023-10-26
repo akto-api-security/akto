@@ -16,6 +16,8 @@ info:
     - https://www.acunetix.com/vulnerabilities/web/ruby-on-rails-database-configuration-file/
   cwe:
     - CWE-538
+  cve:
+    - CVE-2019-5418
 
 api_selection_filters:
   response_code:

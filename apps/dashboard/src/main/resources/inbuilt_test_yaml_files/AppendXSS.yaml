@@ -21,6 +21,10 @@ info:
     - "https://hackerone.com/reports/840759"
   cwe:
     - CWE-79
+  cve:
+    - CVE-2015-1159 
+    - CVE-2023-24737 
+    - CVE-2020-25495
 
 api_selection_filters:
   method:

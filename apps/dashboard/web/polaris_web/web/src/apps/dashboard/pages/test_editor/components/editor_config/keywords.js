@@ -12,7 +12,7 @@ const keywords = [
     "api_selection_filters", "execute", "type", "auth", "validate", "authenticated", 
     "private_variable_context", "param_context", "endpoint_in_traffic_context",
     "sample_request_payload", "sample_response_payload", "sample_request_headers", "sample_response_headers", 
-    "test_request_payload", "test_response_payload", "test_request_headers", "test_response_headers", "cwe"
+    "test_request_payload", "test_response_payload", "test_request_headers", "test_response_headers", "cwe", "cve"
 ]
 
 export default keywords
