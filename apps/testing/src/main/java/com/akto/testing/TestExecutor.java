@@ -223,51 +223,20 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
 
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        int totalResults = 0;
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
             if (!future.isDone()) continue;
             try {
                 if (!future.get().isEmpty()) {
-                    testingRunResults.addAll(future.get());
+                    int resultSize = future.get().size();
+                    totalResults += resultSize;
                 }
             } catch (InterruptedException | ExecutionException e) {
                 loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
             }
         }
 
-        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
-
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
-        );
-
-        loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
-
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put("HIGH", 0);
-        totalCountIssues.put("MEDIUM", 0);
-        totalCountIssues.put("LOW", 0);
-
-        for (TestingRunResult testingRunResult: testingRunResults) {
-            if (testingRunResult.isVulnerable()) {
-                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.get(severity);
-                totalCountIssues.put(severity, initialCount + 1);
-            }
-        }
-
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.combine(
-                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
-            )
-        );
-
-        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-
+        loggerMaker.infoAndAddToDb("Finished adding " + totalResults + " testingRunResults", LogDb.TESTING);
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
