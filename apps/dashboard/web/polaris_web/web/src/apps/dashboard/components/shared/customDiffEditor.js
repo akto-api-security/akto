@@ -77,7 +77,7 @@ const transform = {
             if(!isNaN(key)){
                 ret.push(parsedJson[key])
             }else{
-                ret.push({key: parsedJson[key]})
+                ret.push({[key]: parsedJson[key]})
             }
         })
         return JSON.stringify(ret, null, 2)
