@@ -209,6 +209,7 @@ const transform = {
       obj['categoryFilter'] = [obj['testCategory']]
       obj['testFilter'] = [obj['name']]
       obj['testResults'] = data['testResults'] || []
+      obj['errors'] = obj['testResults'].filter((res) => (res.errors && res.errors.length > 0)).map((res) => res.errors.join(", "))
       obj['singleTypeInfos'] = data['singleTypeInfos'] || []
       obj['vulnerable'] = data['vulnerable'] || false
       obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
