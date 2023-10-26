@@ -1032,7 +1032,6 @@ public class InitializerListener implements ServletContextListener {
 
         MCollection<?>[] collectionsWithKey = new MCollection[] {
                 SingleTypeInfoDao.instance,
-                APISpecDao.instance,
                 SensitiveParamInfoDao.instance
         };
 

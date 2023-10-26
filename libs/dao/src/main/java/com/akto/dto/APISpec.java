@@ -1,7 +1,5 @@
 package com.akto.dto;   
 
-import java.util.Arrays;
-import java.util.List;
 public class APISpec {
     public enum Type {
         YAML, JSON
@@ -12,7 +10,6 @@ public class APISpec {
     String filename;
     String content;
     int apiCollectionId;
-    List<Integer> collectionIds;
 
     public APISpec() {
     }
@@ -23,7 +20,6 @@ public class APISpec {
         this.filename = filename;
         this.content = content;
         this.apiCollectionId = apiCollectionId;
-        this.collectionIds = Arrays.asList(apiCollectionId);
     }
 
     public Type getType() {
@@ -65,13 +61,4 @@ public class APISpec {
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
-
-    public List<Integer> getCollectionIds() {
-        return collectionIds;
-    }
-
-    public void setCollectionIds(List<Integer> collectionIds) {
-        this.collectionIds = collectionIds;
-    }
-
 }
