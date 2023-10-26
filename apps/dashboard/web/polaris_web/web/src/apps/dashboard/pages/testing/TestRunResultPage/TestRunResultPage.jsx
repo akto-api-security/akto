@@ -7,7 +7,8 @@ import {
   CollectionsMajor,
   FlagMajor,
   CreditCardSecureMajor,
-  MarketingMajor} from '@shopify/polaris-icons';
+  MarketingMajor,
+  FraudProtectMajor} from '@shopify/polaris-icons';
 import {
   Text,
   Button,
@@ -81,6 +82,11 @@ let moreInfoSections = [
   {
     icon: CreditCardSecureMajor,
     title: "CWE",
+    content: ""
+  },
+  {
+    icon: FraudProtectMajor,
+    title: "CVE",
     content: ""
   },
   {
@@ -185,7 +191,7 @@ function TestRunResultPage(props) {
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
-      setInfoState(transform.fillMoreInformation(runIssues, runIssuesArr,subCategoryMap, moreInfoSections))
+      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
       setIssueDetails(...[{}]);
     }

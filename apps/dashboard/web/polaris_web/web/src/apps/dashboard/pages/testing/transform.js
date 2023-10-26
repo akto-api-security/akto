@@ -99,17 +99,32 @@ function checkTestFailure(summaryState, testRunState){
   return false;
 }
 
+function getCweLink(item){
+  let linkUrl = ""
+  let cwe = item.split("-")
+  if(cwe[1]){
+      linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
+  }
+  return linkUrl;
+}
+
+function getCveLink(item){
+  return `https://nvd.nist.gov/vuln/detail/${item}`
+}
+
 const transform = {
-    tagList : (list, cweLink) => {
+    tagList : (list, linkType) => {
 
       let ret = list?.map((tag, index) => {
 
         let linkUrl = ""
-        if(cweLink){ 
-          let cwe = tag.split("-")
-          if(cwe[1]){
-              linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
-          }
+        switch(linkType){
+          case "CWE":
+            linkUrl = getCweLink(tag)
+            break;
+          case "CVE":
+            linkUrl = getCveLink(tag)
+            break;
         }
 
         return (
@@ -215,6 +230,8 @@ const transform = {
       obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
       obj['cwe'] = subCategoryMap[data.testSubType]?.cwe ? subCategoryMap[data.testSubType]?.cwe : []
       obj['cweDisplay'] = minimizeTagList(obj['cwe'])
+      obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
+      obj['cveDisplay'] = minimizeTagList(obj['cve'])
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
@@ -257,58 +274,140 @@ const transform = {
       }
       return []
   },
-  fillMoreInformation(runIssues, runIssuesArr, subCategoryMap, moreInfoSections){
-    moreInfoSections[0].content = (
-        <Text color='subdued'>
-          {subCategoryMap[runIssues.id?.testSubCategory]?.issueImpact || "No impact found"}
-        </Text>
-      )
-    moreInfoSections[1].content = (
-        <HorizontalStack gap="2">
-          {
-            transform.tagList(subCategoryMap[runIssues.id.testSubCategory]?.issueTags)
+
+  replaceTags(details, vulnerableRequests) {
+    let percentageMatch = 0;
+    vulnerableRequests?.forEach((request) => {
+      let testRun = request['testResults']
+      testRun?.forEach((runResult) => {
+        if (percentageMatch < runResult.percentageMatch) {
+          percentageMatch = runResult.percentageMatch
+        }
+      })
+    })
+    return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
+  },
+
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints) {
+
+    let filledSection = []
+    moreInfoSections.forEach((section) => {
+      let sectionLocal = {}
+      sectionLocal.icon = section.icon
+      sectionLocal.title = section.title
+      switch (section.title) {
+        case "Description":
+
+        if(category?.issueDetails == null || category?.issueDetails == undefined){
+          return;
+        }
+
+          sectionLocal.content = (
+            <Text color='subdued'>
+              {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
+            </Text>
+          )
+          break;
+        case "Impact":
+          
+          if(category?.issueImpact == null || category?.issueImpact == undefined){
+            return;
           }
-        </HorizontalStack>
-      )
-      moreInfoSections[2].content = (
-        <HorizontalStack gap="2">
-          {
-            transform.tagList(subCategoryMap[runIssues.id.testSubCategory]?.cwe, true)
+
+          sectionLocal.content = (
+            <Text color='subdued'>
+              {category?.issueImpact || "No impact found"}
+            </Text>
+          )
+          break;
+        case "Tags":
+          if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
+            return;
           }
-        </HorizontalStack>
-      )
-      moreInfoSections[4].content = (
-        <List type='bullet' spacing="extraTight">
-          {
-            subCategoryMap[runIssues.id?.testSubCategory]?.references?.map((reference) => {
-              return (
-                <List.Item key={reference}>
-                  <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
-                    <Text color='subdued'>
-                      {reference}
-                    </Text>
-                  </Link>
-                </List.Item>
-              )
-            })
+
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {
+                transform.tagList(category?.issueTags)
+              }
+            </HorizontalStack>
+          )
+
+          break;
+        case "CWE":
+          if (category?.cwe == null || category?.cwe == undefined || category?.cwe.length == 0) {
+            return;
           }
-        </List>
-      )
-      moreInfoSections[3].content = (
-          <List type='bullet'>
-            {
-              runIssuesArr?.map((item, index) => {
-                return (
-                  <List.Item key={index}>
-                    <Text color='subdued'>
-                      {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
-                    </Text>
-                  </List.Item>)
-              })
-            }
-          </List>
-      )
-    return moreInfoSections;
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {
+                transform.tagList(category?.cwe, "CWE")
+              }
+            </HorizontalStack>
+          )
+          break;
+        case "CVE":
+          if (category?.cve == null || category?.cve == undefined || category?.cve.length == 0) {
+            return;
+          }
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {
+                transform.tagList(category?.cve, "CVE")
+              }
+            </HorizontalStack>
+          )
+          break;
+        case "References":
+
+          if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
+            return;
+          }
+
+          sectionLocal.content = (
+            <List type='bullet' spacing="extraTight">
+              {
+                category?.references?.map((reference) => {
+                  return (
+                    <List.Item key={reference}>
+                      <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
+                        <Text color='subdued'>
+                          {reference}
+                        </Text>
+                      </Link>
+                    </List.Item>
+                  )
+                })
+              }
+            </List>
+          )
+          break;
+        case "API endpoints affected":
+
+          if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
+            return;
+          }
+
+          sectionLocal.content = (
+            <List type='bullet'>
+              {
+                affectedEndpoints?.map((item, index) => {
+                  return (
+                    <List.Item key={index}>
+                      <Text color='subdued'>
+                        {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
+                      </Text>
+                    </List.Item>)
+                })
+              }
+            </List>
+          )
+          break;
+      }
+      filledSection.push(sectionLocal)
+    })
+
+    return filledSection;
   },
 
   filterContainsConditions(conditions, operator) { //operator is string as 'OR' or 'AND'

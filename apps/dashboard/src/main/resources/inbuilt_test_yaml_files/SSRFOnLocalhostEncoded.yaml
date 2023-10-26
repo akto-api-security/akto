@@ -22,6 +22,8 @@ info:
     - HackerOne top 10
   cwe:
     - CWE-918
+  cve:
+    - CVE-2022-4725
 
 api_selection_filters:
   response_code:
