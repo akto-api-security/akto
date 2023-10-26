@@ -15,11 +15,7 @@ echo "### Akto test summary" >> $GITHUB_STEP_SUMMARY
 while true; do
   current_time=$(date +%s)
   elapsed_time=$((current_time - start_time))
-  
-  if ((elapsed_time >= MAX_POLL_INTERVAL)); then
-    echo "Max poll interval reached. Exiting."
-    break
-  fi
+
 
   current_time=$(date +%s)
   recency_period=$((60 * 24 * 60 * 60))
@@ -36,22 +32,21 @@ while true; do
       }")
 
   state=$(echo "$response" | jq -r '.testingRunResultSummaries[0].state // empty')
+  testingRunSummaryhexId=$(echo "$response" | jq -r '.testingRunResultSummaries[0].hexId // empty')
 
   if [[ "$state" == "COMPLETED" ]]; then
     count=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues // empty')
     high=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.HIGH // empty')
     medium=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.MEDIUM // empty')
     low=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.LOW // empty')
-    testingRunSummaryhexId=$(echo "$response" | jq -r '.testingRunResultSummaries[0].hexId // empty')
 
-    publishGithubCommentResponse=$(curl -s "$AKTO_DASHBOARD_URL/api/publishGithubComments" \
+    publishGithubCommentResponse = $(curl -s "$AKTO_DASHBOARD_URL/api/publishGithubComments" \
           --header 'content-type: application/json' \
           --header "X-API-KEY: $AKTO_API_KEY" \
           --data "{
               \"testingRunSummaryHexId\": \"$testingRunSummaryhexId\"
           }")
 
-    echo "$publishGithubCommentResponse" >> $GITHUB_STEP_SUMMARY
     echo "[Results]($AKTO_DASHBOARD_URL/dashboard/testing/$AKTO_TEST_ID/results)" >> $GITHUB_STEP_SUMMARY
     echo "HIGH: $high" >> $GITHUB_STEP_SUMMARY
     echo "MEDIUM: $medium" >> $GITHUB_STEP_SUMMARY
@@ -64,11 +59,28 @@ while true; do
     fi
     break
   elif [[ "$state" == "STOPPED" ]]; then
+    publishGithubCommentResponse = $(curl -s "$AKTO_DASHBOARD_URL/api/publishGithubComments" \
+          --header 'content-type: application/json' \
+          --header "X-API-KEY: $AKTO_API_KEY" \
+          --data "{
+              \"testingRunSummaryHexId\": \"$testingRunSummaryhexId\"
+          }")
     echo "Test stopped" >> $GITHUB_STEP_SUMMARY
     exit 1
     break
   else
     echo "Waiting for akto test to be completed..."
     sleep 5  # Adjust the polling interval as needed
+  fi
+
+  if ((elapsed_time >= MAX_POLL_INTERVAL)); then
+    publishGithubCommentResponse = $(curl -s "$AKTO_DASHBOARD_URL/api/publishGithubComments" \
+          --header 'content-type: application/json' \
+          --header "X-API-KEY: $AKTO_API_KEY" \
+          --data "{
+              \"testingRunSummaryHexId\": \"$testingRunSummaryhexId\"
+          }")
+    echo "Max poll interval reached. Exiting."
+    break
   fi
 done
