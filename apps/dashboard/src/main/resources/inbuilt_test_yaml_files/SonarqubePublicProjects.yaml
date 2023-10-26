@@ -15,6 +15,7 @@ info:
     - https://next.sonarqube.com/sonarqube/web_api/api/components/suggestions?internal=true
   cwe:
     - CWE-16
+    - CWE-200
   cve:
     - CVE-2020-28002
 

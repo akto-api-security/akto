@@ -21,6 +21,7 @@ info:
     - "https://www.acunetix.com/vulnerabilities/web/unrestricted-access-to-nginx-status-module/"
   cwe:
     - CWE-16
+    - CWE-200
   cve:
     - CVE-2022-41741
     - CVE-2019-20372

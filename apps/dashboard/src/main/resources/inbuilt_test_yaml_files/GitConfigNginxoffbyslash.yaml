@@ -16,7 +16,7 @@ info:
     - https://twitter.com/Random_Robbie/status/1262676628167110656
     - https://github.com/PortSwigger/nginx-alias-traversal/blob/master/off-by-slash.py
   cwe:
-    - CWE-16
+    - CWE-22
   cve:
     - CVE-2021-23017
 

@@ -31,7 +31,9 @@ info:
     - "https://web.archive.org/web/20081116154150/http://www.aspectsecurity.com/documents/Bypassing_VBAAC_with_HTTP_Verb_Tampering.pdf"
     - "https://capec.mitre.org/data/definitions/274.html"
   cwe:
-    - CWE-274
+    - CWE-288
+    - CWE-287
+    - CWE-285
   cve:
     - CVE-2020-35239
     - CVE-2018-19908

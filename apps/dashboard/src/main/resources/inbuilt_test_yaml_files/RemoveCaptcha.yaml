@@ -20,6 +20,7 @@ info:
     - "https://hackerone.com/reports/124173"
   cwe:
     - CWE-287
+    - CWE-294
   cve:
     - CVE-2021-37417
 

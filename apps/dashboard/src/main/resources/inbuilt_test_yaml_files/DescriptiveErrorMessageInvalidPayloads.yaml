@@ -20,6 +20,7 @@ info:
     - "https://owasp.org/www-community/Improper_Error_Handling"
   cwe:
     - CWE-209
+    - CWE-200
   cve:
     - CVE-2020-11883
     - CVE-2020-15652

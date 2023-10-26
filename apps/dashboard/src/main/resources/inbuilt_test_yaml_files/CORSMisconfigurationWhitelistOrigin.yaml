@@ -22,7 +22,7 @@ info:
   references:
     - "https://crashtest-security.com/cors-misconfiguration/"
   cwe:
-    - CWE-16
+    - CWE-942
   cve:
     - CVE-2021-27786
 

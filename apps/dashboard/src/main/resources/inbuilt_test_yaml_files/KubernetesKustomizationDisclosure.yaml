@@ -15,6 +15,7 @@ info:
     - https://github.com/detectify/ugly-duckling/blob/master/modules/crowdsourced/kubernetes-kustomization-disclosure.json
   cwe:
     - CWE-16
+    - CWE-200
   cve:
     - CVE-2021-41254
 

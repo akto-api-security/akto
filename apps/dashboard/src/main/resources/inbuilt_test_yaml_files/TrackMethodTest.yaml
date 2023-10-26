@@ -23,7 +23,7 @@ info:
     - "https://www.onwebsecurity.com/security/unsafe-http-methods.html"
     - "https://hackerone.com/reports/83837"
   cwe:
-    - CWE-274
+    - CWE-16
   cve:
     - CVE-2021-35233
 

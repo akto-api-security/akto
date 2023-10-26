@@ -18,7 +18,7 @@ info:
     - OWASP top 10
     - HackerOne top 10
   cwe:
-    - CWE-77
+    - CWE-78
   cve:
     - CVE-2021-31799
 

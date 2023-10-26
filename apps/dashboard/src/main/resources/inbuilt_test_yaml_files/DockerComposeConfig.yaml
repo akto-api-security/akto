@@ -16,6 +16,9 @@ info:
     - https://secapps.com/vulndb/docker-compose-exposure
   cwe:
     - CWE-16
+    - CWE-530
+    - CWE-538
+    - CWE-552
   cve:
     - CVE-2023-37273
 

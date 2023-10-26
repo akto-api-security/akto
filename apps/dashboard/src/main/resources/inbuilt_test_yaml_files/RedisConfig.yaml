@@ -15,6 +15,7 @@ info:
     - https://redis.io/docs/manual/config/
   cwe:
     - CWE-16
+    - CWE-200
   cve:
     - CVE-2023-36824
     - CVE-2022-0543

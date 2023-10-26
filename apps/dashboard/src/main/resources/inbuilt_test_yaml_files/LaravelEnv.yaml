@@ -15,6 +15,7 @@ info:
     - https://laravel.com/docs/master/configuration#environment-configuration
     - https://stackoverflow.com/questions/38331397/how-to-protect-env-file-in-laravel
   cwe:
+    - CWE-200
     - CWE-16
   cve:
     - CVE-2017-16894

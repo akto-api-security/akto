@@ -26,7 +26,7 @@ info:
     - "https://www.keycdn.com/blog/http-security-headers"
     - "https://www.invicti.com/white-papers/whitepaper-http-security-headers"
   cwe:
-    - CWE-16
+    - CWE-693
   cve:
     - CVE-2022-41915
     - CVE-2022-37436

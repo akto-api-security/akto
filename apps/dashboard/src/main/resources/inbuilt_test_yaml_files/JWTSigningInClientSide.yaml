@@ -20,6 +20,7 @@ info:
     - "https://hackerone.com/reports/638635"
   cwe:
     - CWE-287
+    - CWE-347
 
 api_selection_filters:
   response_payload:
