@@ -168,13 +168,13 @@ jobs:
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+          AKTO_TEST_ID: 65317bede46f73639b315e1d
 
       - name: Check for Akto test completion
         env:
             AKTO_DASHBOARD_URL: https://flash.staging.akto.io
             AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-            AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+            AKTO_TEST_ID: 65317bede46f73639b315e1d
         run: bash ./.github/scripts/akto-cicd.sh
 
       - name: Check Vulnerable API's
