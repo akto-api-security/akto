@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
+import { CellType } from "../../../components/tables/rows/GithubRow";
 
 /*
   {
@@ -44,7 +45,7 @@ let headers = [
     title: "Number of tests",
     value: "number_of_tests",
     itemOrder: 3,
-    isText: true,
+    type: CellType.TEXT,
   },
   {
     text:"Severity",
@@ -58,11 +59,11 @@ let headers = [
     value: 'run_time',
     title: 'Status',
     itemOrder: 3,
-    isText: true,
+    type: CellType.TEXT,
   },
   {
     title: '',
-    isAction: true,
+    type: CellType.ACTION,
   }
 ]
 

@@ -18,6 +18,7 @@ import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
+import { CellType } from "../../../components/tables/rows/GithubRow"
 
 const headings = [
     {
@@ -30,21 +31,21 @@ const headings = [
         value: 'hostName',
         title: "Hostname",
         maxWidth: '100px',
-        isText: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Access Type',
         value: 'access_type',
         title: 'Access type',
         showFilter: true,
-        isText: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Auth Type',
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        isText: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Sensitive Params',
@@ -57,7 +58,7 @@ const headings = [
         text: 'Last Seen',
         title: 'Last seen',
         value: 'last_seen',
-        isText: true,
+        type: CellType.TEXT,
     },
 ]
 
@@ -207,7 +208,8 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
-        const sameRow = func.deepComparison(apiDetail, data);
+        let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
+        const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)
         } else {
@@ -217,7 +219,7 @@ function ApiEndpoints() {
             if (sameRow) {
                 return prev;
             }
-            return { ...data }
+            return { ...tmp }
         })
     }
 
