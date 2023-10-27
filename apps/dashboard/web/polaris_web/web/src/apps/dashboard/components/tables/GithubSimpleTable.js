@@ -62,7 +62,9 @@ function GithubSimpleTable(props) {
           props.getFilteredItems(tempData)
         }
 
-        return {value:tempData,total:tempData.length}
+        let finalData = props.useModifiedData ? props.modifyData(tempData,filters) : tempData
+
+        return {value:finalData,total:tempData.length}
     }
     
 
@@ -88,6 +90,12 @@ function GithubSimpleTable(props) {
         onSelect={props.onSelect}
         onRowClick={props.onRowClick}
         increasedHeight = {props.increasedHeight}
+        mode={props?.mode}
+        headings={props?.headings}
+        useNewRow={props?.useNewRow}
+        condensedHeight={props?.condensedHeight}
+        tableTabs={props?.tableTabs}
+        notHighlightOnselected={props.notHighlightOnselected}
     />
 
 }

@@ -18,6 +18,9 @@ info:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa4-lack-of-resources-and-rate-limiting.md#scenario-2"
   cwe:
     - CWE-400
+  cve:
+    - CVE-2023-4647
+    - CVE-2023-38254
 
 api_selection_filters:
   query_param:
