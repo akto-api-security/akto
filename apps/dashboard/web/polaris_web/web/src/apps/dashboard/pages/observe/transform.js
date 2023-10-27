@@ -1,5 +1,10 @@
 import func from "@/util/func";
+import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
+import tranform from "../onboarding/transform"
+import TooltipText from "../../components/shared/TooltipText";
+import StyledEndpoint from "./api_collections/component/StyledEndpoint"
+import { SearchMinor, InfoMinor, LockMinor, ClockMinor } from "@shopify/polaris-icons"
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -23,6 +28,66 @@ const standardHeaders = [
     'want-digest', 'warning', 'width', 'www-authenticate',
     'x-content-type-options', 'x-dns-prefetch-control', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-frame-options', 'x-xss-protection'
 ];
+
+const apiDetailsHeaders = [
+    {
+        text: "Method",
+        value: "method",
+        showFilter: true
+    },
+    {
+        text: "Endpoint",
+        value: "parameterisedEndpoint",
+        itemOrder: 1,
+        showFilter: true,
+        component: StyledEndpoint
+    },
+    {
+        text: 'Tags',
+        value: 'tags',
+        itemCell: 3,
+        showFilter: true
+    },
+    {
+        text: 'Sensitive Params',
+        value: 'sensitiveTags',
+        itemOrder: 2,
+        showFilter: true
+    },
+    {
+        text: 'Last Seen',
+        value: 'last_seen',
+        icon: SearchMinor,
+        itemOrder: 3
+    },
+    {
+        text: 'Access Type',
+        value: 'access_type',
+        icon: InfoMinor,
+        itemOrder: 3,
+        showFilter: true
+    },
+    {
+        text: 'Auth Type',
+        value: 'auth_type',
+        icon: LockMinor,
+        itemOrder: 3,
+        showFilter: true
+    },
+    {
+        text: "Discovered",
+        value: 'added',
+        icon: ClockMinor,
+        itemOrder: 3
+    },
+    {
+        text: 'Changes',
+        value: 'changes',
+        icon: InfoMinor,
+        itemOrder: 3
+
+    }
+]
 
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
@@ -142,6 +207,118 @@ const transform = {
         })
         const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
         return finalArr
+    },
+
+    getColor(key){
+        switch(key.toUpperCase()){
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "attention";
+            case "LOW": return "info";
+            default:
+                return "bg";
+        }
+    },
+
+    getIssuesList(severityInfo){
+        return (
+            <HorizontalStack gap="1">
+                {
+                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                        return(
+                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                        )
+                    }):
+                    <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
+                }
+            </HorizontalStack>
+        )
+    },
+
+    prettifySubtypes(sensitiveTags){
+        return(
+            <Box maxWidth="200px">
+                <HorizontalStack gap={1}>
+                    {sensitiveTags.map((item,index)=>{
+                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
+                    })}
+                    {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
+                </HorizontalStack>
+            </Box>
+        )
+    },
+
+    prettifyCollectionsData(newData){
+        const prettifyData = newData.map((c)=>{
+            return{
+                ...c,
+                nextUrl: '/dashboard/observe/inventory/' + c.id,
+                displayNameComp: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
+            }
+        })
+
+        return prettifyData
+    },
+
+    getTruncatedUrl(url){
+        try {
+            const parsedURL = new URL(url)
+            return parsedURL.pathname
+        } catch (error) {
+            return url
+        }
+    },
+
+    getHostName(url){
+        try {
+            const parsedURL = new URL(url)
+            return parsedURL.hostname
+        } catch (error) {
+            return "No host"
+        }
+    },
+
+    getPrettifyEndpoint(method,url, isNew){
+        return(
+            <HorizontalStack gap={1}>
+                <Box width="54px">
+                    <HorizontalStack align="end">
+                        <span style={{color: tranform.getTextColor(method), fontSize: "14px", fontWeight: 500}}>{method}</span>
+                    </HorizontalStack>
+                </Box>
+                <Box width="240px">
+                    <HorizontalStack align="space-between">
+                        <Box maxWidth={isNew ? "180px" : '220px'}>
+                            <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "medium"}} />
+                        </Box>
+                        {isNew ? <Badge size="small">New</Badge> : null}
+                    </HorizontalStack>
+                </Box>
+            </HorizontalStack>
+        )
+    },
+
+    isNewEndpoint(lastSeen){
+        let lastMonthEpoch = func.timeNow() - (30 * 24 * 60 * 60);
+        return lastSeen > lastMonthEpoch
+    },
+
+    prettifyEndpointsData(inventoryData){
+        const hostNameMap = PersistStore.getState().hostNameMap
+        const prettifyData = inventoryData.map((url) => {
+            return{
+                ...url,
+                hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
+                endpointComp: this.getPrettifyEndpoint(url.method, url.endpoint, this.isNewEndpoint(url.lastSeenTs)),
+                sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
+                isNew: this.isNewEndpoint(url.lastSeenTs)
+            }
+        })
+
+        return prettifyData
+    },
+
+    getDetailsHeaders(){
+        return apiDetailsHeaders
     }
       
 }
