@@ -27,6 +27,7 @@ public class ApiToken {
         "/api/fetchTestingRunResults","/api/fetchWorkflowTestingRun","/api/fetchWorkflowTestingSchedule",
         "/api/stopAllTests","/api/fetchTestRunResultDetails","/api/fetchIssueFromTestRunResultDetails",
                 "/api/publishGithubComments", "/api/updateGithubStatus"));
+        //Adding publishGithubComments and updateGithubStatus
         private final List<String> accessList;
 
         Utility(List<String> accessList) {
