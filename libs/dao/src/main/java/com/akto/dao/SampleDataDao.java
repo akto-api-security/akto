@@ -58,7 +58,7 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,
                                                      String lastFetchedMethod, int limit, int sliceLimit) {
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.eq("_id.apiCollectionId", apiCollectionId));
+        filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)));
 
 
         if (lastFetchedUrl != null && lastFetchedMethod != null) {

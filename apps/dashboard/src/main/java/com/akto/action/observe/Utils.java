@@ -11,6 +11,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Utils {
@@ -46,7 +47,7 @@ public class Utils {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))));
 
         int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 
