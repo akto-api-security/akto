@@ -201,58 +201,7 @@ public class Main {
                 );
 
                 if(summaryId != null && testingRun.getTestIdConfig() != 1){
-                    
-                    long testingRunResultsCount = TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
-
-                    TestingRunResultSummariesDao.instance.updateOne(
-                            Filters.eq("_id", summaryId),
-                            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResultsCount));
-                    
-                    loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
-
-                    Map<String, Integer> totalCountIssues = new HashMap<>();
-                    totalCountIssues.put("HIGH", 0);
-                    totalCountIssues.put("MEDIUM", 0);
-                    totalCountIssues.put("LOW", 0);
-
-                    int skip = 0;
-                    int limit = 1000;
-                    boolean fetchMore = false;
-                    do {
-                        fetchMore = false;
-                        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance
-                                .fetchLatestTestingRunResult(
-                                        Filters.and(
-                                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
-                                            Filters.eq(TestingRunResult.VULNERABLE, true)),
-                                        limit,
-                                        skip,
-                                        Projections.include(
-                                            TestingRunResult.TEST_RESULTS));
-
-                        loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults", LogDb.TESTING);
-
-                        for (TestingRunResult testingRunResult : testingRunResults) {
-                            String severity = TestExecutor.getSeverityFromTestingRunResult(testingRunResult).toString();
-                            int initialCount = totalCountIssues.get(severity);
-                            totalCountIssues.put(severity, initialCount + 1);
-                        }
-
-                        if (testingRunResults.size() == limit) {
-                            skip += limit;
-                            fetchMore = true;
-                        }
-                        
-                    } while (fetchMore);
-
-                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq("_id", summaryId),
-                            Updates.combine(
-                                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)));
-
-                    loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
+                    TestExecutor.updateTestSummary(summaryId);
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
