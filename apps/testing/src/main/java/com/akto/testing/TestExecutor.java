@@ -245,7 +245,7 @@ public class TestExecutor {
         long testingRunResultsCount = TestingRunResultDao.instance
                 .count(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
 
-        TestingRunResultSummariesDao.instance.updateOne(
+        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResultsCount));
 
