@@ -55,7 +55,7 @@ const headings = [
         text: 'Sensitive Params',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
-        showFilter: true
+        filterKey: 'sensitiveTags',
     },
     {
         text: 'Last Seen',
@@ -63,14 +63,13 @@ const headings = [
         value: 'last_seen',
         isText: true,
     },
+    {
+        text: "Method",
+        filterKey: "method",
+        showFilter: true
+    }
 ]
 
-let headers =  JSON.parse(JSON.stringify(headings))
-headers.push({
-    text: "Method",
-    value: "method",
-    showFilter: true
-},)
 
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore'},
@@ -263,7 +262,7 @@ function ApiEndpoints() {
 
     function exportCsv() {
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headings.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['All']
@@ -437,7 +436,7 @@ function ApiEndpoints() {
                                 resourceName={resourceName}
                                 filters={[]}
                                 disambiguateLabel={disambiguateLabel}
-                                headers={headers}
+                                headers={headings}
                                 getStatus={() => { return "warning" }}
                                 selected={selected}
                                 onRowClick={handleRowClick}

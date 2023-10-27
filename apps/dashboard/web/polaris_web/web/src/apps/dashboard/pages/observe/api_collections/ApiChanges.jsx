@@ -36,6 +36,7 @@ function ApiChanges() {
 
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
+    
     function handleRowClick(data,headers) {
         const sameRow = func.deepComparison(apiDetail, data);
         let flag = !sameRow || !showDetails
