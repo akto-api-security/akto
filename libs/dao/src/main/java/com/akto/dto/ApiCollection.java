@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -8,6 +9,7 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.CollectionConditions.CollectionCondition;
 
 public class ApiCollection {
 
@@ -25,6 +27,25 @@ public class ApiCollection {
     int urlsCount;
     public static final String VXLAN_ID = "vxlanId";
 
+    @BsonIgnore
+    Type type;
+
+    public enum Type {
+        TRAFFIC, CUSTOM, API_GROUP
+    }
+
+    public Type getType() {
+        if (this.hostName != null || this.vxlanId != 0) {
+            return Type.TRAFFIC;
+        } else if (this.conditions != null) {
+            return Type.API_GROUP;
+        }
+        return Type.CUSTOM;
+    }
+
+    List<CollectionCondition> conditions;
+    public static final String CONDITIONS_STRING = "conditions";
+
     public ApiCollection() {
     }
 
@@ -35,6 +56,12 @@ public class ApiCollection {
         this.urls = urls;
         this.hostName = hostName;
         this.vxlanId = vxlanId;
+    }
+
+    public ApiCollection(int id, String name, List<CollectionCondition> conditions) {
+        this.id = id;
+        this.name = name;
+        this.conditions = conditions;
     }
 
     public static boolean useHost = Objects.equals(System.getenv("USE_HOSTNAME"), "true");
@@ -125,6 +152,14 @@ public class ApiCollection {
     // To be called if you are creating a collection that is not from mirroring
     public static ApiCollection createManualCollection(int id, String name){
         return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
+    }
+
+    public List<CollectionCondition> getConditions() {
+        return conditions;
+    }
+
+    public void setConditions(List<CollectionCondition> conditions) {
+        this.conditions = conditions;
     }
 
 }
