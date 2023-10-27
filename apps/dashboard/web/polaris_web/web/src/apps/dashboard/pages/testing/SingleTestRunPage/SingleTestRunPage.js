@@ -25,6 +25,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
+import { CellType } from "../../../components/tables/rows/GithubRow";
 
 let headers = [
   {
@@ -38,7 +39,7 @@ let headers = [
   {
     value: 'testCategory',
     title: 'Category',
-    isText: true,
+    type: CellType.TEXT,
   },
   {
     title: 'CWE tags',
@@ -47,7 +48,7 @@ let headers = [
   {
     title: 'Number of urls',
     value: 'totalUrls',
-    isText:true
+    type: CellType.TEXT
   },
   {
     value: "scanned_time_comp",
@@ -55,7 +56,7 @@ let headers = [
   },
   {
     title: '',
-    isCollapsible: true
+    type: CellType.COLLAPSIBLE
   }
 ]
 

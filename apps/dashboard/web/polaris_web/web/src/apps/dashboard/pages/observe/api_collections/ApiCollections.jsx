@@ -9,6 +9,7 @@ import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import { CellType } from "../../../components/tables/rows/GithubRow"
 
 const headers = [
     {
@@ -22,13 +23,13 @@ const headers = [
         title: "Total endpoints",
         text: "Total endpoints",
         value: "endpoints",
-        isText: true,
+        type: CellType.TEXT,
     },
     {
         title: "Discovered",
         text: "Discovered",
         value: "detected",
-        isText: true,
+        type: CellType.TEXT,
     }
 ]
 

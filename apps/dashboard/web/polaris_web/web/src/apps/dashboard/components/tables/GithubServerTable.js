@@ -10,7 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import GithubRow from './rows/GithubRow';
+import {GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useReducer } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
 import "./style.css"

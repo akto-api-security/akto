@@ -21,6 +21,12 @@ import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
 import TooltipText from '../../shared/TooltipText';
 
+const CellType = {
+    TEXT: "TEXT",
+    ACTION: "ACTION",
+    COLLAPSIBLE: "COLLAPSIBLE"
+}
+
 function GithubRow(props) {
 
     const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings } = props;
@@ -137,56 +143,86 @@ function GithubRow(props) {
         )
     }
 
+    function LinkCell(cellData, header) {
+        return (
+            <IndexTable.Cell key={header.title}>
+                <div className='linkClass'>
+                    <Link
+                        dataPrimaryLink
+                        monochrome
+                        removeUnderline
+                        onClick={() => (handleRowClick(data))}
+                    >
+                        {cellData}
+                    </Link>
+                </div>
+            </IndexTable.Cell>
+        )
+    }
+
+    function TextCell(header) {
+        return (
+            <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
+                <TooltipText text={data[header.value]} tooltip={data[header.value]} />
+            </Box>
+        )
+    }
+
+    function ActionCell() {
+        return (
+            <IndexTable.Cell key={"actions"}>
+                <HorizontalStack align='end'>
+                    {
+                        <Popover
+                            active={popoverActive == data.id}
+                            activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                            autofocusTarget="first-node"
+                            onClose={togglePopoverActive(popoverActive)}
+                        >
+                            <ActionList
+                                actionRole="menuitem"
+                                sections={getActions(data)}
+                            />
+                        </Popover>
+                    }
+                </HorizontalStack>
+            </IndexTable.Cell>
+        )
+    }
+
+    function CollapsibleCell() {
+        return (
+            <IndexTable.Cell key={"collapsible"}>
+                <HorizontalStack align='end'>
+                    <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
+                        <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
+                    </div>
+                </HorizontalStack>
+            </IndexTable.Cell>
+        )
+    }
+
+    function getHeader(header){
+        let type = header?.type;
+
+        switch(type){
+
+            case CellType.ACTION : 
+                return hasRowActions ? ActionCell() : <></>;
+            case CellType.COLLAPSIBLE :
+                return CollapsibleCell();
+            case CellType.TEXT :
+                return header.value ? LinkCell(TextCell(header), header) : <></>;
+            default :
+                return header.value ? LinkCell(data[header.value], header) : <></>;
+        }
+    }
+
     function NewCell(){
         return(
             <>
                 {headings.map((header) =>{
-                    return(
-                        header?.value ?
-                            <IndexTable.Cell key={header.title}>
-                                <div className='linkClass'>
-                                    <Link
-                                        dataPrimaryLink
-                                        monochrome
-                                        removeUnderline
-                                        onClick={() => (handleRowClick(data))}
-                                    >
-                                        {header.isText ?
-                                            <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
-                                                <TooltipText text={data[header.value]} tooltip={data[header.value]} />
-                                            </Box>
-                                            : data[header.value]}
-                                    </Link>
-                                </div>
-                            </IndexTable.Cell>
-                        : header.isAction && hasRowActions ? 
-                        <IndexTable.Cell key={"actions"}>
-                            <HorizontalStack align='end'>
-                                {
-                                    <Popover
-                                        active={popoverActive == data.id}
-                                        activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
-                                        autofocusTarget="first-node"
-                                        onClose={togglePopoverActive(popoverActive)}
-                                    >
-                                        <ActionList
-                                            actionRole="menuitem"
-                                            sections={getActions(data)}
-                                        />
-                                    </Popover>
-                                }
-                            </HorizontalStack>
-                        </IndexTable.Cell>  
-                        : header.isCollapsible ?
-                        <IndexTable.Cell key={"collapsible"}>
-                            <HorizontalStack align='end'>
-                                <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
-                                    <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
-                                </div>
-                            </HorizontalStack>
-                        </IndexTable.Cell>
-                        : null
-                    )
+                    return getHeader(header);
                 })}
             </>
         )
@@ -210,4 +246,4 @@ function GithubRow(props) {
 
 }
 
-export default GithubRow;
+export {GithubRow, CellType};
