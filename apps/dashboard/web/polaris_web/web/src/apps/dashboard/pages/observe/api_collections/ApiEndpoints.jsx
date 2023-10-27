@@ -55,6 +55,7 @@ const headings = [
         text: 'Sensitive Params',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
+        filterKey: 'sensitiveTags',
         showFilter: true
     },
     {
