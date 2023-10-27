@@ -26,7 +26,7 @@ public class ApiToken {
         CICD(Arrays.asList("/api/startTest", "/api/retrieveAllCollectionTests", "/api/fetchTestingRunResultSummaries", 
         "/api/fetchTestingRunResults","/api/fetchWorkflowTestingRun","/api/fetchWorkflowTestingSchedule",
         "/api/stopAllTests","/api/fetchTestRunResultDetails","/api/fetchIssueFromTestRunResultDetails",
-                "/api/publishGithubComments"));
+                "/api/publishGithubComments", "/api/updateGithubStatus"));
         private final List<String> accessList;
 
         Utility(List<String> accessList) {
