@@ -25,7 +25,12 @@ public class ApiExecutor {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
+            boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
+                if(rateLimitHit){
+                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                }
+                rateLimitHit = false;
                 Thread.sleep(1000);
             }
         }

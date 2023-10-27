@@ -29,6 +29,12 @@ let persistStore = (set) => ({
     setAllCollections:(allCollections)=>{
         set({allCollections: allCollections})
     },
+
+    hostNameMap: {},
+    setHostNameMap:(hostNameMap)=>{
+        set({hostNameMap: hostNameMap})
+    }
+
 })
 
 persistStore = devtools(persistStore)

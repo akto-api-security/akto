@@ -30,7 +30,10 @@ public class TestResult extends GenericTestResult {
         FAILED_DOWNLOADING_PAYLOAD_FILES("Failed downloading payload files"),
         FAILED_BUILDING_NUCLEI_TEMPLATE("Failed building nuclei template"),
         FAILED_BUILDING_URL_WITH_DOMAIN("Failed building URL with domain"),
-        FAILED_REPLACING_VARIABLES_IN_NUCLEI_TEMPLATE("Failed replacing variables in nuclei template");
+        FAILED_REPLACING_VARIABLES_IN_NUCLEI_TEMPLATE("Failed replacing variables in nuclei template"),
+        EXECUTION_FAILED("Test execution failed"),
+        INVALID_EXECUTION_BLOCK("Invalid test execution block in template"),
+        NO_API_REQUEST("No test requests created");
 
         private final String message;
 
