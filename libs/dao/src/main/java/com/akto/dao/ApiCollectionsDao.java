@@ -1,8 +1,6 @@
 package com.akto.dao;
 
 import com.akto.dto.ApiCollection;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -95,16 +93,14 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
 
-        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
-        pipeline.add(Aggregates.unwind(collectionIdKey));
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(endpointsCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = endpointsCursor.next();
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._COLLECTION_IDS);
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
                 int count = basicDBObject.getInt("count");
                 countMap.put(apiCollectionId, count);
             } catch (Exception e) {
