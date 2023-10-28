@@ -19,8 +19,8 @@
   <img src="https://img.shields.io/docker/image-size/aktosecurity/akto-api-security-dashboard?logo=docker"/>
 </a>
 
-<a href="https://github.com/akto-api-security/akto/issues?q=label%3Ahackfest" _target="blank">
-  <img src="https://img.shields.io/github/issues/akto-api-security/akto/hackfest?logo=github"/>
+<a href="https://github.com/akto-api-security/akto/issues?q=label%3Ahacktoberfest" _target="blank">
+  <img src="https://img.shields.io/github/issues/akto-api-security/akto/hacktoberfest?logo=github"/>
 </a>
 
 <!--a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
