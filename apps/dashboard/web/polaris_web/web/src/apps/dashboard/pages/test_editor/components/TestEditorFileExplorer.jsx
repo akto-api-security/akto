@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Badge, Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
 
 import TestEditorStore from "../testEditorStore"
@@ -22,6 +22,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     const [searchText, setSearchText] = useState('')
     const [showCustom, setShowCustom] = useState(false)
     const [showAkto, setShowAkto] = useState(false)
+    const [count, setCount] = useState({"CUSTOM" : testObj.totalCustomTests, "Akto": testObj.totalAktoTests})
 
     const navigate = useNavigate()
 
@@ -82,6 +83,11 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                 cloneObj.customTests[key] = arr
             }
         }
+
+        setCount({
+            Akto: aktoTotal,
+            CUSTOM: customTotal
+        })
 
         cloneObj.totalCustomTests = customTotal
         cloneObj.totalAktoTests = aktoTotal
@@ -172,6 +178,9 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                     </Box>
                                     <Text variant="headingMd" as="h5" color="subdued">Custom</Text>
                                 </HorizontalStack>
+                                <div style={{marginRight: '-2px'}}>
+                                    <Badge size="small" status="new">{count.CUSTOM.toString()}</Badge>
+                                </div>
                                 {/* <Box onClick={(e) => addCustomTest(e)}>
                                     <Icon source={CirclePlusMinor} />
                                 </Box> */}
@@ -181,11 +190,16 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                     </Box>
                     <Box>
                         <Button plain monochrome onClick={() => toggleFunc("Akto")} removeUnderline fullWidth>
-                            <HorizontalStack gap="1">
-                                <Box>
-                                    <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
-                                </Box>
-                                <Text variant="headingMd" as="h5" color="subdued">Akto Default</Text>
+                            <HorizontalStack align="space-between">
+                                <HorizontalStack gap="1">
+                                    <Box>
+                                        <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
+                                    </Box>
+                                    <Text variant="headingMd" as="h5" color="subdued">Akto Default</Text>
+                                </HorizontalStack>
+                                <div style={{marginRight: '-2px'}}>
+                                    <Badge size="small" status="new">{count.Akto.toString()}</Badge>
+                                </div>
                             </HorizontalStack>
                         </Button>
                         {showAkto ? <Navigation.Section items={getItems(aktoItems)} /> : null}
