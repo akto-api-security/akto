@@ -505,5 +505,14 @@ export default {
                 apiList, collectionName
             }
         })
+    },
+    async removeApisFromCustomCollection(apiList, collectionName) {
+        return await request({
+            url: '/api/removeApisFromCustomCollection',
+            method: 'post',
+            data: {
+                apiList, collectionName
+            }
+        })
     }
 }

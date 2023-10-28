@@ -67,7 +67,17 @@ public class ApiCollectionUsers {
                 Filters.eq(SingleTypeInfo._URL, api.getUrl()));
     }
 
-    public static void updateCollectionsForCollectionId(Set<ApiInfoKey> apis, int apiCollectionId) {
+    public static void addApisInCollectionsForCollectionId(Set<ApiInfoKey> apis, int apiCollectionId) {
+        Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        updateCollectionsForCollectionId(apis, apiCollectionId, update);
+    }
+
+    public static void removeApisFromCollectionsForCollectionId(Set<ApiInfoKey> apis, int apiCollectionId) {
+        Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        updateCollectionsForCollectionId(apis, apiCollectionId, update);
+    }
+
+    private static void updateCollectionsForCollectionId(Set<ApiInfoKey> apis, int apiCollectionId, Bson update) {
         int accountId = Context.accountId.get();
         executorService.schedule(new Runnable() {
             public void run() {
@@ -83,7 +93,6 @@ public class ApiCollectionUsers {
 
                 Bson filterWithId = Filters.or(filtersWithId);
                 Bson filterWithoutId = Filters.or(filtersWithoutId);
-                Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
 
                 Map<Type, MCollection<?>[]> collectionsMap = getCollectionsWithApiCollectionId();
 

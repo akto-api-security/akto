@@ -53,7 +53,7 @@ const func = {
   },
 prettifyEpoch(epoch) {
     if(epoch === 0){
-      return "Never" ;
+      return "-" ;
     }
     let diffSeconds = (+Date.now()) / 1000 - epoch
     let sign = 1
@@ -725,7 +725,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
 
           ret[key] = {
-              id: x.method+ " " + x.url + " " + Math.random(),
+              id: x.method + " " + x.url + " " + x.apiCollectionId + " " + Math.random(),
               shadow: x.shadow ? x.shadow : false,
               sensitive: x.sensitive,
               tags: x.tags,

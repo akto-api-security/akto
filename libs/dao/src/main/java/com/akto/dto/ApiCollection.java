@@ -19,6 +19,7 @@ public class ApiCollection {
     String name;
     int startTs;
     Set<String> urls;
+    public static final String URLS_STRING = "urls";
     String hostName;
     public static final String HOST_NAME = "hostName";
     int vxlanId;

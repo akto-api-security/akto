@@ -19,8 +19,7 @@ import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
-import DropdownSearch from "../../../components/shared/DropdownSearch"
-import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
+import {ApiGroupModal, Operation} from "./ApiGroupModal"
 
 const headings = [
     {
@@ -112,7 +111,6 @@ function ApiEndpoints() {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
-    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
 
     const tableTabs = [
         {
@@ -408,99 +406,29 @@ function ApiEndpoints() {
         },200)
     }
 
-    const [apiGroupName, setApiGroupName] = useState("")
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
-    const [apisToBeAdded, setApisToBeAdded] = useState([])
+    const [apis, setApis] = useState([])
+    const [actionOperation, setActionOperation] = useState(Operation.ADD)
 
-    function addAPIs(){
-        let ret = apisToBeAdded.map((x) => {
-            let tmp = x.split(" ");
-            return {
-                method: tmp[0],
-                url: tmp[1],
-                apiCollectionId: parseInt(apiCollectionId)
-            }
-        })
+    function handleApiGroupAction(selectedResources, operation){
 
-        api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
-            func.setToast(true, false, "APIs added to API group successfully")
-            setCollectionsMap(func.mapCollectionId(resp?.apiCollections))
-        }).catch(err => {
-            func.setToast(true, true, err)
-        })
+        setActionOperation(operation)
+        setApis(selectedResources)
+        setShowApiGroupModal(true);
     }
 
-    const apiGroupModal = (
-        <Modal
-            key={"add-apis-to-api-group"}
-            open={showApiGroupModal}
-            onClose={() => setShowApiGroupModal(false)}
-            title="Add APIs to API group"
-            primaryAction={{
-                content: 'Add APIs',
-                onAction: addAPIs,
-            }}
-        >
-            <Modal.Section flush>
-                <LayoutWithTabs
-                    key="tabs"
-                    tabs={[{
-                        id: 'existing',
-                        content: 'Existing API group',
-                        component: (
-                            <Box padding={5}>
-                                <DropdownSearch
-                                id={"select-api-group"}
-                                label="Select API group"
-                                placeholder="Select API group"
-                                optionsList={Object.keys(collectionsMap).map((x) => {
-                                    return collectionsMap[x];
-                                }).filter((x) => { return x.type === 'API_GROUP' }).map((x) => {
-                                    return {
-                                        label: x.displayName,
-                                        value: x.displayName
-                                    }
-                                })
-                                }
-                                setSelected={setApiGroupName}
-                            />
-                            </Box>
-                        )
-                    }, {
-                        id: 'new',
-                        content: 'New API group',
-                        component: (
-                            <Box padding={5}>
-                            <TextField
-                                id="create-api-group"
-                                label="Name"
-                                helpText="Enter name for new API group"
-                                value={apiGroupName}
-                                onChange={(input) => setApiGroupName(input)}
-                                autoComplete="off"
-                                maxLength="25"
-                            />
-                            </Box>
-                        )
-                    }]}
-                    currTab={() => { }}
-                    noLoading={true}
-                />
-
-            </Modal.Section>
-        </Modal>
-    )
-
-    function handleAddToApiGroup(selectedResources){
-        console.log(selectedResources);
-        setApisToBeAdded(selectedResources)
-        setShowApiGroupModal(true);
+    function toggleApiGroupModal(){
+        setShowApiGroupModal(false);
     }
 
     const promotedBulkActions = (selectedResources) => [
         {
           content: 'Add to API group',
-          onAction: () => handleAddToApiGroup(selectedResources)
+          onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
+        },
+        {
+            content: 'Remove from API group',
+            onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
         },
       ];
 
@@ -552,7 +480,13 @@ function ApiEndpoints() {
                             getStatus={() => { return "warning" }}
                             isGptActive={isGptActive}
                         />,
-                        apiGroupModal
+                        <ApiGroupModal
+                            key="api-group-modal"
+                            showApiGroupModal={showApiGroupModal}
+                            toggleApiGroupModal={toggleApiGroupModal}
+                            apis={apis}
+                            operation={actionOperation}
+                        />
                     ]}
         />
     )
