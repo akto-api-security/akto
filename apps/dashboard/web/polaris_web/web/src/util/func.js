@@ -489,6 +489,22 @@ prettifyEpoch(epoch) {
 
     return collectionsObj
   },
+  mapCollectionId(collections) {
+    let collectionsObj = {}
+    collections.forEach((collection)=>{
+      if(!collectionsObj[collection.id]){
+        collectionsObj[collection.id] = collection
+      }
+    })
+    return collectionsObj
+  },
+  reduceToCollectionName(collectionObj){
+    return Object.keys(collectionObj).reduce((acc, k) => {
+      acc[k] = collectionObj[k].displayName;
+      return acc;
+    }, {});
+  },
+  
 sortFunc: (data, sortKey, sortOrder) => {
   return data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
@@ -709,7 +725,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
 
           ret[key] = {
-              id: x.method+ " " + x.url + Math.random(),
+              id: x.method+ " " + x.url + " " + Math.random(),
               shadow: x.shadow ? x.shadow : false,
               sensitive: x.sensitive,
               tags: x.tags,
@@ -1085,7 +1101,7 @@ mapCollectionIdToHostName(apiCollections){
     }
     return duration.trim();
   },
-  handleKeyPress (event, funcToCall) {
+handleKeyPress (event, funcToCall) {
     const enterKeyPressed = event.keyCode === 13;
     if (enterKeyPressed) {
       event.preventDefault();

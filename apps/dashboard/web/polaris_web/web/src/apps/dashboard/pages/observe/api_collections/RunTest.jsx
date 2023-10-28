@@ -32,7 +32,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     const [testRun, setTestRun] = useState({
         ...initialState
     })
-    const collectionsMap = PersistStore(state => state.collectionsMap)
+    const collectionsMap = func.reduceToCollectionName(PersistStore(state => state.collectionsMap))
     const [loading, setLoading] = useState(true)
     const [active, setActive] = useState(false);
 

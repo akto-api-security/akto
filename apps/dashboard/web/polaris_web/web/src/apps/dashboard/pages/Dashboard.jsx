@@ -24,7 +24,7 @@ function Dashboard() {
 
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
-        const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+        const allCollectionsMap = func.mapCollectionId(apiCollections)
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
         setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)

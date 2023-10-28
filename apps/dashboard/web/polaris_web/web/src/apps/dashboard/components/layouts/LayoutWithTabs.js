@@ -7,7 +7,9 @@ export default function LayoutWithTabs(props){
     const [current, setCurrent] = useState(0)
     const [loading, setLoading] = useState(false)
     const setCurrentTab = (selected) => {
-        setLoading(true)
+        if(!props.noLoading){
+            setLoading(true)
+        }
         setCurrent(selected)
         setTimeout(() => {
             setLoading(false);
