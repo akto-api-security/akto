@@ -7,7 +7,8 @@ import {
   CollectionsMajor,
   FlagMajor,
   CreditCardSecureMajor,
-  MarketingMajor} from '@shopify/polaris-icons';
+  MarketingMajor,
+  FraudProtectMajor} from '@shopify/polaris-icons';
 import {
   Text,
   Button,
@@ -81,6 +82,11 @@ let moreInfoSections = [
   {
     icon: CreditCardSecureMajor,
     title: "CWE",
+    content: ""
+  },
+  {
+    icon: FraudProtectMajor,
+    title: "CVE",
     content: ""
   },
   {
@@ -185,7 +191,7 @@ function TestRunResultPage(props) {
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
-      setInfoState(transform.fillMoreInformation(runIssues, runIssuesArr,tmp, moreInfoSections))
+      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
       setIssueDetails(...[{}]);
     }
@@ -211,6 +217,18 @@ function TestRunResultPage(props) {
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
+  const testErrorComponent = (
+    <LegacyCard title="Errors" sectioned key="test-errors">
+      {
+        selectedTestRunResult?.errors?.map((error, i) => {
+          return (
+            <Text key={i}>{error}</Text>
+          )
+        })
+      }
+    </LegacyCard>
+  )
+
   const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
@@ -220,6 +238,7 @@ function TestRunResultPage(props) {
         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
+    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
     selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}

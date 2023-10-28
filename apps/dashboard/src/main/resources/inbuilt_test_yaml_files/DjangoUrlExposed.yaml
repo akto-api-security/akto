@@ -23,7 +23,10 @@ info:
     - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/08-Testing_for_Error_Handling/01-Testing_For_Improper_Error_Handling"
     - "https://hackerone.com/reports/1033423"
   cwe:
-    - CWE-16
+    - CWE-215
+    - CWE-489
+  cve:
+    - CVE-2017-12794
 
 api_selection_filters:
   response_code:

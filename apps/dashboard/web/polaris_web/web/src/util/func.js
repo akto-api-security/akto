@@ -1231,6 +1231,13 @@ mapCollectionIdToHostName(apiCollections){
         default: 
             return KeyMajor;
     }
+  },
+  handleKeyPress (event, funcToCall) {
+    const enterKeyPressed = event.keyCode === 13;
+    if (enterKeyPressed) {
+      event.preventDefault();
+      funcToCall();
+    }
   }
 }
 
