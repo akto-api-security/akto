@@ -9,6 +9,7 @@ import {
   Box,
   Tooltip,
   LegacyCard,
+  Card,
   Tag,
   IndexFiltersMode,
 } from '@shopify/polaris';
@@ -24,6 +25,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
+import { CellType } from "../../../components/tables/rows/GithubRow";
 
 let headers = [
   {
@@ -37,7 +39,7 @@ let headers = [
   {
     value: 'testCategory',
     title: 'Category',
-    isText: true,
+    type: CellType.TEXT,
   },
   {
     title: 'CWE tags',
@@ -46,7 +48,7 @@ let headers = [
   {
     title: 'Number of urls',
     value: 'totalUrls',
-    isText:true
+    type: CellType.TEXT
   },
   {
     value: "scanned_time_comp",
@@ -54,7 +56,7 @@ let headers = [
   },
   {
     title: '',
-    isCollapsible: true
+    type: CellType.COLLAPSIBLE
   }
 ]
 
@@ -75,7 +77,7 @@ function disambiguateLabel(key, value) {
     case 'severityStatus':
       return (value).map((val) => `${val} severity`).join(', ');
     case 'urlFilters':
-      return value.length + ' API' + (value.length==1 ? '' : 's')
+      return value.length + ' API' + (value.length === 1 ? '' : 's')
     case 'cwe':
     case 'categoryFilter':
     case 'testFilter':
@@ -117,15 +119,6 @@ let filters = [
     title: 'API'
   }
 ]
-
-const TabHeading = (type, testRunResults) => {
-  return (
-    <HorizontalStack gap={2}>
-      <Text> {func.toSentenceCase(type)} </Text>
-      <Tag>{testRunResults[type].length}</Tag>
-    </HorizontalStack>
-  )
-}
 
 function SingleTestRunPage() {
 
@@ -204,7 +197,7 @@ function SingleTestRunPage() {
         cicd = true;
       }
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
-      if(localSelectedTestRun.orderPriority === 1 || localSelectedTestRun.orderPriority === 2){
+      if(localSelectedTestRun.orderPriority === 1){
         if(setData){
           setTimeout(() => {
             refreshSummaries();

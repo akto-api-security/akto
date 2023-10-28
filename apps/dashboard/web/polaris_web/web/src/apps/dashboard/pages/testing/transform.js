@@ -124,6 +124,8 @@ const transform = {
           case "CVE":
             linkUrl = getCveLink(tag)
             break;
+            default:
+            break;
         }
 
         return (
@@ -444,6 +446,8 @@ const transform = {
             </List>
           )
           break;
+          default:
+            break;
       }
       filledSection.push(sectionLocal)
     })
