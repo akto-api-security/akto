@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Card, HorizontalStack, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
+import { Text, Button, Modal, TextField, IndexFiltersMode, Card, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
@@ -9,19 +9,21 @@ import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import { CellType } from "../../../components/tables/rows/GithubRow"
 
 const headers = [
     {
         title: "API collection name",
         text: "API collection name",
-        value: "displayName",
+        value: "displayNameComp",
+        filterKey:"displayName",
         showFilter:true,
     },
     {
         title: "Total endpoints",
         text: "Total endpoints",
         value: "endpoints",
-        isText: true,
+        isText: CellType.TEXT,
     },
     {
         title: 'Risk score',
@@ -31,7 +33,7 @@ const headers = [
         title: 'Test coverage',
         text: 'Test coverage', 
         value: 'coverage',
-        isText: true,
+        isText: CellType.TEXT,
     },
     {
         title: 'Issues', 
@@ -47,7 +49,7 @@ const headers = [
         title: 'Last traffic seen', 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
-        isText: true,
+        isText: CellType.TEXT,
     }
 ]
 

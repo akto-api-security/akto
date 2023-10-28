@@ -14,6 +14,7 @@ import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
 import ChartypeComponent from "./ChartypeComponent";
+import { CellType } from "../../../components/tables/rows/GithubRow";
 
 /*
   {
@@ -35,7 +36,7 @@ import ChartypeComponent from "./ChartypeComponent";
 
 let headers = [
   {
-    text:"Text name",
+    text:"Test name",
     title: 'Test run name',
     value:"testName",
     itemOrder:1,
@@ -45,7 +46,7 @@ let headers = [
     title: "Number of tests",
     value: "number_of_tests",
     itemOrder: 3,
-    isText: true,
+    type: CellType.TEXT,
   },
   {
     text:"Severity",
@@ -59,11 +60,11 @@ let headers = [
     value: 'run_time',
     title: 'Status',
     itemOrder: 3,
-    isText: true,
+    type: CellType.TEXT,
   },
   {
     title: '',
-    isAction: true,
+    type: CellType.ACTION,
   }
 ]
 
