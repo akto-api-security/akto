@@ -40,7 +40,13 @@
                                             <tag-component 
                                                 title="CWE"
                                                 :tagList="subCatogoryMap[issuesDetails.id.testSubCategory].cwe"
-                                                @tagClick="goToCwePage"
+                                                @tagClick="(item) => goToPage(getCweLink(item))"
+                                            />
+                                            <tag-component 
+                                                v-if="subCatogoryMap[issuesDetails.id.testSubCategory].cve"
+                                                title="CVE"
+                                                :tagList="subCatogoryMap[issuesDetails.id.testSubCategory].cve"
+                                                @tagClick="(item) => goToPage(getCveLink(item))"
                                             />
                                     </v-container>
                                 </div>
@@ -190,14 +196,21 @@ export default {
 
             return highlightPaths
         },
-        goToCwePage(item){
+        getCweLink(item){
             let cwe = item.split("-")
             if(cwe[1]){
                 cwe = cwe[1]
             } else {
-                return;
+                return "";
             }
-            return window.open(`https://cwe.mitre.org/data/definitions/${cwe}.html`, "_blank")
+            return `https://cwe.mitre.org/data/definitions/${cwe}.html`
+        },
+        getCveLink(item){
+            console.log(item);
+            return `https://nvd.nist.gov/vuln/detail/${item}`
+        },
+        goToPage(link){
+            return window.open(link, "_blank")
         }
     },
     watch: {
