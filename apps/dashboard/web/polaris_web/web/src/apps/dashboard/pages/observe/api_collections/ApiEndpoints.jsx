@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Box, Popover, IndexFiltersMode, VerticalStack, TextField, Modal } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -19,6 +19,8 @@ import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import DropdownSearch from "../../../components/shared/DropdownSearch"
+import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 
 const headings = [
     {
@@ -91,7 +93,7 @@ function ApiEndpoints() {
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const pageTitle = collectionsMap[apiCollectionId]
+    const pageTitle = collectionsMap[apiCollectionId].displayName
 
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
@@ -110,6 +112,7 @@ function ApiEndpoints() {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
+    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
 
     const tableTabs = [
         {
@@ -237,7 +240,7 @@ function ApiEndpoints() {
             let blob = new Blob([openApiString], {
                 type: "application/json",
             });
-            const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
+            const fileName = "open_api_" + collectionsMap[apiCollectionId].displayName + ".json";
             saveAs(blob, fileName);
 
             lastFetchedUrl = result["lastFetchedUrl"]
@@ -405,6 +408,102 @@ function ApiEndpoints() {
         },200)
     }
 
+    const [apiGroupName, setApiGroupName] = useState("")
+    const [showApiGroupModal, setShowApiGroupModal] = useState(false)
+    const [apisToBeAdded, setApisToBeAdded] = useState([])
+
+    function addAPIs(){
+        let ret = apisToBeAdded.map((x) => {
+            let tmp = x.split(" ");
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(apiCollectionId)
+            }
+        })
+
+        api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
+            func.setToast(true, false, "APIs added to API group successfully")
+            setCollectionsMap(func.mapCollectionId(resp?.apiCollections))
+        }).catch(err => {
+            func.setToast(true, true, err)
+        })
+    }
+
+    const apiGroupModal = (
+        <Modal
+            key={"add-apis-to-api-group"}
+            open={showApiGroupModal}
+            onClose={() => setShowApiGroupModal(false)}
+            title="Add APIs to API group"
+            primaryAction={{
+                content: 'Add APIs',
+                onAction: addAPIs,
+            }}
+        >
+            <Modal.Section flush>
+                <LayoutWithTabs
+                    key="tabs"
+                    tabs={[{
+                        id: 'existing',
+                        content: 'Existing API group',
+                        component: (
+                            <Box padding={5}>
+                                <DropdownSearch
+                                id={"select-api-group"}
+                                label="Select API group"
+                                placeholder="Select API group"
+                                optionsList={Object.keys(collectionsMap).map((x) => {
+                                    return collectionsMap[x];
+                                }).filter((x) => { return x.type === 'API_GROUP' }).map((x) => {
+                                    return {
+                                        label: x.displayName,
+                                        value: x.displayName
+                                    }
+                                })
+                                }
+                                setSelected={setApiGroupName}
+                            />
+                            </Box>
+                        )
+                    }, {
+                        id: 'new',
+                        content: 'New API group',
+                        component: (
+                            <Box padding={5}>
+                            <TextField
+                                id="create-api-group"
+                                label="Name"
+                                helpText="Enter name for new API group"
+                                value={apiGroupName}
+                                onChange={(input) => setApiGroupName(input)}
+                                autoComplete="off"
+                                maxLength="25"
+                            />
+                            </Box>
+                        )
+                    }]}
+                    currTab={() => { }}
+                    noLoading={true}
+                />
+
+            </Modal.Section>
+        </Modal>
+    )
+
+    function handleAddToApiGroup(selectedResources){
+        console.log(selectedResources);
+        setApisToBeAdded(selectedResources)
+        setShowApiGroupModal(true);
+    }
+
+    const promotedBulkActions = (selectedResources) => [
+        {
+          content: 'Add to API group',
+          onAction: () => handleAddToApiGroup(selectedResources)
+        },
+      ];
+
     return (
         <PageWithMultipleCards
             title={
@@ -435,6 +534,8 @@ function ApiEndpoints() {
                                 useNewRow={true}
                                 condensedHeight={true}
                                 tableTabs={tableTabs}
+                                selectable={true}
+                                promotedBulkActions={promotedBulkActions}
                             />
                             <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
                                 <Modal.Section flush>
@@ -450,7 +551,8 @@ function ApiEndpoints() {
                             headers={transform.getDetailsHeaders()}
                             getStatus={() => { return "warning" }}
                             isGptActive={isGptActive}
-                        />
+                        />,
+                        apiGroupModal
                     ]}
         />
     )

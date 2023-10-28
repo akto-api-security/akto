@@ -70,16 +70,44 @@ const convertToNewData = (collectionsArr) => {
 
 function ApiCollections() {
 
-    const [data, setData] = useState([])
+    const [data, setData] = useState({'All':[]})
     const [active, setActive] = useState(false);
     const [newCollectionName, setNewCollectionName] = useState('');
     const [loading, setLoading] = useState(false)
+    const [selectedTab, setSelectedTab] = useState("All")
+    const [selected, setSelected] = useState(0)
     const handleNewCollectionNameChange = 
         useCallback(
             (newValue) => setNewCollectionName(newValue),
         []);
     
-    
+    const tableTabs = [
+        {
+            content: 'All',
+            badge: data["All"]?.length?.toString(),
+            onAction: () => { setSelectedTab('All') },
+            id: 'All',
+        },
+        {
+            content: 'Hostname',
+            badge: data["Hostname"]?.length?.toString(),
+            onAction: () => { setSelectedTab('Hostname') },
+            id: 'Hostname',
+        },
+        {
+            content: 'Groups',
+            badge: data["Groups"]?.length?.toString(),
+            onAction: () => { setSelectedTab('Groups') },
+            id: 'Groups',
+        },
+        {
+            content: 'Custom',
+            badge: data["Custom"]?.length?.toString(),
+            onAction: () => { setSelectedTab('Custom') },
+            id: 'Custom',
+        }
+    ]
+
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
@@ -125,11 +153,17 @@ function ApiCollections() {
         const dataObj = convertToNewData(tmp);
 
         setAllCollections(apiCollectionsResp.apiCollections || [])
-        setCollectionsMap(func.mapCollectionIdToName(tmp))
+        setCollectionsMap(func.mapCollectionId(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
         
-        setData(dataObj.prettify)
+        tmp = {}
+        tmp.All = dataObj.prettify
+        tmp.Hostname = dataObj.prettify.filter((c) => c.type === "TRAFFIC")
+        tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.Custom = dataObj.prettify.filter((c) => c.type === "CUSTOM")
+
+        setData(tmp);
     }
 
     function disambiguateLabel(key, value) {
@@ -191,11 +225,15 @@ function ApiCollections() {
         </Modal>
     )
 
+    const handleSelectedTab = (selectedIndex) => {
+        setSelected(selectedIndex)
+    }
+
     const tableComponent = (
         <GithubSimpleTable
             key="table"
             pageLimit={100}
-            data={data} 
+            data={data[selectedTab]} 
             sortOptions={sortOptions} 
             resourceName={resourceName} 
             filters={[]}
@@ -207,6 +245,9 @@ function ApiCollections() {
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
+            tableTabs={tableTabs}
+            onSelect={handleSelectedTab}
+            selected={selected}
         />
     )
 

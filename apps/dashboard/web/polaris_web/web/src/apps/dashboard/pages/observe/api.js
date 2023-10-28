@@ -496,4 +496,14 @@ export default {
             }
         })
     },
+
+    async addApisToCustomCollection(apiList, collectionName) {
+        return await request({
+            url: '/api/addApisToCustomCollection',
+            method: 'post',
+            data: {
+                apiList, collectionName
+            }
+        })
+    }
 }
