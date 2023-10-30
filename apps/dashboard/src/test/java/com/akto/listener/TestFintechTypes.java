@@ -87,7 +87,7 @@ public class TestFintechTypes extends MongoBasedTest {
                     break;
                  case "AWS Secret Access Key":
                     assertTrue(cdt.validate("3pHXfQaoxG0ZUlgor7GpflAgOYnIZiHCgtgEgIJUyMC", "foo"));
-                    assertFalse(cdt.validate("1g47WR2iBOWklti3ywvbEXC/97k0H4KmF3uR8VyGUe1", "foo"));
+                    assertFalse(cdt.validate("1g47WR2iBOWklti3ywvbEXCg97k0H4KmF3uR8VyGUe1", "foo"));
                     break;
                  case "AWS Secret Access ID":
                     assertTrue(cdt.validate("nA3mQGcxhzIoGwNZWgL0", "foo"));
