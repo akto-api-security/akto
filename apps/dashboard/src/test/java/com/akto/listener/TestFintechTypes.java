@@ -70,7 +70,7 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertFalse(cdt.validate("PO BOX 123, SAN JOSE, CA 11111", "foo"));
                     break;
                  case "MySQL URI":
-                    assertTrue(cdt.validate("mysqlx://user_name@server.example.com/", "foo"));
+                    assertTrue(cdt.validate("mysqlx://user_name@server.example.com", "foo"));
                     assertFalse(cdt.validate("mysql://user@localhost:3306?get-server-public-key=true", "foo"));
                     break;
                  case "Redis URI":
