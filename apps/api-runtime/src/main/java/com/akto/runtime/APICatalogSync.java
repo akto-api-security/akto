@@ -46,7 +46,6 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    public static boolean mergeAsyncOutside = true;
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this.thresh = thresh;
@@ -182,7 +181,7 @@ public class APICatalogSync {
                     aktoPolicyNew.process(responseParams);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    throw new RuntimeException(e);
+                    loggerMaker.errorAndAddToDb("Error while processing aktoPolicyNew for" + responseParams.getRequestParams().getURL() +" : " + e.getMessage(), LogDb.RUNTIME);
                 }
             }
         }
@@ -196,18 +195,13 @@ public class APICatalogSync {
         start = System.currentTimeMillis();
         tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
 
-        if (!mergeAsyncOutside) {
-            start = System.currentTimeMillis();
-            tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
-        } else {
-            for (URLStatic pending: pendingRequests.keySet()) {
-                RequestTemplate pendingTemplate = pendingRequests.get(pending);
-                RequestTemplate rt = deltaCatalog.getStrictURLToMethods().get(pending);
-                if (rt != null) {
-                    rt.mergeFrom(pendingTemplate);
-                } else {
-                    deltaCatalog.getStrictURLToMethods().put(pending, pendingTemplate);
-                }
+        for (URLStatic pending: pendingRequests.keySet()) {
+            RequestTemplate pendingTemplate = pendingRequests.get(pending);
+            RequestTemplate rt = deltaCatalog.getStrictURLToMethods().get(pending);
+            if (rt != null) {
+                rt.mergeFrom(pendingTemplate);
+            } else {
+                deltaCatalog.getStrictURLToMethods().put(pending, pendingTemplate);
             }
         }
     }
@@ -1202,7 +1196,7 @@ public class APICatalogSync {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         boolean mergingCalled = false;
-        if (mergeAsyncOutside && fetchAllSTI ) {
+        if (fetchAllSTI ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
@@ -1255,9 +1249,7 @@ public class APICatalogSync {
             this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
         }
 
-        if (mergeAsyncOutside) {
-            this.delta = new HashMap<>();
-        }
+        this.delta = new HashMap<>();
 
 
         try {
