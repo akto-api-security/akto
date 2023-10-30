@@ -15,6 +15,7 @@ info:
     - https://ubuntu.com/security/notices/USN-982-1
   cwe:
     - CWE-16
+    - CWE-200
 
 api_selection_filters:
   response_code:
