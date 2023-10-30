@@ -63,13 +63,15 @@ const headings = [
         title: 'Last seen',
         value: 'last_seen',
         isText: true,
-    },
-    {
-        text: "Method",
-        filterKey: "method",
-        showFilter: true
     }
 ]
+
+let headers = JSON.parse(JSON.stringify(headings))
+headers.push({
+    text: 'Method',
+    filterKey: 'method',
+    showFilter: true
+})
 
 
 const sortOptions = [
@@ -263,7 +265,7 @@ function ApiEndpoints() {
 
     function exportCsv() {
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headings.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['All']
@@ -437,7 +439,7 @@ function ApiEndpoints() {
                                 resourceName={resourceName}
                                 filters={[]}
                                 disambiguateLabel={disambiguateLabel}
-                                headers={headings}
+                                headers={headers}
                                 getStatus={() => { return "warning" }}
                                 selected={selected}
                                 onRowClick={handleRowClick}

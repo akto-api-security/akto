@@ -42,8 +42,8 @@ function GithubServerTable(props) {
     })
     async function fetchData() {
       let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, queryValue);
-      setData([...tempData.value])
-      setTotal(tempData.total)
+      tempData ? setData([...tempData.value]) : setData([])
+      tempData ? setTotal(tempData.total) : setTotal(0)
     }
     fetchData();
   }, [sortSelected, appliedFilters, queryValue, page])

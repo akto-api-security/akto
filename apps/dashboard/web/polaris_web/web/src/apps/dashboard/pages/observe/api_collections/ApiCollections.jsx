@@ -10,6 +10,7 @@ import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import TooltipText from "../../../components/shared/TooltipText"
 
 const headers = [
     {
@@ -88,6 +89,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoArr, severityInfoMap, cov
     const newData = collectionsArr.map((c) => {
         return{
             ...c,
+            displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
             sensitiveInRespCount: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveUrlsInResponse'] : 0,
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveSubtypesInResponse'] : [],

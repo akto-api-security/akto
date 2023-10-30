@@ -13,12 +13,13 @@ import values from "@/util/values";
 import ObserveStore from "../observeStore";
 import ApiDetails from "./ApiDetails";
 import PersistStore from "../../../../main/PersistStore";
+import ApiChangesTable from "./component/ApiChangesTable";
 
 
 function ApiChanges() {
 
     const allCollections = PersistStore(state => state.allCollections);
-    const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
+    const collectionsMap = PersistStore(state => state.collectionsMap);
     const [newEndpoints, setNewEndpoints] = useState([])
     const [newParametersCount, setNewParametersCount] = useState("")
     const [sensitiveParams, setSensitiveParams] = useState([])
@@ -68,8 +69,9 @@ function ApiChanges() {
                 setSensitiveParams([...sensitiveParams]);
                 apiCollection = transform.fillSensitiveParams(sensitiveParams, apiCollection);
             })
-            let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, mapCollectionIdToName);
-            setNewEndpoints(data);
+            let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
+            const prettifiedData = transform.prettifyEndpointsData(data)
+            setNewEndpoints(prettifiedData);
             await api.fetchNewParametersTrend(startTimestamp, endTimestamp).then((resp) => {
                 setNewParametersCount(transform.findNewParametersCount(resp, startTimestamp, endTimestamp))
             })
@@ -118,26 +120,16 @@ function ApiChanges() {
         </Card>
     )
 
-    const endpointsTable = {
-        id: 'newEndpoints',
-        content: "New endpoints",
-        component: <NewEndpointsTable loading={loading} newEndpoints={newEndpoints} handleRowClick={handleRowClick}/>
-    }
-
-    const parameterTable = {
-        id: 'newParameters',
-        content: "New parameters",
-        component: <NewParametersTable startTimestamp={startTimestamp} endTimestamp={endTimestamp} handleRowClick={handleRowClick}/>
-    }
-
-    const tabs = (
-        <Card padding={"0"} key="tabs">
-            <LayoutWithTabs
-                key="tabs"
-                tabs={[endpointsTable, parameterTable]}
-                currTab={() => { }}
-            />
-        </Card>
+    const tableComponent = (
+        <ApiChangesTable
+            handleRowClick={handleRowClick}
+            tableLoading={loading}
+            startTimeStamp={startTimestamp}
+            endTimeStamp={endTimestamp}
+            newEndpoints={newEndpoints}
+            parametersCount={newParametersCount}
+            key="table"
+        />
     )
 
     const apiChanges = (
@@ -146,12 +138,12 @@ function ApiChanges() {
             showDetails={showDetails}
             setShowDetails={setShowDetails}
             apiDetail={apiDetail}
-            headers={tableHeaders}
+            headers={transform.getDetailsHeaders()}
             getStatus={() => { return "warning" }}
         />
     )
 
-    const components = [infoCard, tabs, apiChanges]
+    const components = [infoCard, tableComponent, apiChanges]
 
     return (
         <PageWithMultipleCards

@@ -162,7 +162,7 @@ function GithubRow(props) {
 
     function TextCell(header) {
         return (
-            <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
+            <Box maxWidth={header.maxWidth ? header.maxWidth : ''} key={header.value}>
                 <TooltipText text={data[header.value]} tooltip={data[header.value]} />
             </Box>
         )
@@ -208,13 +208,13 @@ function GithubRow(props) {
         switch(type){
 
             case CellType.ACTION : 
-                return hasRowActions ? ActionCell() : <></>;
+                return hasRowActions ? ActionCell() : null;
             case CellType.COLLAPSIBLE :
                 return CollapsibleCell();
             case CellType.TEXT :
-                return header.value ? LinkCell(TextCell(header), header) : <></>;
+                return header.value ? LinkCell(TextCell(header), header) : null;
             default :
-                return header.value ? LinkCell(data[header.value], header) : <></>;
+                return header.value ? LinkCell(data[header.value], header) : null;
         }
     }
 
