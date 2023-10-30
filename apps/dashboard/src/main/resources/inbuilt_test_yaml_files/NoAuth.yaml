@@ -25,6 +25,9 @@ info:
     - "https://cwe.mitre.org/data/definitions/798.html"
   cwe:
     - CWE-287
+    - CWE-306
+  cve:
+    - CVE-2023-22501
 
 api_selection_filters:
   response_code:

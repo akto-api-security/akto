@@ -27,6 +27,9 @@ info:
     - "https://0xn3va.gitbook.io/cheat-sheets/web-application/graphql-vulnerabilities"
   cwe:
     - CWE-16
+    - CWE-200
+  cve:
+    - CVE-2021-41248
 
 api_selection_filters:
   url:

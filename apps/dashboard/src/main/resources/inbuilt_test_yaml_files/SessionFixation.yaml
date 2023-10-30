@@ -20,6 +20,9 @@ info:
     - "https://hackerone.com/reports/2421"
   cwe:
     - CWE-384
+  cve:
+    - CVE-2021-35046
+    - CVE-2021-46279
 
 api_selection_filters:
   response_code:
