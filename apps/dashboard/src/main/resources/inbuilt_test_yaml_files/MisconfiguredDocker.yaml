@@ -15,6 +15,9 @@ info:
     - https://madhuakula.com/content/attacking-and-auditing-docker-containers-using-opensource/attacking-docker-containers/misconfiguration.html
   cwe:
     - CWE-16
+  cve:
+    - CVE-2021-41092
+    - CVE-2023-5165
 
 api_selection_filters:
   response_code:
