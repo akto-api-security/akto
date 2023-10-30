@@ -24,6 +24,9 @@ info:
     - "https://owasp.org/www-community/attacks/csrf"
   cwe:
     - CWE-352
+  cve:
+    - CVE-2023-27495
+    - CVE-2020-27379
 
 api_selection_filters:
   response_code:

@@ -20,6 +20,9 @@ info:
     - "https://owasp.org/www-community/attacks/xss/"
   cwe:
     - CWE-79
+  cve:
+    - CVE-2022-34196 
+    - CVE-2023-44764
 
 api_selection_filters:
   response_code:

@@ -15,6 +15,8 @@ info:
     - https://linux.die.net/man/5/esmtprc
   cwe:
     - CWE-16
+    - CWE-200
+    - CWE-538
 
 api_selection_filters:
   response_code:
