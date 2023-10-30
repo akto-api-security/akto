@@ -18,7 +18,12 @@ info:
   references:
     - "https://hackerone.com/reports/58679"
   cwe:
-    - CWE-16
+    - CWE-614
+    - CWE-1004
+    - CWE-315
+  cve:
+    - CVE-2023-4654
+    - CVE-2023-28708
 
 api_selection_filters:
   response_code:

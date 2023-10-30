@@ -32,6 +32,8 @@ info:
     - CWE-284
     - CWE-285
     - CWE-639
+  cve:
+    - CVE-2023-39349
 
 auth:
   authenticated: true

@@ -16,6 +16,9 @@ info:
   cwe:
     - CWE-200
     - CWE-213
+  cve:
+    - CVE-2022-31159
+    - CVE-2022-2582
 
 api_selection_filters:
   response_code:
