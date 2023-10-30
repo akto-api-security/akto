@@ -1,3 +1,5 @@
+import { CellType } from "../../../../components/tables/rows/GithubRow";
+
 const endpointHeadings = [
     {
         text: "Endpoint",
@@ -14,21 +16,28 @@ const endpointHeadings = [
         value: 'hostName',
         title: "Hostname",
         maxWidth: '100px',
-        isText: true,
+        type: CellType.TEXT,
+    },
+    {
+        text: "Collection",
+        value: 'apiCollectionName',
+        title: "Collection",
+        maxWidth: '120px',
+        type: CellType.TEXT,
     },
     {
         text: 'Access Type',
         value: 'access_type',
         title: 'Access type',
         showFilter: true,
-        isText: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Auth Type',
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        isText: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Sensitive Params',
@@ -40,13 +49,8 @@ const endpointHeadings = [
         text: 'Last Seen',
         title: 'Last seen',
         value: 'last_seen',
-        isText: true,
+        type: CellType.TEXT,
     },
-    {
-        text: "Method",
-        filterKey: "method",
-        showFilter: true
-    }
 ]
 
 const newParametersHeaders = [
@@ -59,13 +63,17 @@ const newParametersHeaders = [
         text: 'Type',
         value: 'subType',
         title: 'Parameter Type',
+        type: CellType.TEXT,
+        maxWidth: '100px',
     },
     {
         text: "Discovered",
         title: 'Discovered',
         value: 'added',
         sortKey: 'timestamp',
-        showFilterMenu: true
+        showFilterMenu: true,
+        type: CellType.TEXT,
+        maxWidth: '120px'
     },
     {
         text: "Endpoint",
@@ -77,22 +85,29 @@ const newParametersHeaders = [
     },
     {
         text: 'Collection',
+        title: 'Collection',
         value: 'apiCollectionName',
         maxWidth: '120px',
         sortKey: 'apiCollectionId',
-        showFilterMenu: true
+        showFilterMenu: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Location',
+        title: 'Location',
         value: 'location',
         sortKey: 'isHeader',
-        showFilterMenu: true
+        showFilterMenu: true,
+        type: CellType.TEXT,
+        maxWidth: '120px'
     },
     {
         text: 'Values',
+        title: 'Values',
         value: 'domain',
         maxWidth: '150px',
-        showFilterMenu: true
+        showFilterMenu: true,
+        type: CellType.TEXT,
     }
 ]
 

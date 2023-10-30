@@ -165,13 +165,16 @@ const transform = {
     },
     prepareEndpointForTable(x, index) {
         const idToNameMap = PersistStore.getState().collectionsMap;
+        const endpointComp = this.getPrettifyEndpoint(x.method, x.url, false);
+        const name = x.param.replaceAll("#", ".").replaceAll(".$", "")
+
         return {
             id:index,
-            name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
+            name: <Box maxWidth="130px"><TooltipText tooltip={name} text={name} textProps={{fontWeight: 'medium'}} /></Box> ,
             endpoint: x.url,
             url: x.url,
             method: x.method,
-            added: "Discovered " + func.prettifyEpoch(x.timestamp),
+            added: func.prettifyEpoch(x.timestamp),
             location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
             subType: x.subType.name,
             detectedTs: x.timestamp,
@@ -179,7 +182,8 @@ const transform = {
             apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
             x: x,
             domain: func.prepareDomain(x),
-            valuesString: func.prepareValuesTooltip(x)
+            valuesString: func.prepareValuesTooltip(x),
+            endpointComp: endpointComp,
         }
     },
     formatNumberWithCommas(number) {
@@ -266,7 +270,8 @@ const transform = {
             return{
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
-                displayName: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
+                displayName: c.displayName,
+                displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
                 riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
@@ -314,7 +319,7 @@ const transform = {
             return "No host"
         }
     },
-
+    
     getPrettifyEndpoint(method,url, isNew){
         return(
             <HorizontalStack gap={1}>
@@ -323,9 +328,9 @@ const transform = {
                         <span style={{color: tranform.getTextColor(method), fontSize: "14px", fontWeight: 500}}>{method}</span>
                     </HorizontalStack>
                 </Box>
-                <Box width="240px">
+                <Box width="200px" maxWidth="200px">
                     <HorizontalStack align="space-between">
-                        <Box maxWidth={isNew ? "180px" : '220px'}>
+                        <Box maxWidth={isNew ? "140px" : '180px'}>
                             <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "medium"}} />
                         </Box>
                         {isNew ? <Badge size="small">New</Badge> : null}
