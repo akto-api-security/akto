@@ -620,7 +620,8 @@ public class APICatalogSync {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
 
-            if (tempToken.equalsIgnoreCase(dbToken)) {
+            int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
+            if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
                 continue;
             }
             
@@ -636,6 +637,13 @@ public class APICatalogSync {
                 templatizedStrTokens++;
             }
         }
+
+        boolean allNull = true;
+        for (SingleTypeInfo.SuperType superType: newTypes) {
+            allNull = allNull && (superType == null);
+        }
+
+        if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
             return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
