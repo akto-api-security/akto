@@ -40,7 +40,7 @@ function SingleRequest(){
     function togglePopoverActive() {
         setPopoverActive(!popoverActive);
     }
-    const collectionsMap = func.reduceToCollectionName(PersistStore(state => state.collectionsMap));
+    const collectionsMap = PersistStore(state => state.collectionsMap)
     const [endpointData, setEndpointData]=useState({})
 
     useEffect(() => {

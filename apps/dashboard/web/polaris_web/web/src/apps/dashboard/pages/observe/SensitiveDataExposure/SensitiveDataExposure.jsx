@@ -115,7 +115,7 @@ function SensitiveDataExposure() {
     const [loading, setLoading] = useState(true);
     const params = useParams()
     const subType = params.subType;
-    const apiCollectionMap = func.reduceToCollectionName(PersistStore(state => state.collectionsMap));
+    const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
     function disambiguateLabel(key, value) {
         switch (key) {

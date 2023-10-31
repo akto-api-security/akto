@@ -139,7 +139,7 @@ function IssuesPage(){
     const [issueStatus, setIssueStatus] = useState([]);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
-    const apiCollectionMap = func.reduceToCollectionName(PersistStore(state => state.collectionsMap))
+    const apiCollectionMap = PersistStore(state => state.collectionsMap);
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {

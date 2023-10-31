@@ -16,8 +16,9 @@ function ApiGroupModal(props){
 
     const {showApiGroupModal, toggleApiGroupModal, apis, operation } = props;
 
-    const collectionsMap = PersistStore(state => state.collectionsMap)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const allCollections = PersistStore(state => state.allCollections);
+    const setAllCollections = PersistStore(state => state.setAllCollections)
 
     const [apiGroupName, setApiGroupName] = useState("")
 
@@ -37,7 +38,8 @@ function ApiGroupModal(props){
 
         api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
             func.setToast(true, false, "APIs added to API group successfully")
-            setCollectionsMap(func.mapCollectionId(resp?.apiCollections))
+            setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
+            setAllCollections(resp?.apiCollections)
             setTimeout(() => {
                 toggleApiGroupModal()
             }, 500)
@@ -49,7 +51,8 @@ function ApiGroupModal(props){
 
         api.removeApisFromCustomCollection(ret, apiGroupName).then((resp)=>{
             func.setToast(true, false, "APIs removed from API group successfully")
-            setCollectionsMap(func.mapCollectionId(resp?.apiCollections))
+            setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
+            setAllCollections(resp?.apiCollections)
             setTimeout(() => {
                 toggleApiGroupModal()
             }, 500)
@@ -65,9 +68,7 @@ function ApiGroupModal(props){
                     id={"select-api-group"}
                     label="Select API group"
                     placeholder="Select API group"
-                    optionsList={Object.keys(collectionsMap).map((x) => {
-                        return collectionsMap[x];
-                    }).filter((x) => { return x.type === 'API_GROUP' }).map((x) => {
+                    optionsList={allCollections.filter((x) => { return x.type === 'API_GROUP' }).map((x) => {
                         return {
                             label: x.displayName,
                             value: x.displayName

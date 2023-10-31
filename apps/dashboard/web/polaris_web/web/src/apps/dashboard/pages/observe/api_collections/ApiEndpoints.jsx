@@ -92,7 +92,7 @@ function ApiEndpoints() {
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const pageTitle = collectionsMap[apiCollectionId].displayName
+    const pageTitle = collectionsMap[apiCollectionId]
 
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
@@ -238,7 +238,7 @@ function ApiEndpoints() {
             let blob = new Blob([openApiString], {
                 type: "application/json",
             });
-            const fileName = "open_api_" + collectionsMap[apiCollectionId].displayName + ".json";
+            const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
             saveAs(blob, fileName);
 
             lastFetchedUrl = result["lastFetchedUrl"]
