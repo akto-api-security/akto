@@ -9,15 +9,12 @@ import java.util.concurrent.TimeUnit;
 import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.APIConfig;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiCollection;
+import com.akto.dto.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.dto.HttpResponseParams;
 import com.akto.util.AccountTask;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
@@ -180,6 +177,8 @@ public class Main {
         }
 
         final Main main = new Main();
+
+        APICatalogSync.fillMissingApiInfo();
         Properties properties = main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 

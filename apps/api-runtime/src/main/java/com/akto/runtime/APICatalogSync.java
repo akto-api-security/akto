@@ -1277,6 +1277,82 @@ public class APICatalogSync {
         aktoPolicyNew.buildFromDb(fetchAllSTI);
     }
 
+    public static void fillMissingApiInfo() {
+        Bson updates = Updates.combine(
+            Updates.set("triggerApiInfoFixScript", true)
+        );
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions().upsert(false);
+        Bson filter = Filters.exists("triggerApiInfoFixScript", false);
+        try {
+            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.getMCollection().findOneAndUpdate(filter, updates, options);
+            if (backwardCompatibility == null) {
+                return;
+            }
+        } catch (Exception e) {
+            return;
+        }
+        int offset = 0, res = 20000;
+        List<SampleData> sampleDataList = new ArrayList<>();
+        Bson filters;
+        Map<Integer, ArrayList<HttpResponseParams>> data = new HashMap<>();
+        while(res >= 20000) {
+            sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), offset, 20000, null);
+            res = sampleDataList.size();
+            offset += 20000;
+            for (SampleData sampleData: sampleDataList) {
+                if (sampleData.getSamples() == null || sampleData.getSamples().size() == 0) {
+                    continue;
+                }
+                String sample = sampleData.getSamples().get(0);
+                HttpResponseParams responseParams;
+                try {
+                    responseParams =  HttpCallParser.parseKafkaMessage(sample);
+                    int ts = responseParams.getTime();
+                    if (Context.now() - ts <= (7 * 24 * 60 * 60)) {
+                        continue;
+                    }
+                } catch (Exception e) {
+                    continue;
+                }
+
+                filters = Filters.and(
+                    Filters.eq("_id.apiCollectionId", sampleData.getId().getApiCollectionId()),
+                    Filters.eq("_id.method", sampleData.getId().getMethod()),
+                    Filters.eq("_id.url", sampleData.getId().getUrl())
+                );
+
+                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filters);
+
+                if (apiInfo == null) {
+                    if (!data.containsKey(sampleData.getId().getApiCollectionId())) {
+                        data.put(sampleData.getId().getApiCollectionId(), new ArrayList<>());
+                    }
+                    ArrayList<HttpResponseParams> samples = data.get(sampleData.getId().getApiCollectionId());
+                    samples.add(responseParams);
+                    data.put(sampleData.getId().getApiCollectionId(), samples);
+                }
+            }
+            if (sampleDataList.size() <= 20000) {
+                break;
+            }
+        }
+
+        AktoPolicyNew aktoPolicyNew = new AktoPolicyNew();
+        aktoPolicyNew.fetchFilters();
+
+        for (int apiCollectionId: data.keySet()) {
+            loggerMaker.infoAndAddToDb("running api info fix script for apiCollectionId " + apiCollectionId, null);
+            ArrayList<HttpResponseParams> sampleDatas = data.get(apiCollectionId);
+            for(HttpResponseParams responseParams: sampleDatas) {
+                try {
+                    aktoPolicyNew.process(responseParams);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("error running api info filling script " + e.getMessage(), LogDb.RUNTIME);
+                }
+            }
+        }
+    }
+
     public static void updateApiCollectionCount(APICatalog apiCatalog, int apiCollectionId) {
         Set<String> newURLs = new HashSet<>();
         for(URLTemplate url: apiCatalog.getTemplateURLToMethods().keySet()) {
