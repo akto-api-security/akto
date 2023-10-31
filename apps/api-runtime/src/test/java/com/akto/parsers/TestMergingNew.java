@@ -803,4 +803,32 @@ public class TestMergingNew extends MongoBasedTest {
 
     }
 
+    @Test
+    public void testHarIPMerging() {
+        testInitializer();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+        String url = "https://akto";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        for (int i=0; i< 50; i++) {
+            urls.add(url + "-"+i + ".io/" + "books");
+        }
+        for (String c: urls) {
+            HttpResponseParams resp = createSampleParams("user1", c);
+            responseParams.add(resp);
+        }
+
+        parser.syncFunction(responseParams.subList(0,23), false, true);
+        parser.apiCatalogSync.syncWithDB(false, true);
+        APICatalogSync.mergeUrlsAndSave(123,true);
+        parser.apiCatalogSync.buildFromDB(false, true);
+
+        APICatalog dbState = parser.apiCatalogSync.getDbState(123);
+        assertEquals(23, dbState.getStrictURLToMethods().size());
+        assertEquals(0, dbState.getTemplateURLToMethods().size());
+
+    }
+
 }
