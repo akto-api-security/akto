@@ -101,7 +101,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
-        return new UpdateOneModel<>(SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.combine(Updates.set("count",1),Updates.set("timestamp",singleTypeInfo.getTimestamp())),updateOptions);
+        return new UpdateOneModel<>(SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.combine(Updates.set("count",1),Updates.set("timestamp",singleTypeInfo.getTimestamp()), Updates.set(SingleTypeInfo._COLLECTION_IDS, singleTypeInfo.getCollectionIds())),updateOptions);
     }
 
     @Test
