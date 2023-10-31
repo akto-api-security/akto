@@ -32,12 +32,14 @@ public class ApiCollection {
     Type type;
 
     public enum Type {
-        TRAFFIC, CUSTOM, API_GROUP
+        TRAFFIC, OTHER_SOURCES, CUSTOM, API_GROUP
     }
 
     public Type getType() {
-        if (this.hostName != null || this.vxlanId != 0) {
+        if (this.hostName != null) {
             return Type.TRAFFIC;
+        } else if(this.vxlanId == this.id) {
+            return Type.OTHER_SOURCES;
         } else if (this.conditions != null) {
             return Type.API_GROUP;
         }

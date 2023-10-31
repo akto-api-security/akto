@@ -161,7 +161,7 @@ function ApiCollections() {
         tmp.All = dataObj.prettify
         tmp.Hostname = dataObj.prettify.filter((c) => c.type === "TRAFFIC")
         tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.Custom = dataObj.prettify.filter((c) => c.type === "CUSTOM")
+        tmp.Custom = dataObj.prettify.filter((c) => (c.type === "CUSTOM" || c.type === "OTHER_SOURCES"))
 
         setData(tmp);
     }
