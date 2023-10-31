@@ -243,7 +243,7 @@ public class TestExecutor {
 
     public static void updateTestSummary(ObjectId summaryId){
 
-        long testingRunResultsCount = TestingRunResultDao.instance
+        int testingRunResultsCount = (int) TestingRunResultDao.instance
                 .count(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
 
         TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
