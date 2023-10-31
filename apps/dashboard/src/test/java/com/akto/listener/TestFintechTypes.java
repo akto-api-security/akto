@@ -71,7 +71,7 @@ public class TestFintechTypes extends MongoBasedTest {
                     break;
                  case "MySQL URI":
                     assertTrue(cdt.validate("mysqlx://user_name@server.example.com", "foo"));
-                    assertFalse(cdt.validate("mysql://user@localhost:3306?get-server-public-key=true", "foo"));
+                    assertFalse(cdt.validate("mysql://user_name@localhost:3333", "foo"));
                     break;
                  case "Redis URI":
                     assertTrue(cdt.validate("redis://localhost:6379?ConnectTimeout=5000&IdleTimeOutSecs=180", "foo"));
