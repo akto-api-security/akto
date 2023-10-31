@@ -153,7 +153,7 @@ function ApiCollections() {
         const dataObj = convertToNewData(tmp);
 
         setAllCollections(apiCollectionsResp.apiCollections || [])
-        setCollectionsMap(func.mapCollectionId(tmp))
+        setCollectionsMap(func.mapCollectionIdToName(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
         
