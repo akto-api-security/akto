@@ -45,7 +45,7 @@ public class TestExecutorTest extends MongoBasedTest {
         testResultList.add(generateTestResult(false));
         TestingRunResult testingRunResult = new TestingRunResult(
                 new ObjectId(), new ApiInfo.ApiInfoKey(0, "url", URLMethods.Method.GET), "BOLA",
-                "REPLACE_AUTH_TOKEN", testResultList ,true, new ArrayList<>(), 90, 0, 100, new ObjectId()
+                "REPLACE_AUTH_TOKEN", testResultList, true, new ArrayList<>(), 90, 0, 100, new ObjectId()
         );
         TestExecutor.trim(testingRunResult);
         assertEquals(5, testingRunResult.getTestResults().size());
@@ -57,7 +57,7 @@ public class TestExecutorTest extends MongoBasedTest {
         List<String> messages = Collections.singletonList(message);
         SampleData data = new SampleData();
         data.setSamples(messages);
-        Key key = new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), 200, Context.now(),Context.now());
+        Key key = new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), 200, Context.now(), Context.now());
         data.setId(key);
         SampleDataDao.instance.insertOne(data);
         SampleMessageStore messageStore = SampleMessageStore.create();
@@ -65,12 +65,12 @@ public class TestExecutorTest extends MongoBasedTest {
         TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "", new ArrayList<>());
 
         String host = TestExecutor.findHost(apiInfoKey, testingUtil.getSampleMessages(), messageStore);
-        assertEquals(answer,host);
+        assertEquals(answer, host);
     }
 
     @Test
     public void testFindHost() throws URISyntaxException {
-        testFindHostUtil("/api/books", "https://akto.io","akto.io");
+        testFindHostUtil("/api/books", "https://akto.io", "akto.io");
 
         testFindHostUtil("https://akto.io/api/books", "https://akto.io", "akto.io");
         testFindHostUtil("http://akto.io/api/books", "http://akto.io", "akto.io");
