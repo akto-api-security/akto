@@ -14,7 +14,8 @@ info:
   references:
     - https://hackerone.com/reports/1650035
   cwe:
-    - CWE-16
+    - CWE-200
+    - CWE-538
 
 api_selection_filters:
   response_code:

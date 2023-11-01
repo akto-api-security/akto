@@ -21,6 +21,9 @@ info:
     - "https://twitter.com/trbughunters/status/1283133356922884096"
   cwe:
     - CWE-77
+  cve:
+    - CVE-2023-25826
+    - CVE-2023-41031
 
 api_selection_filters:
   response_code:
