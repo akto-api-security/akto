@@ -112,6 +112,8 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+        OptimizeStorageCron osc = new OptimizeStorageCron();
+        osc.init();
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
