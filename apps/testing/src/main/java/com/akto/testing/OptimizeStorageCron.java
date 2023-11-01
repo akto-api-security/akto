@@ -34,6 +34,7 @@ public class OptimizeStorageCron {
                 int limit = 10000;
                 Context.accountId.set(account.getId());
                 List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
+                boolean runCompact = false;
                 while (!testingRunResults.isEmpty()) {
                     logger.infoAndAddToDb("Processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
                     int batch_time = Context.now();
@@ -61,6 +62,7 @@ public class OptimizeStorageCron {
                         if (notFixedCount > 0) {
 //                            logger.infoAndAddToDb("Fixed: " + fixedCount + " not fixed: " + notFixedCount + " for testing run result: " + testingRunResult.getId(), LoggerMaker.LogDb.TESTING);
                             TestingRunResultDao.instance.replaceOne(Filters.eq("_id", testingRunResult.getId()), testingRunResult);
+                            runCompact = true;
                         }
                     }
                     if (!urlToOriginalMessageMap.isEmpty()) {
@@ -86,12 +88,16 @@ public class OptimizeStorageCron {
                     logger.infoAndAddToDb("Finished processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId() + " in: " + (Context.now() - batch_time), LoggerMaker.LogDb.TESTING);
                     testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", 1));
                 }
-                int accountId = account.getId();
-                logger.infoAndAddToDb("Starting compact for account: " + accountId, LoggerMaker.LogDb.TESTING);
-                int now = Context.now();
-                clients[0].getDatabase(String.valueOf(accountId)).runCommand(new BasicDBObject("compact", "testing_run_result"));
-                int compactTime = Context.now() - now;
-                logger.infoAndAddToDb("Finished optimizing storage, compact time for account: " + accountId + " is: " + compactTime, LoggerMaker.LogDb.TESTING);
+                if(runCompact) {
+                    int accountId = account.getId();
+                    logger.infoAndAddToDb("Starting compact for account: " + accountId, LoggerMaker.LogDb.TESTING);
+                    int now = Context.now();
+                    clients[0].getDatabase(String.valueOf(accountId)).runCommand(new BasicDBObject("compact", "testing_run_result"));
+                    int compactTime = Context.now() - now;
+                    logger.infoAndAddToDb("Finished optimizing storage, compact time for account: " + accountId + " is: " + compactTime, LoggerMaker.LogDb.TESTING);
+                }  else {
+                    logger.infoAndAddToDb("No need to compact for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
+                }
             } catch(Exception e) {
                 e.printStackTrace();
                 logger.errorAndAddToDb("Error while optimizing storage for account: " + account.getId(), LoggerMaker.LogDb.TESTING);

@@ -42,6 +42,7 @@ public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
 
     public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
@@ -112,8 +113,11 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
-        OptimizeStorageCron osc = new OptimizeStorageCron();
-        osc.init();
+
+        scheduler2.scheduleAtFixedRate(()-> {
+            OptimizeStorageCron osc = new OptimizeStorageCron();
+            osc.init();
+        }, 0, 3, TimeUnit.HOURS);
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
