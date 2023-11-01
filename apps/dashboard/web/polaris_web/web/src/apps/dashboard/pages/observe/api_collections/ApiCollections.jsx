@@ -57,7 +57,7 @@ function convertToCollectionData(c) {
 
 function ApiCollections() {
 
-    const [data, setData] = useState([])
+    const [data, setData] = useState([]);
     const [active, setActive] = useState(false);
     const [newCollectionName, setNewCollectionName] = useState('');
     const handleNewCollectionNameChange = 
@@ -92,8 +92,8 @@ function ApiCollections() {
         setActive(false)
         func.setToast(true, false, "API collection created successfully")
     }
-
-    async function fetchData() {
+    
+    const fetchData = async () => {
         let apiCollectionsResp = await api.getAllCollections()
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
@@ -102,14 +102,25 @@ function ApiCollections() {
         setData(tmp)
     }
 
+    const refreshData = () => {
+        fetchData();
+        func.setToast(true, false, 'Data refreshed successfully');
+    };
+
     function disambiguateLabel(key, value) {
         return func.convertToDisambiguateLabelObj(value, null, 2)
     }
 
     useEffect(() => {
         fetchData()
-        resetFunc()    
-    }, [])
+        resetFunc()
+        const refreshTimer = setInterval(() => {
+          refreshData()
+        }, 10000) //auto refresh every 10 seconds
+        return () => {
+          clearInterval(refreshTimer)
+        };
+    }, []);
 
     const createCollectionModalActivatorRef = useRef();
 
