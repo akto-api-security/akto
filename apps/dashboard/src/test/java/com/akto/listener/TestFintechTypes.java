@@ -105,6 +105,34 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertTrue(cdt.validate("-63SdnqdhQX1amyET4ECsAXzXZZq1ytEsrNNFfv41RYMGq", "foo"));
                     assertFalse(cdt.validate("l1nuYtWF4oCABpD68Icw6Zz818wgxTsEcLDc5T0VFEHDqp", "foo"));
                     break;
+                case "FACEBOOK COOKIES":
+                    assertTrue(cdt.validate("_fbp", "foo"));
+                    assertFalse(cdt.validate("_fdc", "foo"));
+                    break;
+                case "INTERCOM COOKIES":
+                    assertTrue(cdt.validate("intercom-session-app1", "foo"));
+                    assertFalse(cdt.validate("interccd-id", "foo"));
+                    break;
+                case "GOOGLE ADS COOKIES":
+                    assertTrue(cdt.validate("_ga", "foo"));
+                    assertFalse(cdt.validate("_gg", "foo"));
+                    break;
+                case "HOTJAR COOKIES":
+                    assertTrue(cdt.validate("_hjSessionUser_4455", "foo"));
+                    assertFalse(cdt.validate("_hjFirstSeen", "foo"));
+                    break;
+                case "FULLSTORY COOKIES":
+                    assertTrue(cdt.validate("fs_uid", "foo"));
+                    assertFalse(cdt.validate("fs_lua", "foo"));
+                    break;
+                case "MIXPANEL COOKIES":
+                    assertTrue(cdt.validate("mp_mp_mixpanel", "foo"));
+                    assertFalse(cdt.validate("mixpanel", "foo"));
+                    break;
+                case "APPSFLYER COOKIES":
+                    assertTrue(cdt.validate("af_id", "foo"));
+                    assertFalse(cdt.validate("af_cid", "foo"));
+                    break;
                 default:
                     break;
             }

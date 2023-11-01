@@ -9,15 +9,23 @@
         {"name": "German Insurance Identity Number", "regexPattern" : "[0-9]{2}([0-2][0-9]|[3-3][0-1])([0-0][1-9]|[1-1][0-2])[0-9]{2}[A-Za-z][0-9]{3}", "sensitive":false, "onKey": false, "active" : false},
         {"name": "Japanese Social Insurance Number", "regexPattern" : "[0-9]{12}", "sensitive":false, "onKey": false, "active" : false},
         {"name": "IBAN EUROPE", "regexPattern" : "[A-Z]{2}?[ ]?[0-9]{2}[ ]?\\s*(\\d{4}\\s*){4,10}(\\d{1,2}\\s*)?", "sensitive":false, "onKey": false, "active" : false},
-        {"name": "US ADDRESS", "regexPattern" : "\\d{1,5}(\\s[\\w-.,]*){1,6},\\s[A-Z]{2}\\s\\d{5}\\b", "sensitive":false, "onKey": false, "active" : false}
-         {"name": "MySQL URI", "regexPattern" : "^mysqlx?:\/\/[a-zA-Z0-9_@.-]+(:[0-9]+)?([a-zA-Z0-9_=-]+(&[a-zA-Z0-9_=-]+)*)?$", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "Redis URI", "regexPattern" : "redis(s|-sentinel|-socket)?:\/\/(.*)", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "Amazon S3", "regexPattern" : "^https?:\/\/(s3\.amazonaws\.com\/([a-zA-Z0-9_-]+\/)?|([a-zA-Z0-9_-]+\.s3\.amazonaws\.com\/)|s3\.amazonaws\.com\/)([\w.\-]+)?(\?\d+)?", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "MongoDB URI", "regexPattern" : "^(mongodb(?:\+srv)?:\/\/(?:[^:]+:[^@]+@)?[^\/]+\.\w+(?::\d+)?\/\w+(?:\?.*)?)", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "AWS Secret Access Key", "regexPattern" : "^[a-zA-Z0-9+]{43}$", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "AWS Secret Access ID", "regexPattern" : "^[A-Za-z0-9]{20}$", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "Github Personal Access Token (Fine Grained)", "regexPattern" : "^github_pat_[a-zA-Z0-9]{74}$", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "Github Personal Access Token (Classic)", "regexPattern" : "^ghp_[a-zA-Z0-9]{38}$", "sensitive":false, "onKey": false, "active" : false}
-        {"name": "GCP API Access Keys", "regexPattern" : "^(?:[A-Za-z0-9-]{46})$", "sensitive":false, "onKey": false, "active" : false}
+        {"name": "US ADDRESS", "regexPattern" : "\\d{1,5}(\\s[\\w-.,]*){1,6},\\s[A-Z]{2}\\s\\d{5}\\b", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "MySQL URI", "regexPattern" : "^mysqlx?:\/\/[a-zA-Z0-9_@.-]+(:[0-9]+)?([a-zA-Z0-9_=-]+(&[a-zA-Z0-9_=-]+)*)?$", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "Redis URI", "regexPattern" : "redis(s|-sentinel|-socket)?:\/\/(.*)", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "Amazon S3", "regexPattern" : "^https?:\/\/(s3\.amazonaws\.com\/([a-zA-Z0-9_-]+\/)?|([a-zA-Z0-9_-]+\.s3\.amazonaws\.com\/)|s3\.amazonaws\.com\/)([\w.\-]+)?(\?\d+)?", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "MongoDB URI", "regexPattern" : "^(mongodb(?:\+srv)?:\/\/(?:[^:]+:[^@]+@)?[^\/]+\.\w+(?::\d+)?\/\w+(?:\?.*)?)", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "AWS Secret Access Key", "regexPattern" : "^[a-zA-Z0-9+]{43}$", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "AWS Secret Access ID", "regexPattern" : "^[A-Za-z0-9]{20}$", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "Github Personal Access Token (Fine Grained)", "regexPattern" : "^github_pat_[a-zA-Z0-9]{74}$", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "Github Personal Access Token (Classic)", "regexPattern" : "^ghp_[a-zA-Z0-9]{38}$", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "GCP API Access Keys", "regexPattern" : "^(?:[A-Za-z0-9-]{46})$", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "US ADDRESS", "regexPattern" : "\\d{1,5}(\\s[\\w-.,]*){1,6},\\s[A-Z]{2}\\s\\d{5}\\b", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "Facebook Cookies", "regexPattern" : "(_fbp|_fbc)", "sensitive":true, "onKey": false, "active" : true},
+        {"name": "Intercom Cookies", "regexPattern" : "intercom-session-.*", "sensitive":true, "onKey": false, "active" : false},
+        {"name": "Google Ads Cookies", "regexPattern" : "(_ga|_gid)", "sensitive":true, "onKey": false, "active" : false},
+        {"name": "Hotjar Cookies", "regexPattern" : "(_hjSessionUser|_hjSession|_hjUserAttributes).*", "sensitive":true, "onKey": false, "active" : false},
+        {"name": "Fullstory Cookies", "regexPattern" : "(fs_uid|fs_cid)", "sensitive":true, "onKey": false, "active" : false},
+        {"name": "Mixpanel Cookies", "regexPattern" : "mp_.*_mixpanel", "sensitive":true, "onKey": false, "active" : false},
+        {"name": "Appsflyer Cookies", "regexPattern" : "(af_id|afUserId)", "sensitive":true, "onKey": false, "active" : false}
     ]
 }

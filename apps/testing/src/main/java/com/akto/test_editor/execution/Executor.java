@@ -9,6 +9,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -18,6 +19,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.utils.RedactSampleData;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +32,11 @@ public class Executor {
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
         List<TestResult> result = new ArrayList<>();
         
+        TestResult invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.INVALID_EXECUTION_BLOCK.getMessage()), 0, false, TestResult.Confidence.HIGH, null);
+
         if (node.getChildNodes().size() < 2) {
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
+            result.add(invalidExecutionResult);
             return result;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
@@ -39,8 +44,11 @@ public class Executor {
         RawApi sampleRawApi = rawApi.copy();
         ExecutorSingleRequest singleReq = null;
         if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
-            return null;
+            result.add(invalidExecutionResult);
+            return result;
         }
+
+        boolean requestSent = false;
 
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
@@ -61,6 +69,7 @@ public class Executor {
                 try {
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
+                    requestSent = true;
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                     TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                     if (res != null) {
@@ -70,6 +79,14 @@ public class Executor {
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
+            }
+        }
+
+        if(result.isEmpty()){
+            if(requestSent){
+                result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.API_REQUEST_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+            } else {
+                result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.NO_API_REQUEST.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
             }
         }
 
