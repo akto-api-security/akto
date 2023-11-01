@@ -26,17 +26,18 @@ public class OptimizeStorageCron {
     private static final LoggerMaker logger = new LoggerMaker(OptimizeStorageCron.class);
 
     public void init(){
-        List<Account> accountList = AccountsDao.instance.findAll(new BasicDBObject(), new BasicDBObject("_id", 1));
-        for (Account account : accountList) {
+        String accountIdsList = System.getenv("ACCOUNT_IDS");
+        for (String accountIdStr: accountIdsList.split(",")) {
+            int accountId = Integer.parseInt(accountIdStr);
             try {
-                logger.infoAndAddToDb("Starting optimize storage for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
+                logger.infoAndAddToDb("Starting optimize storage for account: " + accountId, LoggerMaker.LogDb.TESTING);
                 int skip = 0;
                 int limit = 10000;
-                Context.accountId.set(account.getId());
+                Context.accountId.set(accountId);
                 List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
                 boolean runCompact = false;
                 while (!testingRunResults.isEmpty()) {
-                    logger.infoAndAddToDb("Processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
+                    logger.infoAndAddToDb("Processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + accountId, LoggerMaker.LogDb.TESTING);
                     int batch_time = Context.now();
                     Map<String, Triple<ApiInfo.ApiInfoKey, ObjectId, String>> urlToOriginalMessageMap = new HashMap<>();
                     for (TestingRunResult testingRunResult : testingRunResults) {
@@ -85,22 +86,21 @@ public class OptimizeStorageCron {
                         }
                     }
                     skip = skip + limit;
-                    logger.infoAndAddToDb("Finished processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId() + " in: " + (Context.now() - batch_time), LoggerMaker.LogDb.TESTING);
+                    logger.infoAndAddToDb("Finished processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + accountId + " in: " + (Context.now() - batch_time), LoggerMaker.LogDb.TESTING);
                     testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", 1));
                 }
                 if(runCompact) {
-                    int accountId = account.getId();
                     logger.infoAndAddToDb("Starting compact for account: " + accountId, LoggerMaker.LogDb.TESTING);
                     int now = Context.now();
                     clients[0].getDatabase(String.valueOf(accountId)).runCommand(new BasicDBObject("compact", "testing_run_result"));
                     int compactTime = Context.now() - now;
                     logger.infoAndAddToDb("Finished optimizing storage, compact time for account: " + accountId + " is: " + compactTime, LoggerMaker.LogDb.TESTING);
                 }  else {
-                    logger.infoAndAddToDb("No need to compact for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
+                    logger.infoAndAddToDb("No need to compact for account: " + accountId, LoggerMaker.LogDb.TESTING);
                 }
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.errorAndAddToDb("Error while optimizing storage for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
+                logger.errorAndAddToDb("Error while optimizing storage for account: " + accountId, LoggerMaker.LogDb.TESTING);
             }
         }
     }
