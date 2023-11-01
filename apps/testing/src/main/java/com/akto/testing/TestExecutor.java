@@ -1,11 +1,10 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -36,6 +35,7 @@ import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
@@ -64,6 +64,19 @@ public class TestExecutor {
         } else {
             workflowInit(testingRun, summaryId);
         }
+    }
+
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        Context.accountId.set(1_000_000);
+
+        TestingRun testingRun = TestingRunDao.instance.findOne(Constants.ID, new ObjectId("6542953fe25b18270fa22e66"));
+        ObjectId summaryId = new ObjectId("6542955380c83b2123f4d0b0");
+        TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+        testingRun.setTestingRunConfig(testingRunConfig);
+        TestExecutor testExecutor = new TestExecutor();
+        testExecutor.init(testingRun,summaryId);
+
     }
 
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
@@ -165,7 +178,7 @@ public class TestExecutor {
 
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
-        List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
+        List<Future<Integer>> futureTestingRunResults = new ArrayList<>();
         Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
@@ -200,7 +213,7 @@ public class TestExecutor {
                 loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
             }
             try {
-                 Future<List<TestingRunResult>> future = threadPool.submit(
+                 Future<Integer> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
@@ -226,13 +239,11 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
 
         int totalResults = 0;
-        for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
+        for (Future<Integer> future: futureTestingRunResults) {
             if (!future.isDone()) continue;
             try {
-                if (!future.get().isEmpty()) {
-                    int resultSize = future.get().size();
-                    totalResults += resultSize;
-                }
+                int resultSize = future.get();
+                totalResults += resultSize;
             } catch (InterruptedException | ExecutionException e) {
                 loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
             }
@@ -463,7 +474,7 @@ public class TestExecutor {
         return respMap;
     }
 
-    public List<TestingRunResult> startWithLatch(
+    public Integer startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
@@ -500,7 +511,7 @@ public class TestExecutor {
         }
 
         latch.countDown();
-        return testingRunResults;
+        return testingRunResults.size();
     }
 
     public static void trim(TestingRunResult testingRunResult) {

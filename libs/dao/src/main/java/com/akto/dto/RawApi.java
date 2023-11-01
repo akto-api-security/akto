@@ -80,16 +80,16 @@ public class RawApi {
     public void modifyQueryParam(BasicDBObject payload) {
         OriginalHttpRequest req = this.getRequest();
 
-        String queryParams = "";
+        StringBuilder stringBuilder = new StringBuilder();
         for (String key: payload.keySet()) {
-            queryParams = queryParams + key + "=" + payload.get(key) + "&";
+            stringBuilder.append(key + "=" + payload.get(key) + "&");
         }
-        if (queryParams.length() > 0) {
-            queryParams = queryParams.substring(0, queryParams.length() - 1);
+        if (stringBuilder.length() > 0) {
+            stringBuilder.setLength(stringBuilder.length() - 1);
         }
 
         // recheck
-        req.setQueryParams(queryParams);
+        req.setQueryParams(stringBuilder.toString());
     }
 
     public RawApi copy() {
