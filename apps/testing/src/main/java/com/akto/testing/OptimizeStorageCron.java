@@ -36,6 +36,7 @@ public class OptimizeStorageCron {
                 List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
                 while (!testingRunResults.isEmpty()) {
                     logger.infoAndAddToDb("Processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
+                    int batch_time = Context.now();
                     Map<String, Triple<ApiInfo.ApiInfoKey, ObjectId, String>> urlToOriginalMessageMap = new HashMap<>();
                     for (TestingRunResult testingRunResult : testingRunResults) {
                         ApiInfo.ApiInfoKey apiInfoKey = testingRunResult.getApiInfoKey();
@@ -82,6 +83,7 @@ public class OptimizeStorageCron {
                         }
                     }
                     skip = skip + limit;
+                    logger.infoAndAddToDb("Finished processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId() + " in: " + (Context.now() - batch_time), LoggerMaker.LogDb.TESTING);
                     testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", 1));
                 }
                 int accountId = account.getId();
