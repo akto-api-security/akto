@@ -69,6 +69,42 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertTrue(cdt.validate("123 MAIN ST, SAN JOSE, CA 11111", "foo"));
                     assertFalse(cdt.validate("PO BOX 123, SAN JOSE, CA 11111", "foo"));
                     break;
+                 case "MySQL URI":
+                    assertTrue(cdt.validate("mysqlx://user_name@server.example.com", "foo"));
+                    assertFalse(cdt.validate("mysql://user_name@localhost:3333", "foo"));
+                    break;
+                 case "Redis URI":
+                    assertTrue(cdt.validate("redis://localhost:6379?ConnectTimeout=5000&IdleTimeOutSecs=180", "foo"));
+                    assertFalse(cdt.validate("rediss://myuser:mypassword@redis.example.com:6380/0?timeout=30s&clientName=myClient&libraryName=redis-lib&libraryVersion=2.0", "foo"));
+                    break;
+                 case "Amazon S3":
+                    assertTrue(cdt.validate("http://s3.amazonaws.com/domain/photos/user_thumbnail/casing-earphones.jpg?1365720318", "foo"));
+                    assertFalse(cdt.validate("http://s3.amazonaws.com/text1/test2.csv", "foo"));
+                    break;
+                  case "MongoDB URI":
+                    assertTrue(cdt.validate("mongodb://sally:sallyspassword@dbserver.example:5555/userdata?tls=true&connectionTimeout=5000", "foo"));
+                    assertFalse(cdt.validate("mongodb+srv://rohit:asdf1234@beyondthebasics.abcde.mongodb.net/test", "foo"));
+                    break;
+                 case "AWS Secret Access Key":
+                    assertTrue(cdt.validate("3pHXfQaoxG0ZUlgor7GpflAgOYnIZiHCgtgEgIJUyMC", "foo"));
+                    assertFalse(cdt.validate("1g47WR2iBOWklti3ywvbEXCg97k0H4KmF3uR8VyGUe1", "foo"));
+                    break;
+                 case "AWS Secret Access ID":
+                    assertTrue(cdt.validate("nA3mQGcxhzIoGwNZWgL0", "foo"));
+                    assertFalse(cdt.validate("tMB873rCOIwY9qyVCBTX", "foo"));
+                    break;
+                 case "Github Personal Access Token (Fine Grained)":
+                    assertTrue(cdt.validate("github_pat_2Py9UArHCDGMhveqKDLfm29BtckaU797TPgapL0F83r33JVjwH3b7U5RLPVcDVXKmHtZHDVScF", "foo"));
+                    assertFalse(cdt.validate("github_pat_xh9NXr8Me5iy9YtCsXo9MKyg82Wzzhwn5wqdjT9dznlKG6PTGvUPHDQrKgipb530wf63wnwiD7", "foo"));
+                    break;
+                 case "Github Personal Access Token (Classic)":
+                    assertTrue(cdt.validate("ghp_fIBZhdFTJiR1Xzxst2yD9pYUx1RF5fweugymMG", "foo"));
+                    assertFalse(cdt.validate("ghp_fIBZhdFTJiR1Xzxst2yD9pYUx1RF5fweugymZZ", "foo"));
+                    break;
+                case "GCP API Access Keys":
+                    assertTrue(cdt.validate("-63SdnqdhQX1amyET4ECsAXzXZZq1ytEsrNNFfv41RYMGq", "foo"));
+                    assertFalse(cdt.validate("l1nuYtWF4oCABpD68Icw6Zz818wgxTsEcLDc5T0VFEHDqp", "foo"));
+                    break;
                 case "FACEBOOK COOKIES":
                     assertTrue(cdt.validate("_fbp", "foo"));
                     assertFalse(cdt.validate("_fdc", "foo"));
