@@ -164,11 +164,12 @@ jobs:
 #        run: bash ./.github/scripts/akto-testsigma.sh
 #
       - name: Run Akto CI/CD tests
-        uses: shivam-rawat-akto/run-scan@v1.0.3
+        uses: shivam-rawat-akto/run-scan@v1.0.5
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
           AKTO_TEST_ID: 65317bede46f73639b315e1d
+          GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
 
       - name: Check for Akto test completion
         env:
