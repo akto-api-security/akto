@@ -191,11 +191,12 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
          "\n" + ColorConstants.RESET;
     }
 
-    public String toOutputString(){
+    public String toOutputString(String severity){
         StringBuilder bld = new StringBuilder();
 
         bld.append("API: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().toString() + "\n");
-        bld.append("Test: " + testSuperType + " " + testSubType + " " + "Vulnerable: " + vulnerable + "\n");
+        bld.append("Test: " + testSuperType + " " + testSubType + " Vulnerable: " + vulnerable +
+        (vulnerable ? " Severity : " + severity : "") + "\n");
         for (TestResult testResult : testResults) {
             Gson gson = new Gson();
             Map<String, Object> json = gson.fromJson(testResult.getOriginalMessage(), new TypeToken<Map<String, Object>>(){}.getType());

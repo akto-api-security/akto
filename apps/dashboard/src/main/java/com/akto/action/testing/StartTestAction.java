@@ -194,6 +194,7 @@ public class StartTestAction extends UserAction {
             0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0);
             summary.setState(TestingRun.State.SCHEDULED);
             if(metadata!=null){
+                loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
                 summary.setMetadata(metadata);
             }
             testingRunResultSummaryHexId = Objects.requireNonNull(TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId())

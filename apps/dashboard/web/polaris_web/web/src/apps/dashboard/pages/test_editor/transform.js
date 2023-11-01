@@ -57,6 +57,7 @@ const convertFunc = {
 
     getNavigationItems(testObj,param,selectedFunc){
         let arr = []
+        let count = 0;
         if(param === 'CUSTOM'){
             for(const key in testObj?.customTests){
                 if(testObj.customTests.hasOwnProperty(key)){
@@ -86,6 +87,7 @@ const convertFunc = {
                     }
                 }
             }
+            count = testObj?.totalCustomTests;
         }else{
             for(const key in testObj?.aktoTests){
                 if(testObj.aktoTests.hasOwnProperty(key)){
@@ -115,8 +117,9 @@ const convertFunc = {
                     }
                 }
             }
+            count = testObj?.totalAktoTests;
         }
-        return arr
+        return {items: arr, count: count}
     },
 
     mapVulnerableRequests(vulnerableRequests){
