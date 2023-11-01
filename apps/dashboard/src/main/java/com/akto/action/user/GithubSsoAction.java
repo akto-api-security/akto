@@ -88,7 +88,7 @@ public class GithubSsoAction extends UserAction {
         try {
             Map<String, String> metaData = testingRunResultSummary.getMetadata();
             String repository = metaData.get("repository");
-            String commitSHA = metaData.get("commit_sha");
+            String commitSHA = metaData.get("commit_sha_head");
             jwtToken = JWT.createJWT(githubAppId,privateKey, 10 * 60 * 1000);
             GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
             GHApp ghApp = gitHub.getApp();
