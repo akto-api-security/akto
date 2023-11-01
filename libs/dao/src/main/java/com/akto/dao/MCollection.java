@@ -84,7 +84,7 @@ public abstract class MCollection<T> {
             commands = commands.sort(sort);
         }
 
-        MongoCursor<T> cursor = commands.maxTime(30, TimeUnit.SECONDS).cursor();
+        MongoCursor<T> cursor = commands.maxTime(10, TimeUnit.MINUTES).cursor();
 
         ArrayList<T> ret = new ArrayList<T>();
 

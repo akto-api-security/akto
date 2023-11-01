@@ -87,7 +87,7 @@ public class OptimizeStorageCron {
                     }
                     skip = skip + limit;
                     logger.infoAndAddToDb("Finished processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + accountId + " in: " + (Context.now() - batch_time), LoggerMaker.LogDb.TESTING);
-                    testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", 1));
+                    testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
                 }
                 if(runCompact) {
                     logger.infoAndAddToDb("Starting compact for account: " + accountId, LoggerMaker.LogDb.TESTING);
