@@ -50,8 +50,8 @@ public class OptimizeStorageCron {
                         for (TestResult testResult : testResults) {
                             if (testResult.getOriginalMessage() != null) {
                                 notFixedCount++;
-                                testResult.setOriginalMessage(null);
                                 urlToOriginalMessageMap.putIfAbsent(apiInfoKey.getUrl(), Triple.of(apiInfoKey, testingRunResultSummaryId, testResult.getOriginalMessage()));
+                                testResult.setOriginalMessage(null);
                             } else {
                                 fixedCount++;
                             }
@@ -70,10 +70,10 @@ public class OptimizeStorageCron {
                             String originalMessage = triple.getRight();
                             TestingOriginalMessage testingOriginalMessage = TestingOriginalMessageDao.instance.findOne(Filters.and(Filters.eq(TestingOriginalMessage.API_INFO_KEY, apiInfoKey), Filters.eq(TestingOriginalMessage.TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)));
                             if (testingOriginalMessage != null) {
-//                                logger.infoAndAddToDb("Original message already exists for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
+                                logger.infoAndAddToDb("Original message already exists for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
                                 continue;
                             }
-//                            logger.infoAndAddToDb("Inserting original message for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
+                            logger.infoAndAddToDb("Inserting original message for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
                             testingOriginalMessage = new TestingOriginalMessage();
                             testingOriginalMessage.setOriginalMessage(originalMessage);
                             testingOriginalMessage.setApiInfoKey(apiInfoKey);
