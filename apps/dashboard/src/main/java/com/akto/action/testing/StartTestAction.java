@@ -607,6 +607,9 @@ public class StartTestAction extends UserAction {
         return this.testingRunResultSummaries;
     }
 
+    public String getTestingRunResultSummaryHexId() {
+        return this.testingRunResultSummaryHexId;
+    }
     public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
         this.testingRunResultSummaryHexId = testingRunResultSummaryHexId;
     }
