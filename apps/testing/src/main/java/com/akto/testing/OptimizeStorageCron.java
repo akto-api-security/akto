@@ -35,7 +35,7 @@ public class OptimizeStorageCron {
                 Context.accountId.set(account.getId());
                 List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
                 while (!testingRunResults.isEmpty()) {
-                    logger.infoAndAddToDb("Processing testing run results from: " + skip + " to: " + (skip + limit), LoggerMaker.LogDb.TESTING);
+                    logger.infoAndAddToDb("Processing testing run results from: " + skip + " to: " + (skip + limit) + " for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
                     Map<String, Triple<ApiInfo.ApiInfoKey, ObjectId, String>> urlToOriginalMessageMap = new HashMap<>();
                     for (TestingRunResult testingRunResult : testingRunResults) {
                         ApiInfo.ApiInfoKey apiInfoKey = testingRunResult.getApiInfoKey();
@@ -58,7 +58,7 @@ public class OptimizeStorageCron {
                         }
                         testingRunResult.setTestResults(testResults);
                         if (notFixedCount > 0) {
-                            logger.infoAndAddToDb("Fixed: " + fixedCount + " not fixed: " + notFixedCount + " for testing run result: " + testingRunResult.getId(), LoggerMaker.LogDb.TESTING);
+//                            logger.infoAndAddToDb("Fixed: " + fixedCount + " not fixed: " + notFixedCount + " for testing run result: " + testingRunResult.getId(), LoggerMaker.LogDb.TESTING);
                             TestingRunResultDao.instance.replaceOne(Filters.eq("_id", testingRunResult.getId()), testingRunResult);
                         }
                     }
@@ -70,10 +70,10 @@ public class OptimizeStorageCron {
                             String originalMessage = triple.getRight();
                             TestingOriginalMessage testingOriginalMessage = TestingOriginalMessageDao.instance.findOne(Filters.and(Filters.eq(TestingOriginalMessage.API_INFO_KEY, apiInfoKey), Filters.eq(TestingOriginalMessage.TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)));
                             if (testingOriginalMessage != null) {
-                                logger.infoAndAddToDb("Original message already exists for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
+//                                logger.infoAndAddToDb("Original message already exists for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
                                 continue;
                             }
-                            logger.infoAndAddToDb("Inserting original message for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
+//                            logger.infoAndAddToDb("Inserting original message for url: " + apiInfoKey.getUrl() + " method: " + apiInfoKey.getMethod() + " testingRunResultSummaryId: " + testingRunResultSummaryId, LoggerMaker.LogDb.TESTING);
                             testingOriginalMessage = new TestingOriginalMessage();
                             testingOriginalMessage.setOriginalMessage(originalMessage);
                             testingOriginalMessage.setApiInfoKey(apiInfoKey);
