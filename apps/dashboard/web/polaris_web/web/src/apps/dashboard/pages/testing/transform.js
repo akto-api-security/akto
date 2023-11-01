@@ -78,14 +78,14 @@ function getAlternateTestsInfo(state){
 }
 
 function getTestsInfo(testResultsCount, state){
-    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " tests"
+    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount
 }
 
 function minimizeTagList(items){
-  if(items.length>2){
+  if(items.length>1){
 
-    let ret = items.slice(0,2)
-    ret.push(`+${items.length-2} more`)
+    let ret = items.slice(0,1)
+    ret.push(`+${items.length-1} more`)
     return ret;
   }
   return items;
@@ -536,6 +536,34 @@ setTestMetadata () {
     PersistStore.getState().setSubCategoryMap(subCategoryMap)
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
 })
+},
+convertSubIntoSubcategory(resp){
+  let obj = {}
+  const subCategoryMap = PersistStore.getState().subCategoryMap
+  Object.keys(resp).forEach((key)=>{
+    if(!subCategoryMap[key]){
+      obj[key] = {
+        text: resp[key],
+        color: func.getColorForCharts(key)
+      }
+    }else{
+      let temp = {
+        text: resp[key],
+        color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
+      }
+      obj[subCategoryMap[key].superCategory.shortName] = temp
+    }
+
+  })
+
+  const sortedEntries = Object.entries(obj).sort(([, val1], [, val2]) => {
+    const prop1 = val1['text'];
+    const prop2 = val2['text'];
+    return prop2 - prop1 ;
+  });
+
+  return Object.fromEntries(sortedEntries);
+
 },
 
 getUrlComp(url){

@@ -28,6 +28,11 @@ const headings = [
         title: "Api endpoints",
     },
     {
+        text: "Risk score",
+        title: "Risk score",
+        value: "riskScoreComp",
+    },
+    {
         text: "Hostname",
         value: 'hostName',
         title: "Hostname",
@@ -52,7 +57,7 @@ const headings = [
         text: 'Sensitive Params',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
-        filterKey: "sensitiveTags",
+        filterKey: 'sensitiveTags',
         showFilter: true
     },
     {
@@ -71,6 +76,8 @@ headers.push({
 },)
 
 const sortOptions = [
+    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore'},
+    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore'},
     { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
     { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
     { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint' },
@@ -135,8 +142,15 @@ function ApiEndpoints() {
             id:'Sensitive',
         },
         {
-            content: 'No auth detected',
+            content: 'High risk',
             index: 3,
+            badge: endpointData["Risk"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('Risk')},
+            id: 'Risk',
+        },
+        {
+            content: 'No auth detected',
+            index: 4,
             badge: endpointData["No_auth"]?.length?.toString(),
             onAction: ()=> {setSelectedTab('No_auth')},
             id: 'No_auth'
@@ -173,6 +187,7 @@ function ApiEndpoints() {
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
         data['All'] = prettifyData
         data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['New'] = prettifyData.filter(x=> x.isNew)
         data['No_auth'] = prettifyData.filter(x => x.open)
         setEndpointData(data)

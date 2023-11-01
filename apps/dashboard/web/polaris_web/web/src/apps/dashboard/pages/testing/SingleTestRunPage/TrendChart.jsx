@@ -5,12 +5,19 @@ import StackedChart from "../../../components/charts/StackedChart";
 import {
     Filters,
     LegacyCard,
-    ChoiceList
+    ChoiceList,
+    Collapsible,
+    HorizontalStack, 
+    Text,
+    Button,
+    Box,
+    Divider
 } from "@shopify/polaris";
 import DateRangePicker from "../../../components/layouts/DateRangePicker"
 import func from '@/util/func';
 import { produce } from "immer"
 import "./style.css"
+import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 
 function TrendChart(props) {
 
@@ -19,6 +26,8 @@ function TrendChart(props) {
     const [appliedFilters, setAppliedFilters] = useState([]);
     const [testingRunResultSummaries, setTestingRunResultSummaries] = useState([]);
     const [metadataFilterData, setMetadataFilterData] = useState([]);
+    const [totalVulnerabilities, setTotalVulnerabilites] = useState(0);
+    const [collapsible, setCollapsible] = useState(true)
 
     const dateRangeFilter =
     {
@@ -131,6 +140,14 @@ function TrendChart(props) {
                 }
                 return testingRunResultSummaries;
             });
+
+            let count = 0
+            testingRunResultSummaries.forEach((ele)=>{
+                let obj = Object.keys(ele.countIssues) ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
+                count += (obj.HIGH + obj.MEDIUM + obj.LOW)
+            })
+
+            setTotalVulnerabilites(count)
 
             if (firstTime) {
 
@@ -278,36 +295,47 @@ function TrendChart(props) {
         return <></>
     }
 
+    const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+
     return (
         <LegacyCard>
-            <LegacyCard.Section flush>
-                <div className="filterClass">
-                    <Filters
-                        hideQueryField={true}
-                        filters={[dateRangeFilter, ...metadataFilters]}
-                        appliedFilters={appliedFilters}
-                        onClearAll={handleFiltersClearAll}
-                    />
-                </div>
-            </LegacyCard.Section>
-            <LegacyCard.Section>
-                <StackedChart
-                    key={`trend-chart-${hexId}`}
-                    type='column'
-                    color='#6200EA'
-                    areaFillHex="true"
-                    height="330"
-                    background-color="#ffffff"
-                    data={processChartData(testingRunResultSummaries)}
-                    testingRunResultSummaries={testingRunResultSummaries}
-                    tooltipFormatter={tooltipFormatter}
-                    defaultChartOptions={defaultChartOptions}
-                    text="true"
-                    yAxisTitle="Number of issues"
-                    dateClicked={dateClicked}
-                    graphPointClick={graphPointClick}
-                    tooltip={tooltip}
-                />
+            <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+                <HorizontalStack align="space-between">
+                    <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
+                    <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+                </HorizontalStack>
+                <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
+                    <Box paddingBlockStart={3}><Divider/></Box>
+                    <LegacyCard.Section flush>
+                        <div className="filterClass">
+                            <Filters
+                                hideQueryField={true}
+                                filters={[dateRangeFilter, ...metadataFilters]}
+                                appliedFilters={appliedFilters}
+                                onClearAll={handleFiltersClearAll}
+                            />
+                        </div>
+                    </LegacyCard.Section>
+                    <LegacyCard.Section>
+                        <StackedChart
+                            key={`trend-chart-${hexId}`}
+                            type='column'
+                            color='#6200EA'
+                            areaFillHex="true"
+                            height="330"
+                            background-color="#ffffff"
+                            data={processChartData(testingRunResultSummaries)}
+                            testingRunResultSummaries={testingRunResultSummaries}
+                            tooltipFormatter={tooltipFormatter}
+                            defaultChartOptions={defaultChartOptions}
+                            text="true"
+                            yAxisTitle="Number of issues"
+                            dateClicked={dateClicked}
+                            graphPointClick={graphPointClick}
+                            tooltip={tooltip}
+                        />
+                    </LegacyCard.Section>
+                </Collapsible>
             </LegacyCard.Section>
         </LegacyCard>
     )

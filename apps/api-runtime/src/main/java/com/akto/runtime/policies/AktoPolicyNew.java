@@ -36,8 +36,7 @@ public class AktoPolicyNew {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
     }
 
-    public AktoPolicyNew(boolean fetchAllSTI) {
-        buildFromDb(fetchAllSTI);
+    public AktoPolicyNew() {
     }
 
     public void buildFromDb(boolean fetchAllSTI) {
@@ -85,22 +84,19 @@ public class AktoPolicyNew {
 
     }
 
-    public void syncWithDb(boolean initialising, boolean fetchAllSTI) {
+    public void syncWithDb() {
         loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
-        if (!initialising) {
-            UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap);
-            List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
-            List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
-            loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
-            try {
-                if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
-                if (!redact && writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
-            }
+        UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap);
+        List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
+        List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
+        loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
+        try {
+            if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+            if (!redact && writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
         }
 
-        buildFromDb(fetchAllSTI);
     }
 
     public void fillApiInfoInCatalog(ApiInfo apiInfo,  Map<Integer, FilterSampleData> filterSampleDataMap) {
@@ -125,7 +121,7 @@ public class AktoPolicyNew {
 
     }
 
-    public void main(List<HttpResponseParams> httpResponseParamsList, boolean syncNow, boolean fetchAllSTI) throws Exception {
+    public void main(List<HttpResponseParams> httpResponseParamsList) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
@@ -134,10 +130,6 @@ public class AktoPolicyNew {
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                 ;
             }
-        }
-
-        if (syncNow) {
-            syncWithDb(false, fetchAllSTI);
         }
     }
 
@@ -321,6 +313,15 @@ public class AktoPolicyNew {
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
+
+            // last tested
+            subUpdates.add(Updates.set(ApiInfo.LAST_TESTED, apiInfo.getLastTested())) ;
+
+            // isSensitive
+            subUpdates.add(Updates.set(ApiInfo.IS_SENSITIVE, apiInfo.getIsSensitive()));
+
+            // severityScore
+            subUpdates.add(Updates.set(ApiInfo.SEVERITY_SCORE, apiInfo.getSeverityScore()));
 
             updates.add(
                     new UpdateOneModel<>(

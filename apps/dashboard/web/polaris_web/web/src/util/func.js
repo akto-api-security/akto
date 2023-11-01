@@ -90,7 +90,6 @@ prettifyEpoch(epoch) {
     }
 
     let plural = count <= 1 ? '' : 's'
-
     return count + ' ' + unit + plural + ' ago'
   },
 
@@ -723,6 +722,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
               id: x.method + " " + x.url + " " + x.apiCollectionId + " " + Math.random(),
@@ -746,6 +747,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              isSensitive: isSensitive,
+              severityScore: score,
           }
 
       }
@@ -1108,6 +1111,65 @@ handleKeyPress (event, funcToCall) {
       funcToCall();
     }
   },
+
+  getColorForCharts(key){
+    switch(key){
+      case "HIGH":
+        return tokens.color["color-icon-critical"]
+      case "MEDIUM":
+        return tokens.color["color-icon-warning"]
+      case "LOW":
+        return tokens.color["color-icon-info"]
+      case "BOLA":
+        return "#800000"
+      case "NO_AUTH":
+        return "#808000"
+      case "BFLA":
+        return "#D9534F"
+      case "IAM":
+        return "#5BC0DE"
+      case "EDE":
+        return "#FF69B4"
+      case "RL":
+        return "#8B4513"
+      case "MA":
+        return "#E6E6FA"
+      case "INJ":
+        return "#008080"
+      case "ILM":
+        return "#26466D"
+      case "SM":
+        return "#CCCCCC"
+      case "SSRF":
+        return "#555555"
+      case "UC":
+        return "#AF7AC5"
+      case "UHM":
+        return "#337AB7"
+      case "VEM":
+        return "#5CB85C"
+      case "MHH":
+        return "#FFC107"
+      case "SVD":
+        return "#FFA500"
+      case "CORS":
+        return "#FFD700"
+      case "COMMAND_INJECTION":
+        return "#556B2F"
+      case "CRLF":
+        return "#708090"
+      case "SSTI":
+        return "#008B8B"
+      case "LFI":
+        return "#483D8B"
+      case "XSS":
+        return "#8B008B"
+
+      default:
+        return tokens.color["color-border"]
+    }
+  },
+
   getSensitiveIcons(data){
     const key = data.toUpperCase();
     switch (key) {

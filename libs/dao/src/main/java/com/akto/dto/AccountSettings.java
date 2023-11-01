@@ -42,6 +42,36 @@ public class AccountSettings {
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
 
+    public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
+    private LastCronRunInfo lastUpdatedCronInfo; 
+
+    public static class LastCronRunInfo{
+        public static final String LAST_UPDATED_ISSUES = "lastUpdatedIssues";
+        private int lastUpdatedIssues;
+
+        public static final String LAST_UPDATED_SENSITIVE_MAP = "lastUpdatedSensitiveMap";
+        private int lastUpdatedSensitiveMap;
+
+        public LastCronRunInfo(){     
+        }
+
+        public int getLastUpdatedIssues() {
+            return lastUpdatedIssues;
+        }
+
+        public void setLastUpdatedIssues(int lastUpdatedIssues) {
+            this.lastUpdatedIssues = lastUpdatedIssues;
+        }
+
+        public int getLastUpdatedSensitiveMap() {
+            return lastUpdatedSensitiveMap;
+        }
+
+        public void setLastUpdatedSensitiveMap(int lastUpdatedSensitiveMap) {
+            this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
+        }
+    }
+
     public AccountSettings() {
     }
 
@@ -177,5 +207,13 @@ public class AccountSettings {
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
+    }
+
+    public LastCronRunInfo getLastUpdatedCronInfo() {
+        return lastUpdatedCronInfo;
+    }
+
+    public void setLastUpdatedCronInfo(LastCronRunInfo lastUpdatedCronInfo) {
+        this.lastUpdatedCronInfo = lastUpdatedCronInfo;
     }
 }

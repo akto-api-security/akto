@@ -184,7 +184,6 @@ function SingleTestRunPage() {
   async function fetchData(setData) {
     let localSelectedTestRun = {}
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
-
       if(testingRun==undefined){
         return {};
       }
@@ -193,7 +192,7 @@ function SingleTestRunPage() {
         setWorkflowTest(workflowTest);
       }
       let cicd = false;
-      let res = await api.fetchTestingDetails(0,0,true,"",1,0,10,{endTimestamp: [testingRun.endTimestamp, testingRun.endTimestamp]});
+      let res = await api.fetchTestingDetails(0,0,true,false,"",1,0,10,{endTimestamp: [testingRun.endTimestamp, testingRun.endTimestamp]});
       if(res.testingRuns.map(x=>x.hexId).includes(testingRun.hexId)){
         cicd = true;
       }

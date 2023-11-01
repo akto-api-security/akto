@@ -17,6 +17,7 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -50,6 +51,8 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.crons.UpdateSeverityScoreInApiInfo;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -74,6 +77,7 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -104,6 +108,8 @@ public class InitializerListener implements ServletContextListener {
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     public static String aktoVersion;
     public static boolean connectedToMongo = false;
+    UpdateSeverityScoreInApiInfo updateSeverityScoreInApiInfo = new UpdateSeverityScoreInApiInfo();
+    UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -992,7 +998,6 @@ public class InitializerListener implements ServletContextListener {
             );
         }
     }
-
     public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
             String resourceName = "/tests-library-master.zip";
@@ -1145,6 +1150,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
+                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        updateSeverityScoreInApiInfo.updateSeverityScoreScheduler();
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
                         if(isSaas){
@@ -1232,6 +1239,8 @@ public class InitializerListener implements ServletContextListener {
         LoadersDao.instance.createIndicesIfAbsent();
         TestingRunResultDao.instance.createIndicesIfAbsent();
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        TestingRunIssuesDao.instance.createIndicesIfAbsent();
+        
         fillCollectionIdArray();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());

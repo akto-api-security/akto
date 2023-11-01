@@ -219,6 +219,20 @@ const transform = {
         }
     },
 
+    getStatus(riskScore){
+        if(riskScore >= 4.5){
+            return "critical"
+        }else if(riskScore >= 4){
+            return "attention"
+        }else if(riskScore >= 2.5){
+            return "warning"
+        }else if(riskScore > 0){
+            return "info"
+        }else{
+            return "success"
+        }
+    },
+
     getIssuesList(severityInfo){
         return (
             <HorizontalStack gap="1">
@@ -250,13 +264,37 @@ const transform = {
     prettifyCollectionsData(newData){
         const prettifyData = newData.map((c)=>{
             return{
-                ...c,
+                id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
-                displayNameComp: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
+                displayName: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
+                endpoints: c.endpoints,
+                riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
+                issuesArr: this.getIssuesList(c.severityInfo),
+                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
+                lastTraffic: c.detected,
+                riskScore: c.riskScore,
             }
         })
 
+
         return prettifyData
+    },
+
+    getSummaryData(collectionsData){
+        let totalUrl = 0;
+        let sensitiveInRes = 0;
+        let totalTested = 0 ;
+
+        collectionsData?.forEach((c) =>{
+            totalUrl += c.endpoints ;
+            totalTested += c.testedEndpoints;
+            sensitiveInRes += c.sensitiveInRespCount;
+        })
+
+        return {
+            totalEndpoints:totalUrl , totalTestedEndpoints: totalTested, totalSensitiveEndpoints: sensitiveInRes
+        }
     },
 
     getTruncatedUrl(url){
@@ -297,19 +335,56 @@ const transform = {
         )
     },
 
+    getRiskScoreValue(severity){
+        if(severity >= 100){
+            return 2
+        }else if(severity >= 10){
+            return 1
+        }else if(severity > 0){
+            return 0.5
+        }else{
+            return 0
+        }
+    },
+
     isNewEndpoint(lastSeen){
         let lastMonthEpoch = func.timeNow() - (30 * 24 * 60 * 60);
         return lastSeen > lastMonthEpoch
     },
 
+    getRiskScoreForEndpoint(url){
+        let riskScore = 0 
+        riskScore += this.getRiskScoreValue(url.severityScore);
+
+        if(url.access_type === "Public"){
+            riskScore += 1
+        }
+
+        if(url.isSensitive){
+            riskScore += 1
+        }
+
+        if(this.isNewEndpoint(url.lastSeenTs)){
+            riskScore += 1
+        }
+
+        return riskScore
+    },
+
     prettifyEndpointsData(inventoryData){
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
+            const score = this.getRiskScoreForEndpoint(url)
             return{
                 ...url,
+                last_seen: url.last_seen,
                 hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
+                access_type: url.access_type,
+                auth_type: url.auth_type,
                 endpointComp: this.getPrettifyEndpoint(url.method, url.endpoint, this.isNewEndpoint(url.lastSeenTs)),
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
+                riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
+                riskScore: score,
                 isNew: this.isNewEndpoint(url.lastSeenTs)
             }
         })
