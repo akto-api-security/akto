@@ -31,7 +31,7 @@ public class OptimizeStorageCron {
             try {
                 logger.infoAndAddToDb("Starting optimize storage for account: " + account.getId(), LoggerMaker.LogDb.TESTING);
                 int skip = 0;
-                int limit = 1000;
+                int limit = 10000;
                 Context.accountId.set(account.getId());
                 List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
                 while (!testingRunResults.isEmpty()) {
@@ -56,9 +56,9 @@ public class OptimizeStorageCron {
                                 fixedCount++;
                             }
                         }
-                        logger.infoAndAddToDb("Fixed count: " + fixedCount + " Not fixed count: " + notFixedCount, LoggerMaker.LogDb.TESTING);
                         testingRunResult.setTestResults(testResults);
                         if (notFixedCount > 0) {
+                            logger.infoAndAddToDb("Fixed: " + fixedCount + " not fixed: " + notFixedCount + " for testing run result: " + testingRunResult.getId(), LoggerMaker.LogDb.TESTING);
                             TestingRunResultDao.instance.replaceOne(Filters.eq("_id", testingRunResult.getId()), testingRunResult);
                         }
                     }
