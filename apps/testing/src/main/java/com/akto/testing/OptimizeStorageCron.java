@@ -32,7 +32,7 @@ public class OptimizeStorageCron {
             try {
                 logger.infoAndAddToDb("Starting optimize storage for account: " + accountId, LoggerMaker.LogDb.TESTING);
                 int skip = 0;
-                int limit = 10000;
+                int limit = Integer.parseInt(System.getenv("LIMIT"));
                 Context.accountId.set(accountId);
                 List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject(), skip, limit, new BasicDBObject("_id", -1));
                 boolean runCompact = false;
