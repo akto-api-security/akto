@@ -68,13 +68,13 @@ jobs:
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_1 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG" >> $GITHUB_OUTPUT
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+          echo "image=$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG" >> $GITHUB_OUTPUT
           cd ../testing-cli
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG" >> $GITHUB_OUTPUT
       - name: Push git tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
