@@ -4,7 +4,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -40,22 +39,22 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
         );
     }
 
-    public static final List<Bson> legacyIndices = Arrays.asList(
-            Indexes.ascending(new String[] { Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL,
-                    Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.METHOD }));
-
-    public void createIndicesIfAbsent(boolean createLegacyIndices) {
+    public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get() + "";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
         List<Bson> indices = new ArrayList<>(Arrays.asList(
-                Indexes.ascending(new String[] { Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL,
-                        SingleTypeInfo._COLLECTION_IDS, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.METHOD })));
+                Indexes.ascending(new String[] {
+                        ApiInfo.ID_URL,
+                        ApiInfo.ID_API_COLLECTION_ID,
+                        ApiInfo.ID_METHOD }),
+                Indexes.ascending(new String[] {
+                        ApiInfo.ID_URL,
+                        SingleTypeInfo._COLLECTION_IDS,
+                        ApiInfo.ID_METHOD })
+            ));
 
-        if (createLegacyIndices) {
-            indices.addAll(legacyIndices);
-        }
         createIndices(indices);
     }
 }
