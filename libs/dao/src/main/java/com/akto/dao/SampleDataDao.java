@@ -4,7 +4,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
@@ -31,27 +30,24 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
         return SampleData.class;
     }
 
-    public static final List<Bson> legacyIndices = Arrays.asList(
-            Indexes.ascending(new String[] { 
-                    Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID,
-                    Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL,
-                    Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.METHOD }),
-            Indexes.ascending(new String[] { Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID }));
-
-    public void createIndicesIfAbsent(boolean createLegacyIndices) {
+    public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get() + "";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
-        List<Bson> indices = new ArrayList<>(Arrays.asList(
-                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS,
-                        Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL,
-                        Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.METHOD }),
+        List<Bson> indices = new ArrayList<>(
+            Arrays.asList(
+                Indexes.ascending(new String[] { 
+                    ApiInfo.ID_API_COLLECTION_ID,
+                    ApiInfo.ID_URL,
+                    ApiInfo.ID_METHOD }),
+                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { 
+                        SingleTypeInfo._COLLECTION_IDS,
+                        ApiInfo.ID_URL,
+                        ApiInfo.ID_METHOD }),
                 Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS })));
 
-        if (createLegacyIndices) {
-            indices.addAll(legacyIndices);
-        }
         createIndices(indices);
     }
 

@@ -35,28 +35,24 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return SingleTypeInfo.class;
     }
 
-    public static final List<Bson> legacyIndices = Arrays.asList(
-                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }));
-
-    public void createIndicesIfAbsent(boolean createLegacyIndices) {
+    public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get() + "";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
         List<Bson> indices = new ArrayList<>(Arrays.asList(
+                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP }),
                 Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS }),
                 Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
                 Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._COLLECTION_IDS }),
-                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS }),
-                Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
-                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP })));
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS })
+        ));
 
-        if (createLegacyIndices) {
-            indices.addAll(legacyIndices);
-        }
         createIndices(indices);
     }
 
