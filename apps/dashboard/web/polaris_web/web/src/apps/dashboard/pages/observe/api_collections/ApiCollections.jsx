@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Card, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
+import { Text, Button, Modal, TextField, IndexFiltersMode, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
@@ -11,6 +11,7 @@ import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import TooltipText from "../../../components/shared/TooltipText"
+import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
 
 const headers = [
     {
@@ -281,27 +282,6 @@ function ApiCollections() {
         }
     ]
 
-    const summaryCard = (
-        <Card padding={0} key="info">
-            <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>
-                <HorizontalGrid columns={4} gap={4}>
-                    {summaryItems.map((item, index) => (
-                        <Box borderInlineEndWidth={index < 3 ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
-                            <VerticalStack gap="1">
-                                <Text color="subdued" variant="headingXs">
-                                    {item.title}
-                                </Text>
-                                <Text variant="bodyMd" fontWeight="semibold">
-                                    {item.data}
-                                </Text>
-                            </VerticalStack>
-                        </Box>
-                    ))}
-                </HorizontalGrid>
-            </Box>
-        </Card>
-    )
-
     const modalComponent = (
         <Modal
             key="modal"
@@ -355,7 +335,7 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [summaryCard, modalComponent, tableComponent]
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, tableComponent]
 
     return(
         <PageWithMultipleCards

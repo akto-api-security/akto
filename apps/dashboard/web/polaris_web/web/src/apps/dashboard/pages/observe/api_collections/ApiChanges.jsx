@@ -1,27 +1,27 @@
-import { Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
+import { Card, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useEffect, useReducer, useState } from "react";
 import api from "../api";
 import func from "@/util/func";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import transform from "../transform";
-import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
-import NewEndpointsTable from "./component/NewEndpointsTable";
-import NewParametersTable from "./component/NewParametersTable";
 import {produce} from "immer"
 import values from "@/util/values";
 import ObserveStore from "../observeStore";
 import ApiDetails from "./ApiDetails";
 import PersistStore from "../../../../main/PersistStore";
 import ApiChangesTable from "./component/ApiChangesTable";
+import SummaryCardInfo from "../../../components/shared/SummaryCardInfo";
+import StackedChart from "../../../components/charts/StackedChart";
 
 
 function ApiChanges() {
 
     const allCollections = PersistStore(state => state.allCollections);
     const collectionsMap = PersistStore(state => state.collectionsMap);
-    const [newEndpoints, setNewEndpoints] = useState([])
-    const [newParametersCount, setNewParametersCount] = useState("")
+    const [newEndpoints, setNewEndpoints] = useState({prettify: [], normal: []})
+    const [newParametersCount, setNewParametersCount] = useState(0)
+    const [parametersTrend, setParametersTrend] = useState([])
     const [sensitiveParams, setSensitiveParams] = useState([])
     const [loading, setLoading] = useState(true);
     const [apiDetail, setApiDetail] = useState({})
@@ -71,9 +71,11 @@ function ApiChanges() {
             })
             let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
             const prettifiedData = transform.prettifyEndpointsData(data)
-            setNewEndpoints(prettifiedData);
+            setNewEndpoints({prettify: prettifiedData, normal: data});
             await api.fetchNewParametersTrend(startTimestamp, endTimestamp).then((resp) => {
-                setNewParametersCount(transform.findNewParametersCount(resp, startTimestamp, endTimestamp))
+                const trendObj = transform.findNewParametersCountTrend(resp, startTimestamp, endTimestamp)
+                setNewParametersCount(trendObj.count)
+                setParametersTrend(trendObj.trend)
             })
             setLoading(false);
         }
@@ -85,11 +87,11 @@ function ApiChanges() {
     const infoItems = [
         {
             title: "New endpoints",
-            data: transform.formatNumberWithCommas(newEndpoints.length),
+            data: transform.formatNumberWithCommas(newEndpoints.normal.length),
         },
         {
             title: "New sensitive endpoints",
-            data: transform.formatNumberWithCommas(newEndpoints.filter(x => x.sensitive && x.sensitive.size > 0).length),
+            data: transform.formatNumberWithCommas(newEndpoints.normal.filter(x => x.sensitive && x.sensitive.size > 0).length),
             color: "critical",
         },
         {
@@ -102,23 +104,7 @@ function ApiChanges() {
             color: "critical",
         }
     ]
-
-    const infoCard = (
-        <Card key="info">
-            <HorizontalStack gap="1" align="space-between">
-                {infoItems.map((item, index) => (
-                    <VerticalStack gap="1" key={index}>
-                        <Text color="subdued" variant="bodyLg">
-                            {item.title}
-                        </Text>
-                        <Text variant="bodyMd" fontWeight="semibold" color={item?.color}>
-                            {item.data}
-                        </Text>
-                    </VerticalStack>
-                ))}
-            </HorizontalStack>
-        </Card>
-    )
+    const endpointsTrend = transform.changesTrend(newEndpoints.normal, startTimestamp, endTimestamp)
 
     const tableComponent = (
         <ApiChangesTable
@@ -126,7 +112,7 @@ function ApiChanges() {
             tableLoading={loading}
             startTimeStamp={startTimestamp}
             endTimeStamp={endTimestamp}
-            newEndpoints={newEndpoints}
+            newEndpoints={newEndpoints.prettify}
             parametersCount={newParametersCount}
             key="table"
         />
@@ -143,7 +129,64 @@ function ApiChanges() {
         />
     )
 
-    const components = [infoCard, tableComponent, apiChanges]
+    const processChartData = () => {
+        return [
+            {
+                data: endpointsTrend,
+                color: "#AEE9D1",
+                name: "New endpoints"
+            },
+            {
+                data: parametersTrend,
+                color: "#A4E8F2",
+                name: "New parameters"
+            }
+        ]
+    }
+    const defaultChartOptions = {
+        "legend": {
+            enabled: false
+        },
+    }
+
+    const graphComponent = (
+        <Card>
+            <VerticalStack gap={4}>
+                <VerticalStack gap={3}>
+                    <Text variant="bodyMd" fontWeight="medium">Changes</Text>
+                    <Divider />
+                </VerticalStack>
+                <VerticalStack gap={2}>
+                    <HorizontalStack align="end">
+                        <HorizontalStack gap={3}>
+                            <HorizontalStack gap={2}>
+                                <div style={{background: "#A4E8F2", borderRadius: '50%', height:'8px', width: '8px'}} />
+                                <Text variant="bodyMd">Sensitive params</Text>
+                            </HorizontalStack>
+                            <HorizontalStack gap={2}>
+                                <div style={{background: "#AEE9D1", borderRadius: '50%', height:'8px', width: '8px'}} />
+                                <Text variant="bodyMd">New endpoints</Text>
+                            </HorizontalStack>
+                        </HorizontalStack>
+                    </HorizontalStack>
+                    <StackedChart
+                        key={`trend-chart`}
+                        type='column'
+                        color='#6200EA'
+                        areaFillHex="true"
+                        height="280"
+                        background-color="#ffffff"
+                        data={processChartData()}
+                        defaultChartOptions={defaultChartOptions}
+                        text="true"
+                        yAxisTitle="Number of issues"
+                    />
+                </VerticalStack>
+            </VerticalStack>
+        </Card>
+    )
+
+    const components = [<SummaryCardInfo summaryItems={infoItems} key="infoCard" />, graphComponent, tableComponent, apiChanges]
 
     return (
         <PageWithMultipleCards
