@@ -95,26 +95,17 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public void updateLastTestedField(List<TestingRunResult> testingRunResults, ApiInfo.ApiInfoKey apiInfoKey){
         if(hasTestRunSuccessfullyOnApi(testingRunResults)){
-            UpdateOptions updateOptions = new UpdateOptions();
-            updateOptions.upsert(true);
             instance.getMCollection().updateOne(
                 getFilter(apiInfoKey), 
-                Updates.combine(
-                    Updates.set("lastTested", Context.now()),
-                    Updates.setOnInsert("allAuthTypesFound", new ArrayList<>()),
-                    Updates.setOnInsert("lastSeen", 0),
-                    Updates.setOnInsert("apiAccessTypes",  new ArrayList<>()),
-                    Updates.setOnInsert("violations", new HashMap<>())
-                ),
-                updateOptions
-            ) ;
+                Updates.set("lastTested", Context.now())
+            );
         }
     }
 
     public Map<Integer,Integer> getCoverageCount(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        int oneMonthAgo = Context.now() - (30 * 24 * 60 * 60) ;
+        int oneMonthAgo = Context.now() - Constants.ONE_MONTH_TIMESTAMP ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
         BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
@@ -124,7 +115,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
                 int count = basicDBObject.getInt("count");
                 result.put(apiCollectionId, count);
             } catch (Exception e) {
@@ -145,7 +136,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
                 int lastTrafficSeen = basicDBObject.getInt("lastSeen");
                 result.put(apiCollectionId, lastTrafficSeen);
             } catch (Exception e) {

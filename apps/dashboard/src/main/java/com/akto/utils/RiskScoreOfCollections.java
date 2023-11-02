@@ -75,12 +75,12 @@ public class RiskScoreOfCollections {
 
         for(TestingRunIssues issue: issues){
             String severity = issue.getSeverity().toString();
-            Float severityScore = (Float) inventoryAction.calculateRiskValueForSeverity(severity);
+            float severityScore = (float) inventoryAction.calculateRiskValueForSeverity(severity);
             ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
             if(severityScoreMap.isEmpty() || !severityScoreMap.containsKey(apiInfoKey)){
                 severityScoreMap.put(apiInfoKey, severityScore);
             }else{
-                Float prev = severityScoreMap.get(apiInfoKey);
+                float prev = severityScoreMap.get(apiInfoKey);
                 severityScore += prev;
                 severityScoreMap.put(apiInfoKey, severityScore);
             }
