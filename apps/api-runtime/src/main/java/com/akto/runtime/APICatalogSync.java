@@ -19,6 +19,7 @@ import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
+import com.akto.util.Constants;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
@@ -653,8 +654,6 @@ public class APICatalogSync {
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
-        ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
-        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
 
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
@@ -667,12 +666,6 @@ public class APICatalogSync {
                     Filters.eq("apiCollectionId", apiCollectionId),
                     Filters.eq("method", delMethod.name()),
                     Filters.eq("url", delEndpoint)
-                );
-
-                Bson filterQSampleData = Filters.and(
-                    Filters.eq("_id.apiCollectionId", apiCollectionId),
-                    Filters.eq("_id.method", delMethod.name()),
-                    Filters.eq("_id.url", delEndpoint)
                 );
 
                 if (isFirst) {
@@ -698,33 +691,10 @@ public class APICatalogSync {
 
                     bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, Updates.set("url", newTemplateUrl), new UpdateOptions()));
 
-
-                    SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
-                    if (sd != null) {
-                        sd.getId().url = newTemplateUrl;
-                        // SampleDataDao.instance.insertOne(sd);
-                        bulkUpdatesForSampleData.add(new InsertOneModel<>(sd));
-                    }
-
-
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData);
-                    if (apiInfo != null) {
-                        apiInfo.getId().url = newTemplateUrl;
-                        // ApiInfoDao.instance.insertOne(apiInfo);
-                        bulkUpdatesForApiInfo.add(new InsertOneModel<>(apiInfo));
-                    }
-
                     isFirst = false;
                 } else {
                     bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
-                    // SingleTypeInfoDao.instance.deleteAll(filterQ);
-
                 }
-
-                bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
-                bulkUpdatesForApiInfo.add(new DeleteManyModel<>(filterQSampleData));
-                // SampleDataDao.instance.deleteAll(filterQSampleData);
-                // ApiInfoDao.instance.deleteAll(filterQSampleData);
             }
         }
 
@@ -737,29 +707,115 @@ public class APICatalogSync {
                 Filters.eq("url", delEndpoint)
             );
 
-            Bson filterQSampleData = Filters.and(
-                Filters.eq("_id.apiCollectionId", apiCollectionId),
-                Filters.eq("_id.method", delMethod.name()),
-                Filters.eq("_id.url", delEndpoint)
-            );
-
             bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
-            bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
-            // SingleTypeInfoDao.instance.deleteAll(filterQ);
-            // SampleDataDao.instance.deleteAll(filterQSampleData);
         }
 
         if (bulkUpdatesForSti.size() > 0) {
             SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
         }
 
-        if (bulkUpdatesForSampleData.size() > 0) {
-            SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
+        Set<URLStatic> strictURLs = new HashSet<>();
+        Set<URLTemplate> templateURLs = new HashSet<>();
+        List<BasicDBObject> endpoints = SingleTypeInfoDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+        for (BasicDBObject obj : endpoints) {
+            BasicDBObject urlObj = (BasicDBObject) obj.get(Constants.ID);
+            String url = urlObj.getString("url");
+            String method = urlObj.getString("method");
+            if (APICatalog.isTemplateUrl(url)) {
+                templateURLs.add(APICatalogSync.createUrlTemplate(url, Method.fromString(method))); // todo: if method is "ST" what will happen
+            } else {
+                strictURLs.add(new URLStatic(url, Method.fromString(method)));
+            }
         }
 
-        if (bulkUpdatesForApiInfo.size() > 0) {
-            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+        mergeApiInfo(apiCollectionId, strictURLs, templateURLs);
+        mergeSampleData(apiCollectionId, strictURLs, templateURLs);
+    }
+
+
+    public static void mergeApiInfo(int apiCollectionId, Set<URLStatic> strictURLs, Set<URLTemplate> templateURLs ) {
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id."+ ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiCollectionId));
+
+        Set<ApiInfo> deleteStaticUrls = new HashSet<>();
+        Set<ApiInfo> withoutSlashStaticUrls = new HashSet<>();
+        Map<ApiInfo.ApiInfoKey, Set<ApiInfo>> templateToStaticURLs = new HashMap<>();
+
+        Set<ApiInfo.ApiInfoKey> templateKeys = new HashSet<>();
+
+        for (ApiInfo apiInfo: apiInfoList) {
+            ApiInfo.ApiInfoKey apiInfoKey = apiInfo.getId();
+            String url = apiInfoKey.getUrl();
+            Method method = apiInfoKey.getMethod();
+
+            if (APICatalog.isTemplateUrl(url)) {
+                templateKeys.add(apiInfoKey);
+                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+                if (!templateURLs.contains(urlTemplate)) deleteStaticUrls.add(apiInfo);
+            } else {
+                URLStatic urlStatic = new URLStatic(url, method);
+                if (!strictURLs.contains(urlStatic)) {
+                    if (url.startsWith("/")  && strictURLs.contains(new URLStatic(url.substring(1), method))) {
+                        withoutSlashStaticUrls.add(apiInfo);
+                        break;
+                    }
+
+                    boolean delete = true;
+                    for (URLTemplate urlTemplateFromSTI: templateURLs) {
+                        if (urlTemplateFromSTI.match(urlStatic)) {
+                            delete = false;
+                            ApiInfo.ApiInfoKey urlTemplateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlTemplateFromSTI.getTemplateString(), urlTemplateFromSTI.getMethod());
+                            Set<ApiInfo> staticUrls = templateToStaticURLs.getOrDefault(urlTemplateApiInfoKey, new HashSet<>());
+                            staticUrls.add(apiInfo);
+                            templateToStaticURLs.put(urlTemplateApiInfoKey, staticUrls);
+                            break;
+                        }
+                    }
+
+                    if (delete) {
+                        deleteStaticUrls.add(apiInfo);
+                    }
+                }
+            }
+
         }
+
+        // delete static urls
+        ArrayList<WriteModel<ApiInfo>> bulkWrites = new ArrayList<>();
+        for (ApiInfo apiInfo: deleteStaticUrls) {
+            Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
+            bulkWrites.add(new DeleteManyModel<>(filter));
+        }
+
+        // modify without slash static urls
+        for (ApiInfo apiInfo: withoutSlashStaticUrls) {
+            bulkWrites.add(new InsertOneModel<>(apiInfo));
+        }
+
+        // merge
+        for (ApiInfo.ApiInfoKey apiInfoKey: templateToStaticURLs.keySet()) {
+            if (templateKeys.contains(apiInfoKey)) continue;
+            Set<ApiInfo> apiInfos = templateToStaticURLs.get(apiInfoKey);
+            if (apiInfos == null || apiInfos.isEmpty()) continue;
+
+            boolean isFirst = true;
+            for (ApiInfo apiInfo: apiInfos) {
+                if (isFirst) {
+                    bulkWrites.add(new DeleteManyModel<>(ApiInfoDao.getFilter(apiInfo.getId())));
+                    apiInfo.setId(apiInfoKey);
+                    bulkWrites.add(new InsertOneModel<>(apiInfo));
+                    isFirst = false;
+                } else {
+                    bulkWrites.add(new DeleteManyModel<>(ApiInfoDao.getFilter(apiInfo.getId())));
+                }
+            }
+        }
+
+        if (bulkWrites.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(bulkWrites, new BulkWriteOptions().ordered(false));
+
+    }
+
+    public static void mergeSampleData(int apiCollectionId, Set<URLStatic> strictURLs, Set<URLTemplate> templateURLs ) {
+
     }
 
     private void tryWithKnownURLTemplates(

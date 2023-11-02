@@ -2,6 +2,7 @@ package com.akto.action.gpt.data_extractors;
 
 import com.akto.action.gpt.data_extractors.filters.Filter;
 import com.akto.action.observe.Utils;
+import com.akto.dao.SingleTypeInfoDao;
 import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,7 @@ public class ListApisEndpointNames implements DataExtractor<String>{
             }
 
         } else {
-            List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+            List<BasicDBObject> list = SingleTypeInfoDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
             
             for (BasicDBObject obj : list) {
                 String url = ((BasicDBObject)obj.get("_id")).getString("url", "");

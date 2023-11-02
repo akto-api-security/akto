@@ -1,14 +1,9 @@
 package com.akto.parsers;
 
 import com.akto.MongoBasedTest;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
+import com.akto.dto.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
@@ -42,6 +37,8 @@ public class TestMergingNew extends MongoBasedTest {
         }
         info.setAktoDataTypeMap(aktoDataTypeMap);
         SingleTypeInfo.getAccountToDataTypesInfo().put(ACCOUNT_ID, info);
+
+        RuntimeFilterDao.instance.initialiseFilters();
     }
     @Test
     public void testMultipleIntegerMerging() {
@@ -49,7 +46,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "api/";
+        String url = "/api/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 50; i++) {
@@ -65,6 +62,13 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams.subList(10,15), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
+
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(1, apiInfoList.size());
+        assertEquals("api/INTEGER/books/INTEGER/cars/INTEGER", apiInfoList.get(0).getId().getUrl());
+        assertEquals(123, apiInfoList.get(0).getId().getApiCollectionId());
+        assertEquals(URLMethods.Method.POST, apiInfoList.get(0).getId().getMethod());
+
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
@@ -82,6 +86,12 @@ public class TestMergingNew extends MongoBasedTest {
 
         assertEquals(1, urlTemplateMap.size());
         assertEquals(0, getStaticURLsSize(parser));
+
+        apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(1, apiInfoList.size());
+        assertEquals("api/INTEGER/books/INTEGER/cars/INTEGER", apiInfoList.get(0).getId().getUrl());
+        assertEquals(123, apiInfoList.get(0).getId().getApiCollectionId());
+        assertEquals(URLMethods.Method.POST, apiInfoList.get(0).getId().getMethod());
 
     }
 
@@ -130,6 +140,13 @@ public class TestMergingNew extends MongoBasedTest {
 
         Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         assertEquals(1, templateURLToMethods.size());
+
+
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(1, apiInfoList.size());
+        assertEquals("api/product/STRING/subproduct/STRING/subitem/STRING/id/INTEGER", apiInfoList.get(0).getId().getUrl());
+        assertEquals(123, apiInfoList.get(0).getId().getApiCollectionId());
+        assertEquals(URLMethods.Method.GET, apiInfoList.get(0).getId().getMethod());
 
         parser.syncFunction(responseParams.subList(3,10), false,true);
         parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, 
@@ -216,7 +233,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "link/";
+        String url = "/link/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (String x: Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H")) {
@@ -238,6 +255,12 @@ public class TestMergingNew extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
+
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(1, apiInfoList.size());
+        assertEquals("link/STRING", apiInfoList.get(0).getId().getUrl());
+        assertEquals(123, apiInfoList.get(0).getId().getApiCollectionId());
+        assertEquals(URLMethods.Method.POST, apiInfoList.get(0).getId().getMethod());
 
         parser.syncFunction(responseParams.subList(28,33), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);

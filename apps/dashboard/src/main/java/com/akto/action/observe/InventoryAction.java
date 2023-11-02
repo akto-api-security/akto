@@ -115,7 +115,7 @@ public class InventoryAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<SingleTypeInfo> singleTypeInfos = Utils.fetchHostSTI(apiCollection.getId(), skip);
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.fetchHostSTI(apiCollection.getId(), skip);
         for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
             BasicDBObject value = new BasicDBObject();
             value.put("url", singleTypeInfo.getUrl());
@@ -132,7 +132,7 @@ public class InventoryAction extends UserAction {
         listOfEndpointsInCollection = new HashSet<>();
         List<BasicDBObject> list = null;
         if (apiCollectionId > -1) {
-            list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+            list = SingleTypeInfoDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
         }
         if (list != null && !list.isEmpty()) {
             list.forEach(element -> {
@@ -316,7 +316,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchAPICollection() {
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+        List<BasicDBObject> list = SingleTypeInfoDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
         try {
