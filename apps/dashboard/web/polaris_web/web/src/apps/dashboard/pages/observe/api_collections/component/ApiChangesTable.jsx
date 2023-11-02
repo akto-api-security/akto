@@ -39,7 +39,13 @@ function ApiChangesTable(props) {
   const tableDataObj = apiChangesData.getData(selectedTab);
 
   const handleRow = (data) => {
-      handleRowClick(data,tableDataObj.headers)
+      let headers = []
+      if(selectedTab === 'param'){
+        headers = transform.getParamHeaders() ;
+      }else{
+        headers = transform.getDetailsHeaders() ;
+      }
+      handleRowClick(data,headers)
   }
 
   const paramFilters = apiChangesData.getParamFilters() ;
