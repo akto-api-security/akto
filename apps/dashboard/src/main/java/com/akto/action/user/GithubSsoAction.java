@@ -134,7 +134,7 @@ public class GithubSsoAction extends UserAction {
             Map<String, String> metaData = testingRunResultSummary.getMetadata();
             String repository = metaData.get("repository");
             String pullRequestId = metaData.get("pull_request_id");
-            String commitSHA = metaData.get("commit_sha");
+            String commitSHA = metaData.get("commit_sha_head");
             boolean isCompleted = testingRunResultSummary.getState() == TestingRun.State.COMPLETED;
             StringBuilder messageStringBuilder = new StringBuilder();
             if (isCompleted) {
