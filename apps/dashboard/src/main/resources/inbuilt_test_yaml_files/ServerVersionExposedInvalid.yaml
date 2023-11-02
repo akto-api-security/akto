@@ -29,6 +29,8 @@ info:
     - "https://github.com/ASRG/asrg.io/issues/200"
   cwe:
     - CWE-209
+  cve:
+    - CVE-2017-4013
 
 api_selection_filters:
   response_code:

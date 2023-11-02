@@ -19,6 +19,10 @@ info:
     - "https://hackerone.com/reports/223324"
   cwe:
     - CWE-287
+    - CWE-294
+  cve:
+    - CVE-2021-29047
+    - CVE-2022-34983
 
 api_selection_filters:
   response_code:

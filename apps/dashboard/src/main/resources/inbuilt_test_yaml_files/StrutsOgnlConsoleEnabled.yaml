@@ -26,7 +26,7 @@ info:
     - "https://struts.apache.org/core-developers/development-mode"
     - "https://nvd.nist.gov/vuln/detail/CVE-2020-17530"
   cwe:
-    - CWE-16
+    - CWE-215
 
 api_selection_filters:
   response_code:
