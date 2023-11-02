@@ -164,7 +164,7 @@ jobs:
 #        run: bash ./.github/scripts/akto-testsigma.sh
 #
       - name: Run Akto CI/CD tests
-        uses: shivam-rawat-akto/run-scan@v1.0.11
+        uses: shivam-rawat-akto/run-scan@v1.0.12
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
