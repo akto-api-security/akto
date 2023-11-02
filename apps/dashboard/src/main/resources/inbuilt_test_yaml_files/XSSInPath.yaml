@@ -21,6 +21,8 @@ info:
     - "https://www.codegrazer.com/blog/7-reflected-xss.html"
   cwe:
     - CWE-79
+  cve:
+    - CVE-2021-35976
 
 api_selection_filters:
   response_code:

@@ -26,26 +26,25 @@ public class VariableResolver {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
-        if (matcher.find()) {
+        while (matcher.find()) {
             try {
                 String match = matcher.group(0);
                 match = match.substring(2, match.length());
                 match = match.substring(0, match.length() - 1);
                 Object val = getValue(varMap, match);
                 String valString = val.toString();
-                expression = expression.replaceAll("(\\$\\{[^}]*\\})", valString);
+                expression = expression.replaceFirst("(\\$\\{[^}]*\\})", valString);
             } catch (Exception e) {
                 return expression;
             }
-        } else {
-            Object val = getValue(varMap, expression);
-            if (val == null) {
-                return expression;
-            } else {
-                return val.toString();
-            }
         }
-        return expression;
+
+        Object val = getValue(varMap, expression);
+        if (val == null) {
+            return expression;
+        } else {
+            return val.toString();
+        }
 
     }
 

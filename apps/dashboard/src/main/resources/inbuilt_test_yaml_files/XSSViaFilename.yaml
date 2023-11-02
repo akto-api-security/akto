@@ -21,6 +21,9 @@ info:
     - "https://infosecwriteups.com/all-about-file-upload-xss-c72c797aaba3"
   cwe:
     - CWE-79
+  cve:
+    - CVE-2023-43309
+    - CVE-2021-38143
 
 api_selection_filters:
   and:
