@@ -116,7 +116,7 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
             try {
                 BasicDBObject basicDBObject = severitiesCursor.next();
                 String subCategory = ((BasicDBObject) basicDBObject.get("_id")).getString("subCategory");
-                Integer count = basicDBObject.getInt("count");
+                int count = basicDBObject.getInt("count");
                 result.put(subCategory, count);
             }catch(Exception e){
                 e.printStackTrace();
@@ -144,7 +144,7 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
             try {
                 BasicDBObject basicDBObject = severitiesCursor.next();
                 String severity = ((BasicDBObject) basicDBObject.get("_id")).getString("severity");
-                Integer count = basicDBObject.getInt("count");
+                int count = basicDBObject.getInt("count");
                 result.put(severity, count);
             }catch(Exception e){
                 e.printStackTrace();

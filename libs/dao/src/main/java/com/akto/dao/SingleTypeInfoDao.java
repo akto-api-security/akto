@@ -402,7 +402,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return countMap;
     }
 
-    public Map<Integer,Integer> getSensitiveCountForCollections(List<String> sensitiveParameters, Integer responseCode){
+    public Map<Integer,Integer> getSensitiveCountForCollections(List<String> sensitiveParameters, int responseCode){
         Bson filterOnResponse;
         if(responseCode == -1){
             filterOnResponse = Filters.eq("responseCode", -1);
@@ -428,7 +428,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
                 int count = basicDBObject.getInt("count");
                 result.put(apiCollectionId, count);
             } catch (Exception e) {
@@ -458,7 +458,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
                 List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
                 result.put(apiCollectionId, subtypes);
             } catch (Exception e) {
@@ -483,10 +483,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         Map<Integer,List<String>> subtypesInResponse = getSensitiveSubtypesDetectedForCollection(sensitiveInResponse, 1);
 
         for (Map.Entry<Integer, List<String>> entry : subtypesInRequest.entrySet()) {
-            Integer apiCollectionId = entry.getKey();
+            int apiCollectionId = entry.getKey();
 
-            Integer countSensitiveRequest = countSensitiveInRequest.getOrDefault(apiCollectionId,0) ;
-            Integer countSensitiveResponse = countSensitiveInResponse.getOrDefault(apiCollectionId, 0);
+            int countSensitiveRequest = countSensitiveInRequest.getOrDefault(apiCollectionId,0) ;
+            int countSensitiveResponse = countSensitiveInResponse.getOrDefault(apiCollectionId, 0);
 
             List<String> subTypesRequest = entry.getValue();
             List<String> subTypesResponse = subtypesInResponse.getOrDefault(apiCollectionId, new ArrayList<>()) ;
@@ -496,10 +496,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         for (Map.Entry<Integer, List<String>> entry : subtypesInResponse.entrySet()) {
-            Integer apiCollectionId = entry.getKey();
+            int apiCollectionId = entry.getKey();
             if(!subtypesInRequest.containsKey(apiCollectionId)){
-                Integer countSensitiveRequest = countSensitiveInRequest.getOrDefault(apiCollectionId,0) ;
-                Integer countSensitiveResponse = countSensitiveInResponse.getOrDefault(apiCollectionId, 0);
+                int countSensitiveRequest = countSensitiveInRequest.getOrDefault(apiCollectionId,0) ;
+                int countSensitiveResponse = countSensitiveInResponse.getOrDefault(apiCollectionId, 0);
 
                 List<String> subTypesResponse = entry.getValue();
                 List<String> subTypesRequest = subtypesInRequest.getOrDefault(apiCollectionId, new ArrayList<>()) ;

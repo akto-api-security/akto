@@ -159,7 +159,7 @@ public class ApiCollectionsAction extends UserAction {
                 BasicDBObject basicDBObject = apiCursor.next();
                 double riskScore = basicDBObject.getDouble("riskScore");
                 BasicDBObject bd = (BasicDBObject) basicDBObject.get("_id");
-                Integer collectionId = bd.getInt("apiCollectionId");
+                int collectionId = bd.getInt("apiCollectionId");
 
                 // store count of total critical endpoints present in ApiInfo
                 if(riskScore >= 4){
