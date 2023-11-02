@@ -127,7 +127,7 @@ const transform = {
         }
         return paths;
     },
-    findNewParametersCount: (resp, startTimestamp, endTimestamp) => {
+    findNewParametersCountTrend: (resp, startTimestamp, endTimestamp) => {
         let newParametersCount = 0
         let todayDate = new Date(endTimestamp * 1000)
         let twoMonthsAgo = new Date(startTimestamp * 1000)
@@ -144,7 +144,10 @@ const transform = {
             ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
             currDate = func.incrDays(currDate, 1)
         }
-        return newParametersCount
+        return {
+            count: newParametersCount,
+            trend: ret
+        }
     },
     fillSensitiveParams: (sensitiveParams, apiCollection) => {
         sensitiveParams = sensitiveParams.reduce((z,e) => {
@@ -399,6 +402,24 @@ const transform = {
 
     getDetailsHeaders(){
         return apiDetailsHeaders
+    },
+
+    changesTrend (data, startTimestamp, endTimestamp) {
+        let end = new Date(endTimestamp * 1000)
+        let start = new Date(startTimestamp * 1000)
+        
+        let date = start
+        let ret = []
+        let dateToCount = data.reduce((m, e) => { 
+            let detectDate = func.toYMD(new Date(e.detectedTs*1000))
+            m[detectDate] = (m[detectDate] || 0 ) + 1
+            return m
+        }, {})
+        while (date <= end) {
+            ret.push([func.toDate(func.toYMD(date)), dateToCount[func.toYMD(date)] || 0])
+            date = func.incrDays(date, 1)
+        }
+        return ret
     }
       
 }
