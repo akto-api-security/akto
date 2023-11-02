@@ -28,9 +28,11 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.util.Constants;
+import com.akto.utils.Utils;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 
@@ -309,8 +311,8 @@ public class ApiCollectionsAction extends UserAction {
             try {
                 BasicDBObject basicDBObject = apiCursor.next();
                 double riskScore = basicDBObject.getDouble("riskScore");
-                BasicDBObject bd = (BasicDBObject) basicDBObject.get("_id");
-                Integer collectionId = bd.getInt("apiCollectionId");
+                BasicDBList collectionIdsList = (BasicDBList) basicDBObject.get(SingleTypeInfo._COLLECTION_IDS);
+                List<Integer> collectionIds = Utils.castList(Integer.class, collectionIdsList);
 
                 // store count of total critical endpoints present in ApiInfo
                 if(riskScore >= 4){
@@ -318,12 +320,15 @@ public class ApiCollectionsAction extends UserAction {
                 }
 
                 // as for collections, risk score is max of apis in it, here we take max for collection id
-                if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(collectionId)){
-                    riskScoreMap.put(collectionId, riskScore);
-                }else{
-                    double prev = riskScoreMap.get(collectionId);
-                    riskScore = Math.max(riskScore, prev);
-                    riskScoreMap.put(collectionId, riskScore);
+                for(int collectionId: collectionIds){
+                    double tmp = riskScore;
+                    if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(collectionId)){
+                        riskScoreMap.put(collectionId, tmp);
+                    }else{
+                        double prev = riskScoreMap.get(collectionId);
+                        tmp = Math.max(tmp, prev);
+                        riskScoreMap.put(collectionId, tmp);
+                    }
                 }
 
             } catch (Exception e) {

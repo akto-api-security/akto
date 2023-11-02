@@ -14,6 +14,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
@@ -387,8 +388,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
         pipeline.add(Aggregates.group(groupedId1));
 
-        BasicDBObject groupedId2 =
-                new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        pipeline.add(Aggregates.unwind(collectionIdKey));
+        BasicDBObject groupedId2 = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);        
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -396,7 +398,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._COLLECTION_IDS);
                 int count = basicDBObject.getInt("count");
                 result.put(apiCollectionId, count);
             } catch (Exception e) {
@@ -417,7 +419,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId");
+        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        pipeline.add(Aggregates.unwind(collectionIdKey));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
 
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -426,7 +430,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._COLLECTION_IDS);
                 List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
                 result.put(apiCollectionId, subtypes);
             } catch (Exception e) {

@@ -543,7 +543,7 @@ export default {
             method: 'post',
             data: {}
         })
-    }
+    },
 
     async addApisToCustomCollection(apiList, collectionName) {
         return await request({

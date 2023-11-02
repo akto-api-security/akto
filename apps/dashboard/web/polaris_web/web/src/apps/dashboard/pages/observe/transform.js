@@ -264,16 +264,14 @@ const transform = {
     prettifyCollectionsData(newData){
         const prettifyData = newData.map((c)=>{
             return{
-                id: c.id,
+                ...c,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
-                endpoints: c.endpoints,
                 riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
                 issuesArr: this.getIssuesList(c.severityInfo),
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,
-                riskScore: c.riskScore,
             }
         })
 

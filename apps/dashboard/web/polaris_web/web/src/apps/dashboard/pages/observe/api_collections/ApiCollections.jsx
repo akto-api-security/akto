@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Card, HorizontalStack, VerticalStack, Box, HorizontalGrid, IndexFiltersMode, Card, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
+import { Text, Button, Modal, TextField, IndexFiltersMode, Card, HorizontalStack, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
@@ -15,8 +15,7 @@ const headers = [
     {
         title: "API collection name",
         text: "API collection name",
-        value: "displayNameComp",
-        filterKey:"displayName",
+        value: "displayName",
         showFilter:true,
     },
     {
@@ -115,6 +114,7 @@ function ApiCollections() {
     const [loading, setLoading] = useState(false)
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
+    const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const handleNewCollectionNameChange = 
         useCallback(
             (newValue) => setNewCollectionName(newValue),

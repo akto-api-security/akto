@@ -92,14 +92,16 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         int oneMonthAgo = Context.now() - (30 * 24 * 60 * 60) ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
-        BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
-        pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
+        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        pipeline.add(Aggregates.unwind(collectionIdKey));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);        
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> collectionsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._COLLECTION_IDS);
                 int count = basicDBObject.getInt("count");
                 result.put(apiCollectionId, count);
             } catch (Exception e) {
@@ -112,7 +114,9 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public Map<Integer,Integer> getLastTrafficSeen(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        pipeline.add(Aggregates.unwind(collectionIdKey));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
         pipeline.add(Aggregates.sort(Sorts.descending(ApiInfo.LAST_SEEN)));
         pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
 
@@ -120,7 +124,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                Integer apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._COLLECTION_IDS);
                 int lastTrafficSeen = basicDBObject.getInt("lastSeen");
                 result.put(apiCollectionId, lastTrafficSeen);
             } catch (Exception e) {
@@ -141,6 +145,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         pipeline.add(Aggregates.project(
             Projections.fields(
                 Projections.include("_id"),
+                Projections.include(SingleTypeInfo._COLLECTION_IDS),
                 Projections.computed("sensitiveScore",Document.parse(computedIsSensitiveScore)),
                 Projections.computed("isNewScore",Document.parse(computedLastSeenScore)),
                 Projections.computed("accessTypeScore",Document.parse(computedAccessTypeScore)),
@@ -154,6 +159,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             Aggregates.project(
                 Projections.fields(
                     Projections.include("_id"),
+                    Projections.include(SingleTypeInfo._COLLECTION_IDS),
                     Projections.computed("riskScore", Document.parse(computedRiskScore))
                 )
             )
