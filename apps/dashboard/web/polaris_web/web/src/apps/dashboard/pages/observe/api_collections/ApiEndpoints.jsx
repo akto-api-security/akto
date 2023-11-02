@@ -57,6 +57,7 @@ const headings = [
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
         filterKey: 'sensitiveTags',
+        showFilter: true
     },
     {
         text: 'Last Seen',
