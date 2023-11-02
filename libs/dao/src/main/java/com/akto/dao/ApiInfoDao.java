@@ -3,7 +3,6 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -18,24 +17,19 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
-    public static final List<Bson> legacyIndices = Arrays.asList(
-                Indexes.ascending(new String[] {Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID}),
-                Indexes.ascending(new String[] {Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}));
-
-    public void createIndicesIfAbsent(boolean createLegacyIndices) {
+    public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
         List<Bson> indices = new ArrayList<>(Arrays.asList(
-                Indexes.ascending(new String[]{SingleTypeInfo._COLLECTION_IDS}),
-                Indexes.ascending(new String[]{Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}),
-                Indexes.ascending(new String[]{SingleTypeInfo._COLLECTION_IDS, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL})
+                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL }),
+                Indexes.ascending(new String[] { ApiInfo.ID_URL }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL })
         ));
 
-        if (createLegacyIndices) {
-            indices.addAll(legacyIndices);
-        }
         createIndices(indices);
     }
 
