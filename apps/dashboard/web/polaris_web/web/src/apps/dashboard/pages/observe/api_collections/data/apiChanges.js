@@ -22,7 +22,7 @@ const endpointHeadings = [
         text: "Collection",
         value: 'apiCollectionName',
         title: "Collection",
-        maxWidth: '120px',
+        maxWidth: '95px',
         type: CellType.TEXT,
     },
     {
@@ -87,7 +87,7 @@ const newParametersHeaders = [
         text: 'Collection',
         title: 'Collection',
         value: 'apiCollectionName',
-        maxWidth: '120px',
+        maxWidth: '100px',
         sortKey: 'apiCollectionId',
         showFilterMenu: true,
         type: CellType.TEXT,

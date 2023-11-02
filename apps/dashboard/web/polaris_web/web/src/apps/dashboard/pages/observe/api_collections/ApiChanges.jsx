@@ -124,7 +124,7 @@ function ApiChanges() {
             showDetails={showDetails}
             setShowDetails={setShowDetails}
             apiDetail={apiDetail}
-            headers={transform.getDetailsHeaders()}
+            headers={tableHeaders}
             getStatus={() => { return "warning" }}
         />
     )
@@ -150,7 +150,7 @@ function ApiChanges() {
     }
 
     const graphComponent = (
-        <Card>
+        <Card key={"graphComponent"}>
             <VerticalStack gap={4}>
                 <VerticalStack gap={3}>
                     <Text variant="bodyMd" fontWeight="medium">Changes</Text>

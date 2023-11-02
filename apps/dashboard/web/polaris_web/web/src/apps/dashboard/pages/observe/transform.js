@@ -4,7 +4,7 @@ import PersistStore from "../../../main/PersistStore";
 import tranform from "../onboarding/transform"
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
-import { SearchMinor, InfoMinor, LockMinor, ClockMinor } from "@shopify/polaris-icons"
+import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -41,6 +41,12 @@ const apiDetailsHeaders = [
         itemOrder: 1,
         showFilter: true,
         component: StyledEndpoint
+    },
+    {
+        text: 'Collection name',
+        value: 'apiCollectionName',
+        itemOrder: 3,
+        icon: DynamicSourceMinor,
     },
     {
         text: 'Tags',
@@ -86,6 +92,67 @@ const apiDetailsHeaders = [
         icon: InfoMinor,
         itemOrder: 3
 
+    }
+]
+
+const paramHeaders = [
+    {
+        text: 'Name',
+        value: 'name',
+        itemOrder: 1,
+    },
+    {
+        text: 'Type',
+        value: 'subType',
+        icon: PasskeyMinor,
+        itemOrder: 3
+    },
+    {
+        text: 'Endpoint',
+        value: 'endpoint',
+        icon: LinkMinor,
+        itemOrder: 3,
+        sortKey: 'url',
+        showFilterMenu: true
+    },
+    {
+        text: 'Collection',
+        value: 'apiCollectionName',
+        icon: DynamicSourceMinor,
+        itemOrder: 3,
+        sortKey: 'apiCollectionId',
+        showFilterMenu: true
+    },
+    {
+        text: 'Method',
+        value: 'method',
+        icon: GlobeMinor,
+        itemOrder: 3,
+        sortKey: 'method',
+        showFilterMenu: true
+    },
+    {
+        text: 'Location',
+        value: 'location',
+        icon: LocationsMinor,
+        itemOrder: 3,
+        sortKey: 'isHeader',
+        showFilterMenu: true
+    },
+    {
+        text: "Discovered",
+        value: 'added',
+        icon: ClockMinor,
+        itemOrder: 3,
+        sortKey: 'timestamp',
+        showFilterMenu: true
+    },
+    {
+        text: 'Values',
+        value: 'domain',
+        icon: PriceLookupMinor,
+        itemOrder: 3,
+        showFilterMenu: true
     }
 ]
 
@@ -420,6 +487,10 @@ const transform = {
             date = func.incrDays(date, 1)
         }
         return ret
+    },
+
+    getParamHeaders(){
+        return paramHeaders;
     }
       
 }
