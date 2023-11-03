@@ -21,6 +21,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
 
 public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
 
@@ -152,6 +153,23 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         }
 
         return result;
+    }
+
+    public List<Bson> buildPipelineForCalculatingTrend(int startTimestamp, int endTimestamp){
+        // this functions make a pipeline for calculating a list map to the epoch value in day.
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.gte(TestingRunIssues.LAST_SEEN, startTimestamp)));
+        pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
+
+        BasicDBObject groupedId = new BasicDBObject("dayOfYear", "$dayOfYear").append("subCategory", "$_id.testSubCategory");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        BasicDBObject bd = new BasicDBObject("subCategory", "$_id.subCategory").append("count", "$count");
+        pipeline.add(Aggregates.group("$_id.dayOfYear", Accumulators.addToSet("issuesTrend", bd)));
+
+        return pipeline;
     }
 
     private TestingRunIssuesDao() {}

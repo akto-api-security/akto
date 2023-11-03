@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, OrdersFilledMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -36,16 +36,16 @@ export default function LeftNav(){
                   selected: leftNavSelected === 'quick_start',
                   key: '1',
                 },
-                // {
-                //   label: 'Dashboard',
-                //   icon: OrdersMinor,
-                //   onClick: ()=>{
-                //     handleSelect("dashboard")
-                //     navigate("/dashboard")
-                //   },
-                //   selected: leftNavSelected === 'dashboard',
-                //   key: '2',
-                // },
+                {
+                  label: 'Dashboard',
+                  icon: OrdersFilledMinor,
+                  onClick: ()=>{
+                    handleSelect("dashboard")
+                    navigate("/dashboard/home")
+                  },
+                  selected: leftNavSelected === 'dashboard',
+                  key: '2',
+                },
                 {   
                   url: '#',
                   label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("inventory") ? (active === 'active' ? "subdued" : ""): ""}>API Inventory</Text>,

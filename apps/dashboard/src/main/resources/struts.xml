@@ -2140,6 +2140,28 @@
             </result>
         </action>
 
+        <action name="api/getRiskScoreRangeMap" class="com.akto.action.DashboardAction" method="fetchRiskScoreCountMap">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">riskScoreCountMap</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getIssuesTrend" class="com.akto.action.DashboardAction" method="fetchIssuesTrend">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">issuesTrendMap</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>
