@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.bson.conversions.Bson;
+
 import com.akto.dao.APISpecDao;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -199,11 +200,6 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(collectionName == null){
-            addActionError("Invalid collection name");
-            return ERROR.toUpperCase();
-        }
-
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
         if(apiCollection == null || !apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
             addActionError("Invalid api collection group");
@@ -217,6 +213,19 @@ public class ApiCollectionsAction extends UserAction {
 
         fetchAllCollections();
     
+        return SUCCESS.toUpperCase();
+    }
+
+    public String computeCustomCollections(){
+        
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        if(apiCollection == null || !apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+            addActionError("Invalid api collection group");
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+
         return SUCCESS.toUpperCase();
     }
 
@@ -288,19 +297,6 @@ public class ApiCollectionsAction extends UserAction {
         LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
         this.timerInfo = timeInfo;
         return Action.SUCCESS.toUpperCase();
-    }
-
-    public String computeCustomCollections(){
-        
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
-        if(apiCollection == null || !apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
-            addActionError("Invalid api collection group");
-            return ERROR.toUpperCase();
-        }
-
-        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-
-        return SUCCESS.toUpperCase();
     }
 
     public List<ApiCollection> getApiCollections() {

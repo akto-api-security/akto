@@ -16,7 +16,6 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
-import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
