@@ -55,6 +55,11 @@ public class AccountSettings {
         public LastCronRunInfo(){     
         }
 
+        public LastCronRunInfo(int lastUpdatedIssues, int lastUpdatedSensitiveMap){
+            this.lastUpdatedIssues = lastUpdatedIssues;
+            this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
+        }
+
         public int getLastUpdatedIssues() {
             return lastUpdatedIssues;
         }

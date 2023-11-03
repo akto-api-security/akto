@@ -187,9 +187,14 @@ public class ApiCollectionsAction extends UserAction {
     }
     
     public String fetchTimersInfo(){
-        LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
-        this.timerInfo = timeInfo;
-        return Action.SUCCESS.toUpperCase();
+        try {
+            LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
+            this.timerInfo = timeInfo;
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
     }
 
     public List<ApiCollection> getApiCollections() {
