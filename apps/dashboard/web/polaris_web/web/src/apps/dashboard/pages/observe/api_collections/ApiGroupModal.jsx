@@ -19,18 +19,26 @@ function ApiGroupModal(props){
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
     const setAllCollections = PersistStore(state => state.setAllCollections)
+    const setLastFetchedInfo = PersistStore(state => state.setLastFetchedInfo)
 
     const [apiGroupName, setApiGroupName] = useState("")
 
     function getApis(){
         return apis.map((x) => {
-            let tmp = x.split(" ");
+            let tmp = x.split("###");
             return {
                 method: tmp[0],
                 url: tmp[1],
                 apiCollectionId: parseInt(tmp[2])
             }
         })
+    }
+
+    function clearPersistedData() {
+        setLastFetchedInfo({
+            lastRiskScoreInfo: 0,
+            lastSensitiveInfo: 0
+        });
     }
 
     function addAPIs(){
@@ -44,6 +52,7 @@ function ApiGroupModal(props){
                 toggleApiGroupModal()
             }, 500)
         })
+        clearPersistedData();
     }
 
     function removeAPIs(){
@@ -57,6 +66,7 @@ function ApiGroupModal(props){
                 toggleApiGroupModal()
             }, 500)
         })
+        clearPersistedData()
     }
 
     const existingTab = {

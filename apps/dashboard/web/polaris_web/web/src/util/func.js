@@ -730,7 +730,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
-              id: x.method + " " + x.url + " " + x.apiCollectionId + " " + Math.random(),
+              id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
               sensitive: x.sensitive,
               tags: x.tags,
