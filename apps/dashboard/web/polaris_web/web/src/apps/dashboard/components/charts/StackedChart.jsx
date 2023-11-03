@@ -6,7 +6,7 @@ import SpinnerCentered from "../progress/SpinnerCentered";
 
 function StackedChart(props) {
 
-    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width } = props;
+    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -43,7 +43,7 @@ function StackedChart(props) {
                 }
             },
             series: {
-                minPointLength: 0,
+                minPointLength: noGap ? 0 : 5,
                 pointWidth: width,
                 cursor: 'pointer',
                 point: {

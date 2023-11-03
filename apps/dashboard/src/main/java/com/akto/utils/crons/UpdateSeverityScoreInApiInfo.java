@@ -23,14 +23,14 @@ public class UpdateSeverityScoreInApiInfo {
     public void updateSeverityScoreScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                boolean dibs = callDibs(Cluster.UPDATE_SEVERITY_SCORE, 300, 60);
+                if(!dibs){
+                    loggerMaker.infoAndAddToDb("Cron for calculating severity info for apiInfo dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
-                    public void accept(Account t) {
-                        boolean dibs = callDibs(Cluster.UPDATE_SEVERITY_SCORE, 300, 60);
-                        if(!dibs){
-                            loggerMaker.infoAndAddToDb("Cron for calculating severity info for apiInfo dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
-                            return;
-                        }
+                    public void accept(Account t) {       
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
                         loggerMaker.infoAndAddToDb("Cron for calculating severity info for apiInfo picked up by " + accountSettings.getId(), LogDb.DASHBOARD);

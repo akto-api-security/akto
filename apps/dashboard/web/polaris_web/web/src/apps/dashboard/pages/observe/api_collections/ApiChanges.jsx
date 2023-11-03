@@ -181,6 +181,7 @@ function ApiChanges() {
                         text="true"
                         yAxisTitle="Number of issues"
                         width={20}
+                        noGap={true}
                     />
                 </VerticalStack>
             </VerticalStack>
