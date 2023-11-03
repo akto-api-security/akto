@@ -1,8 +1,10 @@
 package com.akto.dto.CollectionConditions;
 
+import java.util.Map;
 import java.util.Set;
-
+import org.bson.conversions.Bson;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 
 public abstract class CollectionCondition {
     private Type type;
@@ -12,6 +14,7 @@ public abstract class CollectionCondition {
     }
 
     public abstract Set<ApiInfo.ApiInfoKey> returnApis();
+    public abstract Map<CollectionType, Bson> returnFiltersMap();
 
     public enum Type {
         API_LIST

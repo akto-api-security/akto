@@ -91,6 +91,7 @@ function ApiEndpoints() {
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const allCollections = PersistStore(state => state.allCollections);
 
     const pageTitle = collectionsMap[apiCollectionId]
 
@@ -229,6 +230,11 @@ function ApiEndpoints() {
         func.setToast(true, false, "Endpoints refreshed")
     }
 
+    function computeApiGroup() {
+        api.computeCustomCollections(pageTitle);
+        func.setToast(true, false, "API group is being computed.")
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -360,13 +366,26 @@ function ApiEndpoints() {
                             <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
-                            <UploadFile
+                            {
+                                allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length > 0 ?
+                                    <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
+                                        <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
+                                    </div> :
+                                    null
+                            }
+                            { allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length == 0 ?
+                                <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}
                                 tooltipText="Upload traffic(.har)"
                                 label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
                                 primary={false} 
-                            />
+                                /> : null
+                            }
                         </VerticalStack>
                     </Popover.Section>
                     <Popover.Section>
