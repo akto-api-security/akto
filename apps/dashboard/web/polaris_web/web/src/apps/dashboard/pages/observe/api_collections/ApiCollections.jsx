@@ -1,34 +1,35 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField } from "@shopify/polaris"
+import { Text, Button, Modal, TextField, IndexFiltersMode, Card, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import {
-    SearchMinor,
-    CircleTickMajor
-  } from '@shopify/polaris-icons';
+import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
+import transform from "../transform"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import { CellType } from "../../../components/tables/rows/GithubRow"
 
 const headers = [
     {
+        title: "API collection name",
         text: "API collection name",
-        value: "displayName",
+        value: "displayNameComp",
+        filterKey:"displayName",
         showFilter:true,
-        itemOrder: 1,
     },
     {
-        text: "Endpoints",
+        title: "Total endpoints",
+        text: "Total endpoints",
         value: "endpoints",
-        itemCell: 2,
+        type: CellType.TEXT,
     },
     {
+        title: "Discovered",
         text: "Discovered",
         value: "detected",
-        icon: SearchMinor,
-        itemOrder: 3,
-        iconColor: "subdued"
+        type: CellType.TEXT,
     }
 ]
 
@@ -49,10 +50,22 @@ function convertToCollectionData(c) {
     return {
         ...c,
         endpoints: c["urlsCount"] || 0,
-        detected: "Discovered " + func.prettifyEpoch(c.startTs),
+        detected: func.prettifyEpoch(c.startTs),
         icon: CircleTickMajor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
     }    
+}
+
+const convertToNewData = (collectionsArr) => {
+
+    const newData = collectionsArr.map((c) => {
+        return{
+            ...c
+        }
+    })
+
+    const prettifyData = transform.prettifyCollectionsData(newData)
+    return { prettify: prettifyData, normal: newData }
 }
 
 function ApiCollections() {
@@ -60,6 +73,7 @@ function ApiCollections() {
     const [data, setData] = useState([])
     const [active, setActive] = useState(false);
     const [newCollectionName, setNewCollectionName] = useState('');
+    const [loading, setLoading] = useState(false)
     const handleNewCollectionNameChange = 
         useCallback(
             (newValue) => setNewCollectionName(newValue),
@@ -83,6 +97,7 @@ function ApiCollections() {
 
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
     const createNewCollection = async () => {
         let newColl = await api.createCollection(newCollectionName)
@@ -94,12 +109,27 @@ function ApiCollections() {
     }
 
     async function fetchData() {
-        let apiCollectionsResp = await api.getAllCollections()
+        setLoading(true)
+        let apiPromises = [
+            api.getAllCollections()
+        ];
+        
+        let results = await Promise.allSettled(apiPromises);
+
+        let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+
+        setLoading(false)
+
+        const dataObj = convertToNewData(tmp);
+
         setAllCollections(apiCollectionsResp.apiCollections || [])
         setCollectionsMap(func.mapCollectionIdToName(tmp))
-        setData(tmp)
+        const allHostNameMap = func.mapCollectionIdToHostName(tmp)
+        setHostNameMap(allHostNameMap)
+        
+        setData(dataObj.prettify)
     }
 
     function disambiguateLabel(key, value) {
@@ -127,6 +157,61 @@ function ApiCollections() {
         },
       ];
 
+    const modalComponent = (
+        <Modal
+            key="modal"
+            activator={createCollectionModalActivatorRef}
+            open={active}
+            onClose={() => setActive(false)}
+            title="New collection"
+            primaryAction={{
+            id:"create-new-collection",
+            content: 'Create',
+            onAction: createNewCollection,
+            }}
+        >
+            <Modal.Section>
+
+            <TextField
+                id={"new-collection-input"}
+                label="Name"
+                helpText="Enter name for the new collection"
+                value={newCollectionName}
+                onChange={handleNewCollectionNameChange}
+                autoComplete="off"
+                maxLength="24"
+                suffix={(
+                    <Text>{newCollectionName.length}/24</Text>
+                )}
+                autoFocus
+            />
+
+
+            </Modal.Section>
+        </Modal>
+    )
+
+    const tableComponent = (
+        <GithubSimpleTable
+            key="table"
+            pageLimit={100}
+            data={data} 
+            sortOptions={sortOptions} 
+            resourceName={resourceName} 
+            filters={[]}
+            disambiguateLabel={disambiguateLabel} 
+            headers={headers}
+            selectable={true}
+            promotedBulkActions={promotedBulkActions}
+            mode={IndexFiltersMode.Default}
+            headings={headers}
+            useNewRow={true}
+            condensedHeight={true}
+        />
+    )
+
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [modalComponent, tableComponent]
+
     return(
         <PageWithMultipleCards
         title={
@@ -138,54 +223,7 @@ function ApiCollections() {
             }
             primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
-            components={[
-               
-                (<Modal
-                    key="modal"
-                    activator={createCollectionModalActivatorRef}
-                    open={active}
-                    onClose={() => setActive(false)}
-                    title="New collection"
-                    primaryAction={{
-                    id:"create-new-collection",
-                    content: 'Create',
-                    onAction: createNewCollection,
-                    }}
-                >
-                    <Modal.Section>
-                    <div onKeyDown={(e) => func.handleKeyPress(e, createNewCollection)}>
-                    <TextField
-                        id={"new-collection-input"}
-                        label="Name"
-                        helpText="Enter name for the new collection"
-                        value={newCollectionName}
-                        onChange={handleNewCollectionNameChange}
-                        autoComplete="off"
-                        maxLength="24"
-                        suffix={(
-                            <Text>{newCollectionName.length}/24</Text>
-                        )}
-                        autoFocus
-                    />
-                    </div>
-
-                    </Modal.Section>
-                </Modal>)
-                ,               
-                (<GithubSimpleTable
-                key="table"
-                pageLimit={100}
-                data={data} 
-                sortOptions={sortOptions} 
-                resourceName={resourceName} 
-                filters={[]}
-                disambiguateLabel={disambiguateLabel} 
-                headers={headers}
-                selectable={true}
-                promotedBulkActions={promotedBulkActions}
-                increasedHeight={true}
-                />)
-            ]}
+            components={components}
         />
     )
 }
