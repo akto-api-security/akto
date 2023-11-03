@@ -26,14 +26,14 @@ public class UpdateSensitiveInfoInApiInfo {
     public void setUpSensitiveMapInApiInfoScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                boolean dibs = callDibs(Cluster.MAP_SENSITIVE_IN_INFO, 900, 60);
+                if(!dibs){
+                    loggerMaker.infoAndAddToDb("Cron for mapping sensitive info to apiInfo dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        boolean dibs = callDibs(Cluster.MAP_SENSITIVE_IN_INFO, 900, 60);
-                        if(!dibs){
-                            loggerMaker.infoAndAddToDb("Cron for mapping sensitive info to apiInfo dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
-                            return;
-                        }
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         loggerMaker.infoAndAddToDb("Cron for mapping sensitive info picked up by " + accountSettings.getId(), LogDb.DASHBOARD);
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
