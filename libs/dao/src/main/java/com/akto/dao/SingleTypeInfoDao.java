@@ -51,7 +51,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
                 Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
                 Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP }),
-                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS })
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.descending(new String[]{"lastSeen", "apiCollectionId"})
         ));
 
         createIndices(indices);
