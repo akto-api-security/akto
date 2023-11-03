@@ -36,7 +36,7 @@ import ChartypeComponent from "./ChartypeComponent";
 
 let headers = [
   {
-    text:"Text name",
+    text:"Test name",
     title: 'Test run name',
     value:"testName",
     itemOrder:1,
@@ -184,8 +184,8 @@ const now = func.timeNow()
 const [loading, setLoading] = useState(true);
 const [currentTab, setCurrentTab] = useState("oneTime");
 const [updateTable, setUpdateTable] = useState(false);
-const [selected, setSelected] = useState(0);
 const [countMap, setCountMap] = useState({});
+const [selected, setSelected] = useState(0);
 const [timeStamp, setTimestamp] = useState({
   startTimestamp: now - func.recencyPeriod,
   endTimestamp: now
@@ -264,6 +264,12 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         });
         break;
       default:
+        await api.fetchTestingDetails(
+          now - func.recencyPeriod, now, false, true, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
         break;
     }
 

@@ -181,7 +181,7 @@ public class DaoInit {
         ClassModel<ApiListCondition> apiListConditionClassModel = ClassModel.builder(ApiListCondition.class)
                 .enableDiscriminator(true).build();
         ClassModel<AccountSettings.LastCronRunInfo> cronTimersClassModel = ClassModel.builder(AccountSettings.LastCronRunInfo.class)
-                .enableDiscriminator(true).build();
+                .enableDiscriminator(true).build(); 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
@@ -205,8 +205,7 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, 
-                collectionConditionClassModel, apiListConditionClassModel,
-                cronTimersClassModel).automatic(true).build());
+                collectionConditionClassModel, apiListConditionClassModel, cronTimersClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

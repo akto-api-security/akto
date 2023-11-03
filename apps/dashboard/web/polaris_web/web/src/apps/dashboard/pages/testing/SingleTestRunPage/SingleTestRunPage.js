@@ -9,6 +9,7 @@ import {
   Box,
   Tooltip,
   LegacyCard,
+  Card,
   Tag,
   IndexFiltersMode,
 } from '@shopify/polaris';
