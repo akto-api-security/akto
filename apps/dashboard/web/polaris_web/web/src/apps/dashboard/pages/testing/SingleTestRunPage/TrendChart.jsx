@@ -333,6 +333,7 @@ function TrendChart(props) {
                             dateClicked={dateClicked}
                             graphPointClick={graphPointClick}
                             tooltip={tooltip}
+                            width={50}
                         />
                     </LegacyCard.Section>
                 </Collapsible>
