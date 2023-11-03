@@ -14,6 +14,10 @@ public class ApiInfo {
     // ApiInfo.java
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     private ApiInfoKey id;
+    public static final String ID_API_COLLECTION_ID = "_id." + ApiInfoKey.API_COLLECTION_ID;
+    public static final String ID_URL = "_id." + ApiInfoKey.URL;
+    public static final String ID_METHOD = "_id." + ApiInfoKey.METHOD;
+
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
     private Set<Set<AuthType>> allAuthTypesFound;
 

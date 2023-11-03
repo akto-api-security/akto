@@ -49,6 +49,9 @@ const headers = [
         text: "API call",
         value: "isRequest",
     },
+    {
+        value: 'collectionIds',
+    }
 ]
 
 const sortOptions = [
@@ -68,7 +71,15 @@ let filters = [
     key: 'isRequest',
     label: 'API call',
     title: 'API call',
-    choices: [],
+    choices: [
+        {
+            label:"In request",
+            value:true
+        },
+        {
+            label:"In response",
+            value:false
+        }],
     singleSelect:true
   },
   {
@@ -80,6 +91,12 @@ let filters = [
         {label:"Payload", value:"payload"},
         {label:"URL param", value:"urlParam"}
     ],
+  },
+  {
+    key: 'collectionIds',
+    label: 'API groups',
+    title: 'API groups',
+    choices: [],
   }
 ]
 
@@ -121,6 +138,7 @@ function SensitiveDataExposure() {
         switch (key) {
             case "location":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
+            case "collectionIds": 
             case "apiCollectionId": 
             return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             case "isRequest":
@@ -131,20 +149,8 @@ function SensitiveDataExposure() {
                 return value;
         }
       }
-    filters[0].choices=[];
-    Object.keys(apiCollectionMap).forEach((key) => { 
-        filters[0].choices.push({
-            label:apiCollectionMap[key],
-            value:Number(key)
-        })
-    });
-    filters[1].choices=[{
-        label:"In request",
-        value:true
-    },{
-        label:"In response",
-        value:false
-    }]
+
+    filters = func.getCollectionFilters(filters)
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);

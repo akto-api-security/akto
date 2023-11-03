@@ -578,7 +578,7 @@ public class InventoryAction extends UserAction {
     public String method;
     public String loadParamsOfEndpoint() {
         Bson filters = Filters.and(
-            Filters.eq("apiCollectionId", apiCollectionId),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
             Filters.eq("url", url),  
             Filters.eq("method", method)
         );

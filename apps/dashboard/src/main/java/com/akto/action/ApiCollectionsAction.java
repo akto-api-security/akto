@@ -7,8 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.bson.conversions.Bson;
-
-import org.bson.conversions.Bson;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -21,7 +19,6 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ApiListCondition;
-import com.akto.dto.CollectionConditions.CollectionCondition;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.SensitiveInfoInApiCollections;
 import com.akto.log.LoggerMaker;
@@ -163,35 +160,6 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private void doUpdate(ApiCollection apiCollection, List<CollectionCondition> conditions, Set<ApiInfoKey> apisToRemove, boolean add){
-        Set<ApiInfoKey> apis = new HashSet<>();
-        conditions.forEach((condition) -> {
-            apis.addAll(condition.returnApis());
-        });
-
-        Set<String> urls = new HashSet<>();
-        apis.forEach((api) -> {
-            urls.add(api.getUrl() + " " + api.getMethod());
-        });
-
-        // upsert is true, by default.
-        ApiCollectionsDao.instance.updateOne(
-            Filters.and(
-                Filters.eq(Constants.ID, apiCollection.getId()),
-                Filters.eq(ApiCollection.NAME, apiCollection.getName())
-            ),
-            Updates.combine(
-                    Updates.set(ApiCollection.CONDITIONS_STRING, conditions),
-                    Updates.set(ApiCollection.URLS_STRING, urls)));
-
-        if(add){
-            ApiCollectionUsers.addApisInCollectionsForCollectionId(apis, apiCollection.getId());
-        } else {
-            ApiCollectionUsers.removeApisFromCollectionsForCollectionId(apisToRemove, apiCollection.getId());
-        }
-
-    }
-
     public String addApisToCustomCollection(){
 
         if(apiList.isEmpty()){
@@ -207,34 +175,18 @@ public class ApiCollectionsAction extends UserAction {
             }
 
             apiCollection = new ApiCollection(Context.now(), collectionName, new ArrayList<>() );
+            ApiCollectionsDao.instance.insertOne(apiCollection);
 
         } else if(!apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
             addActionError("Invalid api collection group.");
             return ERROR.toUpperCase();
         }
 
-        List<CollectionCondition> conditions = apiCollection.getConditions();
-        
-        if(conditions == null){
-            conditions = new ArrayList<>();
-        }
+        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList));
+        apiCollection.addToConditions(condition);
+        ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
+        ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
-        boolean found = false;
-
-        for(CollectionCondition condition : conditions){
-            if(condition.getType().equals(CollectionCondition.Type.API_LIST)){
-                Set<ApiInfoKey> tmp = condition.returnApis();
-                tmp.addAll(apiList);
-                ((ApiListCondition) condition).setApiList(tmp);
-                found = true;
-            }
-        }
-        
-        if(!found){
-            conditions.add(new ApiListCondition(new HashSet<>(apiList)));
-        }
-
-        doUpdate(apiCollection, conditions, new HashSet<>(), true);
         fetchAllCollections();
 
         return SUCCESS.toUpperCase();
@@ -258,21 +210,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<CollectionCondition> conditions = apiCollection.getConditions();
+        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList));
+        apiCollection.removeFromConditions(condition);
+        ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
-        if(conditions == null){
-            conditions = new ArrayList<>();
-        }
-
-        for(CollectionCondition condition : conditions){
-            if(condition.getType().equals(CollectionCondition.Type.API_LIST)){
-                Set<ApiInfoKey> tmp = condition.returnApis();
-                tmp.removeAll(new HashSet<>(apiList));
-                ((ApiListCondition) condition).setApiList(tmp);
-            }
-        }
-
-        doUpdate(apiCollection, conditions, new HashSet<>(apiList), false);
         fetchAllCollections();
     
         return SUCCESS.toUpperCase();
@@ -346,6 +288,19 @@ public class ApiCollectionsAction extends UserAction {
         LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
         this.timerInfo = timeInfo;
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String computeCustomCollections(){
+        
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        if(apiCollection == null || !apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+            addActionError("Invalid api collection group");
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+
+        return SUCCESS.toUpperCase();
     }
 
     public List<ApiCollection> getApiCollections() {

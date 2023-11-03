@@ -3,7 +3,6 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
@@ -32,26 +31,20 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
-    public static final List<Bson> legacyIndices = Arrays.asList(
-                Indexes.ascending(new String[] {Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID}),
-                Indexes.ascending(new String[] {Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.API_COLLECTION_ID, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}));
-
-    public void createIndicesIfAbsent(boolean createLegacyIndices) {
+    public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
         List<Bson> indices = new ArrayList<>(Arrays.asList(
-                Indexes.ascending(new String[]{SingleTypeInfo._COLLECTION_IDS}),
-                Indexes.ascending(new String[]{Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}),
-                Indexes.ascending(new String[]{SingleTypeInfo._COLLECTION_IDS, Constants.ID + Constants.DOT + ApiInfo.ApiInfoKey.URL}),
+                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL }),
+                Indexes.ascending(new String[] { ApiInfo.ID_URL }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }),
                 Indexes.descending(new String[]{ApiInfo.LAST_SEEN}),
                 Indexes.descending(new String[]{ApiInfo.LAST_TESTED})
         ));
-
-        if (createLegacyIndices) {
-            indices.addAll(legacyIndices);
-        }
         createIndices(indices);
     }
 
@@ -92,7 +85,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         int oneMonthAgo = Context.now() - (30 * 24 * 60 * 60) ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
-        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
         pipeline.add(Aggregates.unwind(collectionIdKey));
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);        
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
@@ -114,7 +107,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public Map<Integer,Integer> getLastTrafficSeen(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
         pipeline.add(Aggregates.unwind(collectionIdKey));
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
         pipeline.add(Aggregates.sort(Sorts.descending(ApiInfo.LAST_SEEN)));

@@ -39,29 +39,24 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return SingleTypeInfo.class;
     }
 
-    public static final List<Bson> legacyIndices = Arrays.asList(
-                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
-                Indexes.descending(new String[] { SingleTypeInfo.LAST_SEEN, SingleTypeInfo._API_COLLECTION_ID }));
-
-    public void createIndicesIfAbsent(boolean createLegacyIndices) {
+    public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get() + "";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
         List<Bson> indices = new ArrayList<>(Arrays.asList(
+                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP }),
                 Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS }),
                 Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
                 Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._COLLECTION_IDS }),
-                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS }),
-                Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
-                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP })));
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._COLLECTION_IDS })
+        ));
 
-        if (createLegacyIndices) {
-            indices.addAll(legacyIndices);
-        }
         createIndices(indices);
     }
 
@@ -204,7 +199,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.or(subTypeFilters));
 
         if (apiCollectionId != null && apiCollectionId != -1) {
-            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)) );
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
         }
 
         if (url != null) {
@@ -388,7 +383,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
         pipeline.add(Aggregates.group(groupedId1));
 
-        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
         pipeline.add(Aggregates.unwind(collectionIdKey));
         BasicDBObject groupedId2 = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);        
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
@@ -419,7 +414,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-        final String collectionIdKey = Constants.DOLLAR + SingleTypeInfo._COLLECTION_IDS;
+        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
         pipeline.add(Aggregates.unwind(collectionIdKey));
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));

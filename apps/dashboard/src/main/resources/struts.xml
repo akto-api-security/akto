@@ -557,6 +557,18 @@
             </result>
         </action>
 
+        <action name="api/computeCustomCollections" class="com.akto.action.ApiCollectionsAction" method="computeCustomCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <!--   NEVER CHANGE VALUE OF api/uploadHar (path) this is used in ApiToken     -->
         <action name="api/uploadHar" class="com.akto.action.HarAction">
             <interceptor-ref name="json"/>

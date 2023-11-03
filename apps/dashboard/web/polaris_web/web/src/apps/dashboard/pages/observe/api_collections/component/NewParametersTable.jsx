@@ -66,6 +66,9 @@ const headers = [
         icon: PriceLookupMinor,
         itemOrder: 3,
         showFilterMenu: true
+    },
+    {
+        value: 'collectionIds',
     }
 ]
 
@@ -115,6 +118,12 @@ let filters = [
             {label:"Payload", value:"payload"},
             {label:"URL param", value:"urlParam"}
         ],
+    },
+    {
+        key: 'collectionIds',
+        label: 'API groups',
+        title: 'API groups',
+        choices: [],
     }
 ]
 
@@ -135,6 +144,7 @@ function NewParametersTable(props) {
 
     function disambiguateLabel(key, value) {
         switch (key) {
+            case "collectionIds": 
             case "apiCollectionId": 
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
             default:
@@ -142,20 +152,14 @@ function NewParametersTable(props) {
         }
     }
 
-    filters[0].choices = [];
-    Object.keys(apiCollectionMap).forEach((key) => {
-        filters[0].choices.push({
-            label: apiCollectionMap[key],
-            value: Number(key)
-        })
-    });
-
     filters[2].choices = dataTypeNames.map((x) => {
         return {
             label:x,
             value:x
         }
     })
+
+    filters = func.getCollectionFilters(filters)
 
     const [loading, setLoading] = useState(true);
 

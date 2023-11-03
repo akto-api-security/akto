@@ -5,7 +5,6 @@ import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
@@ -18,6 +17,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.AccountSettings.LastCronRunInfo;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -61,7 +61,6 @@ import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
-import com.mongodb.client.result.UpdateResult;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
@@ -73,7 +72,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,8 +88,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -1031,67 +1027,32 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void fillCollectionIdArray() {
+        Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
 
-        List<String> matchKey = Arrays.asList(Constants.DOLLAR + SingleTypeInfo._API_COLLECTION_ID);
-        List<String> matchKeyWithId = Arrays.asList(Constants.DOLLAR + Constants.ID + Constants.DOT + SingleTypeInfo._API_COLLECTION_ID);
+            put(CollectionType.ApiCollectionId,
+                Arrays.asList("$apiCollectionId"));
+            put(CollectionType.Id_ApiCollectionId,
+                Arrays.asList("$_id.apiCollectionId"));
+            put(CollectionType.Id_ApiInfoKey_ApiCollectionId,
+                Arrays.asList("$_id.apiInfoKey.apiCollectionId"));
+        }};
 
-        MCollection<?>[] collectionsWithKey = new MCollection[] {
-                SingleTypeInfoDao.instance,
-                SensitiveParamInfoDao.instance
-        };
+        Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
 
-        int LIMIT = 50_000;
+        Bson filter = Filters.exists(SingleTypeInfo._COLLECTION_IDS, false);
 
-        for (MCollection<?> collection : collectionsWithKey) {
-            boolean doUpdate = true;
-            int c = 0;
-            int time = Context.now();
-            while (doUpdate) {
+        for(Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()){
 
-                List<Bson> pipeline = new ArrayList<>();
-                pipeline.add(Aggregates.match(Filters.exists(SingleTypeInfo._COLLECTION_IDS, false)));
-                pipeline.add(Aggregates.project(Projections.include(Constants.ID)));
-                pipeline.add(Aggregates.limit(LIMIT));
+            List<Bson> update = Arrays.asList(
+                            Updates.set(SingleTypeInfo._COLLECTION_IDS, 
+                            matchKeyMap.get(collections.getKey())));
 
-                MongoCursor<BasicDBObject> cursor = collection.getMCollection()
-                        .aggregate(pipeline, BasicDBObject.class).cursor();
-
-                ArrayList<ObjectId> ret = new ArrayList<>();
-
-                while (cursor.hasNext()) {
-                    BasicDBObject elem = cursor.next();
-                    ret.add((ObjectId) elem.get(Constants.ID));
-                }
-
-                UpdateResult res = collection.getMCollection().updateMany(
-                        Filters.in(Constants.ID, ret),
-                        Arrays.asList(
-                                Updates.set(SingleTypeInfo._COLLECTION_IDS, matchKey)));
-
-                if (res.getMatchedCount() == 0) {
-                    doUpdate = false;
-                }
-                loggerMaker.infoAndAddToDb("updated " + Math.min(c + LIMIT, res.getModifiedCount()) + " " + collection.getCollName(), LogDb.DASHBOARD);
-                c += LIMIT;
+            if(collections.getKey().equals(CollectionType.ApiCollectionId)){
+                ApiCollectionUsers.updateCollectionsInBatches(collections.getValue(), filter, update);
+            } else {
+                ApiCollectionUsers.updateCollections(collections.getValue(), filter, update);
             }
-            loggerMaker.infoAndAddToDb("Total time taken : " + (Context.now() - time), LogDb.DASHBOARD);
         }
-
-        MCollection<?>[] collectionsWithKeyID = new MCollection[] {
-                ApiInfoDao.instance,
-                TrafficInfoDao.instance,
-                SampleDataDao.instance,
-                SensitiveSampleDataDao.instance,
-                VulnerableRequestForTemplateDao.instance,
-                FilterSampleDataDao.instance
-        };
-
-        for (MCollection<?> collection : collectionsWithKeyID) {
-            collection.getMCollection().updateMany(Filters.exists(SingleTypeInfo._COLLECTION_IDS, false),
-                    Arrays.asList(
-                            Updates.set(SingleTypeInfo._COLLECTION_IDS, matchKeyWithId)));
-        }
-
     }
 
     private static void checkMongoConnection() throws Exception {
@@ -1228,11 +1189,11 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent(true);
+        SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
-        ApiInfoDao.instance.createIndicesIfAbsent(true);
+        ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
