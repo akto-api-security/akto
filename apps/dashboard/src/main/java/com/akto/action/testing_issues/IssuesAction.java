@@ -17,6 +17,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -59,9 +60,7 @@ public class IssuesAction extends UserAction {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, filterStatus));
         }
         if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
-            filters = Filters.and(filters, Filters.in(ID + "."
-                    + TestingIssuesId.API_KEY_INFO + "."
-                    + ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterCollectionsId));
+            filters = Filters.and(filters, Filters.in(SingleTypeInfo._COLLECTION_IDS, filterCollectionsId));
         }
         if (filterSeverity != null && !filterSeverity.isEmpty()) {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.KEY_SEVERITY, filterSeverity));

@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -9,6 +10,8 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
 
 public class ApiCollection {
@@ -163,6 +166,52 @@ public class ApiCollection {
 
     public void setConditions(List<CollectionCondition> conditions) {
         this.conditions = conditions;
+    }
+
+    public void addToConditions(CollectionCondition condition) {
+        
+        if(conditions == null){
+            conditions = new ArrayList<>();
+        }
+
+        boolean found = false;
+
+        for(CollectionCondition it : conditions){
+            switch(it.getType()){
+                case API_LIST:
+                    Set<ApiInfoKey> tmp = it.returnApis();
+                    tmp.addAll(condition.returnApis());
+                    ((ApiListCondition) it).setApiList(tmp);
+                    found = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+        if(!found){
+            conditions.add(condition);
+        }
+    }
+
+    public void removeFromConditions(CollectionCondition condition) {
+        
+        if(conditions == null){
+            conditions = new ArrayList<>();
+        }
+
+        for(CollectionCondition it : conditions){
+            switch(it.getType()){
+                case API_LIST:
+                    Set<ApiInfoKey> tmp = it.returnApis();
+                    tmp.removeAll(condition.returnApis());
+                    ((ApiListCondition) it).setApiList(tmp);
+                    break;
+                default:
+                    break;
+            }
+        }
+
     }
 
 }

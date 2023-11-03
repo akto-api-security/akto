@@ -47,7 +47,7 @@ public class Utils {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId))));
+        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
 
         int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 

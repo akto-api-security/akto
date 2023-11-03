@@ -64,6 +64,11 @@ const headers = [
         value: 'last_seen',
         icon: SearchMinor,
         itemOrder: 3
+    },
+    {
+        text: 'API Groups',
+        value: 'collectionIds',
+        showFilter: true
     }
 ]
 

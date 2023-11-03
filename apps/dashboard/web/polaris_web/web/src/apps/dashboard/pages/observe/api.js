@@ -514,5 +514,14 @@ export default {
                 apiList, collectionName
             }
         })
+    },
+    async computeCustomCollections(collectionName) {
+        return await request({
+            url: '/api/computeCustomCollections',
+            method: 'post',
+            data: {
+                collectionName
+            }
+        })
     }
 }
