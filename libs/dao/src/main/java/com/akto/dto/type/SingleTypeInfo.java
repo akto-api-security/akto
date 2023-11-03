@@ -443,6 +443,7 @@ public class SingleTypeInfo {
     public static final String COLLECTION_NAME = "collectionName";
     int apiCollectionId;
     public static final String _COLLECTION_IDS = "collectionIds";
+    public static final String _COLLECTION_IDS_KEY = "$collectionIds";
     List<Integer> collectionIds;
     public static final String _SENSITIVE = "sensitive";
     @BsonIgnore

@@ -383,9 +383,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
         pipeline.add(Aggregates.group(groupedId1));
 
-        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
-        pipeline.add(Aggregates.unwind(collectionIdKey));
-        BasicDBObject groupedId2 = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);        
+        pipeline.add(Aggregates.unwind(SingleTypeInfo._COLLECTION_IDS_KEY));
+        BasicDBObject groupedId2 = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, SingleTypeInfo._COLLECTION_IDS_KEY);        
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -414,9 +413,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
-        pipeline.add(Aggregates.unwind(collectionIdKey));
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
+        pipeline.add(Aggregates.unwind(SingleTypeInfo._COLLECTION_IDS_KEY));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, SingleTypeInfo._COLLECTION_IDS_KEY);
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
 
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();

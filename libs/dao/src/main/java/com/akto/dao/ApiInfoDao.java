@@ -85,9 +85,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         int oneMonthAgo = Context.now() - (30 * 24 * 60 * 60) ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
-        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
-        pipeline.add(Aggregates.unwind(collectionIdKey));
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);        
+        pipeline.add(Aggregates.unwind(SingleTypeInfo._COLLECTION_IDS_KEY));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, SingleTypeInfo._COLLECTION_IDS_KEY);        
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> collectionsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -107,9 +106,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public Map<Integer,Integer> getLastTrafficSeen(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        final String collectionIdKey = "$" + SingleTypeInfo._COLLECTION_IDS;
-        pipeline.add(Aggregates.unwind(collectionIdKey));
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, collectionIdKey);
+        pipeline.add(Aggregates.unwind(SingleTypeInfo._COLLECTION_IDS_KEY));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, SingleTypeInfo._COLLECTION_IDS_KEY);
         pipeline.add(Aggregates.sort(Sorts.descending(ApiInfo.LAST_SEEN)));
         pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
 

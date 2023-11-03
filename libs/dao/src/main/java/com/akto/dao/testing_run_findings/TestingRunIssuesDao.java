@@ -14,6 +14,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -69,8 +70,8 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
-
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
+        pipeline.add(Aggregates.unwind(SingleTypeInfo._COLLECTION_IDS_KEY));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, SingleTypeInfo._COLLECTION_IDS_KEY)
                                                 .append("severity", "$severity") ;
 
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
@@ -80,7 +81,7 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
             try {
                 BasicDBObject basicDBObject = severitiesCursor.next();
                 String severity = ((BasicDBObject) basicDBObject.get("_id")).getString("severity");
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt(SingleTypeInfo._COLLECTION_IDS);
                 int count = basicDBObject.getInt("count");
                 if(resultMap.containsKey(apiCollectionId)){
                     Map<String,Integer> severityMap = resultMap.get(apiCollectionId);
