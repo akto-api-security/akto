@@ -74,10 +74,14 @@ public class ApiListCondition extends CollectionCondition{
         for(Map.Entry<CollectionType, Bson> filters: filtersMap.entrySet()){
             List<Bson> apiFilters = new ArrayList<>();
             CollectionType type = filters.getKey();
-            for (ApiInfoKey api : this.apiList) {
-                apiFilters.add(createApiFilters(type, api));
+            if(this.apiList != null && !this.apiList.isEmpty()){
+                for (ApiInfoKey api : this.apiList) {
+                    apiFilters.add(createApiFilters(type, api));
+                }
+                filters.setValue(Filters.or(apiFilters));
+            } else {
+                filters.setValue(Filters.nor(new BasicDBObject()));
             }
-            filters.setValue(Filters.or(apiFilters));
         }
         return filtersMap;
     }
