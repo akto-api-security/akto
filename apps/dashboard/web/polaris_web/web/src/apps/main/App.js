@@ -51,6 +51,7 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 
 const router = createBrowserRouter([
   {
@@ -61,6 +62,10 @@ const router = createBrowserRouter([
         path: "",
         element: <HomePage />,
         children: [
+          {
+            path: "home",
+            element: <HomeDashboard />,
+          },
           {
             path: "testing",
             element: <PageTesting />,
