@@ -1,22 +1,19 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {
-  Text,
-  Card} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import {
   CircleCancelMajor,
   CalendarMinor,
   ReplayMinor,
-  NoteMinor,
-  PlayCircleMajor,
   PlayMinor,
-  ClockMinor
+  ChevronDownMinor,
+  ChevronUpMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
-import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
+import { CellType } from "../../../components/tables/rows/GithubRow";
 
 /*
   {
@@ -38,39 +35,36 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 
 let headers = [
   {
-    text:"",
-    value:"icon",
-    itemOrder:0
+    text:"Test name",
+    title: 'Test run name',
+    value:"testName",
+    itemOrder:1,
   },
   {
-    text:"Text name",
-    value:"name",
-    itemOrder:1
+    text: "Number of tests",
+    title: "Number of tests",
+    value: "number_of_tests",
+    itemOrder: 3,
+    type: CellType.TEXT,
   },
   {
     text:"Severity",
     value: 'severity',
+    title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
   },
   {
-    text: "Number of tests",
-    value: "number_of_tests_str",
-    itemOrder: 3,
-    icon: NoteMinor,
-  },
-  {
-    text: 'Run type',
-    value: 'run_type',
-    itemOrder: 3,
-    icon: PlayCircleMajor
-  },
-  {
     text: 'Run time',
     value: 'run_time',
+    title: 'Status',
     itemOrder: 3,
-    icon: ClockMinor
+    type: CellType.TEXT,
   },
+  {
+    title: '',
+    type: CellType.ACTION,
+  }
 ]
 
 const sortOptions = [
@@ -184,8 +178,9 @@ function getActions(item){
 }
 
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("onetime");
+const [currentTab, setCurrentTab] = useState("oneTime");
 const [updateTable, setUpdateTable] = useState(false);
+const [selected, setSelected] = useState(0);
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -204,7 +199,7 @@ const refreshSummaries = () =>{
 }
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
-  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd);
+  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
   if(checkIsTestRunning(testRuns)){
     refreshSummaries();
   }
@@ -236,7 +231,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
           total = testingRunsCount;
         });
         break;
-      case "recurring":
+      case "scheduled":
         await api.fetchTestingDetails(
           0, 0, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
@@ -244,13 +239,15 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
           total = testingRunsCount;
         });
         break;
-      case "onetime":
+      case "oneTime":
         await api.fetchTestingDetails(
           now - func.recencyPeriod, now, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
+        break;
+      default:
         break;
     }
 
@@ -269,9 +266,38 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   }
 
+  const tableTabs = [
+    {
+      content: 'One time',
+      index: 0,
+      onAction: ()=> {setCurrentTab('oneTime')},
+      id: 'oneTime',
+    },
+    {
+      content: 'Recurring',
+      index: 0,
+      onAction: ()=> {setCurrentTab('scheduled')},
+      id: 'scheduled',
+    },
+    {
+      content: 'CI/CD',
+      index: 0,
+      onAction: ()=> {setCurrentTab('cicd')},
+      id: 'cicd',
+    },
+  ]
+
+  const handleSelectedTab = (selectedIndex) => {
+    setLoading(true)
+    setSelected(selectedIndex)
+    setTimeout(()=>{
+        setLoading(false)
+    },200)
+}
+
 const coreTable = (
 <GithubServerTable
-    key={updateTable}
+    key={currentTab + updateTable}
     pageLimit={50}
     fetchData={fetchTableData}
     sortOptions={sortOptions} 
@@ -286,49 +312,17 @@ const coreTable = (
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}
+    tableTabs={tableTabs}
+    onSelect={handleSelectedTab}
+    selected={selected}
+    mode={IndexFiltersMode.Default}
+    headings={headers}
+    useNewRow={true}
+    condensedHeight={true}
   />   
 )
 
-const OnetimeTable = {
-  id:  'onetime',
-  content: "One time",
-  component: (
-    coreTable
-  )
-}
-
-const CicdTable = {
-  id:  'cicd',
-  content: "CI/CD",
-  component: (
-    coreTable
-  )
-}
-
-const RecurringTable = {
-  id:  'recurring',
-  content: "Recurring",
-  component: (
-    coreTable
-  )
-}
-
-function handleCurrTab(tab) {
-  setCurrentTab(tab.id)
-}
-
-const TestTabs = (
-  <Card padding={"0"} key="tabs">
-    <LayoutWithTabs
-      key="tabs"
-      tabs={[OnetimeTable, CicdTable, RecurringTable ]}
-      currTab={handleCurrTab}
-    />
-  </Card>
-)
-
-const components = [ TestTabs]
-
+const components = [coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
