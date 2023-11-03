@@ -68,7 +68,7 @@ public class ApiCollectionUsers {
         }
     }
 
-    static final int UPDATE_LIMIT = 50;
+    static final int UPDATE_LIMIT = 50_000;
 
     // NOTE: This update only works with collections which have ObjectId as id.
     private static void updateCollectionInBatches(MCollection<?> collection, Bson filter, List<Bson> update) {
