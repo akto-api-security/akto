@@ -26,7 +26,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
                 Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID }),
                 Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL }),
                 Indexes.ascending(new String[] { ApiInfo.ID_URL }),
-                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS }),
                 Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL })
         ));
 

@@ -37,16 +37,9 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
 
         List<Bson> indices = new ArrayList<>(
             Arrays.asList(
-                Indexes.ascending(new String[] { 
-                    ApiInfo.ID_API_COLLECTION_ID,
-                    ApiInfo.ID_URL,
-                    ApiInfo.ID_METHOD }),
+                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD }),
                 Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { 
-                        SingleTypeInfo._COLLECTION_IDS,
-                        ApiInfo.ID_URL,
-                        ApiInfo.ID_METHOD }),
-                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS })));
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD })));
 
         createIndices(indices);
     }
