@@ -173,5 +173,5 @@ public class BackwardCompatibility {
 
     public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
         return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
-    } 
+    }
 }

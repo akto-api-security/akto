@@ -26,14 +26,42 @@ const headers = [
         type: CellType.TEXT,
     },
     {
+        title: 'Risk score',
+        value: 'riskScoreComp',
+    },
+    {
         title: "Discovered",
         text: "Discovered",
         value: "detected",
+        type: CellType.TEXT,
+    },
+    {   
+        title: 'Test coverage',
+        text: 'Test coverage', 
+        value: 'coverage',
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Issues', 
+        text: 'Issues', 
+        value: 'issuesArr',
+    },
+    {   
+        title: 'Sensitive data' , 
+        text: 'Sensitive data' , 
+        value: 'sensitiveSubTypes',
+    },
+    {   
+        title: 'Last traffic seen', 
+        text: 'Last traffic seen', 
+        value: 'lastTraffic',
         type: CellType.TEXT,
     }
 ]
 
 const sortOptions = [
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'Risky first', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Stable first', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
     { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
@@ -56,11 +84,22 @@ function convertToCollectionData(c) {
     }    
 }
 
-const convertToNewData = (collectionsArr) => {
+const convertToNewData = (collectionsArr, sensitiveInfoArr, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
+    const sensitiveInfoMap = {} 
+    sensitiveInfoArr.forEach((curr) =>{
+        const { apiCollectionId, ...obj } = curr
+        sensitiveInfoMap[apiCollectionId] = obj
+    })
 
     const newData = collectionsArr.map((c) => {
         return{
-            ...c
+            ...c,
+            testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
+            sensitiveInRespCount: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveUrlsInResponse'] : 0,
+            sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveSubtypesInResponse'] : [],
+            severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
+            detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
         }
     })
 
@@ -112,6 +151,18 @@ function ApiCollections() {
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
+
+    const lastFetchedInfo = PersistStore(state => state.lastFetchedInfo)
+    const lastFetchedResp = PersistStore(state => state.lastFetchedResp)
+    const lastFetchedSeverityResp = PersistStore(state => state.lastFetchedSeverityResp)
+    const lastCalledSensitiveInfo = PersistStore(state => state.lastCalledSensitiveInfo)
+    const lastFetchedSensitiveResp = PersistStore(state => state.lastFetchedSensitiveResp)
+    const setLastFetchedInfo = PersistStore(state => state.setLastFetchedInfo)
+    const setLastFetchedResp = PersistStore(state => state.setLastFetchedResp)
+    const setLastFetchedSeverityResp = PersistStore(state => state.setLastFetchedSeverityResp)
+    const setLastCalledSensitiveInfo = PersistStore(state => state.setLastCalledSensitiveInfo)
+    const setLastFetchedSensitiveResp = PersistStore(state => state.setLastFetchedSensitiveResp)
+
     const resetFunc = () => {
         setInventoryFlyout(false)
         setFilteredItems([])
@@ -136,21 +187,77 @@ function ApiCollections() {
         func.setToast(true, false, "API collection created successfully")
     }
 
+    async function fetchRiskScoreInfo(){
+        let tempRiskScoreObj = lastFetchedResp
+        let tempSeverityObj = lastFetchedSeverityResp
+        await api.lastUpdatedInfo().then(async(resp) => {
+            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
+                await api.getRiskScoreInfo().then((res) =>{
+                    const newObj = {
+                        criticalUrls: res.criticalEndpointsCount,
+                        riskScoreMap: res.riskScoreOfCollectionsMap, 
+                    }
+                    tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
+                    setLastFetchedResp(newObj);
+                })
+            }
+            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo){
+                await api.getSeverityInfoForCollections().then((resp) => {
+                    tempSeverityObj = JSON.parse(JSON.stringify(resp))
+                    setLastFetchedSeverityResp(resp)
+                })
+            }
+            setLastFetchedInfo({
+                lastRiskScoreInfo: func.timeNow() > resp.lastUpdatedIssues ? func.timeNow() : resp.lastUpdatedIssues,
+                lastSensitiveInfo: func.timeNow() > resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
+            })
+        })
+        let finalObj = {
+            riskScoreObj: tempRiskScoreObj,
+            severityObj: tempSeverityObj
+        }
+        return finalObj
+    }
+    
+    async function fetchSensitiveInfo(){
+        let tempSensitveArr = lastFetchedSensitiveResp
+        if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
+            await api.getSensitiveInfoForCollections().then((resp) => {
+                tempSensitveArr = JSON.parse(JSON.stringify(resp))
+                setLastCalledSensitiveInfo(func.timeNow())
+                setLastFetchedSensitiveResp(resp)
+            })
+        }
+        return tempSensitveArr 
+    }
+
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
-            api.getAllCollections()
+            api.getAllCollections(),
+            api.getCoverageInfoForCollections(),
+            api.getLastTrafficSeen()
         ];
         
         let results = await Promise.allSettled(apiPromises);
 
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
+        let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
+        let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
+        const issuesObj = await fetchRiskScoreInfo();
+        const severityObj = issuesObj.severityObj;
+        const riskScoreObj = issuesObj.riskScoreObj;
+        const sensitveInfoArr = await fetchSensitiveInfo();
         setLoading(false)
 
-        const dataObj = convertToNewData(tmp);
+        const dataObj = convertToNewData(tmp, sensitveInfoArr, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
+
+        const summary = transform.getSummaryData(dataObj.normal)
+        summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
+        setSummaryData(summary)
 
         setAllCollections(apiCollectionsResp.apiCollections || [])
         setCollectionsMap(func.mapCollectionIdToName(tmp))
@@ -190,6 +297,47 @@ function ApiCollections() {
           onAction: () => handleRemoveCollections(selectedResources)
         },
       ];
+
+
+      const summaryItems = [
+        {
+            title: "Total APIs",
+            data: summaryData.totalEndpoints,
+        },
+        {
+            title: "Critical APIs",
+            data: summaryData.totalCriticalEndpoints,
+        },
+        {
+            title: "Tested APIs (Coverage)",
+            data: Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+        },
+        {
+            title: "Sensitive in response APIs",
+            data: summaryData.totalSensitiveEndpoints,
+        }
+    ]
+
+    const summaryCard = (
+        <Card padding={0} key="info">
+            <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>
+                <HorizontalGrid columns={4} gap={4}>
+                    {summaryItems.map((item, index) => (
+                        <Box borderInlineEndWidth={index < 3 ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
+                            <VerticalStack gap="1">
+                                <Text color="subdued" variant="headingXs">
+                                    {item.title}
+                                </Text>
+                                <Text variant="bodyMd" fontWeight="semibold">
+                                    {item.data}
+                                </Text>
+                            </VerticalStack>
+                        </Box>
+                    ))}
+                </HorizontalGrid>
+            </Box>
+        </Card>
+    )
 
     const modalComponent = (
         <Modal

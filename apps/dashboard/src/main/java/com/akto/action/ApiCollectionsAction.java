@@ -9,16 +9,24 @@ import java.util.List;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.APISpecDao;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.SensitiveInfoInApiCollections;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.util.Constants;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
@@ -27,6 +35,15 @@ import com.opensymphony.xwork2.Action;
 public class ApiCollectionsAction extends UserAction {
 
     List<ApiCollection> apiCollections = new ArrayList<>();
+    List<SensitiveInfoInApiCollections> sensitiveInfoInApiCollections = new ArrayList<>() ;
+    Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
+    Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
+    Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
+    int criticalEndpointsCount;
+    LastCronRunInfo timerInfo;
+
+    Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
     List<ApiInfoKey> apiList;
 
@@ -210,6 +227,73 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // required for icons and total sensitive endpoints in collections
+    public String fetchSensitiveInfoInCollections(){
+        this.sensitiveInfoInApiCollections = SingleTypeInfoDao.instance.getSensitiveInfoForCollections() ;
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // required to measure the count of total tested endpoints per collection.
+    public String fetchCoverageInfoInCollections(){
+        this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // required to measure the count of total issues per collection.
+    public String fetchSeverityInfoInCollections(){
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchLastSeenInfoInCollections(){
+        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchRiskScoreInfo(){
+        int criticalCount = 0 ;
+        Map<Integer, Double> riskScoreMap = new HashMap<>();
+        List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
+
+        MongoCursor<BasicDBObject> apiCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(apiCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = apiCursor.next();
+                double riskScore = basicDBObject.getDouble("riskScore");
+                BasicDBObject bd = (BasicDBObject) basicDBObject.get("_id");
+                Integer collectionId = bd.getInt("apiCollectionId");
+
+                // store count of total critical endpoints present in ApiInfo
+                if(riskScore >= 4){
+                    criticalCount++;
+                }
+
+                // as for collections, risk score is max of apis in it, here we take max for collection id
+                if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(collectionId)){
+                    riskScoreMap.put(collectionId, riskScore);
+                }else{
+                    double prev = riskScoreMap.get(collectionId);
+                    riskScore = Math.max(riskScore, prev);
+                    riskScoreMap.put(collectionId, riskScore);
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
+                e.printStackTrace();
+            }
+        }
+
+        this.criticalEndpointsCount = criticalCount;
+        this.riskScoreOfCollectionsMap = riskScoreMap;
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String fetchTimersInfo(){
+        LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
+        this.timerInfo = timeInfo;
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -228,6 +312,34 @@ public class ApiCollectionsAction extends UserAction {
   
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
-    } 
+    }
+    
+    public List<SensitiveInfoInApiCollections> getSensitiveInfoInApiCollections() {
+        return sensitiveInfoInApiCollections;
+    }
+
+    public Map<Integer, Integer> getTestedEndpointsMaps() {
+        return testedEndpointsMaps;
+    }
+
+    public Map<Integer, Map<String, Integer>> getSeverityInfo() {
+        return severityInfo;
+    }
+
+    public Map<Integer, Integer> getLastTrafficSeenMap() {
+        return lastTrafficSeenMap;
+    }
+
+    public int getCriticalEndpointsCount() {
+        return criticalEndpointsCount;
+    }
+
+    public Map<Integer, Double> getRiskScoreOfCollectionsMap() {
+        return riskScoreOfCollectionsMap;
+    }
+
+    public LastCronRunInfo getTimerInfo() {
+        return timerInfo;
+    }
 
 }

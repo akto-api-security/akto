@@ -33,8 +33,38 @@ let persistStore = (set) => ({
     hostNameMap: {},
     setHostNameMap:(hostNameMap)=>{
         set({hostNameMap: hostNameMap})
-    }
+    },
 
+    lastFetchedInfo: {
+        lastRiskScoreInfo: 0,
+        lastSensitiveInfo: 0 
+    },
+    setLastFetchedInfo:(lastFetchedInfo)=>{
+        set({lastFetchedInfo: lastFetchedInfo})
+    },
+
+    lastFetchedResp: {
+        criticalUrls: 0,
+        riskScoreMap: {} 
+    },
+    setLastFetchedResp:(lastFetchedResp)=>{
+        set({lastFetchedResp: lastFetchedResp})
+    },
+
+    lastFetchedSeverityResp: {},
+    setLastFetchedSeverityResp:(lastFetchedSeverityResp)=>{
+        set({lastFetchedSeverityResp: lastFetchedSeverityResp})
+    },
+
+    lastCalledSensitiveInfo: 0,
+    setLastCalledSensitiveInfo: (lastCalledSensitiveInfo)=>{
+        set({lastCalledSensitiveInfo: lastCalledSensitiveInfo})
+    },
+
+    lastFetchedSensitiveResp: [],
+    setLastFetchedSensitiveResp:(lastFetchedSensitiveResp)=>{
+        set({lastFetchedSensitiveResp: lastFetchedSensitiveResp})
+    },
 })
 
 persistStore = devtools(persistStore)

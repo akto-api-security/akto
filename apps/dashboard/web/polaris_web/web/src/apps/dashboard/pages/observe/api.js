@@ -497,6 +497,54 @@ export default {
         })
     },
 
+    async getSensitiveInfoForCollections(){
+        return await request({
+            url: '/api/getSensitiveInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getCoverageInfoForCollections(){
+        return await request({
+            url: '/api/getCoverageInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getSeverityInfoForCollections(){
+        return await request({
+            url: '/api/getSeverityInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getLastTrafficSeen(){
+        return await request({
+            url: '/api/getLastSeenTrafficInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getRiskScoreInfo() {
+        return await request({
+            url: '/api/getRiskScoreInfo',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    async lastUpdatedInfo() {
+        return await request({
+            url: '/api/getLastCalculatedInfo',
+            method: 'post',
+            data: {}
+        })
+    }
+
     async addApisToCustomCollection(apiList, collectionName) {
         return await request({
             url: '/api/addApisToCustomCollection',

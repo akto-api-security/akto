@@ -68,6 +68,10 @@ public class StartTestAction extends UserAction {
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private boolean fetchAllTestRuns;
+
+    private Map<String,Long> allTestsCountMap = new HashMap<>();
+    private Map<String, Map<String,Integer>> issuesSummaryInfoMap = new HashMap<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -164,6 +168,7 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
+                e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             }
         }
@@ -315,8 +320,13 @@ public class StartTestAction extends UserAction {
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
 
         if(fetchCicd){
+            // filters for test runs to be only CI/CD pipeline
             testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
+        } else if(fetchAllTestRuns){
+            // get All test runs which are not run by test editor
+            testingRunFilters.add(Filters.ne("triggeredBy", "test_editor"));
         } else {
+            // the left test are the scheduled one
             Collections.addAll(testingRunFilters, 
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
                 Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
@@ -541,6 +551,59 @@ public class StartTestAction extends UserAction {
         List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
         metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
         
+        return SUCCESS.toUpperCase();
+    }
+
+    // this gives the count for test runs types{ All, CI/CD, One-time, Scheduled}
+    // needed for new ui as the table was server table.
+    public String computeAllTestsCountMap(){
+        Map<String,Long> result = new HashMap<>();
+
+        long totalCount = TestingRunDao.instance.getMCollection().countDocuments();
+        List<Bson> filtersForCiCd = new ArrayList<>();
+        filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
+        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
+
+        int startTime = Context.now();
+        int endTime = Context.now() + 86400;
+        List<Bson> filtersForSchedule = new ArrayList<>();
+        Collections.addAll(filtersForSchedule,
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTime),
+                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTime),
+                Filters.nin(Constants.ID,getCicdTests())
+        );
+        long scheduleCount =  TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForSchedule));
+
+        long oneTimeCount = totalCount - cicdCount - scheduleCount;
+        result.put("allTestRuns", totalCount);
+        result.put("oneTime", oneTimeCount);
+        result.put("scheduled", scheduleCount);
+        result.put("cicd", cicdCount);
+
+        this.allTestsCountMap = result;
+        return SUCCESS.toUpperCase();
+    }
+
+    // this gives the count of total vulnerabilites and map of count of subcategories for which issues are generated.
+    public String getIssueSummaryInfo(){
+
+        if(this.endTimestamp == 0){
+            this.endTimestamp = Context.now();
+        }
+        // issues default for 2 months
+        if(this.startTimestamp == 0){
+            this.startTimestamp = Context.now() - (2 * Constants.ONE_MONTH_TIMESTAMP);
+        }
+
+        Map<String,Integer> totalSeveritiesCountMap = TestingRunIssuesDao.instance.getTotalSeveritiesCountMap(this.startTimestamp,this.endTimestamp);
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp);
+
+        Map<String,Map<String,Integer>> result = new HashMap<>();
+        result.put("subcategoryInfo", totalSubcategoriesCountMap);
+        result.put("severityInfo", totalSeveritiesCountMap);
+
+        this.issuesSummaryInfoMap = result;
+
         return SUCCESS.toUpperCase();
     }
 
@@ -793,6 +856,22 @@ public class StartTestAction extends UserAction {
 
     public Map<String, Set<String>> getMetadataFilters() {
         return metadataFilters;
+    }
+
+    public boolean isFetchAllTestRuns() {
+        return fetchAllTestRuns;
+    }
+
+    public void setFetchAllTestRuns(boolean fetchAllTestRuns) {
+        this.fetchAllTestRuns = fetchAllTestRuns;
+    }
+    
+    public Map<String, Map<String, Integer>> getIssuesSummaryInfoMap() {
+        return issuesSummaryInfoMap;
+    }
+
+    public Map<String, Long> getAllTestsCountMap() {
+        return allTestsCountMap;
     }
 
     public enum CallSource{

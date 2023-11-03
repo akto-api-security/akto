@@ -727,6 +727,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),

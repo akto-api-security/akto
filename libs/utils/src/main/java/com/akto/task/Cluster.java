@@ -16,6 +16,8 @@ import org.bson.conversions.Bson;
 public class Cluster {
     
     public static final String RUNTIME_MERGER = "runtime-merger";
+    public static final String UPDATE_SEVERITY_SCORE = "update-severity-score";
+    public static final String MAP_SENSITIVE_IN_INFO = "map-sensitiveInfo-in-ApiInfo";
 
     public static final String winnerId = UUID.randomUUID().toString();
 

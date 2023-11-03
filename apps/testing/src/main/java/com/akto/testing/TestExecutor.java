@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -484,7 +485,9 @@ public class TestExecutor {
                 if (!testingRunResults.isEmpty()) {
                     trim(testingRunResults);
                     TestingRunResultDao.instance.insertMany(testingRunResults);
+                    ApiInfoDao.instance.updateLastTestedField(testingRunResults, apiInfoKey);
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+                    
                     //Creating issues from testingRunResults
                    TestingIssuesHandler handler = new TestingIssuesHandler();
                    boolean triggeredByTestEditor = false;
