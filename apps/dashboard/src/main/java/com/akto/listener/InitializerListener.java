@@ -40,6 +40,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -1307,14 +1308,28 @@ public class InitializerListener implements ServletContextListener {
                             int updatedAt = Context.now();
                             String author = "AKTO";
 
-                            YamlTemplateDao.instance.updateOne(
-                                    Filters.eq("_id", id),
-                                    Updates.combine(
+                            List<Bson> updates = new ArrayList<>(
+                                    Arrays.asList(
                                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
                                             Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
+                            
+                            try {
+                                Object inactiveObject = TestConfigYamlParser.getFieldIfExists(templateContent,
+                                        YamlTemplate.INACTIVE);
+                                if (inactiveObject != null && inactiveObject instanceof Boolean) {
+                                    boolean inactive = (boolean) inactiveObject;
+                                    updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
+                                }
+                            } catch (Exception e) {
+                            }
+
+                            YamlTemplateDao.instance.updateOne(
+                                    Filters.eq(Constants.ID, id),
+                                    Updates.combine(updates));
+
                         }
                     }
 
