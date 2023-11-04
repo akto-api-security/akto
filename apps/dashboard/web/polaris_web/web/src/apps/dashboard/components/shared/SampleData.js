@@ -122,7 +122,7 @@ function highlightHeaders(data, ref, getLineNumbers){
 
 function SampleData(props) {
 
-    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers} = props;
+    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData} = props;
 
     const ref = useRef(null);
     const [instance, setInstance] = useState(undefined);
@@ -136,11 +136,21 @@ function SampleData(props) {
       editorLanguage='json'
     }
 
+    if (readOnly == undefined) {
+      readOnly = true
+    }
+
     useEffect(() => {
       if (instance===undefined) {
         createInstance();
       }
     }, [])
+
+    if (instance){
+      instance.onDidChangeModelContent(()=> {
+          getEditorData(instance.getValue())
+      })
+    }
 
     useEffect(() => {
       setEditorData((prev) => {
@@ -181,7 +191,7 @@ function SampleData(props) {
             automaticLayout: true,
             colorDecorations: true,
             scrollBeyondLastLine: false,
-            readOnly: true,
+            readOnly: readOnly,
             enableSplitViewResizing: false,
 		        renderSideBySide: false,
             // this prop doesn't work currently might be fixed in future versions.

@@ -636,6 +636,9 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
+        String webhookBody = webhook.getBody();
+        if (webhookBody.contains("$")) return; // use custom body
+
         StringBuilder body = new StringBuilder();
         body.append("{");
 
