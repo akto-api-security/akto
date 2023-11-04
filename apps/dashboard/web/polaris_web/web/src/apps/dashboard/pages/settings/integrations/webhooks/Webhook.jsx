@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, HorizontalGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField } from "@shopify/polaris"
+import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, HorizontalGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField} from "@shopify/polaris"
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards"
 import { useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
@@ -8,6 +8,9 @@ import Store from "../../../../store"
 import WebhooksStore from "./webhooksStore"
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered"
 import SampleDataList from "../../../../components/shared/SampleDataList"
+
+import SampleData from '../../../../components/shared/SampleData'
+import func from "@/util/func"
 
 function Webhook() {
     const initialState = {
@@ -33,35 +36,61 @@ function Webhook() {
     const [error, setError] = useState(false)
     const [hasChanges, setHasChanges] = useState(false)
     const [selectedWebhookTab, setSelectedWebhookTab] = useState(0);
+    const [showOptions, setShowOptions] = useState(true)
 
 
     async function loadWebhookById() {
         setIsLoading(true)
         if (webhookId) {
-            const customWebhookFindId = customWebhooks.find(customWebhook => customWebhook.id.toString() === webhookId)
-            if (customWebhookFindId) {
-                setWebhook({
-                    name: customWebhookFindId.webhookName,
-                    url: customWebhookFindId.url,
-                    method: customWebhookFindId.method,
-                    queryParams: customWebhookFindId.queryParams,
-                    headers: customWebhookFindId.headerString,
-                    body: customWebhookFindId.body,
-                    selectedWebhookOptions: customWebhookFindId.selectedWebhookOptions,
-                    newEndpointCollections: customWebhookFindId.newEndpointCollections,
-                    newSensitiveEndpointCollections: customWebhookFindId.newSensitiveEndpointCollections,
-                    frequencyInSeconds: customWebhookFindId.frequencyInSeconds
-                })
+            let customWebhookFindId = customWebhooks.find(customWebhook => customWebhook.id.toString() === webhookId)
 
-                const customWebhookResult = await settingRequests.fetchLatestWebhookResult(parseInt(webhookId))
-                const result = [{ 
+            if (!customWebhookFindId) {
+                const customWebhooksResponse = await settingRequests.fetchCustomWebhooks(webhookId)
+                if (customWebhooksResponse) {
+                    const CustomWebhooks = customWebhooksResponse.customWebhooks
+
+                    // remove null values from a given custom webhook object
+                    const filterCustomWebhooks = CustomWebhooks.map(obj => 
+                        Object.fromEntries(Object.entries(obj).filter(([k, v]) => v !== null))
+                    )
+
+                    // prettify custom webhook data
+                    const mapCustomWebhooks = filterCustomWebhooks.map(customWebhook => ({
+                        ...customWebhook,
+                        createTime: func.prettifyEpoch(customWebhook.createTime),
+                        lastSentTimestamp: func.prettifyEpoch(customWebhook.createTime),
+                        nextUrl: `${customWebhook.id}`
+                    }))
+
+                    customWebhookFindId = mapCustomWebhooks.find(customWebhook => customWebhook.id.toString() === webhookId)
+                }
+            }
+
+            setWebhook({
+                name: customWebhookFindId.webhookName,
+                url: customWebhookFindId.url,
+                method: customWebhookFindId.method,
+                queryParams: customWebhookFindId.queryParams,
+                headers: customWebhookFindId.headerString,
+                body: customWebhookFindId.body,
+                selectedWebhookOptions: customWebhookFindId.selectedWebhookOptions,
+                newEndpointCollections: customWebhookFindId.newEndpointCollections,
+                newSensitiveEndpointCollections: customWebhookFindId.newSensitiveEndpointCollections,
+                frequencyInSeconds: customWebhookFindId.frequencyInSeconds
+            })
+
+            let webhookBody = customWebhookFindId.body;
+            setShowOptions(!(webhookBody && webhookBody.indexOf("$") > 0))
+
+            const customWebhookResult = await settingRequests.fetchLatestWebhookResult(parseInt(webhookId))
+            let result = []
+            if (customWebhookResult.customWebhookResult) {
+                result = [{ 
                     message: customWebhookResult.customWebhookResult.message,
                     highlightPaths: [] 
                 }]
-                setWebhook(prev => ({ ...prev, result}))
-            } else {
-                setError(true)
             }
+            setWebhook(prev => ({ ...prev, result}))
         }
         setIsLoading(false)
     }
@@ -110,6 +139,7 @@ function Webhook() {
         switch (field) {
             case "selectedWebhookOptions":
                 setWebhook(prev => {
+                    if (!prev.selectedWebhookOptions)  prev.selectedWebhookOptions = []
                     if (prev.selectedWebhookOptions.includes(value))
                         return { ...prev, selectedWebhookOptions: prev.selectedWebhookOptions.filter(selectedWebhookOption => selectedWebhookOption !== value) }
                     else
@@ -139,10 +169,10 @@ function Webhook() {
         const method = webhook.method
         const queryParams = webhook.queryParams
         const headers = webhook.headers
-        const body = webhook.body
-        const selectedWebhookOptions = webhook.selectedWebhookOptions
-        const newEndpointCollections = webhook.newEndpointCollections
-        const newSensitiveEndpointCollections = webhook.newSensitiveEndpointCollections
+        const body = showOptions ? "{}" : webhookJson
+        const selectedWebhookOptions = showOptions ? webhook.selectedWebhookOptions : null
+        const newEndpointCollections = showOptions ? webhook.newEndpointCollections : null
+        const newSensitiveEndpointCollections = showOptions ? webhook.newSensitiveEndpointCollections : null
         const frequencyInSeconds = webhook.frequencyInSeconds
 
         if (webhookName === "") {
@@ -196,36 +226,70 @@ function Webhook() {
         </LegacyCard>
     )
 
-    const OptionsCard = (
-        <LegacyCard title="Options" key="options">
-            <LegacyCard.Section>
-                {customWebhookOptions.map(customWebhookOption => {
-                    return (
-                        <div key={customWebhookOption.title} style={{ paddingBottom: "10px" }}>
-                            <Checkbox
-                                label={
-                                    <div >
-                                        {customWebhookOption.title}
-                                        <div style={{ paddingTop: "10px" }}>
-                                            {customWebhookOption.collectionSelection && webhook.selectedWebhookOptions.includes(customWebhookOption.value) ?
-                                                <ApiCollectionsDropdown
-                                                    selectedCollections={getSelectedCollections(customWebhookOption.collectionStateField)}
-                                                    setSelectedCollections={(selectedCollections) =>
-                                                        updateWebhookState(
-                                                            customWebhookOption.collectionStateField,
-                                                            selectedCollections)}
-                                                />
-                                                : ''}
-                                        </div>
-                                    </div>
+    const data = {}
+    data["message"] = webhook.body && webhook.body.indexOf("$") > 0 ? webhook.body : "{\r\n  \"New Endpoint\": ${AKTO.changes_info.newEndpoints},\r\n  \"New Endpoint Count\": ${AKTO.changes_info.newEndpointsCount},\r\n  \"New Sensitive Endpoint\": ${AKTO.changes_info.newSensitiveEndpoints},\r\n  \"New Sensitive Endpoint Count\": ${AKTO.changes_info.newSensitiveEndpointsCount},\r\n  \"New Sensitive Parameter Count\": ${AKTO.changes_info.newSensitiveParametersCount},\r\n  \"New Parameter Count\": ${AKTO.changes_info.newParametersCount}\r\n}"
 
-                                }
-                                checked={webhook.selectedWebhookOptions.includes(customWebhookOption.value)}
-                                onChange={() => { updateWebhookState("selectedWebhookOptions", customWebhookOption.value) }}
-                            />
-                        </div>
-                    )
-                })}
+    const [webhookJson, setWebhookJson] = useState({})
+
+    const CustomWebhookEditor = (
+            <SampleData data={data} language="json" minHeight="240px" readOnly={false} getEditorData={setWebhookJson}/>
+    )
+
+    const OptionsCard = (
+        <div>
+            {customWebhookOptions.map(customWebhookOption => {
+                return (
+                    <div key={customWebhookOption.title} style={{ paddingBottom: "10px" }}>
+                        <Checkbox
+                            label={
+                                <div >
+                                    {customWebhookOption.title}
+                                    <div style={{ paddingTop: "10px" }}>
+                                        {customWebhookOption.collectionSelection && webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes(customWebhookOption.value) ?
+                                            <ApiCollectionsDropdown
+                                                selectedCollections={getSelectedCollections(customWebhookOption.collectionStateField)}
+                                                setSelectedCollections={(selectedCollections) =>
+                                                    updateWebhookState(
+                                                        customWebhookOption.collectionStateField,
+                                                        selectedCollections)}
+                                            />
+                                            : ''}
+                                    </div>
+                                </div>
+
+                            }
+                            checked={webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes(customWebhookOption.value)}
+                            onChange={() => { updateWebhookState("selectedWebhookOptions", customWebhookOption.value) }}
+                        />
+                    </div>
+                )
+            })}
+        </div>
+
+    )
+
+
+    let Card
+    let CardTitle
+    let actionContent
+    if (showOptions) {
+        Card = OptionsCard
+        CardTitle = "Options"
+        actionContent = "Custom"
+    } else {
+        Card = CustomWebhookEditor
+        CardTitle = "Custom"
+        actionContent = "Default"
+    }
+
+    const toggleShowOptions = () => {
+        setShowOptions(!showOptions);
+    }
+
+    const OverallCard = (
+        <LegacyCard title={CardTitle} key="options" actions={[{content: actionContent, onAction: toggleShowOptions}]}>
+            <LegacyCard.Section>
+                {Card}
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>
                     <Text variant="headingMd">Run every</Text>
@@ -256,7 +320,7 @@ function Webhook() {
             selectedWebhookTab === 0 ?
                 <div key="infoTab">
                     {InfoCard}
-                    {OptionsCard}
+                    {OverallCard}
                 </div>
                 :   webhook.result.length !== 0 ? 
                     <SampleDataList

@@ -162,11 +162,11 @@ const settingRequests = {
             }
         })
     },
-    fetchCustomWebhooks() {
+    fetchCustomWebhooks(customWebhookId) {
         return request({
             url: '/api/fetchCustomWebhooks',
             method: 'post',
-            data: {}
+            data: {customWebhookId}
         })
     },
     changeStatus(id, activeStatus) {
