@@ -147,9 +147,11 @@ function SampleData(props) {
     }, [])
 
     if (instance){
-      instance.onDidChangeModelContent(()=> {
-          getEditorData(instance.getValue())
-      })
+      if (!readOnly) {
+        instance.onDidChangeModelContent(()=> {
+            getEditorData(instance.getValue())
+        })
+      }
     }
 
     useEffect(() => {
