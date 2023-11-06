@@ -126,7 +126,7 @@ jobs:
           node ./vulnerable_checker.js
 
   delete:
-    needs: deploy
+    needs: test
     runs-on: ubuntu-latest
     environment: Dev
     permissions:
