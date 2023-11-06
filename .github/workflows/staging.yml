@@ -69,7 +69,7 @@ jobs:
         aws-region: ap-south-1
         
     - name: deploy to cluster
-      uses: kodermax/kubectl-aws-eks@main
+      uses: davi020/kubectl-advanced@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
         IMAGE_TAG: ${{ github.sha }}
