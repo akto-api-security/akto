@@ -129,8 +129,6 @@ function Webhook() {
         },
     ];
 
-    const customWebhookFindId = customWebhooks.find(customWebhook => customWebhook.id.toString() === webhookId)
-
     function handleWebhookTabChange(selectedTabIndex) {
         setSelectedWebhookTab(selectedTabIndex)
     }
@@ -201,9 +199,7 @@ function Webhook() {
     }
 
     function getSelectedCollections(collectionStateField) {
-        const customWebhookFindId = customWebhooks.find(customWebhook => customWebhook.id.toString() === webhookId)
-
-        if (customWebhookFindId) return customWebhookFindId[collectionStateField]
+        if (webhook) return webhook[collectionStateField]
         else return []
     }
 
@@ -269,15 +265,15 @@ function Webhook() {
     )
 
 
-    let Card
+    let CardComponent
     let CardTitle
     let actionContent
     if (showOptions) {
-        Card = OptionsCard
+        CardComponent = OptionsCard
         CardTitle = "Options"
         actionContent = "Custom"
     } else {
-        Card = CustomWebhookEditor
+        CardComponent = CustomWebhookEditor
         CardTitle = "Custom"
         actionContent = "Default"
     }
@@ -289,7 +285,7 @@ function Webhook() {
     const OverallCard = (
         <LegacyCard title={CardTitle} key="options" actions={[{content: actionContent, onAction: toggleShowOptions}]}>
             <LegacyCard.Section>
-                {Card}
+                {CardComponent}
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>
                     <Text variant="headingMd">Run every</Text>
@@ -335,7 +331,7 @@ function Webhook() {
         isLoading ? <SpinnerCentered /> :
             <PageWithMultipleCards
                 title={webhookId ?
-                    customWebhookFindId ? customWebhookFindId.webhookName : ''
+                    webhook? webhook.webhookName : ''
                     : "Create custom webhook"}
                 divider
                 backUrl="/dashboard/settings/integrations/webhooks"
