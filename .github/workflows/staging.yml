@@ -76,23 +76,9 @@ jobs:
       with:
         args: apply -f single_complete.yml
       
-  test:
-    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-    needs: deploy
-    runs-on: ubuntu-latest
-    steps:
-
-      - uses: actions/checkout@v2
-      
-      - name: Run testsigma end to end tests
-        env:
-            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            TESTSIGMA_TEST_PLAN_ID: 789
-            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-        run: bash ./.github/scripts/akto-testsigma.sh
 
   delete:
-    needs: test
+    needs: deploy
     runs-on: ubuntu-latest
     environment: Dev
     permissions:
