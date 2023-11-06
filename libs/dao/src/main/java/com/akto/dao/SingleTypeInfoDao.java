@@ -37,56 +37,21 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     public void createIndicesIfAbsent() {
 
-        boolean exists = false;
-        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
-            if (getCollName().equalsIgnoreCase(col)){
-                exists = true;
-                break;
-            }
-        };
+        String dbName = Context.accountId.get() + "";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
-        }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
+        List<Bson> indices = new ArrayList<>(Arrays.asList(
+                Indexes.ascending(new String[] { SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE,SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID }),
+                Indexes.ascending(new String[] { SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE }),
+                Indexes.ascending(new String[] { SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP }),
+                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS })
+        ));
 
-        if (counter == 1) {
-            String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-        }
-
-        if (counter == 2) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"apiCollectionId"}));
-            counter++;
-        }
-
-        if (counter == 3) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"param", "apiCollectionId"}));
-            counter++;
-        }
-
-        if (counter == 4) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID}));
-            counter++;
-        }
-
-        if (counter == 5) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE}));
-            counter++;
-        }
-
-        if (counter == 6) {
-            String[] fieldNames = {"responseCode", "subType", "timestamp",};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-        }
+        createIndices(indices);
     }
-
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
         List<Bson> filters = new ArrayList<>();
