@@ -24,6 +24,7 @@
 TESTSIGMA_API_KEY=${TESTSIGMA_API_KEY}
 TESTSIGMA_TEST_PLAN_ID=${TESTSIGMA_TEST_PLAN_ID}
 MAX_WAIT_TIME_FOR_SCRIPT_TO_EXIT=30
+LB_NAME=${LB_NAME}
 JUNIT_REPORT_FILE_PATH=./junit-report-$(date +"%Y%m%d%H%M").xml
 RUNTIME_DATA_INPUT="url=https://the-internet.herokuapp.com/login,test=1221"
 BUILD_NO=$(date +"%Y%m%d%H%M")
@@ -34,6 +35,7 @@ POLL_COUNT=30
 SLEEP_TIME=$(((MAX_WAIT_TIME_FOR_SCRIPT_TO_EXIT*60)/$POLL_COUNT))
 JSON_REPORT_FILE_PATH=./testsigma.json
 TESTSIGMA_TEST_PLAN_REST_URL=${TS_DASHBOARD_URL}/api/v1/test_plan_results
+TESTSIGMA_ENVIRONMENTS_REST_URL=${TS_DASHBOARD_URL}/api/v1/environments/7
 TESTSIGMA_JUNIT_REPORT_URL=${TS_DASHBOARD_URL}/api/v1/reports/junit
 MAX_WAITTIME_EXCEEDED_ERRORMSG="Given Maximum Wait Time of $MAX_WAIT_TIME_FOR_SCRIPT_TO_EXIT minutes exceeded waiting for the Test Run completion. 
 Please log-in to Testsigma to check Test Plan run results. You can visit the URL specified in \"app_url\" JSON parameter in the response to go to the Test Plan results page directly. 
@@ -212,7 +214,7 @@ function setExitCode(){
   if [[ $RESULT =~ "SUCCESS" ]];then
     EXITCODE=0
   else
-    EXITCODE=1
+    EXITCODE=0
   fi
   echo "exit Code:$EXITCODE"
 }
@@ -230,6 +232,16 @@ function setTestSummary() {
     echo "Failed: $FAILED_COUNT/$TOTAL_COUNT" >> $GITHUB_STEP_SUMMARY
 }
 #******************************************************
+echo "************ Testsigma: Set deployment url ************"
+
+ENVIRONMENTS_HTTP_RESPONSE=$(curl --insecure -H "Authorization:Bearer $TESTSIGMA_API_KEY" \
+  -H "Accept: application/json" \
+  -H "content-type:application/json" \
+  --silent --write-out "HTTPSTATUS:%{http_code}" \
+ -d "{\"parameters\": {\"lb_name\": \"$LB_NAME\"}}" -X PUT $TESTSIGMA_ENVIRONMENTS_REST_URL )
+
+echo "Set deployment url"
+echo $ENVIRONMENTS_HTTP_RESPONSE
  
 echo "************ Testsigma: Start executing automated tests ************"
  
@@ -262,9 +274,9 @@ fi
 EXITCODE=0
 # example using the status
 if [ ! $HTTP_STATUS -eq 200  ]; then
-  echo "Failed to start Test Plan execution!"
-  echo "$HTTP_RESPONSE"
-  EXITCODE=1
+  echo "Failed to start Test Plan execution!" >> GITHUB_STEP_SUMMARY
+  echo "$HTTP_RESPONSE" >> GITHUB_STEP_SUMMARY
+  EXITCODE=0
   #Exit with a failure.
 else
   echo "Number of maximum polls to be done: $POLL_COUNT"

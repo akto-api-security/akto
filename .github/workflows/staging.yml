@@ -99,7 +99,8 @@ jobs:
         env:
             TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
             TESTSIGMA_TEST_PLAN_ID: 789
-            TS_DASHBOARD_URL: ${{needs.deploy.outputs.output1}}
+            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+            LB_NAME: ${{needs.deploy.outputs.lb_name}}
         run: bash ./.github/scripts/akto-testsigma.sh
 
       - name: Run Akto CI/CD tests
