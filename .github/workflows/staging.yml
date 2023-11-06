@@ -90,3 +90,32 @@ jobs:
             TESTSIGMA_TEST_PLAN_ID: 789
             TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
         run: bash ./.github/scripts/akto-testsigma.sh
+
+  delete:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: Dev
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Fetch kube yaml
+      run: |
+        wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
+        export SETUP_SUFFIX=test
+        envsubst < single.yml > single_complete.yml
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+        aws-region: ap-south-1
+        
+    - name: deploy to cluster
+      uses: kodermax/kubectl-aws-eks@main
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{ github.sha }}
+      with:
+        args: delete -f single_complete.yml
