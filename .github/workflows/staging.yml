@@ -75,8 +75,16 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       with:
         args: apply -f single_complete.yml
-      
 
+    - name: cluster status
+      uses: kodermax/kubectl-aws-eks@main
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{ github.sha }}
+      with:
+        args: get pods -n dev >> $GITHUB_STEP_SUMMARY
+
+          
   delete:
     needs: deploy
     runs-on: ubuntu-latest
@@ -98,10 +106,20 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
         aws-region: ap-south-1
         
-    - name: deploy to cluster
+    - name: delete cluster
       uses: kodermax/kubectl-aws-eks@main
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
         IMAGE_TAG: ${{ github.sha }}
       with:
         args: delete -f single_complete.yml
+        
+    - name: cluster status
+      uses: kodermax/kubectl-aws-eks@main
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{ github.sha }}
+      with:
+        args: get pods -n dev >> $GITHUB_STEP_SUMMARY
+
+        
