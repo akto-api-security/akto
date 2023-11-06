@@ -2648,6 +2648,162 @@
       },
       "statusCode": 200
     }
+  },
+  {
+    "id": "INVALID_SSN",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\"status\" : \"SSN validation complete\"}",
+      "requestHeaders": "",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/v1/employeecheck?ssn_id=111-34-4547"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/v1/employeecheck",
+      "responsePayload": "{\"status\" : \"SSN validation complete\"}",
+      "responseHeaders": "",
+      "statusCode": 200
+    }
+  },
+  {
+    "id": "SSRF_ON_GCP_META_ENDPOINT",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\"message\":\"Welcome to the digital library of Google department. Here you can access all the books and research journals related to the world of WWW\"}",
+      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/college/library/depart/books/google?redirect=http://college.com/library/depart/books-journals/google"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/college/library/depart/books/google",
+      "responsePayload": "{\"kind\": \"compute#instance\",\n\"id\": \"1234567890123456789\",\n\"creationTimestamp\": \"2023-11-01T12:34:56.789-07:00\",\n\"name\": \"instance-1\",\n\"description\": \"\",\n\"machineType\": \"zones/us-central1-a/machineTypes/n1-standard-1\",\n\"status\": \"RUNNING\",\n\"zone\": \"us-central1-a\",\n\"canIpForward\": false,\n\"networkInterfaces\": \"compute#networkInterface\",\n\"accessConfigs\": \"compute#accessConfig\",\n\"fingerprint\": \"abc123\"\n}",
+      "statusCode": 200
+    }
+  },
+  {
+    "id": "SSRF_ON_AZURE_META_ENDPOINT",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\"message\":\"Welcome to the digital library of Microsoft department. Here you can access all the books and research journals related to the world of Windows\"}",
+      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/college/library/depart/books/windows?redirect=http://college.com/library/depart/books-journals/google"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/college/library/depart/books/windows",
+      "responsePayload": " {\n\"azEnvironment\": \"AZUREPUBLIC\",\n\"location\": \"westus\",\n\"name\": \"myVM\",\n\"vmId\": \"13f56399-bd52-4150-9748-7190aae1ff21\",\n\"offer\": \"UbuntuServer\",\n\"osType\": \"Linux\",\n\"placementGroupId\": \"\",\n\"platformFaultDomain\": \"0\",\n\"platformUpdateDomain\": \"0\",\n\"provider\": \"Microsoft.Compute\",\n\"publisher\": \"Canonical\",\n\"resourceGroupName\": \"myResourceGroup\",\n\"securityProfile\": false,\n\"privateIpAddress\": \"10.0.0.4\",\n\"publicIpAddress\": \"203.0.113.4\"\n}",
+      "statusCode": 200
+    }
+  },
+  {
+    "id": "SSRF_ON_PROTOCOL",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\"message\":\"Welcome to the digital library of WeWork department. Here you can access all the books and research journals related to the world of WeWork\"}",
+      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/college/library/depart/books/wework?redirect=http://college.com/library/depart/books-journals/wework"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/college/library/depart/books/wework",
+      "responsePayload": "{\n    \"ssh_server_data\": \"OpenSSH_7.9p1 Debian-10+deb10u2, OpenSSL 1.1.1d  10 Sep 2019\\nUnauthorized access prohibited\"\n  }",
+      "statusCode": 200
+    }
+  },
+  {
+    "id": "LIKE_DISLIKE_RACE_CONDITION",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\n  \"likeStatus\": \"True\",\n  \"text\": \"Thanks for the Like!\"\n}",
+      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/video_for_like?like=1"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/video_for_like",
+      "responsePayload": "{\n  \"likeStatus\": \"True\",\n  \"text\": \"Thanks for the Like!\"\n}",
+      "statusCode": 200
+    }
+  },
+  {
+    
+        "id": "REDEEM_SAME_COUPON",
+        "sampleData": {
+          "method":"GET",
+          "requestPayload": "",
+          "responsePayload": "{\"response\":\"COUPON APPLIED\"}",
+          "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+          "responseHeaders": "",
+          "status": "OK",
+          "statusCode": "200",
+          "path": "/api/payment_for_worldcup?coupon_code=%22WORLDCUP100%22"
+        },
+        "testData": {
+          "method": "GET",
+          "url": "/api/payment_for_worldcup",
+          "responsePayload": "{\"response\":\"COUPON APPLIED\"}",
+          "statusCode": 200
+        }
+      
+  },
+  {
+    "id": "USERNAME_ENUMERATION",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\"status\":\"login unsuccessful!, Access Denied.\"}",
+      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/login_into_portal?uname=admin%40noneofyourbeeswax.com&login=true"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/login_into_portal",
+      "responsePayload": "{\"status\":\"login successful!, Access Granted.\"}",
+      "statusCode": 200
+    }
+  },
+  {
+    "id": "INVALID_INTEGER_INPUT",
+    "sampleData": {
+      "method":"GET",
+      "requestPayload": "",
+      "responsePayload": "{\"status\":\"the question is correct\"}",
+      "requestHeaders": "{\"Access-Token\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+      "responseHeaders": "",
+      "status": "OK",
+      "statusCode": "200",
+      "path": "/api/checkQuestion?q=2"
+    },
+    "testData": {
+      "method": "GET",
+      "url": "/api/checkQuestion",
+      "responsePayload": "{\n\"code\": 400,\n\"message\": \"Invalid Integer error\",\n\"type\": \"InvalidIntegerException\",\n\"message\": \"The value provided is not a valid integer.\",\n\"file\": \"/path/to/file1.php\",\n\"line\": 23,\n\"function\": \"convertToInt\",\n\"class\": \"IntegerConverter\",\n\"type\": \"->\"\n}",
+      "statusCode": 200
+    }
   }
+
 
 ]

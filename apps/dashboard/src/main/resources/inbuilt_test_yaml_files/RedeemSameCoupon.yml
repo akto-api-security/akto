@@ -1,0 +1,54 @@
+id: REDEEM_SAME_COUPON
+info:
+  name: "Race condition in redeem coupon code API"
+  description: >
+    "Attacker can redeem coupon code multiple times by exploiting
+    race condition vulnerability"
+  details: > 
+      "In a normal scenario, the user will arrive at the redeem stage on which 
+      details are sent to the application, only after all other data was received 
+      and coupon code is verified. However, re-submitting the request right after 
+      the original request, might end up with redeeming same coupon again."
+  impact: >
+    "A typical Time of Check Time of Use vulnerability, allowing an attacker to steal from the 
+    app by submitting out-of-order requests"
+  category:
+    name: BLE
+    shortName: Business Logic Errors
+    displayName: Business Logic Errors (BLE)
+  subCategory: REDEEM_SAME_COUPON
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://github.com/OWASP/DVSA/blob/c04e0a536ac54db8f732144be92b5f208169f8c4/CONTENT/AWS/LESSONS/LESSON_08.md#81-race-condition"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+  or:
+    - query_param:
+        for_one:
+          key:
+            contains_either:
+              - coupon
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - coupon
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_payload:
+    percentage_match:
+      gte: 90

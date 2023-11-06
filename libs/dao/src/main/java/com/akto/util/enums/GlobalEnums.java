@@ -43,7 +43,8 @@ public class GlobalEnums {
         SSTI("SSTI", Severity.HIGH, "Server Side Template Injection (SSTI)", "Server Side Template Injection"),
         LFI("LFI", Severity.HIGH, "Local File Inclusion (LFI)", "Local File Inclusion"),
         XSS("XSS", Severity.HIGH, "Cross-site scripting (XSS)", "Cross-site scripting"),
-        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM");
+        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM"),
+        BLE("BLE",Severity.HIGH,"Business Logic Errors (BLE)","Business Logic Errors");
 
         private final String name;
         private final Severity severity;

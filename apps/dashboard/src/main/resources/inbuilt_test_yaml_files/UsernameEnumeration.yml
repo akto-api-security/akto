@@ -1,0 +1,188 @@
+id: USERNAME_ENUMERATION
+info:
+  name: Username enumeration vulnerability
+  description: >
+    "Credential stuffing (using lists of known usernames/passwords), 
+    is a common attack. If an application does not implement automated threat or 
+    credential stuffing protections, the application can be used as a password 
+    oracle (tester) to determine if the credentials are valid."
+  details: >
+    "Permits credential stuffing whereby the attacker has a list of valid usernames and 
+    passwords. Permits attackers to perform a brute force attack on the same user 
+    account, without presenting captcha/account lockout mechanism."
+  impact: >
+    "Attackers can gain control to other users\' accounts in the system, read their 
+    personal data, and perform sensitive actions on their behalf, like money 
+    transactions and sending personal messages"
+  category:
+    name: BUA
+    shortName: Broken Authentication
+    displayName: Broken User Authentication (BUA)
+  subCategory: USERNAME_ENUMERATION
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references: 
+    - https://github.com/OWASP/API-Security/blob/develop/editions/2019/en/0xa2-broken-user-authentication.md
+    - https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+    - https://owasp.org/www-community/attacks/Credential_stuffing
+  cwe: 
+    - CWE-798
+  
+wordLists:
+  usernames:
+    - admin
+    - user
+    - Administrator
+    - root
+    - user
+    - system
+    - SYSTEM
+    - root
+    - admin
+    - test
+    - guest
+    - info
+    - adm
+    - mysql
+    - user
+    - administrator
+    - oracle
+    - ftp
+    - pi
+    - puppet
+    - ansible
+    - ec2-user
+    - vagrant
+    - azureuser
+    - ADAMS
+    - ADLDEMO
+    - ADMIN
+    - ADMINISTRATOR
+    - ADVMAIL
+    - ALLIN1
+    - ALLIN1MAIL
+    - ALLINONE
+    - ANDY
+    - AP
+    - AP2SVP
+    - APL2PP
+    - APPLSYS
+    - APPLSYSPUB
+    - APPS
+    - APPUSER
+    - AQ
+    - AQDEMO
+    - AQJAVA
+    - AQUSER
+    - ARAdmin
+    - ARCHIVIST
+    - AUDIOUSER
+    - AURORA$JIS$UTILITY$
+    - AURORA$ORB$UNAUTHENTICATED
+    - AUTOLOG1
+    - Admin
+    - Admin1
+    - Admin5
+    - Administrator
+    - AdvWebadmin
+    - Airaya
+    - Any
+    - Audrey
+    - BACKUP
+    - BATCH
+    - BATCH1
+    - BATCH2
+    - BC4J
+    - BLAKE
+    - BRIO_ADMIN
+    - Best1_User
+    - Bill
+    - Bobo
+    - CATALOG
+    - CCC
+    - CDEMO82
+    - CDEMOCO
+    - CHEY_ARCHSVR
+    - CICSUSER
+    - CIDS
+    - CIS
+    - CISINFO
+    - CLARK
+    - CMSBATCH
+    - CMSUSER
+    - COMPANY
+    - COMPIERE
+    - CSMIG
+    - CSPUSER
+    - CTXDEMO
+    - CTXSYS
+    - CVIEW
+    - Cisco
+    - ClearOne
+    - Coco
+    - Craft
+    - Crowd
+    - D-Link
+    - DATAMOVE
+    - DBA
+    - ODM
+    - ODM_MTR
+    - ODS
+    - ODSCOMMON
+    - OE
+    - anonymous
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - query_param:
+        for_one:
+          key:
+            contains_either:
+              - username
+              - email
+              - uname
+            extract: queryUsernameKey
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - username
+              - email
+              - uname
+            extract: bodyUsernameKey
+  
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          queryUsernameKey: ${usernames}
+      - modify_body_param:
+          bodyUsernameKey: ${usernames}
+validate:
+  response_payload:
+    not_contains_either: 
+      - limit
+      - "LoginAttemptsExceeded"
+      - "MaxLoginAttemptsReached"
+      - "AccountLocked"
+      - "RateLimitExceeded"
+      - "RetryLater"
+      - "ExcessiveLoginAttempts"
+      - "LoginThrottle"
+      - "AccountSuspended"  
+      - "AuthLimitReached"
+      - "TooManyFailedLogins"
+      - "LoginQuotaExceeded"
+      - "UserLockedOut"
+      - "TemporarilyDisabled"
+      - "AccessTemporarilyBlocked"
+      - "SecurityThrottle"
+      - "AttemptLimitReached"
