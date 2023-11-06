@@ -16,6 +16,7 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -83,8 +84,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -1022,6 +1021,35 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void fillCollectionIdArray() {
+        Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
+
+            put(CollectionType.ApiCollectionId,
+                Arrays.asList("$apiCollectionId"));
+            put(CollectionType.Id_ApiCollectionId,
+                Arrays.asList("$_id.apiCollectionId"));
+            put(CollectionType.Id_ApiInfoKey_ApiCollectionId,
+                Arrays.asList("$_id.apiInfoKey.apiCollectionId"));
+        }};
+
+        Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
+
+        Bson filter = Filters.exists(SingleTypeInfo._COLLECTION_IDS, false);
+
+        for(Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()){
+
+            List<Bson> update = Arrays.asList(
+                            Updates.set(SingleTypeInfo._COLLECTION_IDS, 
+                            matchKeyMap.get(collections.getKey())));
+
+            if(collections.getKey().equals(CollectionType.ApiCollectionId)){
+                ApiCollectionUsers.updateCollectionsInBatches(collections.getValue(), filter, update);
+            } else {
+                ApiCollectionUsers.updateCollections(collections.getValue(), filter, update);
+            }
+        }
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1165,6 +1193,8 @@ public class InitializerListener implements ServletContextListener {
         LoadersDao.instance.createIndicesIfAbsent();
         TestingRunResultDao.instance.createIndicesIfAbsent();
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        fillCollectionIdArray();
+
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();
