@@ -74,22 +74,15 @@ jobs:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
         IMAGE_TAG: ${{ github.sha }}
       with:
-        args: apply -f single_complete.yml
+        command: |
+          kubectl apply -f single_complete.yml
+          kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
+          export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
+          echo $LB_NAME >> $GITHUB_STEP_SUMMARY
+          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
+          echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
 
-    - name: cluster status
-      uses: kodermax/kubectl-aws-eks@main
-      env:
-        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-        IMAGE_TAG: ${{ github.sha }}
-      with:
-        args: get pods -n dev >> $GITHUB_STEP_SUMMARY
 
-    - name: cluster LB
-      run: |
-        export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
-        echo $LB_NAME >> $GITHUB_STEP_SUMMARY
-        while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
-        echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
   delete:
     needs: deploy
     runs-on: ubuntu-latest
