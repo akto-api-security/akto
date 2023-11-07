@@ -86,7 +86,9 @@ public class ProfileAction extends UserAction {
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
-
+        String dashboardVersion = accountSettings.getDashboardVersion();
+        String[] versions = dashboardVersion.split(" - ");
+        User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
