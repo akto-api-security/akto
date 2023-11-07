@@ -17,6 +17,11 @@ info:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
+  cwe:
+    - CWE-78
+  cve:
+    - CVE-2021-31799
+
 api_selection_filters:
   or:
     - request_payload:

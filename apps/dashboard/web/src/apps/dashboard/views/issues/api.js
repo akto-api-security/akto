@@ -8,6 +8,14 @@ export default {
             data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch}
         })
     },
+    fetchVulnerableTestingRunResultsFromIssues(filters, skip) {
+        filters['skip'] = skip
+        return request({
+            url: 'api/fetchVulnerableTestingRunResultsFromIssues',
+            method: 'post',
+            data: filters
+        })
+    },
     updateIssueStatus(issueId, statusToBeUpdated, ignoreReason) {
         return request({
             url: 'api/updateIssueStatus',
@@ -36,11 +44,11 @@ export default {
             data: {issueId}
         })
     },
-    fetchAllSubCategories () {
+    fetchAllSubCategories (fetchOnlyActive) {
         return request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: {}
+            data: {fetchOnlyActive}
         })
     }
 }

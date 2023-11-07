@@ -37,7 +37,10 @@ public class LoggerMaker  {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                updateAccountSettings();
+                String cliTestIds = System.getenv("TEST_IDS");
+                if(cliTestIds==null){
+                    updateAccountSettings();
+                }
             }
         }, 0, 2, TimeUnit.MINUTES);
     }
@@ -65,7 +68,7 @@ public class LoggerMaker  {
         try{
             insert(err, "error", db);
         } catch (Exception e){
-            e.printStackTrace();
+
         }
     }
 
@@ -79,7 +82,7 @@ public class LoggerMaker  {
         try{
             insert(info, "info",db);
         } catch (Exception e){
-            e.printStackTrace();
+
         }
     }
 

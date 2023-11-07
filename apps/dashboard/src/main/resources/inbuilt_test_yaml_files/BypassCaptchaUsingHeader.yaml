@@ -18,6 +18,11 @@ info:
     - HackerOne top 10
   references:
     - "https://hackerone.com/reports/210417"
+  cwe:
+    - CWE-287
+  cve:
+    - CVE-2022-39955
+    - CVE-2023-0085
 
 api_selection_filters:
   response_code:

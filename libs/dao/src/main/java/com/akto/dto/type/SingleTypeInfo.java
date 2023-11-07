@@ -125,7 +125,7 @@ public class SingleTypeInfo {
     }
 
     public enum SuperType {
-        BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM
+        BOOLEAN, INTEGER, FLOAT, STRING, OBJECT_ID, NULL, OTHER, CUSTOM
     }
 
     public enum Position {
@@ -395,6 +395,21 @@ public class SingleTypeInfo {
 
         public void setIsUrlParam(boolean urlParam) {
             isUrlParam = urlParam;
+        }
+
+        @Override
+        public String toString() {
+            return "ParamId{" +
+                    "url='" + url + '\'' +
+                    ", method='" + method + '\'' +
+                    ", responseCode=" + responseCode +
+                    ", isHeader=" + isHeader +
+                    ", param='" + param + '\'' +
+                    ", subType=" + subType +
+                    ", apiCollectionId=" + apiCollectionId +
+                    ", subTypeString='" + subTypeString + '\'' +
+                    ", isUrlParam=" + isUrlParam +
+                    '}';
         }
     }
 

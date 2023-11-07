@@ -6,6 +6,7 @@ import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dto.Account;
@@ -16,6 +17,7 @@ import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
@@ -28,7 +30,10 @@ import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+
+import org.bson.conversions.Bson;
 import org.json.JSONArray;
 
 import java.io.BufferedReader;
@@ -48,7 +53,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
     //todo add resource analyser in AccountHttpCallParserAktoPolicyInfo
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
     public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
+    public static final String LLM_API_COLLECTION_NAME = "llm_apis";
     public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
+    public static final int LLM_API_COLLECTION_ID = 1222222222;
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
 
@@ -211,11 +218,106 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
                 Map<String, Object> testDataMap = (Map)json.get("testData");
             }
-            Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+            Bson filters = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, VULNERABLE_API_COLLECTION_ID);
+            List<SingleTypeInfo> params = SingleTypeInfoDao.instance.findAll(filters);
+            Set<String> urlList = new HashSet<>();
+            for (SingleTypeInfo singleTypeInfo: params) {
+                urlList.add(singleTypeInfo.getUrl());
+            }
+            if (urlList.size() != 117) {
+                Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+            }
 
         } catch (Exception e) {
             // add log
             loggerMaker.errorAndAddToDb("error inserting vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+        }
+
+    }
+
+    public static void addLlmSampleData(int accountId) {
+        List<String> result = new ArrayList<>();
+
+        loggerMaker.infoAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
+        ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(LLM_API_COLLECTION_NAME);
+        if (sameNameCollection == null){
+            ApiCollection apiCollection = new ApiCollection(LLM_API_COLLECTION_ID, LLM_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, LLM_API_COLLECTION_ID);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
+        }
+
+        try {
+            String mockServiceUrl = "https://vuln-llm.akto.io";
+            String data = convertStreamToString(InitializerListener.class.getResourceAsStream("/LlmSampleApiData.json"));
+            JSONArray dataobject = new JSONArray(data);
+            for (Object obj: dataobject) {
+
+                try {
+                    Map<String, Object> json = new Gson().fromJson(obj.toString(), Map.class);
+                    Map<String, Object> sampleDataMap = (Map)json.get("sampleData");
+                    String testId = (String) json.get("id");
+
+                    int ts = Context.now();
+                    sampleDataMap.put("akto_account_id", ""+accountId);
+                    sampleDataMap.put("ip", "null");
+                    sampleDataMap.put("time", String.valueOf(ts));
+                    sampleDataMap.put("type", "HTTP/1.1");
+                    sampleDataMap.put("contentType", "application/json");
+                    sampleDataMap.put("source", "HAR");
+                    sampleDataMap.put("akto_vxlan_id", LLM_API_COLLECTION_ID);
+
+                    String path = (String) sampleDataMap.get("path");
+                    sampleDataMap.put("path", mockServiceUrl + path);
+
+                    String jsonInString = new Gson().toJson(sampleDataMap);
+                    result.add(jsonInString);
+
+                    VulnerableRequestForTemplate vulnerableRequestForTemplate = new VulnerableRequestForTemplate();
+                    List<String> testList = new ArrayList<>();
+                    testList.add(testId);
+                    //vulnerableRequestForTemplate.setTemplateIds(testList);
+
+                    String p = (String) sampleDataMap.get("path");
+                    String []split = p.split("\\?");
+
+                    if (split.length > 1) {
+                        p = split[0];
+                    }
+
+                    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
+                        LLM_API_COLLECTION_ID, p, Method.fromString((String) sampleDataMap.get("method"))
+                    );
+                    // vulnerableRequestForTemplate.setId(apiInfoKey);
+
+
+
+                    VulnerableRequestForTemplate vul = VulnerableRequestForTemplateDao.instance.findOne(
+                        Filters.eq("_id.apiCollectionId", LLM_API_COLLECTION_ID)
+                    );
+                    if (vul == null) {
+                        VulnerableRequestForTemplateDao.instance.getMCollection().insertOne(new VulnerableRequestForTemplate(apiInfoKey, testList));
+                    } else {
+                        List<String> templateIds = vul.getTemplateIds();
+                        if (templateIds.contains(testId)) {
+                            continue;
+                        } else {
+                            templateIds.add(testId);
+                            Bson update = Updates.set("templateIds", templateIds);
+                            VulnerableRequestForTemplateDao.instance.getMCollection().updateOne(
+                                Filters.eq("_id.apiCollectionId", LLM_API_COLLECTION_ID), update, new UpdateOptions());
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("error inserting demo vul req", LoggerMaker.LogDb.DASHBOARD);
+                }
+                
+
+            }
+            loggerMaker.infoAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
+            Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+
+        } catch (Exception e) {
+            // add log
+            loggerMaker.errorAndAddToDb("error inserting llm vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
 
     }

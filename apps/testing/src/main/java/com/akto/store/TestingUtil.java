@@ -1,9 +1,9 @@
 package com.akto.store;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestRoles;
-import com.akto.dto.type.SingleTypeInfo;
 
 import java.util.List;
 import java.util.Map;
@@ -15,12 +15,15 @@ public class TestingUtil {
     private List<TestRoles> testRoles;
     private String userEmail;
 
+    private List<CustomAuthType> customAuthTypes;
+
     public TestingUtil(AuthMechanism authMechanism, SampleMessageStore sampleMessageStore, List<TestRoles> testRoles,
-                       String userEmail) {
+                       String userEmail, List<CustomAuthType> customAuthTypes) {
         this.authMechanism = authMechanism;
         this.sampleMessageStore = sampleMessageStore;
         this.testRoles = testRoles;
         this.userEmail = userEmail;
+        this.customAuthTypes = customAuthTypes;
     }
 
     public TestingUtil() {
@@ -60,5 +63,13 @@ public class TestingUtil {
 
     public void setUserEmail(String userEmail) {
         this.userEmail = userEmail;
+    }
+
+    public List<CustomAuthType> getCustomAuthTypes() {
+        return customAuthTypes;
+    }
+
+    public void setCustomAuthTypes(List<CustomAuthType> customAuthTypes) {
+        this.customAuthTypes = customAuthTypes;
     }
 }

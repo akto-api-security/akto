@@ -1,14 +1,18 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-
+import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.model.IndexOptions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
@@ -38,23 +42,32 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(ObjectId testRunResultSummaryId) {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId))
-                .projection(
-                        Projections.include(
-                            TestingRunResult.TEST_RUN_ID,
-                            TestingRunResult.API_INFO_KEY,
-                            TestingRunResult.TEST_SUPER_TYPE,
-                            TestingRunResult.TEST_SUB_TYPE,
-                            TestingRunResult.VULNERABLE,
-                            TestingRunResult.CONFIDENCE_PERCENTAGE,
-                            TestingRunResult.START_TIMESTAMP,
-                            TestingRunResult.END_TIMESTAMP,
-                            TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
-                        )
-                )
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
+        return fetchLatestTestingRunResult(filters, 10_000);
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
+        Bson projections = Projections.include(
+                                TestingRunResult.TEST_RUN_ID,
+                                TestingRunResult.API_INFO_KEY,
+                                TestingRunResult.TEST_SUPER_TYPE,
+                                TestingRunResult.TEST_SUB_TYPE,
+                                TestingRunResult.VULNERABLE,
+                                TestingRunResult.CONFIDENCE_PERCENTAGE,
+                                TestingRunResult.START_TIMESTAMP,
+                                TestingRunResult.END_TIMESTAMP,
+                                TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
+                        );
+
+        return fetchLatestTestingRunResult(filters, limit, 0, projections);
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
+                .projection(projections)
                 .sort(Sorts.descending("_id"))
-                .limit(10_000)
+                .skip(skip)
+                .limit(limit)
                 .cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
@@ -65,4 +78,15 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
         return testingRunResults;
     }
+
+    public void createIndicesIfAbsent() {
+        
+        String dbName = Context.accountId.get()+"";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+
+        Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
+        createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name("testRunResultSummaryId_-1__id_-1"));
+
+    }
+
 }

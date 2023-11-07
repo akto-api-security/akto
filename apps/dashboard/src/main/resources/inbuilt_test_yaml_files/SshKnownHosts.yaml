@@ -13,6 +13,11 @@ info:
   severity: LOW
   references:
     - https://datacadamia.com/ssh/known_hosts
+  cwe:
+    - CWE-16
+    - CWE-200
+  cve:
+    - CVE-2005-2666
 
 api_selection_filters:
   response_code:

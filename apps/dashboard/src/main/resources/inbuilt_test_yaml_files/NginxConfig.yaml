@@ -13,6 +13,11 @@ info:
   severity: LOW
   references:
     - https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/nginx
+  cwe:
+    - CWE-16
+    - CWE-200
+  cve:
+    - CVE-2020-11959
 
 api_selection_filters:
   response_code:

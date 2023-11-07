@@ -8,23 +8,22 @@ import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.Predicate.Type;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.AuthParam;
-import com.akto.dto.testing.AuthParamData;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.HardcodedAuthParam;
-import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.DeleteResult;
 import org.bson.conversions.Bson;
 
 import java.util.*;
 
 public class TestRolesAction extends UserAction {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestRolesAction.class);
+
     private List<TestRoles> testRoles;
     private TestRoles selectedRole;
     private RolesConditionUtils andConditions;
@@ -32,6 +31,9 @@ public class TestRolesAction extends UserAction {
     private String roleName;
     private List<AuthParamData> authParamData;
     private Map<String, String> apiCond;
+    private String authAutomationType;
+    private ArrayList<RequestData> reqData;
+
 
     public static class RolesConditionUtils {
         private Operator operator;
@@ -76,12 +78,17 @@ public class TestRolesAction extends UserAction {
         if (authParamData != null) {
             List<AuthParam> authParams = new ArrayList<>();
 
-            for (AuthParamData authParamDataElem: authParamData) {
-                AuthParam param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
+            for (AuthParamData authParamDataElem : authParamData) {
+                AuthParam param = null;
+                if (authAutomationType.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+                    param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
+                } else {
+                    param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), authParamDataElem.getShowHeader());
+                }
                 authParams.add(param);
             }
 
-            AuthMechanism authM = new AuthMechanism(authParams, null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString());
+            AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond);
             TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
         }
@@ -100,6 +107,25 @@ public class TestRolesAction extends UserAction {
         }
 
         return role;
+    }
+
+    public String deleteTestRole() {
+        loggerMaker.infoAndAddToDb("Started deleting role: " + roleName, LoggerMaker.LogDb.DASHBOARD);
+        TestRoles role = getRole();
+        if (role == null) {
+            addActionError("Role doesn't exists");
+            return ERROR.toUpperCase();
+        }
+
+        Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);
+        DeleteResult delete = TestRolesDao.instance.deleteAll(roleFilterQ);
+        loggerMaker.infoAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
+
+        AccessMatrixTaskAction accessMatrixTaskAction = new AccessMatrixTaskAction();
+        accessMatrixTaskAction.setRoleName(roleName);
+        accessMatrixTaskAction.deleteAccessMatrix();
+
+        return SUCCESS.toUpperCase();
     }
 
     public String updateTestRoles() {
@@ -253,5 +279,21 @@ public class TestRolesAction extends UserAction {
     }
     public void setApiCond(Map<String, String> apiCond) {
         this.apiCond = apiCond;
-    }    
+    }
+
+    public String getAuthAutomationType() {
+        return authAutomationType;
+    }
+
+    public ArrayList<RequestData> getReqData() {
+        return reqData;
+    }
+
+    public void setReqData(ArrayList<RequestData> reqData) {
+        this.reqData = reqData;
+    }
+
+    public void setAuthAutomationType(String authAutomationType) {
+        this.authAutomationType = authAutomationType;
+    }
 }

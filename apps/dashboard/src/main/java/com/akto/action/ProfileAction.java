@@ -9,12 +9,15 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.listener.InitializerListener;
+import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Intercom;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -93,7 +96,15 @@ public class ProfileAction extends UserAction {
                 .append("userHash", Intercom.getUserHash(user.getLogin()))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
-                .append("accountName", accountName);
+                .append("accountName", accountName)
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+        if (versions.length > 2) {
+            if (versions[2].contains("akto-release-version")) {
+                userDetails.append("releaseVersion", "akto-release-version");
+            } else {
+                userDetails.append("releaseVersion", versions[2]);
+            }
+        }
 
         for (String k: userDetails.keySet()) {
             request.setAttribute(k, userDetails.get(k));

@@ -106,7 +106,7 @@ export default {
             let days = parseInt(Math.round(run.periodInSeconds/86400))
             return {
                 apiCollectionName: run.name || this.getCollectionName(run.testingEndpoints),
-                link: run.hexId+'/results',
+                link: run.hexId,
                 endpoints: testing.getEndpoints(run.testingEndpoints),
                 type: run.testingEndpoints.type,
                 userEmail: run.userEmail,
@@ -136,7 +136,7 @@ export default {
                     break;
                 case func.testingType().inactive:
                     res = await api.fetchTestingDetails({
-                        startTimestamp: now - func.recencyPeriod, endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
+                        startTimestamp: Math.min(now - func.recencyPeriod, this.lastRunTs.startTimestamp) , endTimestamp: now, fetchCicd: false, sortKey, sortOrder, skip, limit, filters
                     });
                     break;
             }

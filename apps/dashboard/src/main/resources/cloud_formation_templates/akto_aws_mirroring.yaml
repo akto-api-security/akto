@@ -435,6 +435,7 @@ Resources:
             - sudo dockerd&
             - sudo mkdir -p /opt/aws/bin
             - export COMPOSE_FILE=docker-compose-context-analyser.yml
+            - sudo systemctl enable /usr/lib/systemd/system/docker.service
             - >-
               sudo wget
               https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
@@ -577,6 +578,7 @@ Resources:
             - sudo yum install -y python python-setuptools
             - sudo yum install -y docker
             - sudo dockerd&
+            - sudo systemctl enable /usr/lib/systemd/system/docker.service
             - sudo mkdir -p /opt/aws/bin
             - export COMPOSE_FILE=docker-compose-runtime.yml
             - >-

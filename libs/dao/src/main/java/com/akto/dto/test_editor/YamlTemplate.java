@@ -17,7 +17,8 @@ public class YamlTemplate {
     public static final String CONTENT = "content";
     private Info info;
     public static final String INFO = "info";
-
+    private boolean inactive;
+    public static final String INACTIVE = "inactive";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
         this.id = id;
@@ -77,6 +78,14 @@ public class YamlTemplate {
 
     public void setInfo(Info info) {
         this.info = info;
+    }
+    
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
     }
 
     public GlobalEnums.YamlTemplateSource getSource() {

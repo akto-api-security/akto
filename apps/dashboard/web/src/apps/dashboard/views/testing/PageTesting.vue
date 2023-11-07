@@ -117,7 +117,7 @@
             </div>
         </template>
         <template slot="Roles">
-            <test-roles title="Roles" :testRoles="testRoles">
+            <test-roles title="Roles" :testRoles="testRoles" @refreshRoles="refreshRoles">
                 <template #details-container="{}">
                     <test-roles-config-details></test-roles-config-details>
                 </template>
@@ -238,8 +238,11 @@ export default {
         async saveTestRoles() {
             if (this.testRoleName && this.testLogicalGroupRegex) {
                 await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
-                this.$store.dispatch('testing/loadTestRoles')
+                this.$store.dispatch('test_roles/loadTestRoles')
             }
+        },
+        refreshRoles() {
+            this.$store.dispatch('test_roles/loadTestRoles')
         },
         prepareItemForTable(x) {
             return {
@@ -268,7 +271,15 @@ export default {
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
         },
-        toggleOriginalStateDb() {
+        toggleOriginalStateDb({reqData, authParamsList}) {
+            let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, authParamsList)
+            result.then((resp) => {
+                func.showSuccessSnackBar("Login Flow saved successfully!")
+                
+            }).catch((err) => {
+                console.log(err);
+            })
+
             console.log('got db state event')
             this.fetchAuthMechanismData()
         },
@@ -347,7 +358,7 @@ export default {
                             }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })
@@ -373,7 +384,7 @@ export default {
                             }
                             return {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true,
                                 cicd: true
                             }
@@ -400,7 +411,7 @@ export default {
                             }
                             return {
                                 title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                link: "/dashboard/testing/" + x.hexId,
                                 active: true
                             }
                         })

@@ -14,6 +14,9 @@ info:
   references:
     - https://github.com/prometheus/prometheus
     - https://hackerone.com/reports/1026196
+  cwe:
+    - CWE-16
+    - CWE-200
 
 api_selection_filters:
   response_code:

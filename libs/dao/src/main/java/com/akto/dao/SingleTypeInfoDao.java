@@ -87,6 +87,14 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
     }
 
+    public static Bson filterForSTIUsingURL(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
+                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.eq("url", url),
+                Filters.eq("method", method.name())
+        );
+    }
+
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
         List<Bson> filters = new ArrayList<>();

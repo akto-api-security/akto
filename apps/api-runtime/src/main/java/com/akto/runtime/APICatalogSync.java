@@ -9,16 +9,10 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
-import com.akto.dto.traffic.Key;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.TrafficRecorder;
-import com.akto.dto.type.URLStatic;
-import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.*;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
@@ -33,13 +27,17 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
-
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -652,6 +650,9 @@ public class APICatalogSync {
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
                 newTypes[i] = SuperType.INTEGER;
                 newTokens[i] = null;
+            } else if(ObjectId.isValid(tempToken) && ObjectId.isValid(dbToken)){
+                newTypes[i] = SuperType.OBJECT_ID;
+                newTokens[i] = null;
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
@@ -720,17 +721,8 @@ public class APICatalogSync {
             for (String matchedURL: matchStaticURLs) {
                 Method delMethod = Method.fromString(matchedURL.split(" ")[0]);
                 String delEndpoint = matchedURL.split(" ")[1];  
-                Bson filterQ = Filters.and(
-                    Filters.eq("apiCollectionId", apiCollectionId),
-                    Filters.eq("method", delMethod.name()),
-                    Filters.eq("url", delEndpoint)
-                );
-
-                Bson filterQSampleData = Filters.and(
-                    Filters.eq("_id.apiCollectionId", apiCollectionId),
-                    Filters.eq("_id.method", delMethod.name()),
-                    Filters.eq("_id.url", delEndpoint)
-                );
+                Bson filterQ = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, delEndpoint, delMethod);
+                Bson filterQSampleData = SampleDataDao.filterForSampleData(apiCollectionId, delEndpoint, delMethod);
 
                 if (isFirst) {
 
@@ -1234,7 +1226,7 @@ public class APICatalogSync {
                 if (gotDibs) {
                     loggerMaker.infoAndAddToDb("Got dibs", LogDb.RUNTIME);
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-                    if (backwardCompatibility.getMergeOnHostInit() == 0) {
+                    if (backwardCompatibility ==null || backwardCompatibility.getMergeOnHostInit() == 0) {
                         loggerMaker.infoAndAddToDb("Merging hosts...", LogDb.RUNTIME);
                         new MergeOnHostOnly().mergeHosts();
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
@@ -1476,17 +1468,23 @@ public class APICatalogSync {
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
+        int from = 0;
+        int batch = 10000;
 
         long start = System.currentTimeMillis();
-
         if (writesForParams.size() >0) {
-            
-            BulkWriteResult res = 
-                SingleTypeInfoDao.instance.getMCollection().bulkWrite(
-                    writesForParams
-                );
+            do {
 
-                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
+                List<WriteModel<SingleTypeInfo>> slicedWrites = writesForParams.subList(from, Math.min(from + batch, writesForParams.size()));
+                from += batch;
+                BulkWriteResult res =
+                        SingleTypeInfoDao.instance.getMCollection().bulkWrite(
+                                slicedWrites,
+                                new BulkWriteOptions().ordered(true).bypassDocumentValidation(false)
+                        );
+
+                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " + res.getUpserts().size(), LogDb.RUNTIME);
+            } while (from < writesForParams.size());
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);

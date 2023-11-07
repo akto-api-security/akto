@@ -1,7 +1,9 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -58,6 +60,19 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
             instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
         }
 
+    }
+
+    public SampleData fetchSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
+        Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
+        return SampleDataDao.instance.findOne(filterQSampleData);
+    }
+
+    public static Bson filterForSampleData(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url),
+                Filters.eq("_id.method", method.name())
+        );
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,

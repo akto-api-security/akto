@@ -11,6 +11,7 @@
       <div v-for="(auth, index) in auths" :key="index">
         <role-single-auth :def-auth="auth" @deleteAuthFromRole="() => deleteAuthFromRole(index)"/>
       </div>
+
     </div>
   </template>
   
@@ -18,7 +19,8 @@
   
   import RoleHardcodedAuth from './RoleHardcodedAuth'
   import RoleSingleAuth from './RoleSingleAuth'
-  
+  import TokenAutomation from '../../token/TokenAutomation'
+
   import { mapState } from "vuex";
   import SecondaryButton from "@/apps/dashboard/shared/components/buttons/SecondaryButton";
   export default {
@@ -26,7 +28,8 @@
     components: {
       SecondaryButton,
       RoleHardcodedAuth,
-      RoleSingleAuth
+      RoleSingleAuth,
+      TokenAutomation
     },
     data() {
       return {
@@ -37,22 +40,28 @@
       addNewAuth() {
         this.showEmptyAuth = true
       },
-      async addAuthToRole({newKey, newVal, headerKey, headerVal}) {
+      async addAuthToRole({authAutomationType, newKey, newVal, headerKey, headerVal, reqData, authParamsList}) {
         let apiCond = {}
         if (headerKey && headerVal) {
           apiCond[headerKey] = headerVal
         }
         
         let authParamData = []
-        for (let index = 0; index < newKey.length; index++) {
-            authParamData.push({
-                "key": newKey[index],
-                "value": newVal[index],
-                "where": "HEADER"
-            })
+        if (authAutomationType === "Hardcoded") {
+
+          for (let index = 0; index < newKey.length; index++) {
+              authParamData.push({
+                  "key": newKey[index],
+                  "value": newVal[index],
+                  "where": "HEADER"
+              })
+          }
+
+        } else {
+          authParamData = authParamsList
         }
 
-        await this.$store.dispatch('test_roles/addAuthToRole', {roleName: this.curr.name, apiCond, authParamData})
+        await this.$store.dispatch('test_roles/addAuthToRole', {roleName: this.curr.name, apiCond, authParamData, authAutomationType, reqData})
         this.showEmptyAuth = false
       },
       async deleteAuthFromRole(index) {

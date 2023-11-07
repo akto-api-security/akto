@@ -10,6 +10,9 @@ public enum DashboardMode {
         if(StringUtils.isEmpty(dashboardMode)){
             return ON_PREM;
         }
+        if("on_prem".equalsIgnoreCase(dashboardMode)){
+            return ON_PREM;
+        }
         if("local_deploy".equalsIgnoreCase(dashboardMode)){
             return LOCAL_DEPLOY;
         }
@@ -19,7 +22,7 @@ public enum DashboardMode {
         if("stairway".equalsIgnoreCase(dashboardMode)){
             return STAIRWAY;
         }
-        return LOCAL_DEPLOY;
+        return ON_PREM;
     }
 
     public static boolean isLocalDeployment(){

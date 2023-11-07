@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public class AuthMechanism {
     private ObjectId id;
+    public static final String OBJECT_ID = "objectId";
     private List<AuthParam> authParams;
 
     private String type;

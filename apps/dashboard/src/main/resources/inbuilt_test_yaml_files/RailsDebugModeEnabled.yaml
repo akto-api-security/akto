@@ -26,6 +26,10 @@ info:
   references:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
     - "https://beaglesecurity.com/blog/vulnerability/rails-debug-mode-enabled.html"
+  cwe:
+    - CWE-215
+  cve:
+    - CVE-2019-5420
 
 api_selection_filters:
   response_code:

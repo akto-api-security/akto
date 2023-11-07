@@ -13,6 +13,11 @@ info:
   severity: MEDIUM
   references:
     - https://beaglesecurity.com/blog/vulnerability/dockerrun-aws-configuration-exposure.html
+  cwe:
+    - CWE-200
+    - CWE-213
+  cve:
+    - CVE-2020-14329
 
 api_selection_filters:
   response_code:

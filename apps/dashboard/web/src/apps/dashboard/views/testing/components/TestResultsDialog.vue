@@ -32,19 +32,22 @@
                                                 </span>
                                             </v-col>
                                         </v-row>
-                                        <v-row v-if="issuesDetails.id.testSubCategory" class="mx-0 pa-0"
-                                            :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
-                                            <v-col cols="2" class="ma-0 pa-0">
-                                                <span class="description-content">Tags</span>
-                                            </v-col>
-                                            <v-col class="my-0 mr-0 ml-7 pa-0">
-                                                <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
-                                                    class="issue-summary mr-2" text-color="var(--white)" :key="index"
-                                                    v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
-                                                    {{ chipItem }}
-                                                </v-chip>
-                                            </v-col>
-                                        </v-row>
+                                            <tag-component
+                                                v-if="issuesDetails.id.testSubCategory"
+                                                title="Tags"
+                                                :tagList="subCatogoryMap[issuesDetails.id.testSubCategory].issueTags"
+                                            />
+                                            <tag-component 
+                                                title="CWE"
+                                                :tagList="subCatogoryMap[issuesDetails.id.testSubCategory].cwe"
+                                                @tagClick="(item) => goToPage(getCweLink(item))"
+                                            />
+                                            <tag-component 
+                                                v-if="subCatogoryMap[issuesDetails.id.testSubCategory].cve"
+                                                title="CVE"
+                                                :tagList="subCatogoryMap[issuesDetails.id.testSubCategory].cve"
+                                                @tagClick="(item) => goToPage(getCveLink(item))"
+                                            />
                                     </v-container>
                                 </div>
                             </div>
@@ -139,13 +142,15 @@ import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SampleData from "../../../shared/components/SampleData";
 import TestResultDetails from "./TestResultDetails";
 import func from "@/util/func";
+import TagComponent from "./TagComponent";
 
 export default {
     name: "TestResultsDialog",
     components: {
         SampleData,
         LayoutWithTabs,
-        TestResultDetails
+        TestResultDetails,
+        TagComponent
     },
     props: {
         testingRunResult: obj.objR,
@@ -190,6 +195,22 @@ export default {
             })
 
             return highlightPaths
+        },
+        getCweLink(item){
+            let cwe = item.split("-")
+            if(cwe[1]){
+                cwe = cwe[1]
+            } else {
+                return "";
+            }
+            return `https://cwe.mitre.org/data/definitions/${cwe}.html`
+        },
+        getCveLink(item){
+            console.log(item);
+            return `https://nvd.nist.gov/vuln/detail/${item}`
+        },
+        goToPage(link){
+            return window.open(link, "_blank")
         }
     },
     watch: {
@@ -312,6 +333,15 @@ export default {
     color: var(--themeColorDark);
 }
 
+.issue-summary-border {
+    border-width: 1px 0px;
+    border-color: var(--lighten2);
+    border-style: solid;
+}
+</style>
+
+<style>
+
 .description-content {
     font-size: 12px !important;
     font-weight: 400;
@@ -324,9 +354,4 @@ export default {
     color: var(--themeColorDark);
 }
 
-.issue-summary-border {
-    border-width: 1px 0px;
-    border-color: var(--lighten2);
-    border-style: solid;
-}
 </style>

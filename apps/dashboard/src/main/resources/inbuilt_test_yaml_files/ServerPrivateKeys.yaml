@@ -14,6 +14,12 @@ info:
   references:
     - https://www.acunetix.com/blog/articles/tls-vulnerabilities-attacks-final-part/
     - https://venafi.com/blog/most-common-ssh-vulnerabilities-how-to-avoid-them/
+  cwe:
+    - CWE-200
+    - CWE-213
+  cve:
+    - CVE-2022-22424
+    - CVE-2022-23529
 
 api_selection_filters:
   response_code:

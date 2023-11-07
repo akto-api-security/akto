@@ -111,7 +111,7 @@ export default {
     },
     mounted() {
         let _this = this
-        issuesApi.fetchAllSubCategories().then(resp => {
+        issuesApi.fetchAllSubCategories(true).then(resp => {
             _this.businessLogicSubcategories = resp.subCategories
             _this.categories = resp.categories
             _this.loading = false

@@ -1,5 +1,6 @@
 package com.akto.action.testing_issues;
 
+import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -10,11 +11,16 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -22,6 +28,7 @@ import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +40,8 @@ public class IssuesAction extends UserAction {
     private TestingIssuesId issueId;
     private List<TestingIssuesId> issueIdArray;
     private TestingRunResult testingRunResult;
+    private List<TestingRunResult> testingRunResults;
+    private Map<String, String> sampleDataVsCurlMap;
     private TestRunIssueStatus statusToBeUpdated;
     private String ignoreReason;
     private int skip;
@@ -105,6 +114,46 @@ public class IssuesAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
+
+    public String fetchVulnerableTestingRunResultsFromIssues() {
+        Bson filters = createFilters();
+        try {
+            List<TestingRunIssues> issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+            this.totalIssuesCount = issues.size();
+            List<Bson> andFilters = new ArrayList<>();
+            for (TestingRunIssues issue : issues) {
+                andFilters.add(Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, issue.getLatestTestingRunSummaryId()),
+                        Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory()),
+                        Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                        Filters.eq(TestingRunResult.VULNERABLE, true)
+                ));
+            }
+            if (issues.isEmpty()) {
+                this.testingRunResults = new ArrayList<>();
+                this.sampleDataVsCurlMap = new HashMap<>();
+                return SUCCESS.toUpperCase();
+            }
+            Bson orFilters = Filters.or(andFilters);
+            this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
+            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            for (TestingRunResult runResult: this.testingRunResults) {
+                List<TestResult> testResults = new ArrayList<>();
+                for (TestResult testResult : runResult.getTestResults()) {
+                    if (testResult.isVulnerable()) {
+                        testResults.add(testResult);
+                        sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
+                        sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                    }
+                }
+                runResult.setTestResults(testResults);
+            }
+            this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+        } catch (Exception e) {
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
     public String fetchTestingRunResult() {
         if (issueId == null) {
             throw new IllegalStateException();
@@ -147,6 +196,8 @@ public class IssuesAction extends UserAction {
         infoObj.put("issueTags", info.getTags());
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
+        infoObj.put("cwe", info.getCwe());
+        infoObj.put("cve", info.getCve());
         infoObj.put("name", testConfig.getId());
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
@@ -160,12 +211,15 @@ public class IssuesAction extends UserAction {
         severity.put("_name",info.getSeverity());
         superCategory.put("severity", severity);
         infoObj.put("superCategory", superCategory);
+        infoObj.put(YamlTemplate.INACTIVE, testConfig.getInactive());
         return infoObj;
     }
 
+    private boolean fetchOnlyActive;
+
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true);
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
@@ -367,5 +421,29 @@ public class IssuesAction extends UserAction {
 
     public void setVulnerableRequests(List<VulnerableRequestForTemplate> vulnerableRequests) {
         this.vulnerableRequests = vulnerableRequests;
+    }
+
+    public boolean getFetchOnlyActive() {
+        return fetchOnlyActive;
+    }
+
+    public void setFetchOnlyActive(boolean fetchOnlyActive) {
+        this.fetchOnlyActive = fetchOnlyActive;
+    }
+
+    public List<TestingRunResult> getTestingRunResults() {
+        return testingRunResults;
+    }
+
+    public void setTestingRunResults(List<TestingRunResult> testingRunResults) {
+        this.testingRunResults = testingRunResults;
+    }
+
+    public Map<String, String> getSampleDataVsCurlMap() {
+        return sampleDataVsCurlMap;
+    }
+
+    public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
+        this.sampleDataVsCurlMap = sampleDataVsCurlMap;
     }
 }

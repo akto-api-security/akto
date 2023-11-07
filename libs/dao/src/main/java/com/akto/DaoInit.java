@@ -25,6 +25,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
@@ -49,7 +50,7 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public class DaoInit {
 
-    public static void init(ConnectionString connectionString) {
+    public static CodecRegistry createCodecRegistry(){
         ClassModel<MessageQueueEntry> queueEntryClassModel = ClassModel.builder(MessageQueueEntry.class)
                 .enableDiscriminator(true).build();
         ClassModel<Config> configClassModel = ClassModel.builder(Config.class).enableDiscriminator(true).build();
@@ -176,6 +177,7 @@ public class DaoInit {
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
+        ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
                 configClassModel,
@@ -199,7 +201,7 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,                
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel).automatic(true).build());
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -230,10 +232,18 @@ public class DaoInit {
                 new EnumCodec<>(Loader.Type.class),
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
-                new EnumCodec<>(AktoGptConfigState.class));
+                new EnumCodec<>(AktoGptConfigState.class),
+                new EnumCodec<>(CustomWebhook.WebhookOptions.class),
+                new EnumCodec<>(TrafficMetricsAlert.FilterType.class));
 
-        CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
+        return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);
+    }
+
+    public static void init(ConnectionString connectionString) {
+
+        CodecRegistry codecRegistry = createCodecRegistry();
+
         MongoClientSettings clientSettings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString)
                 .codecRegistry(codecRegistry)

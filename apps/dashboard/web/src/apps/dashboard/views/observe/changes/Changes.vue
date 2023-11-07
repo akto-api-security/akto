@@ -523,7 +523,7 @@ export default {
         }
     },
     mounted() {
-        this.refreshPage(false)
+        this.refreshPage(true)
     }    
 
 }

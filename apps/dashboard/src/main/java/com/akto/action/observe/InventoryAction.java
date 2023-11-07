@@ -1,17 +1,27 @@
 package com.akto.action.observe;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.*;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.Main;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.Constants;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -26,6 +36,7 @@ import org.bson.conversions.Bson;
 
 import java.net.URI;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class InventoryAction extends UserAction {
 
@@ -512,6 +523,26 @@ public class InventoryAction extends UserAction {
                     filterList.add(Filters.lte(key, (long) (Context.now()) - ll.get(0) * 86400L));
                     filterList.add(Filters.gte(key, (long) (Context.now()) - ll.get(1) * 86400L));
                     break;
+                case "location":
+                    boolean isHeader = value.contains("header");
+                    boolean isUrlParam = value.contains("urlParam");
+                    boolean isPayload = value.contains("payload");
+                    ArrayList<Bson> locationFilters = new ArrayList<>();
+                    if (isHeader) {
+                        locationFilters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
+                    }
+                    if (isUrlParam) {
+                        locationFilters.add(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+                    }
+                    if (isPayload) {
+                        locationFilters.add(Filters.and(
+                                Filters.eq(SingleTypeInfo._IS_HEADER, false),
+                                Filters.or(
+                                        Filters.exists(SingleTypeInfo._IS_URL_PARAM, false),
+                                        Filters.eq(SingleTypeInfo._IS_URL_PARAM, false))));
+                    }
+                    filterList.add(Filters.or(locationFilters));
+                    break;
                 default: 
                     switch (operator) {
                         case "OR":
@@ -585,6 +616,115 @@ public class InventoryAction extends UserAction {
         response.put("subTypeCountMap", subTypeCountMap);
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String deMergeApi() {
+        if (this.url == null || this.url.length() == 0) {
+            addActionError("URL can't be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        if (this.method == null || this.method.length() == 0) {
+            addActionError("Method can't be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        Method urlMethod = null;
+        try {
+            urlMethod = Method.valueOf(method);
+        } catch (Exception e) {
+            addActionError("Invalid Method");
+            return ERROR.toUpperCase();
+        }
+
+        if (!APICatalog.isTemplateUrl(this.url)) {
+            addActionError("Only merged URLs can be de-merged");
+            return ERROR.toUpperCase();
+        }
+
+
+        SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
+        List<String> samples = sampleData.getSamples();
+        loggerMaker.infoAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+
+        Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
+        SingleTypeInfoDao.instance.deleteAll(stiFilter);
+
+        Bson sampleDataFilter = SampleDataDao.filterForSampleData(apiCollectionId, url, urlMethod);
+        ApiInfoDao.instance.deleteAll(sampleDataFilter);
+        SampleDataDao.instance.deleteAll(sampleDataFilter);
+        SensitiveSampleDataDao.instance.deleteAll(sampleDataFilter);
+        TrafficInfoDao.instance.deleteAll(sampleDataFilter);
+
+        loggerMaker.infoAndAddToDb("Cleanup done", LogDb.DASHBOARD);
+
+        List<HttpResponseParams> responses = new ArrayList<>();
+        for (String sample : samples) {
+            try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpResponseParams.requestParams.setApiCollectionId(apiCollectionId);
+                responses.add(httpResponseParams);
+            } catch (Exception e) {
+                loggerMaker.infoAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null) {
+            Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            Main.changeTargetCollection(apiCollectioNameMapper, responses);
+        }
+
+        int accountId = Context.accountId.get();
+
+        AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+        if (info == null) { // account created after docker run
+            info = new AccountHTTPCallParserAktoPolicyInfo();
+            HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+            info.setHttpCallParser(callParser);
+            info.setPolicy(new AktoPolicyNew(false));
+            info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
+            RuntimeListener.accountHTTPParserMap.put(accountId, info);
+        }
+
+        // because changes were made to db and apiCatalogSync doesn't have latest data
+        info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+        info.getPolicy().buildFromDb(false);
+
+        try {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.GET);
+            if (info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId) != null) {
+                RequestTemplate requestTemplate = info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId).getTemplateURLToMethods().get(urlTemplate);
+                loggerMaker.infoAndAddToDb("Request template exists for url " + urlTemplate.getTemplateString() + " : " + ( requestTemplate != null), LogDb.DASHBOARD);
+            } else {
+                loggerMaker.infoAndAddToDb("Clean dbState for apiCollectionId: " + apiCollectionId,LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while checking requestTemplate: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        loggerMaker.infoAndAddToDb("Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+
+        responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
+        loggerMaker.infoAndAddToDb("After filter: Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+        try {
+            info.getHttpCallParser().syncFunction(responses, true, false);
+        } catch (Exception e) {
+            addActionError("Error in httpCallParser : " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            info.getPolicy().main(responses, true, false);
+        } catch (Exception e) {
+            addActionError("Error in aktoPolicy : " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+
+        return SUCCESS.toUpperCase();
     }
 
     public String getSortKey() {

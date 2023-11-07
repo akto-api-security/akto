@@ -55,6 +55,7 @@ public class JwtKvModifier extends JwtModifier{
 
         encodedModifiedPayload = Base64.getEncoder().encodeToString(modifiedPayloadStr.getBytes(StandardCharsets.UTF_8));
         if (encodedModifiedPayload.endsWith("=")) encodedModifiedPayload = encodedModifiedPayload.substring(0, encodedModifiedPayload.length()-1);
+        if (encodedModifiedPayload.endsWith("=")) encodedModifiedPayload = encodedModifiedPayload.substring(0, encodedModifiedPayload.length()-1);
 
         return jwtArr[0] + "." + encodedModifiedPayload + "." + jwtArr[2];
     }

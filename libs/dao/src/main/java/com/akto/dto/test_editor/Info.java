@@ -22,9 +22,12 @@ public class Info {
 
     private List<String> references;
 
+    private List<String> cwe;
+
+    private List<String> cve;
 
     public Info(String name, String description, String details, String impact, Category category, String subCategory,
-            String severity, List<String> tags, List<String> references) {
+            String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve) {
         this.name = name;
         this.description = description;
         this.details = details;
@@ -34,6 +37,8 @@ public class Info {
         this.severity = severity;
         this.tags = tags;
         this.references = references;
+        this.cwe = cwe;
+        this.cve = cve;
     }
 
     public Info() { }
@@ -109,4 +114,21 @@ public class Info {
     public void setReferences(List<String> references) {
         this.references = references;
     }
+
+    public List<String> getCwe() {
+        return cwe;
+    }
+
+    public void setCwe(List<String> cwe) {
+        this.cwe = cwe;
+    }
+
+    public List<String> getCve() {
+        return cve;
+    }
+
+    public void setCve(List<String> cve) {
+        this.cve = cve;
+    }
+
 }

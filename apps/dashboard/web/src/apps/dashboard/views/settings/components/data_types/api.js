@@ -43,6 +43,16 @@ export default {
         })
     },
 
+    resetDataType(name) {
+        return request({
+            url: '/api/resetDataType',
+            method: 'post',
+            data: {
+                name
+            }
+        })
+    },
+
     saveAktoDataType(name,sensitiveAlways,sensitivePosition) {
         return request({
             url:'/api/saveAktoDataType',

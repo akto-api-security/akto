@@ -1,0 +1,3 @@
+${akto-image-tag}
+${akto-build-time}
+${akto-release-version}

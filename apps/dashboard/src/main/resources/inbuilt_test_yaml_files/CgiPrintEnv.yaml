@@ -13,6 +13,10 @@ info:
   severity: MEDIUM
   references:
     - https://www.acunetix.com/vulnerabilities/web/test-cgi-script-leaking-environment-variables/
+  cwe:
+    - CWE-16
+  cve:
+    - CVE-2023-22897
 
 api_selection_filters:
   response_code:

@@ -6,6 +6,7 @@ import org.junit.Test;
 import com.akto.test_editor.execution.VariableResolver;
 import com.mongodb.BasicDBObject;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
@@ -69,5 +70,17 @@ public class TestUtils {
         Assert.assertEquals(11, actualObj);
 
 
+    }
+    @Test
+    public void testEncodeDecode() {
+        String orig = "some string this is really a big string you can't imagine";
+        for(int i = 0; i < 200; i ++) {
+            String modified = orig + i;
+            String encoded = Base64.getEncoder().encodeToString(modified.getBytes(StandardCharsets.UTF_8));
+            new String(Base64.getDecoder().decode(encoded));
+            if (encoded.endsWith("=")) encoded = encoded.substring(0, encoded.length()-1);
+            if (encoded.endsWith("=")) encoded = encoded.substring(0, encoded.length()-1);
+            new String(Base64.getDecoder().decode(encoded));
+        }
     }
 }

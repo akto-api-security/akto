@@ -25,11 +25,13 @@ public class TestConfig {
     private int updateTs;
 
     private Strategy strategy;
+    private boolean inactive;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation, Strategy strategy) {
         
         this.id = id;
+        info.setSubCategory(id);
         this.info = info;
         this.auth = auth;
         this.apiSelectionFilters = apiSelectionFilters;
@@ -129,4 +131,11 @@ public class TestConfig {
         this.strategy = strategy;
     }
     
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
+    }
 }

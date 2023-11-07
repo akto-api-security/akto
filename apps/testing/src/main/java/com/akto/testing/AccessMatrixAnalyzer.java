@@ -6,11 +6,14 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
@@ -72,7 +75,7 @@ public class AccessMatrixAnalyzer {
         return ret;
     }
 
-    public void run() {
+    public void run() throws Exception {
         Bson pendingTasks = Filters.lt(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now());
         for(AccessMatrixTaskInfo task: AccessMatrixTaskInfosDao.instance.findAll(pendingTasks)) {
             loggerMaker.infoAndAddToDb("Running task: " + task.toString(),LogDb.TESTING);
@@ -92,16 +95,21 @@ public class AccessMatrixAnalyzer {
 
             Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
-            List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+            String roleFromTask = task.getEndpointLogicalGroupName().substring(0, task.getEndpointLogicalGroupName().length()-EndpointLogicalGroup.GROUP_NAME_SUFFIX.length());
+            loggerMaker.infoAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
+            List<TestRoles> testRoles = TestRolesDao.instance.findAll(TestRoles.NAME, roleFromTask);
 
             AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
             AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-            TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"");
+            List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+            TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"", customAuthTypes);
 
             BFLATest bflaTest = new BFLATest();
 
             if(endpoints!=null && !endpoints.isEmpty()){
                 for(ApiInfoKey endpoint: endpoints){
+                    loggerMaker.infoAndAddToDb("Started checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
+
                     List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(endpoint);
                     if (messages!=null){
 
@@ -109,6 +117,7 @@ public class AccessMatrixAnalyzer {
                             bflaTest.updateAllowedRoles(rawApi, endpoint, testingUtil);
                         }
                     }
+                    loggerMaker.infoAndAddToDb("Finished checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
                 }
             }
             Bson q = Filters.eq(Constants.ID, task.getId());
@@ -117,6 +126,7 @@ public class AccessMatrixAnalyzer {
                 Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now() + task.getFrequencyInSeconds())
             );
             AccessMatrixTaskInfosDao.instance.updateOne(q, update);
+            loggerMaker.infoAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
         }
     }
 }

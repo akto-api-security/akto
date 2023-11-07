@@ -120,6 +120,17 @@
                     Save
                   </v-btn>
                 </div>
+                <div style="padding: 12px">
+                    <v-btn
+                        @click="resetDataType"
+                        color="#white"
+                        class="review-btn"
+                        height="40px"
+                        width="100px"
+                    >
+                        Reset
+                    </v-btn>
+                </div>
                 <div v-if="data_type_copy.id || data_type_copy.createNew" style="padding: 12px">
                   <v-btn
                         @click="reviewCustomDataType"
@@ -157,6 +168,7 @@ import OperatorComponent from './OperatorComponent.vue'
 import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/components/ReviewTable";
 import {mapState} from "vuex";
 import func from "@/util/func";
+import api from "../api.js"
 export default {
     name: "DataTypeDetails",
     props: {
@@ -246,6 +258,21 @@ export default {
               .catch((err) => {
                 this.reviewLoading = false
               })
+        },
+        resetDataType() {
+              window._AKTO.$emit('SHOW_SNACKBAR', {
+                  show: true,
+                  text: 'Datatype reset started!',
+                  color: 'green'
+              });
+
+            api.resetDataType(this.data_type_copy.name).then((resp) => {
+              window._AKTO.$emit('SHOW_SNACKBAR', {
+                  show: true,
+                  text: 'Datatype reset completed!',
+                  color: 'green'
+              });
+            })
         }
     },
     mounted() {

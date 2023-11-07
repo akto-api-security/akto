@@ -24,7 +24,13 @@ public class User {
     private Message.Mode preferredChannel;
     private Map<String, SignupInfo> signupInfoMap;
     public static final String SIGNUP_INFO_MAP = "signupInfoMap";
+    public static final String AKTO_UI_MODE = "aktoUIMode";
+    private AktoUIMode aktoUIMode;
 
+    public enum AktoUIMode {
+        VERSION_1,//
+        VERSION_2
+    }
     public User() {}
 
     public User(String name, String login, Map<String, UserAccountEntry> accounts, Map<String, SignupInfo> signupInfoMap,
@@ -130,5 +136,16 @@ public class User {
 
     public void setLastLoginTs(int lastLoginTs) {
         this.lastLoginTs = lastLoginTs;
+    }
+
+    public AktoUIMode getAktoUIMode() {
+        if (aktoUIMode == null) {
+            return AktoUIMode.VERSION_1;
+        }
+        return aktoUIMode;
+    }
+
+    public void setAktoUIMode(AktoUIMode aktoUIMode) {
+        this.aktoUIMode = aktoUIMode;
     }
 }

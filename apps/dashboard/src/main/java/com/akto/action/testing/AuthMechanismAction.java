@@ -8,6 +8,7 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.TestExecutor;
+import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -40,6 +41,8 @@ public class AuthMechanismAction extends UserAction {
     private ArrayList<Object> responses;
 
     private String nodeId;
+
+    private BasicDBObject authMechanismDoc;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
@@ -141,6 +144,12 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchAuthMechanismDataDoc() {
+        authMechanismDoc = AuthMechanismsDao.instance.findOneDocument(new BasicDBObject());
+        authMechanismDoc.put(AuthMechanism.OBJECT_ID,authMechanismDoc.get(Constants.ID).toString());
+        return SUCCESS.toUpperCase();
+    }
+    
     private int workflowTestId;
     private WorkflowTestResult workflowTestResult;
     private TestingRun workflowTestingRun;
@@ -220,6 +229,14 @@ public class AuthMechanismAction extends UserAction {
 
     public void setNodeId(String nodeId) {
         this.nodeId = nodeId;
+    }
+    
+    public BasicDBObject getAuthMechanismDoc() {
+        return authMechanismDoc;
+    }
+
+    public void setAuthMechanismDoc(BasicDBObject authMechanismDoc) {
+        this.authMechanismDoc = authMechanismDoc;
     }
     
 }

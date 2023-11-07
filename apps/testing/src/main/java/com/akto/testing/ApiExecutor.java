@@ -25,13 +25,30 @@ public class ApiExecutor {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
+            int i = 0;
+            boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
+                if(rateLimitHit){
+                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                }
+                rateLimitHit = false;
                 Thread.sleep(1000);
+                i++;
+
+                if (i%30 == 0) {
+                    loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                }
             }
         }
 
+        boolean isSaasDeployment = "true".equals(System.getenv("IS_SAAS"));
+
+        if (HTTPClientHandler.instance == null) {
+            HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
+        }
+        
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
-        if (!HostDNSLookup.isRequestValid(request.url().host())) {
+        if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
 
@@ -161,6 +178,7 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
+        loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
 
         return response;
     }

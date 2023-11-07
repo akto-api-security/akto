@@ -6,12 +6,15 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
@@ -19,14 +22,12 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.store.AuthMechanismStore;
-import com.akto.store.SampleMessageStore;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -42,6 +43,10 @@ public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
+
+    public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
+    public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
     private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId summaryId = new ObjectId();
@@ -96,6 +101,7 @@ public class Main {
 
         return ret;
     }
+    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
 
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -120,11 +126,15 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(account -> {
                     AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                    matrixAnalyzer.run();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
                 },"matrix-analyser-task");
             }
         }, 0, 1, TimeUnit.MINUTES);
@@ -162,6 +172,7 @@ public class Main {
                 }
 
 
+                ObjectId summaryId = null;
                 try {
                     long timestamp = testingRun.getId().getTimestamp();
                     long seconds = Context.now() - timestamp;
@@ -175,7 +186,27 @@ public class Main {
                             loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
                         }
                     }
-                    ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
+                    if(testingRun.getState().equals(TestingRun.State.RUNNING)){
+                        Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
+                        TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
+                        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
+                        if(testingRunResults != null && !testingRunResults.isEmpty()){
+                            TestingRunResult testingRunResult = testingRunResults.get(0);
+                            if(Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA){
+                                loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                return;
+                            } else {
+                                loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                            }
+                        } else {
+                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                        }
+                    }
+                    summaryId = createTRRSummaryIfAbsent(testingRun, start);
                     TestExecutor testExecutor = new TestExecutor();
                     testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
@@ -198,6 +229,10 @@ public class Main {
                 TestingRunDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", testingRun.getId()),  completedUpdate
                 );
+
+                if(summaryId != null && testingRun.getTestIdConfig() != 1){
+                    TestExecutor.updateTestSummary(summaryId);
+                }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
             }, "testing");

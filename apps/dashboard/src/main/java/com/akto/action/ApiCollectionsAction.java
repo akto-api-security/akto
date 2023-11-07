@@ -16,6 +16,7 @@ import com.akto.dto.ApiCollectionTestStatus;
 import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Sorts;
@@ -71,6 +72,12 @@ public class ApiCollectionsAction extends UserAction {
             apiCollection.setUrls(new HashSet<>());
         }
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchCollection() {
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -3,11 +3,8 @@ package com.akto.dto;
 import com.mongodb.BasicDBObject;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
-import java.security.*;
-import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.Map;
 
 @BsonDiscriminator
 public abstract class SignupInfo {
@@ -387,4 +384,55 @@ public abstract class SignupInfo {
         }
     }
 
+    public static class GithubSignupInfo extends SignupInfo {
+        private String accessToken;
+        private String refreshToken;
+        private int refreshTokenExpiry;
+        private String username;
+
+        public GithubSignupInfo() {
+
+        }
+
+        public GithubSignupInfo(String accessToken, String refreshToken, int refreshTokenExpiry, String username) {
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+            this.refreshTokenExpiry = refreshTokenExpiry;
+            this.username = username;
+            this.configType = Config.ConfigType.GITHUB;
+            this.key = this.configType.name();
+        }
+
+        public String getAccessToken() {
+            return accessToken;
+        }
+
+        public void setAccessToken(String accessToken) {
+            this.accessToken = accessToken;
+        }
+
+        public String getRefreshToken() {
+            return refreshToken;
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+        }
+
+        public int getRefreshTokenExpiry() {
+            return refreshTokenExpiry;
+        }
+
+        public void setRefreshTokenExpiry(int refreshTokenExpiry) {
+            this.refreshTokenExpiry = refreshTokenExpiry;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+    }
 }

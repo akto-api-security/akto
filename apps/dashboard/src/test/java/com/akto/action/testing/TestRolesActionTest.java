@@ -66,6 +66,7 @@ public class TestRolesActionTest extends MongoBasedTest {
         assertEquals("admin", role.getName());
 
         action.setAuthParamData(Arrays.asList(new AuthParamData(Location.HEADER, "Authorization", "value2", null)));
+        action.setAuthAutomationType("HARDCODED");
         action.addAuthMechanism(role);
         list.clear();
         list.add(new BasicDBObject()
