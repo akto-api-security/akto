@@ -252,7 +252,6 @@ const transform = {
             return{
                 ...c,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
-                displayNameComp: <Box minWidth="235px" maxWidth="330px"><TooltipText text={c.displayName} tooltip={c.displayName} /></Box>,
             }
         })
 
