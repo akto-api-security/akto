@@ -92,28 +92,29 @@ public class SaveTestEditorAction extends UserAction {
             // adding all fields check for info in editor
             InfoParser parser = new InfoParser();
             Info convertedInfo = parser.parse(info);
-            Set<String> unNecessaryFields = new HashSet<>();
-            unNecessaryFields.add("tags");
-            unNecessaryFields.add("cwe");
-            unNecessaryFields.add("references");
+            Set<String> optionalFields = new HashSet<>();
+            optionalFields.add(Info._TAGS);
+            optionalFields.add(Info._REFERENCES);
+            optionalFields.add(Info._CWE);
+            optionalFields.add(Info._CVE);
             List<String> fields = new ArrayList<>();
             boolean anyFieldNull = Arrays.stream(Info.class.getDeclaredFields()).anyMatch(field -> {
                 try {
-                    if(!unNecessaryFields.contains(field.getName())){
+                    if(!optionalFields.contains(field.getName())){
                         field.setAccessible(true);
                         if(field.get(convertedInfo) == null){
                             fields.add(field.getName());
                             return true;
-                        }else if(field.getName() == "category"){
+                        }else if(field.getName() == Info._CATEGORY){
                             Category category = (Category) field.get(convertedInfo);
                             if(category.getDisplayName() == null){
-                                fields.add("Category's displayname");
+                                fields.add("Category's displayName");
                                 return true;
                             }else if(category.getName() == null){
                                 fields.add("Category's name");
                                 return true;
                             }else if(category.getShortName() == null){
-                                fields.add("Category's shortname");
+                                fields.add("Category's shortName");
                                 return true;
                             }
                         }{
@@ -128,11 +129,11 @@ public class SaveTestEditorAction extends UserAction {
                 }
             });
             if (info == null || anyFieldNull) {
-                String message = fields.size() > 0 ? "Error in template: " + fields.get(0) + " absent" : "Error in template: info key absent";
+                String absentField = fields.isEmpty() ? TestConfig._INFO : String.join(", ", fields);
+                String message = "Error in template: " + absentField + " absent";
                 addActionError(message);
                 return ERROR.toUpperCase();
             }
-
 
             Map<String, Object> infoMap = (Map<String, Object>) info;
 
