@@ -1338,14 +1338,28 @@ public class InitializerListener implements ServletContextListener {
                             int updatedAt = Context.now();
                             String author = "AKTO";
 
-                            YamlTemplateDao.instance.updateOne(
-                                    Filters.eq("_id", id),
-                                    Updates.combine(
+                            List<Bson> updates = new ArrayList<>(
+                                    Arrays.asList(
                                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
                                             Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
+                            
+                            try {
+                                Object inactiveObject = TestConfigYamlParser.getFieldIfExists(templateContent,
+                                        YamlTemplate.INACTIVE);
+                                if (inactiveObject != null && inactiveObject instanceof Boolean) {
+                                    boolean inactive = (boolean) inactiveObject;
+                                    updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
+                                }
+                            } catch (Exception e) {
+                            }
+
+                            YamlTemplateDao.instance.updateOne(
+                                    Filters.eq(Constants.ID, id),
+                                    Updates.combine(updates));
+
                         }
                     }
 
