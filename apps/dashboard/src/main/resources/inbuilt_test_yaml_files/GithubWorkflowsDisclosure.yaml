@@ -15,6 +15,10 @@ info:
     - https://github.com/detectify/ugly-duckling/blob/master/modules/crowdsourced/github-workflows-disclosure.json
   cwe:
     - CWE-16
+    - CWE-200
+  cve:
+    - CVE-2023-34111
+    - CVE-2022-46258
 
 api_selection_filters:
   response_code:

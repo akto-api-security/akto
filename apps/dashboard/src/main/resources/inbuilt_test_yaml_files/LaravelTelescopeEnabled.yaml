@@ -28,6 +28,7 @@ info:
     - "https://laravel.com/docs/10.x/telescope"
   cwe:
     - CWE-16
+    - CWE-215
 
 api_selection_filters:
   response_code:

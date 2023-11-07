@@ -4,7 +4,7 @@ import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
 import { Avatar, Box, Button,Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon, Badge, List, Link } from '@shopify/polaris'
-import {FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor, CreditCardSecureMajor} from "@shopify/polaris-icons"
+import {FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor, CreditCardSecureMajor, FraudProtectMajor} from "@shopify/polaris-icons"
 import func from '@/util/func'
 import './styles.css'
 import transform from '../transform';
@@ -32,6 +32,11 @@ function ExportHtml() {
         {
             icon: CreditCardSecureMajor,
             title: "CWE",
+            content: ""
+        },
+        {
+            icon: FraudProtectMajor,
+            title: "CVE",
             content: ""
         },
         {
@@ -183,85 +188,7 @@ function ExportHtml() {
     }
 
     const fillContent = (item) => {
-        let filledSection = []
-        moreInfoSections.forEach((section) => {
-            let sectionLocal = {}
-            sectionLocal.icon = section.icon
-            sectionLocal.title = section.title
-            switch(section.title) {
-                case "Description":
-                    sectionLocal.content = (
-                        <Text color='subdued'>
-                          {replaceTags(item.category.issueDetails, item.category.vulnerableTestingRunResults) || "No impact found"}
-                        </Text>
-                      )
-                    break;
-                case "Impact":
-                    sectionLocal.content = (
-                        <Text color='subdued'>
-                          {item.category.issueImpact || "No impact found"}
-                        </Text>
-                      )
-                    break;
-                case "Tags":
-                    sectionLocal.content = (
-                        <HorizontalStack gap="2">
-                          {
-                            item?.category?.issueTags?.map((tag, index) => {
-                              return (
-                                <Badge progress="complete" key={index}>{tag}</Badge>
-                              )
-                            })
-                          }
-                        </HorizontalStack>
-                      )
-                    
-                    break;
-                case "CWE":
-                    sectionLocal.content = (
-                        <HorizontalStack gap="2">
-                            {
-                                transform.tagList(item?.category?.cwe, true)
-                            }
-                        </HorizontalStack>
-                        )
-                    break;
-                case "References":
-                    sectionLocal.content = (
-                        <List type='bullet' spacing="extraTight">
-                          {
-                            item?.category?.references?.map((reference) => {
-                              return (
-                                <List.Item key={reference}>
-                                  <Link key={reference} url={reference} monochrome removeUnderline>
-                                    <Text color='subdued'>
-                                      {reference}
-                                    </Text>
-                                  </Link>
-                                </List.Item>
-                              )
-                            })
-                          }
-                        </List>
-                      )
-                    break;
-            }
-            filledSection.push(sectionLocal)
-        })
-        return filledSection
-    }
-
-    const replaceTags = (details, vulnerableRequests) => {
-        let percentageMatch = 0;
-        vulnerableRequests?.forEach((request) => {
-            let testRun = request['testResults']
-            testRun?.forEach((runResult) => {
-                if (percentageMatch < runResult.percentageMatch) {
-                    percentageMatch = runResult.percentageMatch
-                }
-            })
-        })
-        return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
+        return transform.fillMoreInformation(item.category, moreInfoSections);
     }
 
 

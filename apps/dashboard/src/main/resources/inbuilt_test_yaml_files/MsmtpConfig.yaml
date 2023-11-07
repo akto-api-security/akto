@@ -15,6 +15,8 @@ info:
     - https://wiki.archlinux.org/title/Msmtp
   cwe:
     - CWE-16
+  cve:
+    - CVE-2019-8337
 
 api_selection_filters:
   response_code:

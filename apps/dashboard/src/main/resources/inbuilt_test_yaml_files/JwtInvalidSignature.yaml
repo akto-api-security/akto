@@ -27,6 +27,10 @@ info:
     - "https://portswigger.net/kb/issues/00200900_jwt-signature-not-verified#:~:text=Description%3A%20JWT%20signature%20not%20verified&text=However%2C%20some%20servers%20fail%20to,privileges%20or%20impersonate%20other%20users."
   cwe:
     - CWE-287
+    - CWE-295
+  cve:
+    - CVE-2022-25898
+    - CVE-2021-29455
 
 auth:
   authenticated: true

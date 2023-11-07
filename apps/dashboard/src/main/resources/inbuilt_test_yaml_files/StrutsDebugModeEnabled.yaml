@@ -26,7 +26,7 @@ info:
     - "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
     - "https://struts.apache.org/core-developers/development-mode"
   cwe:
-    - CWE-16
+    - CWE-215
 
 api_selection_filters:
   response_code:

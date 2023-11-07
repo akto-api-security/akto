@@ -8,6 +8,7 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestResult.TestError;
 
 import java.util.Collections;
 
@@ -62,6 +63,10 @@ public abstract class SecurityTestTemplate {
             return testResults;
         }
         List<TestResult> attempts = executor();
+        if(attempts == null || attempts.isEmpty()){
+            attempts = new ArrayList<>();
+            attempts.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.EXECUTION_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+        }
         return attempts;
     }
 

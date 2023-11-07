@@ -15,6 +15,8 @@ info:
     - https://pentester.land/blog/source-code-disclosure-via-exposed-git-folder/
   cwe:
     - CWE-16
+  cve:
+    - CVE-2023-29007
 
 api_selection_filters:
   response_code:

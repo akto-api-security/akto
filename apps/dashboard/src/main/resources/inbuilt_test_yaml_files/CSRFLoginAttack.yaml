@@ -23,6 +23,9 @@ info:
     - "https://www.invicti.com/web-vulnerability-scanner/vulnerabilities/cross-site-request-forgery-in-login-form-invicti/"
   cwe:
     - CWE-352
+  cve:
+    - CVE-2023-33212
+    - CVE-2023-42270
 
 api_selection_filters:
   response_code:
