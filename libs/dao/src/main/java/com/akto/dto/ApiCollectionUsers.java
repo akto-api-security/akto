@@ -179,6 +179,7 @@ public class ApiCollectionUsers {
         boolean doUpdate = true;
         int c = 0;
         int time = Context.now();
+        int accountId = Context.accountId.get();
         while (doUpdate) {
 
             List<Bson> pipeline = new ArrayList<>();
@@ -203,9 +204,9 @@ public class ApiCollectionUsers {
                 doUpdate = false;
             }
             c += Math.min(UPDATE_LIMIT , res.getModifiedCount());
-            logger.info("updated " + c + " " + collection.getCollName());
+            logger.info("updated " + c + " " + collection.getCollName() + " in account id: " + accountId);
         }
-        logger.info("Total time taken : " + (Context.now() - time));
+        logger.info("Total time taken : " + (Context.now() - time) + " for " + collection.getCollName() + " in account id: " + accountId);
     }
 
 }

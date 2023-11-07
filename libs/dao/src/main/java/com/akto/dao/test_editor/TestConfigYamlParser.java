@@ -14,6 +14,7 @@ import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.test_editor.TestConfig;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
@@ -120,6 +121,19 @@ public class TestConfigYamlParser {
 
         testConfig = new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, strategy);
         return testConfig;
+    }
+
+    public static Object getFieldIfExists(String content, String field) throws Exception {
+
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+        Map<String, Object> config = mapper.readValue(content, new TypeReference<Map<String, Object>>() {});
+
+        Object object = config.get(field);
+        if (object == null) {
+            return null;
+        }
+        return object;
     }
 
 }
