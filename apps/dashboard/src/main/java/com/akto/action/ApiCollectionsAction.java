@@ -46,10 +46,19 @@ public class ApiCollectionsAction extends UserAction {
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
+            int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
             if (count != null && apiCollection.getHostName() != null ) {
                 apiCollection.setUrlsCount(count);
+            } else if(apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+                int urlsCount = 0;
+                try {
+                    urlsCount = ApiCollectionUsers.getUrlsFromConditions(apiCollection.getConditions()).size();
+                } catch (Exception e) {
+                    urlsCount = fallbackCount;
+                }
+                apiCollection.setUrlsCount(urlsCount);
             } else {
-                apiCollection.setUrlsCount(apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0);
+                apiCollection.setUrlsCount(fallbackCount);
             }
             apiCollection.setUrls(new HashSet<>());
         }

@@ -68,7 +68,7 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static void updateApiCollection(List<CollectionCondition> conditions, int id) {
+    public static Set<String> getUrlsFromConditions(List<CollectionCondition> conditions){
         Set<ApiInfoKey> apis = new HashSet<>();
         conditions.forEach((condition) -> {
             apis.addAll(condition.returnApis());
@@ -78,6 +78,11 @@ public class ApiCollectionUsers {
         apis.forEach((api) -> {
             urls.add(api.getUrl() + " " + api.getMethod());
         });
+        return urls;
+    }
+
+    public static void updateApiCollection(List<CollectionCondition> conditions, int id) {
+        Set<String> urls = getUrlsFromConditions(conditions);
 
         ApiCollectionsDao.instance.updateOne(
                 Filters.eq(Constants.ID, id),

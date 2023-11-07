@@ -15,9 +15,10 @@ const headers = [
     {
         title: "API collection name",
         text: "API collection name",
-        value: "displayNameComp",
-        filterKey:"displayName",
+        value: "displayName",
+        maxWidth: "45vw",
         showFilter:true,
+        type: CellType.TEXT
     },
     {
         title: "Total endpoints",
