@@ -26,6 +26,8 @@ info:
   cwe:
     - CWE-88
     - CWE-235
+  cve:
+    - CVE-2019-13143
 
 auth:
   authenticated: true

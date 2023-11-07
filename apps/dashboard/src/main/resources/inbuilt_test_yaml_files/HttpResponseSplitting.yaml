@@ -21,6 +21,9 @@ info:
     - "https://www.invicti.com/blog/web-security/crlf-http-header/"
   cwe:
     - CWE-93
+    - CWE-113
+  cve:
+    - CVE-2023-41834
 
 api_selection_filters:
   query_param:
