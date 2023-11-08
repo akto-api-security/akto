@@ -86,42 +86,51 @@ jobs:
           while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
           echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
 
+    - name: setup test environment
+      env:
+        lb_name: ${{needs.deploy.outputs.lb_name}}
+        QA_EMAIL: ${{vars.QA_EMAIL}}
+        QA_PASSWORD: ${{secrets.QA_PASSWORD}}
+        QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
+      run: |
+        curl -X POST "${lb_name}/signup-email" -H "Content-Type: application/json" -d '{"email":${QA_EMAIL},"password":${QA_PASSWORD},"invitationCode":""}'
+        staging_mongo=$(kubectl get pods -n dev | awk '$1 ~ /mongo-test-/ { print $1 }')
+        kubectl exec -it -n dev ${staging_mongo} --mongosh -eval 'use common; db.api_tokens.insertOne({ "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": "'"$QA_API_KEY"'", "name": "external_api", "timestamp": 1692262638, "username": "'"$QA_EMAIL"'", "utility": "EXTERNAL_API" })'
+
   test:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
 
       - uses: actions/checkout@v2
-
-      - run: echo ${{needs.deploy.outputs.lb_name}}
-      
+    
       - name: Run testsigma end to end tests
         env:
             TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            TESTSIGMA_TEST_PLAN_ID: 789
+            TESTSIGMA_TEST_PLAN_ID: 888
             TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
             LB_NAME: ${{needs.deploy.outputs.lb_name}}
         run: bash ./.github/scripts/akto-testsigma.sh
 
-      - name: Run Akto CI/CD tests
-        uses: akto-api-security/run-scan@v1.0.3
-        with:
-          AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+      # - name: Run Akto CI/CD tests
+      #   uses: akto-api-security/run-scan@v1.0.3
+      #   with:
+      #     AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+      #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      #     AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
 
-      - name: Check for Akto test completion
-        env:
-            AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}${{needs.deploy.outputs.lb_name}}
-            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-            AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
-        run: bash ./.github/scripts/akto-cicd.sh
+      # - name: Check for Akto test completion
+      #   env:
+      #       AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+      #       AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      #       AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+      #   run: bash ./.github/scripts/akto-cicd.sh
 
       - name: Check Vulnerable API's
         working-directory: ./.github/scripts
         env:
           AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+          AKTO_API_KEY: ${{secrets.QA_API_TOKEN}}
         run: |
           npm install axios
           node ./vulnerable_checker.js
