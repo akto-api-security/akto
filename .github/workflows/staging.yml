@@ -125,7 +125,7 @@ jobs:
     steps:
     - name: Fetch kube yaml
       env:
-        IMAGE_TAG: ${{needs.deploy.outputs.IMAGE_TAG}}
+        IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
         export SETUP_SUFFIX=$IMAGE_TAG
