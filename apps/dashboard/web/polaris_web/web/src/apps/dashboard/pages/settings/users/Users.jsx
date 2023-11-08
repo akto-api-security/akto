@@ -98,7 +98,7 @@ const Users = () => {
                                         content: 'Remove user',
                                         onAction: () => {handleRemoveUser(login)},
                                     },
-                                    ( role === "MEMBER" ) &&
+                                    ( role.toUpperCase() === "MEMBER" ) &&
                                     {
                                         content: 'Make admin',
                                         onAction: () => {handleMakeAdmin(login)},
