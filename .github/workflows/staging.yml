@@ -88,12 +88,11 @@ jobs:
 
     - name: setup test environment
       env:
-        lb_name: ${{needs.deploy.outputs.lb_name}}
         QA_EMAIL: ${{vars.QA_EMAIL}}
         QA_PASSWORD: ${{secrets.QA_PASSWORD}}
         QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
       run: |
-        curl -X POST "${lb_name}/signup-email" -H "Content-Type: application/json" -d '{"email":${QA_EMAIL},"password":${QA_PASSWORD},"invitationCode":""}'
+        curl -X POST "${LB_NAME}/signup-email" -H "Content-Type: application/json" -d '{"email":${QA_EMAIL},"password":${QA_PASSWORD},"invitationCode":""}'
         staging_mongo=$(kubectl get pods -n dev | awk '$1 ~ /mongo-test-/ { print $1 }')
         kubectl exec -it -n dev ${staging_mongo} --mongosh -eval 'use common; db.api_tokens.insertOne({ "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": "'"$QA_API_KEY"'", "name": "external_api", "timestamp": 1692262638, "username": "'"$QA_EMAIL"'", "utility": "EXTERNAL_API" })'
 
