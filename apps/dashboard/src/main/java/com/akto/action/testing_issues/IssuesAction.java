@@ -17,6 +17,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -36,6 +38,9 @@ import static com.akto.util.Constants.ID;
 import static com.akto.util.enums.GlobalEnums.*;
 
 public class IssuesAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class);
+
     private List<TestingRunIssues> issues;
     private TestingIssuesId issueId;
     private List<TestingIssuesId> issueIdArray;
@@ -222,9 +227,14 @@ public class IssuesAction extends UserAction {
         Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
-            BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
-            if (infoObj != null) {
-                subCategories.add(infoObj);
+            try {
+                BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
+                if (infoObj != null) {
+                    subCategories.add(infoObj);
+                }
+            } catch (Exception e) {
+                String err = "Error while fetching subcategories for " + entry.getKey();
+                loggerMaker.errorAndAddToDb(err, LogDb.DASHBOARD);
             }
         }
 
