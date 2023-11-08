@@ -3,6 +3,7 @@ package com.akto.runtime;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -728,16 +729,24 @@ public class APICatalogSync {
             }
         }
 
-        mergeApiInfo(apiCollectionId, strictURLs, templateURLs);
-        mergeSampleData(apiCollectionId, strictURLs, templateURLs);
+        Map<ApiInfoKey, ApiInfoKey> apiInfoKeyMapping = mergeApiInfoAndDeleteSampleData(apiCollectionId, strictURLs, templateURLs);
+        mergeSampleData(apiInfoKeyMapping);
     }
 
 
-    public static void mergeApiInfo(int apiCollectionId, Set<URLStatic> strictURLs, Set<URLTemplate> templateURLs ) {
-        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id."+ ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiCollectionId));
+    public static Map<ApiInfoKey, ApiInfoKey> mergeApiInfoAndDeleteSampleData(int apiCollectionId, Set<URLStatic> strictURLs, Set<URLTemplate> templateURLs ) {
+        // call in batch of 20000
+        int limit = 20000, cnt = 20000, offset = 0;
+        List<ApiInfo> apiInfoList = new ArrayList<>();
+        while (cnt == 20000) {
+            apiInfoList.addAll(ApiInfoDao.instance.findAll(Filters.eq("_id."+ ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiCollectionId), offset, limit, null));
+            cnt = apiInfoList.size();
+            if (cnt <= 20000) {
+                break;
+            }
+        }
 
         Set<ApiInfo> deleteStaticUrls = new HashSet<>();
-        Set<ApiInfo> withoutSlashStaticUrls = new HashSet<>();
         Map<ApiInfo.ApiInfoKey, Set<ApiInfo>> templateToStaticURLs = new HashMap<>();
 
         Set<ApiInfo.ApiInfoKey> templateKeys = new HashSet<>();
@@ -754,10 +763,6 @@ public class APICatalogSync {
             } else {
                 URLStatic urlStatic = new URLStatic(url, method);
                 if (!strictURLs.contains(urlStatic)) {
-                    if (url.startsWith("/")  && strictURLs.contains(new URLStatic(url.substring(1), method))) {
-                        withoutSlashStaticUrls.add(apiInfo);
-                        break;
-                    }
 
                     boolean delete = true;
                     for (URLTemplate urlTemplateFromSTI: templateURLs) {
@@ -779,16 +784,14 @@ public class APICatalogSync {
 
         }
 
-        // delete static urls
         ArrayList<WriteModel<ApiInfo>> bulkWrites = new ArrayList<>();
+        ArrayList<WriteModel<ApiInfo>> bulkDeletes = new ArrayList<>();
+        ArrayList<WriteModel<SampleData>> bulkDeletesSampleData = new ArrayList<>();
+        Map<ApiInfoKey, ApiInfoKey> apiInfoKeyMapping = new HashMap<>();
         for (ApiInfo apiInfo: deleteStaticUrls) {
             Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
-            bulkWrites.add(new DeleteManyModel<>(filter));
-        }
-
-        // modify without slash static urls
-        for (ApiInfo apiInfo: withoutSlashStaticUrls) {
-            bulkWrites.add(new InsertOneModel<>(apiInfo));
+            bulkDeletes.add(new DeleteManyModel<>(filter));
+            bulkDeletesSampleData.add(new DeleteManyModel<>(filter));
         }
 
         // merge
@@ -800,22 +803,41 @@ public class APICatalogSync {
             boolean isFirst = true;
             for (ApiInfo apiInfo: apiInfos) {
                 if (isFirst) {
-                    bulkWrites.add(new DeleteManyModel<>(ApiInfoDao.getFilter(apiInfo.getId())));
+                    bulkDeletes.add(new DeleteManyModel<>(ApiInfoDao.getFilter(apiInfo.getId())));
+                    apiInfoKeyMapping.put(apiInfo.getId(), apiInfoKey);
                     apiInfo.setId(apiInfoKey);
                     bulkWrites.add(new InsertOneModel<>(apiInfo));
                     isFirst = false;
                 } else {
-                    bulkWrites.add(new DeleteManyModel<>(ApiInfoDao.getFilter(apiInfo.getId())));
+                    Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
+                    bulkDeletes.add(new DeleteManyModel<>(filter));
+                    bulkDeletesSampleData.add(new DeleteManyModel<>(filter));
                 }
             }
         }
 
+        if (bulkDeletes.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(bulkDeletes, new BulkWriteOptions().ordered(false));
+        if (bulkDeletesSampleData.size() > 0) SampleDataDao.instance.getMCollection().bulkWrite(bulkDeletesSampleData, new BulkWriteOptions().ordered(false));
         if (bulkWrites.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(bulkWrites, new BulkWriteOptions().ordered(false));
 
+        return apiInfoKeyMapping;
     }
 
-    public static void mergeSampleData(int apiCollectionId, Set<URLStatic> strictURLs, Set<URLTemplate> templateURLs ) {
+    public static void mergeSampleData(Map<ApiInfoKey, ApiInfoKey> apiInfoKeyMapping) {
 
+        ArrayList<WriteModel<SampleData>> bulkWritesSampleData = new ArrayList<>();
+        ArrayList<WriteModel<SampleData>> bulkDeletesSampleData = new ArrayList<>();
+        for (Map.Entry<ApiInfoKey, ApiInfoKey> entry : apiInfoKeyMapping.entrySet()) {
+            ApiInfoKey apiInfoKey = entry.getKey();
+
+            SampleData sd = SampleDataDao.instance.findOne(ApiInfoDao.getFilter(apiInfoKey));
+            bulkDeletesSampleData.add(new DeleteManyModel<>(ApiInfoDao.getFilter(apiInfoKey)));
+            sd.getId().setUrl(entry.getValue().getUrl());
+            bulkWritesSampleData.add(new InsertOneModel<>(sd));
+        }
+
+        if (bulkDeletesSampleData.size() > 0) SampleDataDao.instance.getMCollection().bulkWrite(bulkDeletesSampleData, new BulkWriteOptions().ordered(false));
+        if (bulkWritesSampleData.size() > 0) SampleDataDao.instance.getMCollection().bulkWrite(bulkWritesSampleData, new BulkWriteOptions().ordered(false));
     }
 
     private void tryWithKnownURLTemplates(
