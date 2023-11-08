@@ -179,6 +179,14 @@ const team = {
                 }))
             })
         },
+        makeAdmin({commit, dispatch}, user) {
+            return api.makeAdmin(user.login).then(resp => {
+                api.getTeamData().then((resp) => {
+                    commit('SET_TEAM_DETAILS', resp)
+                })
+                return resp
+            })
+        },
         emptyState({commit, dispatch}) {
             commit('EMPTY_STATE')
         },
