@@ -168,7 +168,7 @@
                         failure: (err, item) => this.removedFailure(err, item)
                     },
                     {
-                        isValid: item => item.login != window.USER_NAME && ( item.role === "MEMBER" ) ,
+                        isValid: item => item.login != window.USER_NAME && ( item.role.toUpperCase() === "MEMBER" ) ,
                         icon: item => '$fas_bolt',
                         text: item => 'Make admin',
                         func: item => this.makeAdmin(item),
