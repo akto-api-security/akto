@@ -19,13 +19,6 @@ on:
           - akto_staging2
           - akto_staging3
         default: akto_staging1
-      # Environment:
-      #   required: true
-      #   type: choice
-      #   options:
-      #     - prod
-      #     - staging
-      #   default: staging
       Deploy:
         description: 'Deploy to flash staging'
         required: false
@@ -49,9 +42,10 @@ jobs:
           distribution: 'adopt'
           java-version: '8'
           architecture: x64
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: '17'
+          cache: 'npm'
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
@@ -130,9 +124,11 @@ jobs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
     - name: Fetch kube yaml
+      env:
+        IMAGE_TAG: ${{needs.deploy.outputs.IMAGE_TAG}}
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
-        export SETUP_SUFFIX=${{needs.deploy.outputs.IMAGE_TAG}}
+        export SETUP_SUFFIX=$IMAGE_TAG
         envsubst < single.yml > single_complete.yml
 
     - name: Configure AWS credentials
@@ -147,7 +143,6 @@ jobs:
       uses: davi020/kubectl-advanced@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-        IMAGE_TAG: ${{ github.sha }}
       with:
         command: |
           kubectl apply -f single_complete.yml
@@ -155,7 +150,7 @@ jobs:
           export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
           echo "lb_name=http://$LB_NAME:8080" >> "$GITHUB_OUTPUT"
-          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
+          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}/metrics)" != "200" ]]; do sleep 5; done
           echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
 
     - name: setup test environment
@@ -173,9 +168,11 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v2
-    
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '17'
+          cache: 'npm'
       - name: Run testsigma end to end tests
         env:
             TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
