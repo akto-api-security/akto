@@ -29,6 +29,15 @@ const settingRequests = {
             }
         })
     },
+    makeAdmin(email) {
+        return request({
+            url: '/api/makeAdmin',
+            method: 'post',
+            data: {
+                email: email
+            }
+        })
+    },
 
     
     fetchApiTokens() {
