@@ -29,6 +29,9 @@ api_selection_filters:
   response_code:
     gte: 200
     lt: 300
+  response_payload:
+    length:
+      extract: original_length
   url:
     extract: urlVar
   or:
@@ -52,3 +55,5 @@ validate:
   response_payload:
     percentage_match:
       gte: 90
+    length:
+      eq: ${original_length}

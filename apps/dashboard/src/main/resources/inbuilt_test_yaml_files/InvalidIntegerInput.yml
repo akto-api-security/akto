@@ -74,9 +74,8 @@ validate:
           - length:
               gt: 0
           - contains_either:
-              - ERROR
-              - Exception
-              - trace
-              - InvalidIntegerException
-              - Invalid
-              - Integer
+              - "Invalid integer value"
+              - "Integer value out of range"
+              - "Expected type integer but found type string"
+              - "Invalid format for integer type"
+              - "InvalidIntegerException"

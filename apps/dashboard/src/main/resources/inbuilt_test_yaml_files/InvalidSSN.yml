@@ -68,4 +68,12 @@ validate:
     percentage_match:
       gte: 90
     not_contains_either:
-      - "error"
+      - "Invalid SSN format"
+      - "SSN must be 9 digits"
+      - "Invalid SSN value"
+      - "Expected type SSN but found type string"
+      - "Invalid SSN: SSN contains non-numeric characters"
+      - "Invalid SSN: SSN contains less than 9 digits"
+      - "Invalid SSN: SSN contains more than 9 digits"
+      - "Invalid SSN: SSN contains prohibited patterns"
+      - "Invalid SSN: SSN starts with a prohibited digit"

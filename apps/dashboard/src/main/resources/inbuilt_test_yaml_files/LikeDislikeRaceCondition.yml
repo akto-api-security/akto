@@ -65,3 +65,4 @@ validate:
   response_payload:
     percentage_match:
       gt: 90
+    regex: 'Success: [0-9]+ likes'
