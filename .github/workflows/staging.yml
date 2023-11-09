@@ -15,10 +15,10 @@ on:
         required: true
         type: choice
         options:
-          - akto_staging1
-          - akto_staging2
-          - akto_staging3
-        default: akto_staging1
+          - akto-staging1
+          - akto-staging2
+          - akto-staging3
+        default: akto-staging1
       Deploy_Flash:
         description: 'Deploy to flash staging'
         required: false
@@ -42,13 +42,9 @@ jobs:
           distribution: 'adopt'
           java-version: '8'
           architecture: x64
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v2
         with:
           node-version: '17'
-          cache: 'npm'
-          cache-dependency-path: |
-            ./apps/dashboard/package-lock.json
-            ./apps/dashboard/web/polaris_web/package-lock.json
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
@@ -172,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v2
         with:
           node-version: '17'
       - name: Run testsigma end to end tests
