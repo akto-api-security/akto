@@ -4,7 +4,7 @@ name: Staging
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master ]
+    branches: [ master, epehemeral_env_tests ]
   pull_request:
     branches: [ master ]
 
