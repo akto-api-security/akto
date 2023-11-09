@@ -19,11 +19,6 @@ on:
           - akto-staging2
           - akto-staging3
         default: akto-staging1
-      Persist:
-        description: 'Persist staging setup'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   build:
@@ -198,7 +193,7 @@ jobs:
           node ./vulnerable_checker.js
 
   delete:
-    if: ${{ github.event.inputs.Persist == 'true' }}
+    if: ${{ always() }}
     needs: [deploy, test]
     runs-on: ubuntu-latest
     environment: Dev
