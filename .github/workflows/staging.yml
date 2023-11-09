@@ -135,6 +135,7 @@ jobs:
         ls
         cat single_complete.yml
         env
+        echo $SETUP_SUFFIX
 
     # - name: Configure AWS credentials
     #   uses: aws-actions/configure-aws-credentials@v1
