@@ -4,7 +4,7 @@ name: Staging
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master, epehemeral_env_tests ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -19,6 +19,16 @@ on:
           - akto-staging2
           - akto-staging3
         default: akto-staging1
+      Deploy_Flash:
+        description: 'Deploy to flash staging'
+        required: false
+        type: boolean
+        default: false
+      Persist:
+        description: 'Persist staging setup'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -111,53 +121,53 @@ jobs:
       contents: read
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
-    env:
-      SETUP_SUFFIX: ${{needs.build.outputs.IMAGE_TAG}}
     steps:
     - name: Fetch kube yaml
+      env:
+        IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
+        export SETUP_SUFFIX=$IMAGE_TAG
         envsubst < single.yml > single_complete.yml
 
     - name: echo
-      run:
-        cat single_complete.yml
+      run: |
         ls
+        cat single_complete.yml
         env
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
-        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
-        aws-region: ap-south-1
-
+    # - name: Configure AWS credentials
+    #   uses: aws-actions/configure-aws-credentials@v1
+    #   with:
+    #     aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+    #     aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+    #     aws-region: ap-south-1
         
-  #   - name: deploy to cluster
-  #     id: deploy_cluster
-  #     uses: davi020/kubectl-advanced@master
-  #     env:
-  #       KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-  #     with:
-  #       command: |
-  #         kubectl apply -f single_complete.yml
-  #         kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
-  #         export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
-  #         echo $LB_NAME >> $GITHUB_STEP_SUMMARY
-  #         echo "lb_name=http://$LB_NAME:8080" >> "$GITHUB_OUTPUT"
-  #         while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}/metrics)" != "200" ]]; do sleep 5; done
-  #         echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
+    # - name: deploy to cluster
+    #   id: deploy_cluster
+    #   uses: davi020/kubectl-advanced@master
+    #   env:
+    #     KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+    #   with:
+    #     command: |
+    #       kubectl apply -f single_complete.yml
+    #       kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
+    #       export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
+    #       echo $LB_NAME >> $GITHUB_STEP_SUMMARY
+    #       echo "lb_name=http://$LB_NAME:8080" >> "$GITHUB_OUTPUT"
+    #       while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}/metrics)" != "200" ]]; do sleep 5; done
+    #       echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
 
-  #   - name: setup test environment
-  #     env:
-  #       lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
-  #       QA_EMAIL: ${{vars.QA_EMAIL}}
-  #       QA_PASSWORD: ${{secrets.QA_PASSWORD}}
-  #       QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
-  #     run: |
-  #       curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d '{"email":$QA_EMAIL,"password":$QA_PASSWORD,"invitationCode":""}'
-  #       staging_mongo=$(kubectl get pods -n dev | awk "\$1 ~ /mongo-$SETUP_SUFFIX/ { print \$1 }")
-  #       kubectl exec -it -n dev $staging_mongo --mongosh -eval 'use common; db.api_tokens.insertOne({ "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": "'"$QA_API_KEY"'", "name": "external_api", "timestamp": 1692262638, "username": "'"$QA_EMAIL"'", "utility": "EXTERNAL_API" })'
+    # - name: setup test environment
+    #   env:
+    #     lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
+    #     QA_EMAIL: ${{vars.QA_EMAIL}}
+    #     QA_PASSWORD: ${{secrets.QA_PASSWORD}}
+    #     QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
+    #   run: |
+    #     curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d '{"email":$QA_EMAIL,"password":$QA_PASSWORD,"invitationCode":""}'
+    #     staging_mongo=$(kubectl get pods -n dev | awk '$1 ~ /mongo-test-/ { print $1 }')
+    #     kubectl exec -it -n dev $staging_mongo --mongosh -eval 'use common; db.api_tokens.insertOne({ "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": "'"$QA_API_KEY"'", "name": "external_api", "timestamp": 1692262638, "username": "'"$QA_EMAIL"'", "utility": "EXTERNAL_API" })'
 
   # test:
   #   needs: deploy
@@ -199,7 +209,7 @@ jobs:
   #         node ./vulnerable_checker.js
 
   # delete:
-  #   if: ${{ always() }}
+  #   if: ${{ github.event.inputs.Persist == 'true' }}
   #   needs: [deploy, test]
   #   runs-on: ubuntu-latest
   #   environment: Dev
