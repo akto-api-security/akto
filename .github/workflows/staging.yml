@@ -19,7 +19,7 @@ on:
           - akto_staging2
           - akto_staging3
         default: akto_staging1
-      Deploy:
+      Deploy_Flash:
         description: 'Deploy to flash staging'
         required: false
         type: boolean
@@ -46,9 +46,12 @@ jobs:
         with:
           node-version: '17'
           cache: 'npm'
+          cache-dependency-path: |
+            ./apps/dashboard/package-lock.json
+            ./apps/dashboard/web/polaris_web/package-lock.json
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
-        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
+        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
       - name: Download Akto templates zip
         working-directory: ./apps/dashboard/src/main/resources
         run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
@@ -172,7 +175,6 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '17'
-          cache: 'npm'
       - name: Run testsigma end to end tests
         env:
             TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
@@ -243,3 +245,23 @@ jobs:
         args: get pods -n dev >> $GITHUB_STEP_SUMMARY
 
         
+  # deploy_flash:
+  #   if: ${{ github.event.inputs.Deploy_Flash == 'true' }}
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   environment: Dev
+  #   permissions:
+  #     id-token: write
+  #     contents: read
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - uses: aws-actions/configure-aws-credentials@v1
+  #     with:
+  #       role-to-assume: ${{ secrets.IAMROLE_GITHUB }}
+  #       role-session-name: GitHub-Action-Role
+  #       aws-region: ${{ vars.AWS_REGION }}
+  #   - name: Deploy to flash
+  #     run: |
+  #       echo "Deploying branch ${{ env.GITHUB_REF }} to ${{ github.event.inputs.environment }}"
+  #       commit_hash=`git rev-parse HEAD`
+  #       aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
