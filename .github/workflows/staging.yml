@@ -119,23 +119,20 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env: 
+      SETUP_SUFFIX: ${{needs.build.outputs.IMAGE_TAG}}
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
     - name: Fetch kube yaml
-      env:
-        IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
-        export SETUP_SUFFIX=$IMAGE_TAG
         envsubst < single.yml > single_complete.yml
 
     - name: echo
       run: |
-        ls
-        cat single_complete.yml
-        env
         echo $SETUP_SUFFIX
+        cat single_complete.yml
 
     # - name: Configure AWS credentials
     #   uses: aws-actions/configure-aws-credentials@v1
