@@ -126,6 +126,9 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
         aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
         aws-region: ap-south-1
+
+    - name: echo
+      run: echo $SETUP_SUFFIX
         
     - name: deploy to cluster
       id: deploy_cluster
