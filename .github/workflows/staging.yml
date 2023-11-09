@@ -150,7 +150,7 @@ jobs:
         command: |
           curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d "{\"email\":\"$QA_EMAIL\",\"password\":\"$QA_PASSWORD\",\"invitationCode\":\"\"}"\n        
           export staging_mongo=$(kubectl get pods -n dev -l app=mongo-${SETUP_SUFFIX} -o custom-columns=":metadata.name" --no-headers)
-          kubectl exec -it -n dev $staging_mongo -- mongosh -eval 'use common; db.api_tokens.insertOne({ _id: 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_KEY, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" })'
+          kubectl exec -it -n dev $staging_mongo -- mongosh -eval 'use common; db.api_tokens.insertOne({ _id: 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" })'
         
   test:
     needs: deploy
