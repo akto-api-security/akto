@@ -31,23 +31,12 @@ public class ApiCollection {
     int urlsCount;
     public static final String VXLAN_ID = "vxlanId";
 
-    @BsonIgnore
-    Type type;
-
     public enum Type {
-        TRAFFIC, OTHER_SOURCES, CUSTOM, API_GROUP
+        API_GROUP
     }
 
-    public Type getType() {
-        if (this.hostName != null) {
-            return Type.TRAFFIC;
-        } else if(this.vxlanId == this.id) {
-            return Type.OTHER_SOURCES;
-        } else if (this.conditions != null) {
-            return Type.API_GROUP;
-        }
-        return Type.CUSTOM;
-    }
+    Type type;
+    public static final String _TYPE = "type";
 
     List<CollectionCondition> conditions;
     public static final String CONDITIONS_STRING = "conditions";
@@ -68,6 +57,7 @@ public class ApiCollection {
         this.id = id;
         this.name = name;
         this.conditions = conditions;
+        this.type = Type.API_GROUP;
     }
 
     public static boolean useHost = Objects.equals(System.getenv("USE_HOSTNAME"), "true");
@@ -160,6 +150,14 @@ public class ApiCollection {
         return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
     }
 
+    public Type getType() {
+        return type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
+    }
+    
     public List<CollectionCondition> getConditions() {
         return conditions;
     }
@@ -211,7 +209,6 @@ public class ApiCollection {
                     break;
             }
         }
-
     }
 
 }

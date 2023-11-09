@@ -27,11 +27,11 @@ public class ApiListCondition extends CollectionCondition{
     }
 
     public ApiListCondition() {
-        super(Type.API_LIST);
+        super(Type.API_LIST, Operator.OR);
     }
 
     public ApiListCondition(Set<ApiInfoKey> apiList) {
-        super(Type.API_LIST);
+        super(Type.API_LIST, Operator.OR);
         this.apiList = apiList;
     }
 
@@ -58,9 +58,9 @@ public class ApiListCondition extends CollectionCondition{
         }
 
         return Filters.and(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, api.getApiCollectionId()),
-                Filters.eq(prefix + SingleTypeInfo._METHOD, api.getMethod().toString()),
-                Filters.eq(prefix + SingleTypeInfo._URL, api.getUrl()));
+            Filters.eq(prefix + SingleTypeInfo._URL, api.getUrl()),
+            Filters.eq(prefix + SingleTypeInfo._METHOD, api.getMethod().toString()),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, api.getApiCollectionId()));
 
     }
 

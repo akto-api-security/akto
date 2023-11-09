@@ -12,6 +12,7 @@ import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
 import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
+import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import dashboardFunc from "../../transform"
@@ -278,6 +279,12 @@ function ApiEndpoints() {
             func.setToast(true, false, "Postman collection downloaded successfully")
     }
 
+    const [showWorkflowTests, setShowWorkflowTests] = useState(false)
+
+    function toggleWorkflowTests() {
+        setShowWorkflowTests(!showWorkflowTests)
+    }
+
     function disambiguateLabel(key, value) {
         switch (key) {
             case "parameterisedEndpoint":
@@ -404,6 +411,15 @@ function ApiEndpoints() {
                             </VerticalStack>
                         </VerticalStack>
                     </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
+                                <Text fontWeight="regular" variant="bodyMd">
+                                    {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
+                                </Text>
+                            </div>
+                        </VerticalStack>
+                    </Popover.Section>
                 </Popover.Pane>
             </Popover>
 
@@ -440,16 +456,88 @@ function ApiEndpoints() {
         setShowApiGroupModal(false);
     }
 
-    const promotedBulkActions = (selectedResources) => [
-        {
-          content: 'Add to API group',
-          onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
-        },
-        {
-            content: 'Remove from API group',
-            onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
-        },
-      ];
+    const promotedBulkActions = (selectedResources) => {
+
+        let isApiGroup = allCollections.filter(x => {
+            return x.id == apiCollectionId && x.type == "API_GROUP"
+        }).length > 0
+
+        let ret = []
+        if (isApiGroup) {
+            ret.push(
+                {
+                    content: 'Remove from API group',
+                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
+                }
+            )
+        } else {
+            ret.push({
+                content: 'Add to API group',
+                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
+            })
+        }
+        return ret;
+    }
+
+      const components = [
+        loading ? [<SpinnerCentered key="loading" />] : (
+            showWorkflowTests ? [
+                <WorkflowTests
+                key={"workflow-tests"}
+                apiCollectionId={apiCollectionId}
+                endpointsList={loading ? [] : endpointData["All"]}
+            />
+             ] : [
+                <div className="apiEndpointsTable" key="table">
+                      <GithubSimpleTable
+                          key="table"
+                          pageLimit={50}
+                          data={endpointData[selectedTab]}
+                          sortOptions={sortOptions}
+                          resourceName={resourceName}
+                          filters={[]}
+                          disambiguateLabel={disambiguateLabel}
+                          headers={headers}
+                          getStatus={() => { return "warning" }}
+                          selected={selected}
+                          onRowClick={handleRowClick}
+                          onSelect={handleSelectedTab}
+                          getFilteredItems={getFilteredItems}
+                          mode={IndexFiltersMode.Default}
+                          headings={headings}
+                          useNewRow={true}
+                          condensedHeight={true}
+                          tableTabs={tableTabs}
+                          selectable={true}
+                          promotedBulkActions={promotedBulkActions}
+                      />
+                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                          <Modal.Section flush>
+                              <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
+                          </Modal.Section>
+                      </Modal>
+                  </div>,
+                  <ApiDetails
+                      key="details"
+                      showDetails={showDetails}
+                      setShowDetails={setShowDetails}
+                      apiDetail={apiDetail}
+                      headers={transform.getDetailsHeaders()}
+                      getStatus={() => { return "warning" }}
+                      isGptActive={isGptActive}
+                  />,
+                  <ApiGroupModal
+                      key="api-group-modal"
+                      showApiGroupModal={showApiGroupModal}
+                      toggleApiGroupModal={toggleApiGroupModal}
+                      apis={apis}
+                      operation={actionOperation}
+                      currentApiGroupName={pageTitle}
+                      fetchData={fetchData}
+                  />
+            ]
+        )
+      ]
 
     return (
         <PageWithMultipleCards
@@ -458,55 +546,7 @@ function ApiEndpoints() {
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={secondaryActionsComponent}
-            components={
-                loading ? [<SpinnerCentered key="loading" />] :
-                    [
-                        <div className="apiEndpointsTable" key="table">
-                            <GithubSimpleTable
-                                key="table"
-                                pageLimit={50}
-                                data={endpointData[selectedTab]}
-                                sortOptions={sortOptions}
-                                resourceName={resourceName}
-                                filters={[]}
-                                disambiguateLabel={disambiguateLabel}
-                                headers={headers}
-                                getStatus={() => { return "warning" }}
-                                selected={selected}
-                                onRowClick={handleRowClick}
-                                onSelect={handleSelectedTab}
-                                getFilteredItems={getFilteredItems}
-                                mode={IndexFiltersMode.Default}
-                                headings={headings}
-                                useNewRow={true}
-                                condensedHeight={true}
-                                tableTabs={tableTabs}
-                                selectable={true}
-                                promotedBulkActions={promotedBulkActions}
-                            />
-                            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
-                                <Modal.Section flush>
-                                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
-                                </Modal.Section>
-                            </Modal>
-                        </div>,
-                        <ApiDetails
-                            key="details"
-                            showDetails={showDetails}
-                            setShowDetails={setShowDetails}
-                            apiDetail={apiDetail}
-                            headers={transform.getDetailsHeaders()}
-                            getStatus={() => { return "warning" }}
-                            isGptActive={isGptActive}
-                        />,
-                        <ApiGroupModal
-                            key="api-group-modal"
-                            showApiGroupModal={showApiGroupModal}
-                            toggleApiGroupModal={toggleApiGroupModal}
-                            apis={apis}
-                            operation={actionOperation}
-                        />
-                    ]}
+            components={components}
         />
     )
 }

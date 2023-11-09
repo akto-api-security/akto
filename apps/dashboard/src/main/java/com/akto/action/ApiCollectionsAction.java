@@ -17,6 +17,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ApiListCondition;
+import com.akto.dto.CollectionConditions.CollectionCondition;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
@@ -49,7 +50,7 @@ public class ApiCollectionsAction extends UserAction {
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
             if (count != null && apiCollection.getHostName() != null ) {
                 apiCollection.setUrlsCount(count);
-            } else if(apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+            } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 int urlsCount = 0;
                 try {
                     urlsCount = ApiCollectionUsers.getUrlsFromConditions(apiCollection.getConditions()).size();
@@ -148,6 +149,23 @@ public class ApiCollectionsAction extends UserAction {
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));                    
         SensitiveParamInfoDao.instance.updateMany(filter, update);
+
+        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+        for(ApiCollection collection: apiGroups){
+            List<CollectionCondition> conditions = collection.getConditions();
+            for (CollectionCondition it : conditions) {
+                switch (it.getType()) {
+                    case API_LIST:
+                        Set<ApiInfoKey> tmp = it.returnApis();
+                        tmp.removeIf((ApiInfoKey key) -> apiCollectionIds.contains(key.getApiCollectionId()));
+                        ((ApiListCondition) it).setApiList(tmp);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -168,7 +186,7 @@ public class ApiCollectionsAction extends UserAction {
             apiCollection = new ApiCollection(Context.now(), collectionName, new ArrayList<>() );
             ApiCollectionsDao.instance.insertOne(apiCollection);
 
-        } else if(!apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+        } else if(!ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
             addActionError("Invalid api collection group.");
             return ERROR.toUpperCase();
         }
@@ -191,7 +209,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
-        if(apiCollection == null || !apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+        if(apiCollection == null || !ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
             addActionError("Invalid api collection group");
             return ERROR.toUpperCase();
         }
@@ -209,7 +227,7 @@ public class ApiCollectionsAction extends UserAction {
     public String computeCustomCollections(){
         
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
-        if(apiCollection == null || !apiCollection.getType().equals(ApiCollection.Type.API_GROUP)){
+        if(apiCollection == null || !ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
             addActionError("Invalid api collection group");
             return ERROR.toUpperCase();
         }

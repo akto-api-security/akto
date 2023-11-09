@@ -71,7 +71,11 @@ public class ApiCollectionUsers {
     public static Set<String> getUrlsFromConditions(List<CollectionCondition> conditions){
         Set<ApiInfoKey> apis = new HashSet<>();
         conditions.forEach((condition) -> {
-            apis.addAll(condition.returnApis());
+            if(CollectionCondition.Operator.AND.equals(condition.getOperator())){
+                apis.retainAll(condition.returnApis());
+            } else {
+                apis.addAll(condition.returnApis());
+            }
         });
 
         Set<String> urls = new HashSet<>();
@@ -91,45 +95,46 @@ public class ApiCollectionUsers {
                     Updates.set(ApiCollection.URLS_STRING, urls)));
     }
 
-    private static List<Bson> getFilters(List<CollectionCondition> conditions, CollectionType type){
+    private static Bson getFilters(List<CollectionCondition> conditions, CollectionType type){
         List<Bson> filters = new ArrayList<>();
+        List<Bson> orFilters = new ArrayList<>();
         conditions.forEach((condition) -> {
             Bson conditionFilter = condition.returnFiltersMap().get(type);
-            filters.add(conditionFilter);
+            if(condition.getOperator().equals(CollectionCondition.Operator.OR)){
+                orFilters.add(conditionFilter);
+            } else {
+                filters.add(conditionFilter);
+            }
         });
-        return filters;
+        if(!orFilters.isEmpty()){
+            filters.add(Filters.or(orFilters));
+        }
+        return Filters.and(filters);
+    }
+
+    public static void operationForCollectionId(List<CollectionCondition> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
+        Map<CollectionType, Bson> filtersMap = new HashMap<>();
+        for (CollectionType type : CollectionType.values()) {
+            Bson filter = getFilters(conditions, type);
+            if(remove){
+                filter = Filters.nor(filter);
+            }
+            Bson finalFilter = Filters.and(matchFilter, filter);
+            filtersMap.put(type, finalFilter);
+        }
+        updateCollectionsForCollectionId(filtersMap, update);
     }
 
     public static void addToCollectionsForCollectionId(List<CollectionCondition> conditions, int apiCollectionId) {
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-
-        Map<CollectionType, Bson> filtersMap = new HashMap<>();
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-
-        for (CollectionType type : CollectionType.values()) {
-            List<Bson> conditionsFilters = getFilters(conditions, type);
-            Bson orFilter = Filters.or(conditionsFilters);
-            Bson finalFilter = Filters.and(matchFilter, orFilter);
-            filtersMap.put(type, finalFilter);
-        }
-
-        updateCollectionsForCollectionId(filtersMap, update);
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
     }
 
     public static void removeFromCollectionsForCollectionId(List<CollectionCondition> conditions, int apiCollectionId) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        
-        Map<CollectionType, Bson> filtersMap = new HashMap<>();
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-
-        for (CollectionType type : CollectionType.values()) {
-            List<Bson> conditionsFilters = getFilters(conditions, type);
-            Bson norFilter = Filters.nor(conditionsFilters);
-            Bson finalFilter = Filters.and(matchFilter, norFilter);
-            filtersMap.put(type, finalFilter);
-        }
-
-        updateCollectionsForCollectionId(filtersMap, update);
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
     }
 
     public static void computeCollectionsForCollectionId(List<CollectionCondition> conditions, int apiCollectionId) {

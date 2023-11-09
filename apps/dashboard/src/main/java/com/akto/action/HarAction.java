@@ -78,7 +78,7 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (apiCollection.getType().equals(ApiCollection.Type.API_GROUP))  {
+        if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType()))  {
             addActionError("API groups can't be used");
             return ERROR.toUpperCase();
         }

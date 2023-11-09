@@ -14,14 +14,13 @@ const Operation = {
 
 function ApiGroupModal(props){
 
-    const {showApiGroupModal, toggleApiGroupModal, apis, operation } = props;
+    const {showApiGroupModal, toggleApiGroupModal, apis, operation, currentApiGroupName, fetchData } = props;
 
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
     const setAllCollections = PersistStore(state => state.setAllCollections)
-    const setLastFetchedInfo = PersistStore(state => state.setLastFetchedInfo)
 
-    const [apiGroupName, setApiGroupName] = useState("")
+    const [apiGroupName, setApiGroupName] = useState(currentApiGroupName)
 
     function getApis(){
         return apis.map((x) => {
@@ -34,13 +33,6 @@ function ApiGroupModal(props){
         })
     }
 
-    function clearPersistedData() {
-        setLastFetchedInfo({
-            lastRiskScoreInfo: 0,
-            lastSensitiveInfo: 0
-        });
-    }
-
     function addAPIs(){
         let ret = getApis();
 
@@ -48,11 +40,8 @@ function ApiGroupModal(props){
             func.setToast(true, false, "APIs added to API group successfully")
             setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
             setAllCollections(resp?.apiCollections)
-            setTimeout(() => {
-                toggleApiGroupModal()
-            }, 500)
+            toggleApiGroupModal()
         })
-        clearPersistedData();
     }
 
     function removeAPIs(){
@@ -62,11 +51,9 @@ function ApiGroupModal(props){
             func.setToast(true, false, "APIs removed from API group successfully")
             setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
             setAllCollections(resp?.apiCollections)
-            setTimeout(() => {
-                toggleApiGroupModal()
-            }, 500)
+            toggleApiGroupModal()
+            fetchData()
         })
-        clearPersistedData()
     }
 
     const existingTab = {
@@ -130,16 +117,26 @@ function ApiGroupModal(props){
                 content: buttonTitle,
                 onAction: buttonAction,
             }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: toggleApiGroupModal,
+                },
+            ]}
         >
-            <Modal.Section flush>
-                <LayoutWithTabs
-                    key="tabs"
-                    tabs={tabs}
-                    currTab={() => {}}
-                    noLoading={true}
-                />
-
-            </Modal.Section>
+            { operation === Operation.ADD ?
+                <Modal.Section flush>
+                    <LayoutWithTabs
+                        key="tabs"
+                        tabs={tabs}
+                        currTab={() => {}}
+                        noLoading={true}
+                    />
+                </Modal.Section> :
+                <Modal.Section>
+                    {`Are you sure you want to remove these ${getApis().length} APIs from ${apiGroupName} ?`}
+                </Modal.Section>
+            }
         </Modal>
     )
 }

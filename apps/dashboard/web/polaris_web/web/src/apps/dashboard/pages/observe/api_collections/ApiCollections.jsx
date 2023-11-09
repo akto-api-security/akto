@@ -10,6 +10,7 @@ import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import CreateNewCollectionModal from "./CreateNewCollectionModal"
 
 const headers = [
     {
@@ -73,14 +74,9 @@ function ApiCollections() {
 
     const [data, setData] = useState({'All':[]})
     const [active, setActive] = useState(false);
-    const [newCollectionName, setNewCollectionName] = useState('');
     const [loading, setLoading] = useState(false)
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
-    const handleNewCollectionNameChange = 
-        useCallback(
-            (newValue) => setNewCollectionName(newValue),
-        []);
     
     const tableTabs = [
         {
@@ -128,15 +124,6 @@ function ApiCollections() {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
-    const createNewCollection = async () => {
-        let newColl = await api.createCollection(newCollectionName)
-        setNewCollectionName('')
-        //setData([convertToCollectionData(newColl.apiCollections[0]), ...data])
-        fetchData()
-        setActive(false)
-        func.setToast(true, false, "API collection created successfully")
-    }
-
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
@@ -160,9 +147,9 @@ function ApiCollections() {
         
         tmp = {}
         tmp.All = dataObj.prettify
-        tmp.Hostname = dataObj.prettify.filter((c) => c.type === "TRAFFIC")
+        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null)
         tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.Custom = dataObj.prettify.filter((c) => (c.type === "CUSTOM" || c.type === "OTHER_SOURCES"))
+        tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
 
         setData(tmp);
     }
@@ -192,39 +179,13 @@ function ApiCollections() {
         },
       ];
 
-    const modalComponent = (
-        <Modal
-            key="modal"
-            activator={createCollectionModalActivatorRef}
-            open={active}
-            onClose={() => setActive(false)}
-            title="New collection"
-            primaryAction={{
-            id:"create-new-collection",
-            content: 'Create',
-            onAction: createNewCollection,
-            }}
-        >
-            <Modal.Section>
-
-            <TextField
-                id={"new-collection-input"}
-                label="Name"
-                helpText="Enter name for the new collection"
-                value={newCollectionName}
-                onChange={handleNewCollectionNameChange}
-                autoComplete="off"
-                maxLength="24"
-                suffix={(
-                    <Text>{newCollectionName.length}/24</Text>
-                )}
-                autoFocus
-            />
-
-
-            </Modal.Section>
-        </Modal>
-    )
+    const modalComponent = <CreateNewCollectionModal
+        key="modal"
+        active={active}
+        setActive={setActive}
+        createCollectionModalActivatorRef={createCollectionModalActivatorRef}
+        fetchData={fetchData}
+    />
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
