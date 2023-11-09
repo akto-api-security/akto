@@ -189,6 +189,7 @@ jobs:
           node ./vulnerable_checker.js
 
   delete:
+    if: ${{ always() }}
     needs: [deploy, test]
     runs-on: ubuntu-latest
     environment: Dev
