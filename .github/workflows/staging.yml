@@ -11,21 +11,8 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
-      Tag:
-        required: true
-        type: choice
-        options:
-          - akto-staging1
-          - akto-staging2
-          - akto-staging3
-        default: akto-staging1
       Deploy_Flash:
         description: 'Deploy to flash staging'
-        required: false
-        type: boolean
-        default: false
-      Persist:
-        description: 'Persist staging setup'
         required: false
         type: boolean
         default: false
@@ -47,7 +34,7 @@ jobs:
           node-version: '17'
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
-        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
+        run: echo "IMAGE_TAG=${{ a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
       # - name: Download Akto templates zip
       #   working-directory: ./apps/dashboard/src/main/resources
       #   run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
@@ -129,120 +116,115 @@ jobs:
         wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
         envsubst < single.yml > single_complete.yml
 
-    - name: echo
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+        aws-region: ap-south-1
+        
+    - name: deploy to cluster
+      id: deploy_cluster
+      uses: davi020/kubectl-advanced@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+      with:
+        command: |
+          kubectl apply -f single_complete.yml
+          kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
+          export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
+          echo $LB_NAME >> $GITHUB_STEP_SUMMARY
+          echo "lb_name=http://$LB_NAME:8080" >> "$GITHUB_OUTPUT"
+          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}/metrics)" != "200" ]]; do sleep 5; done
+          echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
+
+    - name: setup test environment
+      env:
+        lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
+        QA_EMAIL: ${{vars.QA_EMAIL}}
+        QA_PASSWORD: ${{secrets.QA_PASSWORD}}
+        QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
       run: |
-        echo $SETUP_SUFFIX
-        cat single_complete.yml
+        curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d '{"email":$QA_EMAIL,"password":$QA_PASSWORD,"invitationCode":""}'
+        staging_mongo=$(kubectl get pods -n dev -l app=mongo-${SETUP_SUFFIX} -o custom-columns=":metadata.name" --no-headers)
+        kubectl exec -it -n dev $staging_mongo --mongosh -eval 'use common; db.api_tokens.insertOne({ "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": "'"$QA_API_KEY"'", "name": "external_api", "timestamp": 1692262638, "username": "'"$QA_EMAIL"'", "utility": "EXTERNAL_API" })'
 
-    # - name: Configure AWS credentials
-    #   uses: aws-actions/configure-aws-credentials@v1
-    #   with:
-    #     aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
-    #     aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
-    #     aws-region: ap-south-1
+  test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '17'
+      - name: Run testsigma end to end tests
+        env:
+            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
+            TESTSIGMA_TEST_PLAN_ID: 888
+            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
+            LB_NAME: ${{needs.deploy.outputs.lb_name}}
+        run: bash ./.github/scripts/akto-testsigma.sh
+
+      # - name: Run Akto CI/CD tests
+      #   uses: akto-api-security/run-scan@v1.0.3
+      #   with:
+      #     AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+      #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      #     AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+
+      # - name: Check for Akto test completion
+      #   env:
+      #       AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+      #       AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      #       AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+      #   run: bash ./.github/scripts/akto-cicd.sh
+
+      - name: Check Vulnerable API's
+        working-directory: ./.github/scripts
+        env:
+          AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+          AKTO_API_KEY: ${{secrets.QA_API_TOKEN}}
+        run: |
+          npm install axios
+          node ./vulnerable_checker.js
+
+  delete:
+    needs: [deploy, test]
+    runs-on: ubuntu-latest
+    environment: Dev
+    permissions:
+      id-token: write
+      contents: read
+    env: 
+      SETUP_SUFFIX: ${{needs.build.outputs.IMAGE_TAG}}
+    steps:
+    - name: Fetch kube yaml
+      run: |
+        wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
+        envsubst < single.yml > single_complete.yml
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+        aws-region: ap-south-1
         
-    # - name: deploy to cluster
-    #   id: deploy_cluster
-    #   uses: davi020/kubectl-advanced@master
-    #   env:
-    #     KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-    #   with:
-    #     command: |
-    #       kubectl apply -f single_complete.yml
-    #       kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
-    #       export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
-    #       echo $LB_NAME >> $GITHUB_STEP_SUMMARY
-    #       echo "lb_name=http://$LB_NAME:8080" >> "$GITHUB_OUTPUT"
-    #       while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}/metrics)" != "200" ]]; do sleep 5; done
-    #       echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
-
-    # - name: setup test environment
-    #   env:
-    #     lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
-    #     QA_EMAIL: ${{vars.QA_EMAIL}}
-    #     QA_PASSWORD: ${{secrets.QA_PASSWORD}}
-    #     QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
-    #   run: |
-    #     curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d '{"email":$QA_EMAIL,"password":$QA_PASSWORD,"invitationCode":""}'
-    #     staging_mongo=$(kubectl get pods -n dev | awk '$1 ~ /mongo-test-/ { print $1 }')
-    #     kubectl exec -it -n dev $staging_mongo --mongosh -eval 'use common; db.api_tokens.insertOne({ "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": "'"$QA_API_KEY"'", "name": "external_api", "timestamp": 1692262638, "username": "'"$QA_EMAIL"'", "utility": "EXTERNAL_API" })'
-
-  # test:
-  #   needs: deploy
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - uses: actions/setup-node@v2
-  #       with:
-  #         node-version: '17'
-  #     - name: Run testsigma end to end tests
-  #       env:
-  #           TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-  #           TESTSIGMA_TEST_PLAN_ID: 888
-  #           TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-  #           LB_NAME: ${{needs.deploy.outputs.lb_name}}
-  #       run: bash ./.github/scripts/akto-testsigma.sh
-
-  #     # - name: Run Akto CI/CD tests
-  #     #   uses: akto-api-security/run-scan@v1.0.3
-  #     #   with:
-  #     #     AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
-  #     #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-  #     #     AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
-
-  #     # - name: Check for Akto test completion
-  #     #   env:
-  #     #       AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
-  #     #       AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-  #     #       AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
-  #     #   run: bash ./.github/scripts/akto-cicd.sh
-
-  #     - name: Check Vulnerable API's
-  #       working-directory: ./.github/scripts
-  #       env:
-  #         AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
-  #         AKTO_API_KEY: ${{secrets.QA_API_TOKEN}}
-  #       run: |
-  #         npm install axios
-  #         node ./vulnerable_checker.js
-
-  # delete:
-  #   if: ${{ github.event.inputs.Persist == 'true' }}
-  #   needs: [deploy, test]
-  #   runs-on: ubuntu-latest
-  #   environment: Dev
-  #   permissions:
-  #     id-token: write
-  #     contents: read
-  #   steps:
-  #   - name: Fetch kube yaml
-  #     run: |
-  #       wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
-  #       export SETUP_SUFFIX=${{needs.deploy.outputs.IMAGE_TAG}}
-  #       envsubst < single.yml > single_complete.yml
-
-  #   - name: Configure AWS credentials
-  #     uses: aws-actions/configure-aws-credentials@v1
-  #     with:
-  #       aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
-  #       aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
-  #       aws-region: ap-south-1
+    - name: delete cluster
+      uses: kodermax/kubectl-aws-eks@main
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{ github.sha }}
+      with:
+        args: delete -f single_complete.yml
         
-  #   - name: delete cluster
-  #     uses: kodermax/kubectl-aws-eks@main
-  #     env:
-  #       KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-  #       IMAGE_TAG: ${{ github.sha }}
-  #     with:
-  #       args: delete -f single_complete.yml
-        
-  #   - name: cluster status
-  #     uses: kodermax/kubectl-aws-eks@main
-  #     env:
-  #       KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-  #       IMAGE_TAG: ${{ github.sha }}
-  #     with:
-  #       args: get pods -n dev >> $GITHUB_STEP_SUMMARY
+    - name: cluster status
+      uses: kodermax/kubectl-aws-eks@main
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{ github.sha }}
+      with:
+        args: get pods -n dev >> $GITHUB_STEP_SUMMARY
 
         
   # deploy_flash:
