@@ -134,8 +134,8 @@ jobs:
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
           export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
-          echo "lb_name=http://$LB_NAME:8080" >> "$GITHUB_OUTPUT"
-          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${lb_name}/metrics)" != "200" ]]; do sleep 5; done
+          echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
+          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
           echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
 
     - name: setup test environment
