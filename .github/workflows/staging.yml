@@ -121,7 +121,9 @@ jobs:
 
     - name: echo
       run:
+        cat single_complete.yml
         ls
+        env
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
