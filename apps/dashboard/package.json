@@ -31,7 +31,7 @@
     "@mui/material": "^5.9.2",
     "@mui/x-date-pickers": "^5.0.0",
     "are-you-es5": "^2.1.1",
-    "axios": "^0.21.1",
+    "axios": "^1.6.0",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "dayjs": "^1.11.5",
     "fiber": "^1.0.4",
