@@ -1,0 +1,57 @@
+id: SSRF_DETECTION_TEST
+info:
+  name: SSRF Attack Detection for GraphQL APIs
+  description: |
+    "Test to detect SSRF attacks in GraphQL APIs by sending a GraphQL query with a potential SSRF payload and validating the response for SSRF detection."
+    "This test aims to identify whether the GraphQL API is vulnerable to SSRF attacks. It sends a GraphQL query containing a potential SSRF payload by specifying a malicious website as the user's ID. The expectation is that the API should detect and prevent SSRF, responding with an error message such as 'Invalid URL'."
+
+  details: |
+    "#### Test Steps:"
+    "1. **Send GraphQL Query:** A GraphQL query is sent to the API with a user ID parameter containing a potential SSRF payload."
+    "2. **Validate Response:** The response is validated to ensure that the API has detected and responded appropriately to the SSRF attempt."
+
+    "#### Expected Outcome:"
+    "If the GraphQL API is properly secured against SSRF attacks, the response body should contain an error message indicating 'Invalid URL' or a similar SSRF detection message."
+
+tags:
+  - SSRF
+  - GraphQL
+  - Security Testing
+  - Automated Testing
+
+severity: MEDIUM
+
+cwe:
+  - CWE-918
+  - CWE-918
+
+references:
+  - "https://owasp.org/www-community/attacks/Server_Side_Request_Forgery"
+  - "https://cwe.mitre.org/data/definitions/918.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  content_type:
+    - application/json
+
+execute:
+  type: single
+  requests:
+    - req:
+      - method: POST
+      - url: https://graphql-api-endpoint.com
+      - headers:
+          Content-Type: application/json
+      - body: |
+          {
+            "query": "query { user(id: \"https://malicious-website.com\") { id, name } }"
+          }
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  body:
+    contains: "Invalid URL"
