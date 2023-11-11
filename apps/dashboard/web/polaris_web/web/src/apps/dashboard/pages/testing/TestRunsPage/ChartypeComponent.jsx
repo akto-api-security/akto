@@ -3,7 +3,8 @@ import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight}) {
+    const maxBoxHeight = boxHeight || '200px'
     let tableRows = []
     Object.keys(data).forEach((key,index)=>{
         let comp = [
@@ -26,7 +27,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse}) {
       }, {}) : data
 
     const chartComponent = (
-        title === 'Categories' ? <DonutChart data={chartData} title="" size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+        isNormal ? <DonutChart data={chartData} title="" size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (
@@ -34,7 +35,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse}) {
             <HorizontalStack gap={8}>
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
-                    <Scrollable style={{maxHeight: '200px'}} focusable shadow>
+                    <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
                         <Box width='260px'>
                             <DataTable headings={[]}
                                 columnContentTypes={[

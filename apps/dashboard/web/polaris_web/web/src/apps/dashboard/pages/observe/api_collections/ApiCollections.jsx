@@ -122,17 +122,6 @@ function ApiCollections() {
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
 
-    const lastFetchedInfo = PersistStore(state => state.lastFetchedInfo)
-    const lastFetchedResp = PersistStore(state => state.lastFetchedResp)
-    const lastFetchedSeverityResp = PersistStore(state => state.lastFetchedSeverityResp)
-    const lastCalledSensitiveInfo = PersistStore(state => state.lastCalledSensitiveInfo)
-    const lastFetchedSensitiveResp = PersistStore(state => state.lastFetchedSensitiveResp)
-    const setLastFetchedInfo = PersistStore(state => state.setLastFetchedInfo)
-    const setLastFetchedResp = PersistStore(state => state.setLastFetchedResp)
-    const setLastFetchedSeverityResp = PersistStore(state => state.setLastFetchedSeverityResp)
-    const setLastCalledSensitiveInfo = PersistStore(state => state.setLastCalledSensitiveInfo)
-    const setLastFetchedSensitiveResp = PersistStore(state => state.setLastFetchedSensitiveResp)
-
     const resetFunc = () => {
         setInventoryFlyout(false)
         setFilteredItems([])
@@ -157,50 +146,6 @@ function ApiCollections() {
         func.setToast(true, false, "API collection created successfully")
     }
 
-    async function fetchRiskScoreInfo(){
-        let tempRiskScoreObj = lastFetchedResp
-        let tempSeverityObj = lastFetchedSeverityResp
-        await api.lastUpdatedInfo().then(async(resp) => {
-            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
-                await api.getRiskScoreInfo().then((res) =>{
-                    const newObj = {
-                        criticalUrls: res.criticalEndpointsCount,
-                        riskScoreMap: res.riskScoreOfCollectionsMap, 
-                    }
-                    tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
-                    setLastFetchedResp(newObj);
-                })
-            }
-            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo){
-                await api.getSeverityInfoForCollections().then((resp) => {
-                    tempSeverityObj = JSON.parse(JSON.stringify(resp))
-                    setLastFetchedSeverityResp(resp)
-                })
-            }
-            setLastFetchedInfo({
-                lastRiskScoreInfo: func.timeNow() > resp.lastUpdatedIssues ? func.timeNow() : resp.lastUpdatedIssues,
-                lastSensitiveInfo: func.timeNow() > resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
-            })
-        })
-        let finalObj = {
-            riskScoreObj: tempRiskScoreObj,
-            severityObj: tempSeverityObj
-        }
-        return finalObj
-    }
-    
-    async function fetchSensitiveInfo(){
-        let tempSensitveArr = lastFetchedSensitiveResp
-        if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
-            await api.getSensitiveInfoForCollections().then((resp) => {
-                tempSensitveArr = JSON.parse(JSON.stringify(resp))
-                setLastCalledSensitiveInfo(func.timeNow())
-                setLastFetchedSensitiveResp(resp)
-            })
-        }
-        return tempSensitveArr 
-    }
-
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
@@ -217,10 +162,10 @@ function ApiCollections() {
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
-        const issuesObj = await fetchRiskScoreInfo();
+        const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
         const riskScoreObj = issuesObj.riskScoreObj;
-        const sensitveInfoArr = await fetchSensitiveInfo();
+        const sensitveInfoArr = await transform.fetchSensitiveInfo();
         setLoading(false)
 
         const dataObj = convertToNewData(tmp, sensitveInfoArr, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
@@ -266,11 +211,11 @@ function ApiCollections() {
       const summaryItems = [
         {
             title: "Total APIs",
-            data: summaryData.totalEndpoints,
+            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
         },
         {
             title: "Critical APIs",
-            data: summaryData.totalCriticalEndpoints,
+            data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints),
         },
         {
             title: "Tested APIs (Coverage)",
@@ -278,7 +223,7 @@ function ApiCollections() {
         },
         {
             title: "Sensitive in response APIs",
-            data: summaryData.totalSensitiveEndpoints,
+            data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints),
         }
     ]
 

@@ -14,7 +14,17 @@ const api = {
             method: 'post',
             data: {startTimeStamp,endTimeStamp}
         })
-    }
+    },
+    fetchSubTypeCountMap(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchSubTypeCountMap',
+            method: 'post',
+            data: {
+                startTimestamp, 
+                endTimestamp
+            }
+        })
+    },
 }
 
 export default api;

@@ -5,6 +5,7 @@ import tranform from "../onboarding/transform"
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
+import api from "./api";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -155,6 +156,17 @@ const paramHeaders = [
         showFilterMenu: true
     }
 ]
+
+const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
+const lastFetchedResp = PersistStore.getState().lastFetchedResp
+const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
+const lastCalledSensitiveInfo = PersistStore.getState().lastCalledSensitiveInfo
+const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
+const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
+const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
+const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
+const setLastCalledSensitiveInfo = PersistStore.getState().setLastCalledSensitiveInfo
+const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
 
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
@@ -491,7 +503,52 @@ const transform = {
 
     getParamHeaders(){
         return paramHeaders;
+    },
+
+    async fetchRiskScoreInfo(){
+        let tempRiskScoreObj = lastFetchedResp
+        let tempSeverityObj = lastFetchedSeverityResp
+        await api.lastUpdatedInfo().then(async(resp) => {
+            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
+                await api.getRiskScoreInfo().then((res) =>{
+                    const newObj = {
+                        criticalUrls: res.criticalEndpointsCount,
+                        riskScoreMap: res.riskScoreOfCollectionsMap, 
+                    }
+                    tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
+                    setLastFetchedResp(newObj);
+                })
+            }
+            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo){
+                await api.getSeverityInfoForCollections().then((resp) => {
+                    tempSeverityObj = JSON.parse(JSON.stringify(resp))
+                    setLastFetchedSeverityResp(resp)
+                })
+            }
+            setLastFetchedInfo({
+                lastRiskScoreInfo: func.timeNow() > resp.lastUpdatedIssues ? func.timeNow() : resp.lastUpdatedIssues,
+                lastSensitiveInfo: func.timeNow() > resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
+            })
+        })
+        let finalObj = {
+            riskScoreObj: tempRiskScoreObj,
+            severityObj: tempSeverityObj
+        }
+        return finalObj
+    },
+
+    async fetchSensitiveInfo(){
+        let tempSensitveArr = lastFetchedSensitiveResp
+        if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
+            await api.getSensitiveInfoForCollections().then((resp) => {
+                tempSensitveArr = JSON.parse(JSON.stringify(resp))
+                setLastCalledSensitiveInfo(func.timeNow())
+                setLastFetchedSensitiveResp(resp)
+            })
+        }
+        return tempSensitveArr 
     }
+
       
 }
 
