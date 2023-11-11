@@ -43,6 +43,7 @@
     --p-color-bg-primary-hover: #5400CB !important;
     --p-color-bg-primary-active: #4700AE !important;
     --p-color-bg-primary-subdued-hover: #ECEBFF !important;
+    --p-color-bg-info-subdued-hover: #F2F7FE !important;
 
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
@@ -54,6 +55,7 @@
     --p-color-bg-critical-subdued: #FED3D1 !important;
     --p-color-bg-caution-subdued: #FFD79D !important;
     --p-color-bg-info-subdued: #A4E8F2 !important;
+    --p-color-border-success: var(--akto-primary) !important;
 }
 
 .Polaris-Page{

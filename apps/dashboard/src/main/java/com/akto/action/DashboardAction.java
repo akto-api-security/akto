@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import org.bson.conversions.Bson;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.IssueTrendType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBList;
@@ -21,7 +23,7 @@ public class DashboardAction extends UserAction {
     private Map<Integer,Integer> riskScoreCountMap = new HashMap<>();
     private int startTimeStamp;
     private int endTimeStamp;
-    private Map<Integer,List<Object>> issuesTrendMap = new HashMap<>() ;
+    private Map<Integer,List<IssueTrendType>> issuesTrendMap = new HashMap<>() ;
 
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class);
@@ -62,7 +64,7 @@ public class DashboardAction extends UserAction {
             endTimeStamp = Context.now() ;
         }
 
-        Map<Integer,List<Object>> trendMap = new HashMap<>();
+        Map<Integer,List<IssueTrendType>> trendMap = new HashMap<>();
 
         List<Bson> pipeline = TestingRunIssuesDao.instance.buildPipelineForCalculatingTrend(startTimeStamp, endTimeStamp);
         MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -72,7 +74,14 @@ public class DashboardAction extends UserAction {
                 BasicDBObject basicDBObject = issuesCursor.next();
                 int dayEpoch = basicDBObject.getInt("_id");
                 BasicDBList categoryList = ((BasicDBList) basicDBObject.get("issuesTrend"));
-                trendMap.put(dayEpoch, categoryList);
+                List<IssueTrendType> trendList = new ArrayList<>();
+                for(Object obj: categoryList){
+                    BasicDBObject dbObject = (BasicDBObject) obj;
+                    IssueTrendType trendObj = new IssueTrendType(dbObject.getInt("count"), dbObject.getString("subCategory"));
+                    trendList.add(trendObj);
+                }
+
+                trendMap.put(dayEpoch, trendList);
 
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error in getting issues trend " + e.toString(), LogDb.DASHBOARD);
@@ -82,6 +91,7 @@ public class DashboardAction extends UserAction {
         
         return Action.SUCCESS.toUpperCase();
     }
+
 
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
@@ -103,7 +113,7 @@ public class DashboardAction extends UserAction {
         this.endTimeStamp = endTimeStamp;
     }
 
-    public Map<Integer, List<Object>> getIssuesTrendMap() {
+    public Map<Integer, List<IssueTrendType>> getIssuesTrendMap() {
         return issuesTrendMap;
     }
     

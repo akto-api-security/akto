@@ -179,7 +179,7 @@ function ApiChanges() {
                         data={processChartData()}
                         defaultChartOptions={defaultChartOptions}
                         text="true"
-                        yAxisTitle="Number of issues"
+                        yAxisTitle="Count"
                         width={20}
                         noGap={true}
                     />
