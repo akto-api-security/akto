@@ -1,70 +1,47 @@
 import {create} from "zustand"
 import {devtools, persist, createJSONStorage} from "zustand/middleware"
 
-let persistStore = (set) => ({
+const initialState = {
     leftNavSelected: '',
-    setLeftNavSelected: (selected) =>  set({ leftNavSelected: selected }), 
-    
-    accessToken: null,
-    storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
-
     quickstartTasksCompleted: 0,
-    setQuickstartTasksCompleted: (quickstartTasksCompleted)=>{
-        set({quickstartTasksCompleted: quickstartTasksCompleted})
-    },
     subCategoryMap: {},
-    setSubCategoryMap: (subCategoryMap) => set({subCategoryMap: subCategoryMap}),
     subCategoryFromSourceConfigMap: {},
-    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({subCategoryFromSourceConfigMap: subCategoryFromSourceConfigMap}),
-
     active: '',
-    setActive: (selected) =>  set({ active: selected }),
-    
     collectionsMap: {},
-    setCollectionsMap:(collectionsMap)=>{
-        set({collectionsMap: collectionsMap})
-    },
-
     allCollections: [],
-    setAllCollections:(allCollections)=>{
-        set({allCollections: allCollections})
-    },
-
     hostNameMap: {},
-    setHostNameMap:(hostNameMap)=>{
-        set({hostNameMap: hostNameMap})
-    },
-
     lastFetchedInfo: {
-        lastRiskScoreInfo: 0,
-        lastSensitiveInfo: 0 
+      lastRiskScoreInfo: 0,
+      lastSensitiveInfo: 0,
     },
-    setLastFetchedInfo:(lastFetchedInfo)=>{
-        set({lastFetchedInfo: lastFetchedInfo})
-    },
-
     lastFetchedResp: {
-        criticalUrls: 0,
-        riskScoreMap: {} 
+      criticalUrls: 0,
+      riskScoreMap: {},
     },
-    setLastFetchedResp:(lastFetchedResp)=>{
-        set({lastFetchedResp: lastFetchedResp})
-    },
-
     lastFetchedSeverityResp: {},
-    setLastFetchedSeverityResp:(lastFetchedSeverityResp)=>{
-        set({lastFetchedSeverityResp: lastFetchedSeverityResp})
-    },
-
     lastCalledSensitiveInfo: 0,
-    setLastCalledSensitiveInfo: (lastCalledSensitiveInfo)=>{
-        set({lastCalledSensitiveInfo: lastCalledSensitiveInfo})
-    },
-
     lastFetchedSensitiveResp: [],
-    setLastFetchedSensitiveResp:(lastFetchedSensitiveResp)=>{
-        set({lastFetchedSensitiveResp: lastFetchedSensitiveResp})
-    },
+};
+
+let persistStore = (set) => ({
+    ...initialState,
+    accessToken: null,
+    setLeftNavSelected: (selected) => set({ leftNavSelected: selected }),
+    storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
+    setQuickstartTasksCompleted: (quickstartTasksCompleted) => set({ quickstartTasksCompleted }),
+    setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
+    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({ subCategoryFromSourceConfigMap }),
+    setActive: (selected) => set({ active: selected }),
+    setCollectionsMap: (collectionsMap) => set({ collectionsMap }),
+    setAllCollections: (allCollections) => set({ allCollections }),
+    setHostNameMap: (hostNameMap) => set({ hostNameMap }),
+    setLastFetchedInfo: (lastFetchedInfo) => set({ lastFetchedInfo }),
+    setLastFetchedResp: (lastFetchedResp) => set({ lastFetchedResp }),
+    setLastFetchedSeverityResp: (lastFetchedSeverityResp) => set({ lastFetchedSeverityResp }),
+    setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => set({ lastCalledSensitiveInfo }),
+    setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
+
+    resetAll: () => set(initialState), // Reset function
 })
 
 persistStore = devtools(persistStore)
