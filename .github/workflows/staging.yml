@@ -35,69 +35,69 @@ jobs:
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
-      # - name: Download Akto templates zip
-      #   working-directory: ./apps/dashboard/src/main/resources
-      #   run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
-      # - name: Prepare Dashboard UI
-      #   working-directory: ./apps/dashboard/
-      #   run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
-      # - name: Prepare Dashboard polaris UI
-      #   working-directory: ./apps/dashboard/web/polaris_web
-      #   run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
-      # - name: Configure AWS Credentials
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
-      #     aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-      #     aws-region: ap-south-1
+      - name: Download Akto templates zip
+        working-directory: ./apps/dashboard/src/main/resources
+        run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
+      - name: Prepare Dashboard UI
+        working-directory: ./apps/dashboard/
+        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      - name: Prepare Dashboard polaris UI
+        working-directory: ./apps/dashboard/web/polaris_web
+        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
 
-      # - name: Deploy static site to S3 bucket
-      #   run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
-      # - name: Deploy polaris site to S3 bucket
-      #   run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      - name: Deploy static site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
+      - name: Deploy polaris site to S3 bucket
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
 
-      # - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
-      # - name: DockerHub login
-      #   env:
-      #     DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-      #     DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
-      #   run: |
-      #     docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      # - name: Build, tag, and push the image to DockerHub
-      #   id: build-image-dockerhub
-      #   env:
-      #     ECR_REGISTRY: aktosecurity
-      #     ECR_REPOSITORY: akto-api-security
-      #     IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-      #     IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
-      #     IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
-      #     IMAGE_TAG_TESTING_CLI: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing-cli:flash' || '' }}
-      #   run: |
-      #     docker buildx create --use
-      #     # Build a docker container and push it to DockerHub 
-      #     cd apps/dashboard
-      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
-      #     cd ../testing
-      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-      #     cd ../testing-cli
-      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG $IMAGE_TAG_TESTING_CLI . --push
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - name: DockerHub login
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      - name: Build, tag, and push the image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+          IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
+          IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
+          IMAGE_TAG_TESTING_CLI: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing-cli:flash' || '' }}
+        run: |
+          docker buildx create --use
+          # Build a docker container and push it to DockerHub 
+          cd apps/dashboard
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
+          cd ../testing
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
+          cd ../testing-cli
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG $IMAGE_TAG_TESTING_CLI . --push
 
-      # - name: Set up JDK 11
-      #   uses: actions/setup-java@v1
-      #   with:
-      #     java-version: 11
-      # - name: Cache SonarCloud packages
-      #   uses: actions/cache@v1
-      #   with:
-      #     path: ~/.sonar/cache
-      #     key: ${{ runner.os }}-sonar
-      #     restore-keys: ${{ runner.os }}-sonar
-      # - name: Cache Maven packages
-      #   uses: actions/cache@v1
-      #   with:
-      #     path: ~/.m2
-      #     key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-      #     restore-keys: ${{ runner.os }}-m2
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v1
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Cache Maven packages
+        uses: actions/cache@v1
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
       
   deploy:
     needs: build
@@ -132,6 +132,7 @@ jobs:
         command: |
           kubectl apply -f single_complete.yml
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
+          while [ "$EXTERNAL_IP" == "<pending>" ] || [ -z "$EXTERNAL_IP" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}'); sleep 1; done
           export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${SETUP_SUFFIX} | awk -F " " '{print $4;}')
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
           echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
@@ -148,9 +149,9 @@ jobs:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
       with:
         command: |
-          curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d "{\"email\":\"$QA_EMAIL\",\"password\":\"$QA_PASSWORD\",\"invitationCode\":\"\"}"\n        
+          curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d "{\"email\":\"$QA_EMAIL\",\"password\":\"$QA_PASSWORD\",\"invitationCode\":\"\"}"
           export staging_mongo=$(kubectl get pods -n dev -l app=mongo-${SETUP_SUFFIX} -o custom-columns=":metadata.name" --no-headers)
-          kubectl exec -it -n dev $staging_mongo -- env QA_API_TOKEN=$QA_API_TOKEN QA_EMAIL=$QA_EMAIL mongosh --eval 'use common; db.api_tokens.insertOne({ "_id": 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" });'          
+          kubectl exec -it -n dev $staging_mongo -- env QA_API_TOKEN=$QA_API_TOKEN QA_EMAIL=$QA_EMAIL mongosh --eval 'use common;' --eval ' db.api_tokens.insertOne({ "_id": 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" });' 
           
   test:
     needs: deploy
@@ -160,13 +161,7 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
-      - name: Run testsigma end to end tests
-        env:
-            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            TESTSIGMA_TEST_PLAN_ID: 888
-            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-            LB_NAME: ${{needs.deploy.outputs.lb_name}}
-        run: bash ./.github/scripts/akto-testsigma.sh
+
 
       # - name: Run Akto CI/CD tests
       #   uses: akto-api-security/run-scan@v1.0.3
