@@ -25,6 +25,7 @@ export default function Header() {
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const accounts = Store(state => state.accounts)
     const activeAccount = Store(state => state.activeAccount)
+    const resetAll = PersistStore(state => state.resetAll)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
@@ -50,11 +51,13 @@ export default function Header() {
 
     const handleLogOut = async () => {
         storeAccessToken(null)
+        resetAll();
         await api.logout()
         navigate("/login")
     }
 
     const handleSwitchUI = async () => {
+        resetAll();
         let currPath = window.location.pathname
         await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
         if(currPath.includes("sensitive")){
@@ -93,6 +96,7 @@ export default function Header() {
             onAction: async () => {
                 await api.goToAccount(accountId)
                 func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
+                resetAll();
                 window.location.href = '/dashboard/observe/inventory'
             }
         }
@@ -102,7 +106,7 @@ export default function Header() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
           setNewAccount('')
-
+          resetAll();
           window.location.href="/dashboard/onboarding"
         })
     }      
