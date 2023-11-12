@@ -113,7 +113,7 @@ jobs:
     steps:
     - name: Fetch kube yaml
       run: |
-        wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
         envsubst < single.yml > single_complete.yml
 
     - name: Configure AWS credentials
