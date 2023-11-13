@@ -108,12 +108,16 @@ jobs:
       contents: read
     env: 
       SETUP_SUFFIX: ${{needs.build.outputs.IMAGE_TAG}}
+      FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
+      FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
+
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
+    #revert branch name
     - name: Fetch kube yaml
       run: |
-        wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
         envsubst < single.yml > single_complete.yml
 
     - name: Configure AWS credentials
@@ -165,16 +169,18 @@ jobs:
       # - name: Run Akto CI/CD tests
       #   uses: akto-api-security/run-scan@v1.0.3
       #   with:
-      #     AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+      #     AKTO_DASHBOARD_URL: https://flash.staging.akto.io
       #     AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-      #     AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
+      #     AKTO_TEST_ID: 6551e9662e8be73da145d311
 
-      # - name: Check for Akto test completion
-      #   env:
-      #       AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
-      #       AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-      #       AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
-      #   run: bash ./.github/scripts/akto-cicd.sh
+      - name: Check for Akto test completion
+        env:
+            AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+            LB_NAME: ${{needs.deploy.outputs.lb_name}}
+            #AKTO_TEST_ID: 6551e9662e8be73da145d311
+
+        run: bash ./.github/scripts/akto-cicd.sh
 
       - name: Check Vulnerable API's
         working-directory: ./.github/scripts
@@ -195,10 +201,13 @@ jobs:
       contents: read
     env: 
       SETUP_SUFFIX: ${{needs.build.outputs.IMAGE_TAG}}
+      FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
+      FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
     - name: Fetch kube yaml
+      #revert branch name
       run: |
-        wget https://raw.githubusercontent.com/akto-api-security/infra/feature/ephemeral_env/single.yml
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
         envsubst < single.yml > single_complete.yml
 
     - name: Configure AWS credentials
