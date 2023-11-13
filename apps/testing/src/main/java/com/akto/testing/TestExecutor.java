@@ -522,12 +522,12 @@ public class TestExecutor {
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
-        int random = (int) ( ( Math.random() * 10 ) + 4);
         for (String testSubCategory: testSubCategories) {
+            List<TestingRunResult> testingRunResults = new ArrayList<>();
+
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null) continue;
             TestingRunResult testingRunResult = null;
@@ -542,12 +542,6 @@ public class TestExecutor {
             }
             if (testingRunResult != null) testingRunResults.add(testingRunResult);
 
-            if (!testingRunResults.isEmpty() && testingRunResults.size() % random == 0) {
-                insertResultsAndMakeIssues(testingRunResults);
-            }
-        }
-
-        if(!testingRunResults.isEmpty()){        
             insertResultsAndMakeIssues(testingRunResults);
         }
 
