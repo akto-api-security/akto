@@ -20,6 +20,10 @@ api_selection_filters:
   response_code:
     gte: 200
     lt: 300
+  response_payload:
+    not_contains_either:
+      - 'version'
+      - 'jobs'
   url:
     extract: urlVar
   
@@ -32,7 +36,8 @@ execute:
 
 validate:
   response_code:
-    eq: 200
+    gte: 200
+    lt: 300
   response_payload:
     contains_all:
       - 'version'

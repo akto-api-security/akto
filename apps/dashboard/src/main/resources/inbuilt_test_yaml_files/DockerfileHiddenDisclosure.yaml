@@ -24,6 +24,14 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
+  response_payload:
+    not_contains_either:
+      - "CACHE"
+      - "RUN"
+      - "ADD"
+      - "WORKDIR"
+      - "ENV"
+      - "EXPOSE"
 
 wordLists:
   urlPaths:
@@ -38,7 +46,8 @@ execute:
       
 validate:
   response_code:
-    eq: 200
+    gte: 200
+    lt: 300
   response_payload:
     regex: '^(?:FROM(?:CACHE)?|RUN|ADD|WORKDIR|ENV|EXPOSE|\#)\s+[ -~]+'
   response_headers:

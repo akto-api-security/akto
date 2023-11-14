@@ -39,6 +39,15 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
+  response_payload:
+    not_contains_either:
+      - "Interactive Console"
+      - "Debug mode"
+      - "Traceback"
+      - "Flask version"
+      - "WERKZEUG DEBUG"
+      - "Local Variables"
+      - "Debug PIN"
 
 execute:
   type: single
@@ -48,7 +57,14 @@ execute:
 
 validate:
   response_code: 
-    eq: 200
+    gte: 200
+    lt: 300
   response_payload:
-    contains_all: 
+    contains_either: 
       - "Interactive Console"
+      - "Debug mode"
+      - "Traceback"
+      - "Flask version"
+      - "WERKZEUG DEBUG"
+      - "Local Variables"
+      - "Debug PIN"

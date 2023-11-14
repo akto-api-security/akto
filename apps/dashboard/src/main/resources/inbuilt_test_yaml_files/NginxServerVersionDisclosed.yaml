@@ -46,5 +46,9 @@ validate:
   response_code:
     eq: 200
   response_headers:
-      regex: nginx/[0-9.]+
+      contains_either:
+        - "nginx/"
+        - "Server: nginx"
+        - "X-Powered-By: nginx"
+
         

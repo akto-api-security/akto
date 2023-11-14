@@ -8,7 +8,7 @@ info:
   impact: "An XSS vulnerability can have significant impacts, including the potential for data theft, unauthorized access, session hijacking, defacement of web pages, and the injection of malicious content."
   category:
     name: XSS
-    shortName: XXS
+    shortName: XSS
     displayName: Cross-site scripting (XSS)
   subCategory: BASIC_XSS
   severity: HIGH

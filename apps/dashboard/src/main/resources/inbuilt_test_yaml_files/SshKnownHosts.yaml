@@ -25,6 +25,12 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
+  response_payload:
+    not_contains_either:
+      - "ssh-dss"
+      - "ssh-ed25519"
+      - "ssh-rsa"
+      - "ecdsa-sha2-nistp256"
 
 wordLists:
   urlPaths:
@@ -39,7 +45,8 @@ execute:
 
 validate:
   response_code:
-    eq: 200
+    gte: 200
+    lt: 300
   response_payload:
     contains_either:
       - "ssh-dss"

@@ -27,6 +27,10 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
+  response_payload:
+    not_contains_either:
+      - '[core]'
+      - '[api]'
   
 execute:
   type: single

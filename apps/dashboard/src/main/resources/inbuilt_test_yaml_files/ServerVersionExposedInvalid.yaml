@@ -46,9 +46,6 @@ execute:
       - modify_url: ${urlVar}invalidTestUrl
 
 validate:
-  response_code:
-    gte: 200
-    lt: 300
   response_headers:
     for_one:
       key:

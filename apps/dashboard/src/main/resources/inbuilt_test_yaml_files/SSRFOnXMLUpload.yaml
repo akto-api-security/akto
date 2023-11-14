@@ -28,6 +28,13 @@ info:
     - CVE-2022-4725
 
 api_selection_filters:
+  response_payload:
+    not_contains_either:
+      - "ami-id"
+      - "ami-launch-index"
+      - "ami-manifest-path"
+      - "block-device-mapping"
+      - "instance-action"
   response_code:
     and:
       gte: 200
