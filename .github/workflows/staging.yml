@@ -113,6 +113,26 @@ jobs:
     - run: |
         ls
         pwd
+            
+    - name: test1
+      id: test1
+      uses: davi020/kubectl-advanced@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+      with:
+        command: |
+          cd .github
+          ls
+
+    - name: test2
+      id: test2
+      uses: davi020/kubectl-advanced@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+      with:
+        command: |
+          pwd
+          ls
 
 
   #   - name: Fetch kube yaml
