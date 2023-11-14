@@ -17,6 +17,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -35,12 +36,14 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.EmailAccountName;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
@@ -69,6 +72,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,6 +196,57 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+    public void setUpAktoMixpanelEndpointsScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            raiseMixpanelEvent();
+
+                        } catch (Exception e) {
+                        }
+                    }
+                }, "akto-mixpanel-endpoints-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static void raiseMixpanelEvent() {
+
+        int now = Context.now();
+        List<BasicDBObject> totalEndpoints = new InventoryAction().fetchRecentEndpoints(0, now);
+        List<BasicDBObject> newEndpoints  = new InventoryAction().fetchRecentEndpoints(now - 604800, now);
+
+        DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
+
+        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN);
+
+        if (record == null) {
+            return;
+        }
+
+        BasicDBObject mentionedUser = UsersDao.instance.getUserInfo(record.getUserId());
+        String userEmail = (String) mentionedUser.get("name");
+
+        String distinct_id = userEmail + "_" + dashboardMode;
+
+        EmailAccountName emailAccountName = new EmailAccountName(userEmail);
+        String accountName = emailAccountName.getAccountName();
+
+        JSONObject props = new JSONObject();
+        props.put("Email ID", userEmail);
+        props.put("Dashboard Mode", dashboardMode);
+        props.put("Account Name", accountName);
+        props.put("Total Endpoints", totalEndpoints.size());
+        props.put("New Endpoints", newEndpoints.size());
+
+        AktoMixpanel aktoMixpanel = new AktoMixpanel();
+        aktoMixpanel.sendEvent(distinct_id, "Endpoints Populated", props);
+
+    }
+    
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1104,6 +1159,7 @@ public class InitializerListener implements ServletContextListener {
                             }
                         }, "context-initializer");
                         setUpTrafficAlertScheduler();
+                        setUpAktoMixpanelEndpointsScheduler();
                         SingleTypeInfo.init();
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
