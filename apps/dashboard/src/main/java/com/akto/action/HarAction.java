@@ -54,6 +54,11 @@ public class HarAction extends UserAction {
 
     @Override
     public String execute() throws IOException {
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            skipKafka = true;
+        }
+
         ApiCollection apiCollection = null;
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
