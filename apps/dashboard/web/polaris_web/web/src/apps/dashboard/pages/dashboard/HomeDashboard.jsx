@@ -15,6 +15,8 @@ import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
 import testingFunc from "../testing/transform"
 import InitialSteps from './components/InitialSteps';
+import CoverageCard from './components/CoverageCard';
+import PersistStore from '../../../main/PersistStore';
 
 function HomeDashboard() {
 
@@ -25,7 +27,11 @@ function HomeDashboard() {
     const [riskScoreObj, setRiskScoreObj]= useState({}) ;
     const [sensitiveArr, setSensitiveArr]= useState([]) ;
     const [sensitiveData, setSensitiveData] = useState({request: {}, response: {}})
-    const [subCategoryInfo, setSubCategoryInfo] = useState({})
+    const [subCategoryInfo, setSubCategoryInfo] = useState({});
+    const [coverageObj, setCoverageObj] = useState({})
+
+    const allCollections = PersistStore(state => state.allCollections)
+    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const riskScoreTrendRef = useRef(null)
 
@@ -33,7 +39,6 @@ function HomeDashboard() {
         setLoading(true)
         // all apis 
         let apiPromises = [
-            observeApi.getAllCollections(),
             observeApi.getCoverageInfoForCollections(),
             api.getRiskScoreRangeMap(),
             api.getIssuesTrend((func.timeNow() - func.recencyPeriod), func.timeNow()),
@@ -43,14 +48,14 @@ function HomeDashboard() {
         
         let results = await Promise.allSettled(apiPromises);
 
-        let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
-        let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
-        let riskScoreRangeMap = results[2].status === 'fulfilled' ? results[2].value : {};
-        let issuesTrendResp = results[3].status === 'fulfilled' ? results[3].value : {};
-        let sensitiveDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
-        let subcategoryDataResp = results[4].status === 'fulfilled' ? results[5].value : {} ;
+        let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
+        let riskScoreRangeMap = results[1].status === 'fulfilled' ? results[1].value : {};
+        let issuesTrendResp = results[2].status === 'fulfilled' ? results[2].value : {};
+        let sensitiveDataResp = results[3].status === 'fulfilled' ? results[3].value : {} ;
+        let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
 
-        setCountInfo(transform.getCountInfo((apiCollectionsResp?.apiCollections || []), coverageInfo))
+        setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
+        setCoverageObj(coverageInfo)
         setRiskScoreRangeMap(riskScoreRangeMap);
         setIssuesTrendMap(transform.formatTrendData(issuesTrendResp));
         setSensitiveData(transform.getFormattedSensitiveData(sensitiveDataResp.response))
@@ -229,7 +234,10 @@ function HomeDashboard() {
                 />
             </div>
             <div style={{flex: 3}}>
-                <InitialSteps />
+                <VerticalStack gap={5}>
+                    <InitialSteps />
+                    <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
+                </VerticalStack>
             </div>
         </div>
     )
