@@ -1,0 +1,17 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: mirror-api-logging
+          image: aktosecurity/mirror-api-logging:k8s_agent
+          env: 
+            - name: AKTO_TRAFFIC_BATCH_TIME_SECS
+              value: "10"
+            - name: AKTO_TRAFFIC_BATCH_SIZE
+              value: "100"
+            - name: AKTO_INFRA_MIRRORING_MODE
+              value: "gcp"
+            - name: AKTO_KAFKA_BROKER_MAL
+              value: ${FLASH_NLB_DNS}
+            - name: AKTO_MONGO_CONN
+              value: ${FLASH_MONGO_CONN}
