@@ -108,14 +108,13 @@ jobs:
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
-    #revert branch name and remove ls
+    #revert branch name
     - name: Fetch kube yaml
       run: |
+        cd .github/k8s
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
         cat single.yml | sed "s/latest/${IMAGE_TAG}/g" > single_complete.yml
-        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/akto_k8s_agent.yml
         envsubst < akto_k8s_agent.yml > akto_k8s_agent_complete.yml
-        ls
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -131,6 +130,7 @@ jobs:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
       with:
         command: |
+          cd .github/k8s
           kubectl apply -f single_complete.yml
           kubectl patch deployment/akto-api-security-dashboard-${IMAGE_TAG} -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
