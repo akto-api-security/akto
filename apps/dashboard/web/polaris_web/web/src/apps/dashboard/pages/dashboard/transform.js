@@ -178,6 +178,30 @@ const transform = {
             response: transform.getTrendData(responseObj),
         }
 
+    },
+
+    getStatus: (coverage)=>{
+        if(coverage <= 20){
+            return "critical";
+        }else if(coverage <= 50){
+            return "highlight";
+        }else{
+            return "success";
+        }
+    },
+
+    formatCoverageData: (coverageObj, collections) =>{
+        const finalArr = [] ;
+        collections.forEach((x) => {
+            let coverage = coverageObj[x.id] ? Math.ceil((100 * coverageObj[x.id])/x.urlsCount) : 0;
+            finalArr.push( {
+                id: x.id,
+                coverage: coverage,
+                status: transform.getStatus(coverage)
+            })
+        })
+        return finalArr.sort((a, b) => a.coverage - b.coverage);
+
     }
 }
 export default transform;

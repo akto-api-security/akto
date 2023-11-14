@@ -95,7 +95,7 @@ function InitialSteps() {
                             <Text variant="bodyLg" fontWeight="semibold">Get started checklist</Text>
                             <HorizontalStack gap={1}>
                                 <Box width='85%'>
-                                    <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} color="success" />
+                                    <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} color="primary" />
                                 </Box>
                                 <Text color="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
                             </HorizontalStack>
