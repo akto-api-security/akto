@@ -128,8 +128,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         Bson projections = Projections.fields(
             Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD),
-            Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch})),
-            Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch}))
+            Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch}))
         );
 
         pipeline.add(Aggregates.project(projections));

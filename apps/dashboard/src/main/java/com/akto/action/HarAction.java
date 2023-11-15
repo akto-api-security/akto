@@ -8,6 +8,7 @@ import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
@@ -54,8 +55,7 @@ public class HarAction extends UserAction {
 
     @Override
     public String execute() throws IOException {
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+        if (InitializerListener.isKubernetes()) {
             skipKafka = true;
         }
 
