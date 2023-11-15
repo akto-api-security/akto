@@ -56,7 +56,7 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
 
         if (counter == 1) {
             String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         }
     }
 }

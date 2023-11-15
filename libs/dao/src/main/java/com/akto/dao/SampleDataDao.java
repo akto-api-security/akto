@@ -52,7 +52,7 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
 
         if (counter == 1) {
             String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
             counter++;
         }
 
