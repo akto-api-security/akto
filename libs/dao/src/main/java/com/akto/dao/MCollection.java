@@ -272,4 +272,29 @@ public abstract class MCollection<T> {
 
     }
 
+    public static boolean createIndexIfAbsent(String dbName, String collName, String[] fieldNames, boolean isAscending) {
+
+        Bson indexInfo = isAscending ? Indexes.ascending(fieldNames) : Indexes.descending(fieldNames);
+
+        String name = "";
+
+        int lenPerField = 30/fieldNames.length - 1;
+
+        for (String field: fieldNames) {
+
+            String[] tokens = field.split("\\.");
+            String lastToken = tokens[tokens.length-1];
+            lastToken = lastToken.substring(0, Math.min(lenPerField, lastToken.length()));
+            if (!name.isEmpty()) {
+                name += "-";
+            }
+            name += lastToken;
+        }
+
+        name += ("_");
+        name += (isAscending ? "1" : "-1");
+
+        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
+    }
+
 }
