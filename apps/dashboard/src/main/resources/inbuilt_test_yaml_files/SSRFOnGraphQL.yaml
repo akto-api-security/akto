@@ -1,57 +1,57 @@
 id: SSRF_DETECTION_TEST
 info:
-  name: SSRF Attack Detection for GraphQL APIs
-  description: |
-    "Test to detect SSRF attacks in GraphQL APIs by sending a GraphQL query with a potential SSRF payload and validating the response for SSRF detection."
-    "This test aims to identify whether the GraphQL API is vulnerable to SSRF attacks. It sends a GraphQL query containing a potential SSRF payload by specifying a malicious website as the user's ID. The expectation is that the API should detect and prevent SSRF, responding with an error message such as 'Invalid URL'."
-
-  details: |
-    "#### Test Steps:"
-    "1. **Send GraphQL Query:** A GraphQL query is sent to the API with a user ID parameter containing a potential SSRF payload."
-    "2. **Validate Response:** The response is validated to ensure that the API has detected and responded appropriately to the SSRF attempt."
-
-    "#### Expected Outcome:"
-    "If the GraphQL API is properly secured against SSRF attacks, the response body should contain an error message indicating 'Invalid URL' or a similar SSRF detection message."
-
-tags:
-  - SSRF
-  - GraphQL
-  - Security Testing
-  - Automated Testing
-
-severity: MEDIUM
-
-cwe:
-  - CWE-918
-  - CWE-918
-
-references:
-  - "https://owasp.org/www-community/attacks/Server_Side_Request_Forgery"
-  - "https://cwe.mitre.org/data/definitions/918.html"
-
+  name: "SSRF Attack Detection for GraphQL APIs"
+  description: "Server Side Request Forgery (SSRF) vulnerability in WordPress WPGraphQL Plugin."
+  details: >
+    "This Server Side Request Forgery (SSRF) vulnerability in WordPress WPGraphQL Plugin. This could allow a malicious actor to cause a website to execute website requests to an arbitrary domain of the attacker. This could allow a malicious actor to find sensitive information of other services running on the system. This vulnerability has been fixed in version 1.14.6."
+    "The web server receives a URL or similar request from an upstream component and retrieves the contents of this URL, but it does not sufficiently ensure that the request is being sent to the expected destination."
+  category:
+    name: SSRF
+    shortName: Server Side Request Forgery
+    displayName: Server Side Request Forgery (SSRF)
+  subCategory: SSRF_ON_GRAPHQL
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.cvedetails.com/cve/CVE-2023-23684/"
+    - "https://cwe.mitre.org/data/definitions/918.html"
+  cwe:
+    - CWE-918
+  cve:
+    - CVE-2023-23684
+    
 api_selection_filters:
   response_code:
-    gte: 200
-    lt: 300
-  content_type:
-    - application/json
+    and:
+      gte: 200
+      lt: 205
+  or:
+    - query_param:
+        for_one:
+          key:
+            contains_either:
+                - invoiceId
+            extract: invoiceId
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+                - invoiceId
+            extract: invoiceId
 
 execute:
   type: single
   requests:
     - req:
-      - method: POST
-      - url: https://graphql-api-endpoint.com
-      - headers:
-          Content-Type: application/json
-      - body: |
-          {
-            "query": "query { user(id: \"https://malicious-website.com\") { id, name } }"
-          }
+        - modify_query_param:
+            invoiceId: "https://pentesting101.requestcatcher.com/test"
 
 validate:
   response_code:
     gte: 200
     lt: 300
-  body:
-    contains: "Invalid URL"
+  response_payload:
+    regex: "Leaked Admin Token"
