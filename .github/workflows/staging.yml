@@ -109,7 +109,8 @@ jobs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
     #revert branch name
-    - name: Fetch kube yaml
+    - uses: actions/checkout@v2
+    - name: Fetch and setup akto & akto k8s agent kube yaml
       run: |
         cd .github/k8s
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
