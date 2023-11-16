@@ -106,10 +106,14 @@ jobs:
     steps:
     #revert branch name
     - uses: actions/checkout@v2
-    - name: Fetch and setup akto & akto k8s agent kube yaml
+    - name: Install Helm
       run: |
-        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
-        cat single.yml | sed "s/latest/${IMAGE_TAG}/g" > single_complete.yml
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    - name: addd helm repo and setup mongo, akto-k8s-agent kube yaml's
+      run: |
+        helm repo add akto https://akto-api-security.github.io/helm-charts
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
+        cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
         wget https://raw.githubusercontent.com/akto-api-security/infra/flash/akto_k8s_agent.yml
         envsubst < akto_k8s_agent.yml > akto_k8s_agent_complete.yml
 
@@ -127,11 +131,17 @@ jobs:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
       with:
         command: |
-          kubectl apply -f single_complete.yml
-          kubectl patch deployment/akto-api-security-dashboard-${IMAGE_TAG} -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
+          kubectl apply -n dev -f mongo_complete.yml
+          helm install ${IMAGE_TAG} akto/akto -n dev \
+            --set mongo.aktoMongoConn="mongodb://mongo-${IMAGE_TAG}.dev.svc.cluster.local:27017/admini" \
+            --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
+            --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
+            --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
+            --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
+          kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
-          while [ "$EXTERNAL_IP" == "<pending>" ] || [ -z "$EXTERNAL_IP" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${IMAGE_TAG} | awk -F " " '{print $4;}'); sleep 1; done
-          export LB_NAME=$(kubectl get svc -n dev | grep akto-api-security-dashboard-${IMAGE_TAG} | awk -F " " '{print $4;}')
+          while [ "$EXTERNAL_IP" == "<pending>" ] || [ -z "$EXTERNAL_IP" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
+          export LB_NAME=EXTERNAL_IP
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
           echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
           while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
@@ -148,7 +158,7 @@ jobs:
       with:
         command: |
           curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d "{\"email\":\"$QA_EMAIL\",\"password\":\"$QA_PASSWORD\",\"invitationCode\":\"\"}"
-          export staging_mongo=$(kubectl get pods -n dev -l app=mongo-akto-${IMAGE_TAG} -o custom-columns=":metadata.name" --no-headers)
+          export staging_mongo=$(kubectl get pods -n dev -l app=mongo-${IMAGE_TAG} -o custom-columns=":metadata.name" --no-headers)
           kubectl exec -it -n dev $staging_mongo -- env QA_API_TOKEN=$QA_API_TOKEN QA_EMAIL=$QA_EMAIL mongosh --eval 'use common;' --eval ' db.api_tokens.insertOne({ "_id": 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" });' 
           
   test:
@@ -190,11 +200,15 @@ jobs:
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
+    - name: Install Helm
+      run: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
     - name: Fetch kube yaml
       #revert branch name
       run: |
-        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/single.yml
-        cat single.yml | sed "s/latest/${IMAGE_TAG}/g" > single_complete.yml
+        helm repo add akto https://akto-api-security.github.io/helm-charts
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
+        cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -209,7 +223,10 @@ jobs:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
         IMAGE_TAG: ${{ github.sha }}
       with:
-        args: delete -f single_complete.yml
+        command: |
+          kubectl delete -n dev -f mongo_complete.yml
+          helm uninstall -n dev ${IMAGE_TAG}
+
         
     - name: cluster status
       uses: kodermax/kubectl-aws-eks@main
