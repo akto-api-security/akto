@@ -56,7 +56,7 @@ function CreateNewCollectionModal(props) {
     function conditionsReducer(draft, action) {
         switch (action.type) {
             case "add": draft.push(action.obj); break;
-            case "update": draft[action.index] = { ...draft[action.index], ...action.obj }; break;
+            case "update": draft[action.index] = { ...action.obj }; break;
             case "delete": return draft.filter((item, index) => index !== action.index);
             case "clear": return [];
             default: break;
