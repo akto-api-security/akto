@@ -117,7 +117,7 @@ async function main() {
           }
         }
 
-        await sleep(500)
+        await sleep(100)
       }
 
       logGithubStepSummary("#### Missing ")
