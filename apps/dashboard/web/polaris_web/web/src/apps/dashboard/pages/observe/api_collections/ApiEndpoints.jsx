@@ -21,6 +21,7 @@ import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import {ApiGroupModal, Operation} from "./ApiGroupModal"
+import TooltipText from "../../../components/shared/TooltipText"
 
 const headings = [
     {
@@ -542,7 +543,9 @@ function ApiEndpoints() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg' truncate>{pageTitle}</Text>
+                <Box maxWidth="35vw">
+                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
+                </Box>
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={secondaryActionsComponent}

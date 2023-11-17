@@ -257,7 +257,7 @@ function SingleTestRunPage() {
       await fetchData(true);
     }
     loadData();
-  }, [])
+  }, [subCategoryMap])
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
