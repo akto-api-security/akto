@@ -47,7 +47,7 @@ jobs:
           kubectl apply -n dev -f mongo_complete.yml
 
           helm repo add akto https://akto-api-security.github.io/helm-charts
-          export AKTO_MONGO_IP=$(kubectl get services/mongo-latest -n dev -o jsonpath="{.spec.clusterIP}")
+          export AKTO_MONGO_IP=$(kubectl get services/mongo-${IMAGE_TAG} -n dev -o jsonpath="{.spec.clusterIP}")
           
           echo $AKTO_MONGO_IP >> $GITHUB_STEP_SUMMARY
           echo "starting helm install..." >> $GITHUB_STEP_SUMMARY
