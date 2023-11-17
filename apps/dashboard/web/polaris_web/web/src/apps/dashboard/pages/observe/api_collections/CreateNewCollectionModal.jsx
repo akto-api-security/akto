@@ -94,11 +94,8 @@ function CreateNewCollectionModal(props) {
                         {showApiSelector ? "Create empty collection" : "Add endpoints"}
                     </Button>
                 </span>
-            </VerticalStack>
-        </Modal.Section>
         {
-            showApiSelector ?
-                <Modal.Section>
+        showApiSelector ? <>
                     <VerticalStack gap={2}>
                         {
                             conditions.length > 0 && conditions.map((condition, index) => (
@@ -115,13 +112,14 @@ function CreateNewCollectionModal(props) {
                             ))
                         }
                     </VerticalStack>
-                    <br />
                     <HorizontalStack gap={4} align="start">
                         <Button onClick={handleAddField}>Add condition</Button>
                         <Button plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</Button>
                     </HorizontalStack>
-                </Modal.Section> : null
+                    </> : null
         }
+        </VerticalStack>
+    </Modal.Section>
 
     </Modal>)
 
