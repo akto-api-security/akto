@@ -47,8 +47,10 @@ jobs:
           kubectl apply -n dev -f mongo_complete.yml
 
           helm repo add akto https://akto-api-security.github.io/helm-charts
+          AKTO_MONGO_IP=$(kubectl get services/mongo-latest -n dev -o jsonpath="{.spec.clusterIP}")
+          
           helm install ${IMAGE_TAG} akto/akto -n dev \
-            --set mongo.aktoMongoConn="mongodb://mongo-${IMAGE_TAG}.dev.svc.cluster.local:27017/admini" \
+            --set mongo.aktoMongoConn="mongodb://${AKTO_MONGO_IP}:27017/admini" \
             --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
             --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
             --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
