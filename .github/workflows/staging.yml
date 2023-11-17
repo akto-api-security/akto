@@ -15,7 +15,7 @@ jobs:
       id-token: write
       contents: read
     env: 
-      IMAGE_TAG: master
+      IMAGE_TAG: latest
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
 
@@ -112,7 +112,7 @@ jobs:
       id-token: write
       contents: read
     env: 
-      IMAGE_TAG: master
+      IMAGE_TAG: latest
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
@@ -134,7 +134,7 @@ jobs:
       uses: koslib/helm-eks-action@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-        IMAGE_TAG: master
+        IMAGE_TAG: latest
       with:
         command: |
           kubectl delete -n dev -f mongo_complete.yml
