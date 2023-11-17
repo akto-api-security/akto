@@ -48,7 +48,10 @@ jobs:
 
           helm repo add akto https://akto-api-security.github.io/helm-charts
           export AKTO_MONGO_IP=$(kubectl get services/mongo-latest -n dev -o jsonpath="{.spec.clusterIP}")
+          
           echo $AKTO_MONGO_IP >> $GITHUB_STEP_SUMMARY
+          echo "starting helm install..." >> $GITHUB_STEP_SUMMARY
+          
           helm install ${IMAGE_TAG} akto/akto -n dev \
             --set mongo.aktoMongoConn="mongodb://${AKTO_MONGO_IP}:27017/admini" \
             --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
@@ -56,10 +59,16 @@ jobs:
             --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
             --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
 
+          echo "initiating patch..." >> $GITHUB_STEP_SUMMARY
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
+
+          echo "current status..." >> $GITHUB_STEP_SUMMARY
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
+
+          echo $EXTERNAL_IP >> $GITHUB_STEP_SUMMARY
+          
           while [[ "${EXTERNAL_IP}" == "<pending>" ]] ||  [ -z "${EXTERNAL_IP}" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
-          export LB_NAME=EXTERNAL_IP
+          export LB_NAME=$EXTERNAL_IP
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
           echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
           while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
