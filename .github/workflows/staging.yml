@@ -63,7 +63,6 @@ jobs:
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
 
           echo "current status..." >> $GITHUB_STEP_SUMMARY
-          kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
 
           echo $EXTERNAL_IP >> $GITHUB_STEP_SUMMARY
           
