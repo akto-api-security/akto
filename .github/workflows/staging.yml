@@ -102,44 +102,41 @@ jobs:
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
 
     outputs:
-      lb_name: ${{ steps.wait_cluster.outputs.lb_name }}
+      lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
     #revert branch name
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
-        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
-        aws-region: ap-south-1
-
-    - name: Fetch mongo, akto-k8s-agent kube yaml's
+    - name: Setup mongo, akto-k8s-agent kube yaml's
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
         cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
         wget https://raw.githubusercontent.com/akto-api-security/infra/flash/akto_k8s_agent.yml
         envsubst < akto_k8s_agent.yml > akto_k8s_agent_complete.yml
 
-    - name: Setup helm and deploy akto cluster
-      env:
-        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-      run: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-        helm repo add akto https://akto-api-security.github.io/helm-charts
-        helm install ${IMAGE_TAG} akto/akto -n dev \
-          --set mongo.aktoMongoConn="mongodb://mongo-${IMAGE_TAG}.dev.svc.cluster.local:27017/admini" \
-          --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
-          --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
-          --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
-          --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG}   
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+        aws-region: ap-south-1
         
-    - name: Deploy mongo, k8s agent and wait for dashboard
-      id: wait_cluster
+    - name: deploy to cluster
+      id: deploy_cluster
       uses: davi020/kubectl-advanced@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
       with:
         command: |
           kubectl apply -n dev -f mongo_complete.yml
+
+          helm repo add akto https://akto-api-security.github.io/helm-charts
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm install ${IMAGE_TAG} akto/akto -n dev \
+            --set mongo.aktoMongoConn="mongodb://mongo-${IMAGE_TAG}.dev.svc.cluster.local:27017/admini" \
+            --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
+            --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
+            --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
+            --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
+
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
           while [ "$EXTERNAL_IP" == "<pending>" ] || [ -z "$EXTERNAL_IP" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
@@ -152,7 +149,7 @@ jobs:
     - name: setup test environment
       uses: davi020/kubectl-advanced@master
       env:
-        lb_name: ${{steps.wait_cluster.outputs.lb_name}}
+        lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
         QA_EMAIL: ${{vars.QA_EMAIL}}
         QA_PASSWORD: ${{secrets.QA_PASSWORD}}
         QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
@@ -202,6 +199,12 @@ jobs:
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
+        
+    - name: Fetch kube yaml
+      #revert branch name
+      run: |
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
+        cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -209,29 +212,20 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
         aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
         aws-region: ap-south-1
-
-    - name: Fetch kube yaml
-      #revert branch name
-      run: |
-        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
-        cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
-
-    - name: Delete akto cluster  
-      env:
-        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-      run: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-        helm repo add akto https://akto-api-security.github.io/helm-charts
-        helm uninstall -n dev ${IMAGE_TAG}
-      
-    - name: delete mongo
+        
+    - name: delete cluster
       uses: kodermax/kubectl-aws-eks@main
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{ github.sha }}
       with:
         command: |
           kubectl delete -n dev -f mongo_complete.yml
-        
+
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm repo add akto https://akto-api-security.github.io/helm-charts
+          helm uninstall -n dev ${IMAGE_TAG}
+
     - name: cluster status
       uses: kodermax/kubectl-aws-eks@main
       env:
