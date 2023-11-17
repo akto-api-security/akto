@@ -58,7 +58,7 @@ jobs:
 
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
           kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
-          while [ "$EXTERNAL_IP" == "<pending>" ] || [ -z "$EXTERNAL_IP" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
+          while [[ "${EXTERNAL_IP}" == "<pending>" ]] ||  [ -z "${EXTERNAL_IP}" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
           export LB_NAME=EXTERNAL_IP
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
           echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
