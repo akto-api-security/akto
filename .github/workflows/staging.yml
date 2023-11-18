@@ -16,6 +16,6 @@ jobs:
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 6558b295e9fca33d79d44994
+          AKTO_TEST_ID: 65590b1ce9fca33d79d45440
           START_TIME_DELAY: 2
           OVERRIDEN_TEST_APP_URL: https://ironman.demo.akto.io:443
