@@ -101,6 +101,8 @@ jobs:
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
 
+
+
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
@@ -121,7 +123,7 @@ jobs:
         
     - name: deploy to cluster
       id: deploy_cluster
-      uses: davi020/kubectl-advanced@master
+      uses: koslib/helm-eks-action@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
       with:
@@ -129,25 +131,34 @@ jobs:
           kubectl apply -n dev -f mongo_complete.yml
 
           helm repo add akto https://akto-api-security.github.io/helm-charts
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          export AKTO_MONGO_IP=$(kubectl get services/mongo-${IMAGE_TAG} -n dev -o jsonpath="{.spec.clusterIP}")
+          
+          echo $AKTO_MONGO_IP >> $GITHUB_STEP_SUMMARY
+          echo "starting helm install..." >> $GITHUB_STEP_SUMMARY
+          
           helm install ${IMAGE_TAG} akto/akto -n dev \
-            --set mongo.aktoMongoConn="mongodb://mongo-${IMAGE_TAG}.dev.svc.cluster.local:27017/admini" \
+            --set mongo.aktoMongoConn="mongodb://${AKTO_MONGO_IP}:27017/admini" \
             --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
             --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
             --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
             --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
 
+          echo "initiating patch..." >> $GITHUB_STEP_SUMMARY
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
-          kubectl get pods -n dev >> $GITHUB_STEP_SUMMARY
-          while [ "$EXTERNAL_IP" == "<pending>" ] || [ -z "$EXTERNAL_IP" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
-          export LB_NAME=EXTERNAL_IP
+
+          echo "current status..." >> $GITHUB_STEP_SUMMARY
+
+          echo $EXTERNAL_IP >> $GITHUB_STEP_SUMMARY
+          
+          while [[ "${EXTERNAL_IP}" == "<pending>" ]] ||  [ -z "${EXTERNAL_IP}" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
+          export LB_NAME=$EXTERNAL_IP
           echo $LB_NAME >> $GITHUB_STEP_SUMMARY
           echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
           while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
           echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
 
     - name: setup test environment
-      uses: davi020/kubectl-advanced@master
+      uses: koslib/helm-eks-action@master
       env:
         lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
         QA_EMAIL: ${{vars.QA_EMAIL}}
@@ -158,8 +169,9 @@ jobs:
         command: |
           curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d "{\"email\":\"$QA_EMAIL\",\"password\":\"$QA_PASSWORD\",\"invitationCode\":\"\"}"
           export staging_mongo=$(kubectl get pods -n dev -l app=mongo-${IMAGE_TAG} -o custom-columns=":metadata.name" --no-headers)
-          kubectl exec -it -n dev $staging_mongo -- env QA_API_TOKEN=$QA_API_TOKEN QA_EMAIL=$QA_EMAIL mongosh --eval 'use common;' --eval ' db.api_tokens.insertOne({ "_id": 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" });' 
+          kubectl exec -i -n dev $staging_mongo -- env QA_API_TOKEN=$QA_API_TOKEN QA_EMAIL=$QA_EMAIL mongosh --eval 'use common;' --eval ' db.api_tokens.insertOne({ "_id": 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" });' 
           
+
   test:
     needs: deploy
     runs-on: ubuntu-latest
@@ -214,22 +226,12 @@ jobs:
         aws-region: ap-south-1
         
     - name: delete cluster
-      uses: kodermax/kubectl-aws-eks@main
+      uses: koslib/helm-eks-action@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-        IMAGE_TAG: ${{ github.sha }}
+        IMAGE_TAG: latest
       with:
         command: |
           kubectl delete -n dev -f mongo_complete.yml
-
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm repo add akto https://akto-api-security.github.io/helm-charts
           helm uninstall -n dev ${IMAGE_TAG}
-
-    - name: cluster status
-      uses: kodermax/kubectl-aws-eks@main
-      env:
-        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-        IMAGE_TAG: ${{ github.sha }}
-      with:
-        args: get pods -n dev >> $GITHUB_STEP_SUMMARY
