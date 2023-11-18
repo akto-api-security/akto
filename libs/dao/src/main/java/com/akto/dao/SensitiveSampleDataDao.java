@@ -4,13 +4,10 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import org.bson.Document;
 
 import org.bson.conversions.Bson;
 
@@ -40,16 +37,35 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
     }
 
     public void createIndicesIfAbsent() {
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
 
-        String dbName = Context.accountId.get() + "";
-        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
 
-        List<Bson> indices = new ArrayList<>(Arrays.asList(
-                Indexes.ascending(new String[] { ApiInfo.ID_URL, ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_METHOD }),
-                Indexes.ascending(new String[] { ApiInfo.ID_URL, SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_METHOD }),
-                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS })
-            ));
+        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
+        int counter = 0;
+        while (cursor.hasNext()) {
+            counter++;
+            cursor.next();
+        }
 
-        createIndices(indices);
+        if (counter == 1) {
+            String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+        }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ApiInfo.ID_URL, SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_METHOD }, true);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+
     }
 }
