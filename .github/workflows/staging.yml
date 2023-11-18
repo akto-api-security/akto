@@ -18,4 +18,4 @@ jobs:
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
           AKTO_TEST_ID: 6558b295e9fca33d79d44994
           START_TIME_DELAY: 2
-          OVERRIDEN_TEST_APP_URL: https://ironman.demo.akto.io
+          OVERRIDEN_TEST_APP_URL: https://ironman.demo.akto.io:443
