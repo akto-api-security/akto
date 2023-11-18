@@ -229,7 +229,7 @@ jobs:
       uses: koslib/helm-eks-action@master
       env:
         KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
-        IMAGE_TAG: latest
+        IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       with:
         command: |
           kubectl delete -n dev -f mongo_complete.yml
