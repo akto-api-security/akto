@@ -86,6 +86,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             String[] fieldNames = {"responseCode", "subType", "timestamp",};
             SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
         }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+
     }
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {

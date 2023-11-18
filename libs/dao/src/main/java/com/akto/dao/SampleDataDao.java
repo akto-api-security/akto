@@ -5,17 +5,14 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class SampleDataDao extends AccountsContextDao<SampleData> {
@@ -62,6 +59,9 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
         if (counter == 2) {
             instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
         }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD }, true);
 
     }
 
