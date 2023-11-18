@@ -191,39 +191,6 @@ public abstract class MCollection<T> {
         return logger;
     }
 
-    public void dropIndexes(List<Bson> indexes){
-        try {
-            for(Bson index: indexes) {
-                this.getMCollection().dropIndex(index);
-            }
-        } catch (Exception e) {
-            // error outs on non-existent indices
-            e.printStackTrace();
-        }
-    }
-
-    public String getIndexName(Bson idx){
-        String ret = "";
-        BsonDocument id = idx.toBsonDocument();
-        int c = 0;
-        for(String key : id.keySet()){
-            if(c > 0){
-                ret += "_";
-            }
-            int value = id.getInt32(key).getValue();
-            ret += key + "_" + value;
-            c++;
-        }
-        return ret;
-    }
-
-    public void createIndices(List<Bson> indices){
-        for (Bson index : indices) {
-            String name = this.getIndexName(index);
-            createIndexIfAbsent(this.getDBName(), this.getCollName(), index, new IndexOptions().name(name));
-        }
-    }
-
     public static boolean createCollectionIfAbsent(String dbName, String collName, CreateCollectionOptions options){
         try{
             boolean exists = false;
@@ -270,6 +237,31 @@ public abstract class MCollection<T> {
 
         return false;
 
+    }
+
+    public static boolean createIndexIfAbsent(String dbName, String collName, String[] fieldNames, boolean isAscending) {
+
+        Bson indexInfo = isAscending ? Indexes.ascending(fieldNames) : Indexes.descending(fieldNames);
+
+        String name = "";
+
+        int lenPerField = 30/fieldNames.length - 1;
+
+        for (String field: fieldNames) {
+
+            String[] tokens = field.split("\\.");
+            String lastToken = tokens[tokens.length-1];
+            lastToken = lastToken.substring(0, Math.min(lenPerField, lastToken.length()));
+            if (!name.isEmpty()) {
+                name += "-";
+            }
+            name += lastToken;
+        }
+
+        name += ("_");
+        name += (isAscending ? "1" : "-1");
+
+        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
     }
 
 }
