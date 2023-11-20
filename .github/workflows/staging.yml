@@ -99,7 +99,7 @@ jobs:
     env: 
       IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       FLASH_NLB_DNS_TEST: ${{ secrets.FLASH_NLB_DNS }}
-      FLASH_MONGO_CONN_TEST: ${{ secrets.FLASH_MONGO_CONN }}
+      FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
 
 
 
