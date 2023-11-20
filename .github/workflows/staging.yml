@@ -68,7 +68,10 @@ jobs:
             --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
             --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
             --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
-
+          kubectl delete deployment/${IMAGE_TAG}-akto-runtime  -n dev
+          kubectl delete deployment/${IMAGE_TAG}-akto-keel  -n dev
+          kubectl delete deployment/${IMAGE_TAG}-akto-testing  -n dev
+          
           echo "initiating patch..." >> $GITHUB_STEP_SUMMARY
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
 
