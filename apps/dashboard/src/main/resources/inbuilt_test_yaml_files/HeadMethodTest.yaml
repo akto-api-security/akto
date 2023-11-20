@@ -43,7 +43,8 @@ auth:
 
 api_selection_filters:
   response_code:
-    eq: 302
+    gte: 200
+    lt: 300
 
 execute:
   type: single

@@ -38,15 +38,15 @@ api_selection_filters:
 
 wordLists:
   subURLPaths:
-    - .env 
-    - config/
-    - config/appsettings.json
-    - config/database.yml 
+    - ${urlVar}/.env 
+    - ${urlVar}/config/
+    - ${urlVar}/config/appsettings.json
+    - ${urlVar}/config/database.yml 
 execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}/${subURLPaths}
+      - modify_url: ${subURLPaths}
 
 validate:
   response_code:

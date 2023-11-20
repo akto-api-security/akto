@@ -29,6 +29,9 @@ api_selection_filters:
       - '"api_keys":'
       - '"aws":'
       - '"server":'
+      - '\"api_keys\":'
+      - '\"aws\":'
+      - '\"server\":'
 
   url:
     extract: urlVar
@@ -52,6 +55,9 @@ validate:
     lt: 300
   response_payload:
     contains_either:
+      - '\"api_keys\":'
+      - '\"aws\":'
+      - '\"server\":'
       - '"api_keys":'
       - '"aws":'
       - '"server":'

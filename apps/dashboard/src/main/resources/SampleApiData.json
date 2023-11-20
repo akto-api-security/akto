@@ -1477,6 +1477,7 @@
             "statusCode": 200
         }
     },
+
     {
         "id": "INVALID_FILE_INPUT",
         "sampleData": {
@@ -2454,7 +2455,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/network-info",
-            "responsePayload": "Sensitive Info ....",
+            "responsePayload": "Linux daemon",
             "responseHeaders": {},
             "statusCode": 200
         }
