@@ -37,13 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -139,7 +133,8 @@ public class StartTestAction extends UserAction {
                 return null;
         }
         if (this.selectedTests != null) {
-            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
+            int id = UUID.randomUUID().hashCode();
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -193,9 +188,12 @@ public class StartTestAction extends UserAction {
                     Updates.set(TestingRun.SCHEDULE_TIMESTAMP,scheduleTimestamp)
                 ));
 
-            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests, null, this.overriddenTestAppUrl);
-            this.testIdConfig = testingRunConfig.getId();
-            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+            if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
+                int id = UUID.randomUUID().hashCode();
+                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl);
+                this.testIdConfig = testingRunConfig.getId();
+                TestingRunConfigDao.instance.insertOne(testingRunConfig);
+            }
 
         }
 
