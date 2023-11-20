@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import Store from "../../../store"
 import homeRequests from '../../home/api'
 import OnboardingStore from '../OnboardingStore'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
@@ -9,7 +8,7 @@ import PersistStore from '../../../../main/PersistStore'
 
 function CollectionSelection() {
     const apiCollections = PersistStore(state => state.allCollections)
-    const setCollections = Store(state => state.setAllCollections)
+    const setCollections = PersistStore(state => state.setAllCollections)
     const setSelectedCollection = OnboardingStore(state => state.setSelectedCollection)
     const collection = OnboardingStore(state => state.selectedCollection)
     
@@ -36,10 +35,10 @@ function CollectionSelection() {
     const getCollections = async()=> {
         let interval = setInterval(async () => {
             let localCopy = []
-            if(apiCollections.length <= 1){
+            if(apiCollections.length <= 1 && localCopy.length <= 1){
                 await homeRequests.getCollections().then((resp)=> {
                     setCollections(resp.apiCollections)
-                    localCopy = resp.apiCollections
+                    localCopy = JSON.parse(JSON.stringify(resp.apiCollections));
                 })
             }
 

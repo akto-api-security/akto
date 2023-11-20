@@ -948,7 +948,10 @@ public class APICatalogSync {
                     ;
                 }
             }
-            Bson bson = Updates.pushEach("samples", finalSamples, new PushOptions().slice(-10));
+            Bson bson = Updates.combine(
+                Updates.pushEach("samples", finalSamples, new PushOptions().slice(-10)),
+                Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(sample.getId().getApiCollectionId()))
+            );
 
             bulkUpdates.add(
                 new UpdateOneModel<>(Filters.eq("_id", sample.getId()), bson, new UpdateOptions().upsert(true))
@@ -979,6 +982,7 @@ public class APICatalogSync {
             for (Map.Entry<String, Integer> entry: trafficInfo.mapHoursToCount.entrySet()) {
                 updates.add(Updates.inc("mapHoursToCount."+entry.getKey(), entry.getValue())); 
             }
+            updates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(trafficInfo.getId().getApiCollectionId())));
 
             bulkUpdates.add(
                 new UpdateOneModel<>(Filters.eq("_id", trafficInfo.getId()), Updates.combine(updates), new UpdateOptions().upsert(true))
@@ -1070,7 +1074,10 @@ public class APICatalogSync {
 
 
             if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
-                Bson bson = Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap));
+                Bson bson = Updates.combine(
+                    Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap)),
+                    Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()))
+                );
                 bulkUpdatesForSampleData.add(
                         new UpdateOneModel<>(
                                 SensitiveSampleDataDao.getFilters(deltaInfo),
@@ -1081,6 +1088,8 @@ public class APICatalogSync {
             }
 
             Bson updateKey = SingleTypeInfoDao.createFilters(deltaInfo);
+            update = Updates.combine(update,
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId())));
 
             bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
         }
