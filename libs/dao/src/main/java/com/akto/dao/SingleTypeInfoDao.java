@@ -61,7 +61,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         if (counter == 1) {
             String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         }
 
         if (counter == 2) {
@@ -75,7 +75,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         if (counter == 4) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID}));
+            String[] fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
             counter++;
         }
 
@@ -93,8 +94,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         if(counter == 7){
             SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.descending(new String[]{"lastSeen", "apiCollectionId"}));
         }
-    }
 
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+
+    }
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
         List<Bson> filters = new ArrayList<>();
