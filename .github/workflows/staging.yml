@@ -111,7 +111,7 @@ jobs:
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 65590b1ce9fca33d79d45440
+          AKTO_TEST_ID: 6558b295e9fca33d79d44994
           START_TIME_DELAY: 2
           OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
           WAIT_TIME_FOR_RESULT: 1200
