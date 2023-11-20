@@ -32,6 +32,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.InsertOneResult;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -203,7 +204,9 @@ public class StartTestAction extends UserAction {
                 loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
                 summary.setMetadata(metadata);
             }
-            TestingRunResultSummariesDao.instance.insertOne(summary);
+            InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
+            this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
+
         }
         
         this.startTimestamp = 0;
@@ -383,6 +386,18 @@ public class StartTestAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunResultSummary() {
+        this.testingRunResultSummaries = new ArrayList<>();
+        this.testingRunResultSummaries.add(TestingRunResultSummariesDao.instance.findOne("_id", new ObjectId(this.testingRunResultSummaryHexId)));
+
+        if (this.testingRunResultSummaries.size() == 0) {
+            addActionError("No test summaries found");
+            return ERROR.toUpperCase();
+        } else {
+            return SUCCESS.toUpperCase();
+        }
     }
 
     String testingRunResultSummaryHexId;
@@ -610,6 +625,10 @@ public class StartTestAction extends UserAction {
 
     public List<TestingRunResultSummary> getTestingRunResultSummaries() {
         return this.testingRunResultSummaries;
+    }
+
+    public String getTestingRunResultSummaryHexId() {
+        return this.testingRunResultSummaryHexId;
     }
 
     public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
