@@ -181,7 +181,7 @@ jobs:
         with:
           node-version: '17'
 
-      - uses: akto-api-security/run-scan@v1.0.9
+      - uses: akto-api-security/run-scan@v1.0.10
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
