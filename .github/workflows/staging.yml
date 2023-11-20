@@ -183,7 +183,7 @@ jobs:
 
       - uses: akto-api-security/run-scan@v1.0.10
         with:
-          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+          AKTO_DASHBOARD_URL: https://afd083656d865492486ce09325b3ecf1-1570415488.ap-south-1.elb.amazonaws.com
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
           AKTO_TEST_ID: 65590b1ce9fca33d79d45440
           START_TIME_DELAY: 2
