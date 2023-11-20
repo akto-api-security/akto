@@ -184,6 +184,7 @@ public class StartTestAction extends UserAction {
                 TestingRunDao.instance.insertOne(localTestingRun);
                 testingRunHexId = localTestingRun.getId().toHexString();
             }
+            this.testIdConfig = 0;
         } else {
             TestingRunDao.instance.updateOne(
                 Filters.eq(Constants.ID,localTestingRun.getId()),
@@ -191,6 +192,11 @@ public class StartTestAction extends UserAction {
                     Updates.set(TestingRun.STATE,TestingRun.State.SCHEDULED),
                     Updates.set(TestingRun.SCHEDULE_TIMESTAMP,scheduleTimestamp)
                 ));
+
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests, null, this.overriddenTestAppUrl);
+            this.testIdConfig = testingRunConfig.getId();
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+
         }
 
         Map<String, Object> session = getSession();
@@ -198,7 +204,7 @@ public class StartTestAction extends UserAction {
 
         if(utility!=null && ( Utility.CICD.toString().equals(utility) || Utility.EXTERNAL_API.toString().equals(utility))){
             TestingRunResultSummary summary = new TestingRunResultSummary(scheduleTimestamp, 0, new HashMap<>(),
-            0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0);
+            0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig);
             summary.setState(TestingRun.State.SCHEDULED);
             if(metadata!=null){
                 loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);

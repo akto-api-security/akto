@@ -62,7 +62,7 @@ public class Main {
                     Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING));
         } catch (Exception e){
             TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
-            0, testingRun.getId(), testingRun.getId().toHexString(), 0);
+            0, testingRun.getId(), testingRun.getId().toHexString(), 0, 0);
 
             summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
         }
@@ -133,6 +133,32 @@ public class Main {
         return trrs;
     }
 
+    private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
+        long timestamp = testingRun.getId().getTimestamp();
+        long seconds = Context.now() - timestamp;
+        loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
+
+        TestingRunConfig configFromTrrs = null;
+        TestingRunConfig baseConfig = null;
+
+        if (trrs != null && trrs.getTestIdConfig() > 1) {
+            configFromTrrs = TestingRunConfigDao.instance.findOne(Constants.ID, trrs.getTestIdConfig());
+            loggerMaker.infoAndAddToDb("Found testing run config with id :" + configFromTrrs.getId(), LogDb.TESTING);
+        }
+
+        if (testingRun.getTestIdConfig() > 1) {
+            baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            loggerMaker.infoAndAddToDb("Found testing run config with id :" + baseConfig.getId(), LogDb.TESTING);
+        }
+
+        if (configFromTrrs == null) {
+            testingRun.setTestingRunConfig(baseConfig);
+        } else {
+            configFromTrrs.rebaseOn(baseConfig);
+            testingRun.setTestingRunConfig(configFromTrrs);
+        }
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
@@ -176,19 +202,7 @@ public class Main {
                 }
 
                 try {
-                    long timestamp = testingRun.getId().getTimestamp();
-                    long seconds = Context.now() - timestamp;
-                    loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
-                    if (testingRun.getTestIdConfig() > 1) {
-                        TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-                        if (testingRunConfig != null) {
-                            loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
-                            testingRun.setTestingRunConfig(testingRunConfig);
-                        }else {
-                            loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
-                        }
-                    }
-
+                    setTestingRunConfig(testingRun, trrs);
 
                     if (summaryId == null) {
                         if (testingRun.getState().equals(TestingRun.State.RUNNING)) {
