@@ -261,8 +261,7 @@ public class TestExecutor {
                     Filters.and(
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
                             Filters.eq(TestingRunResult.VULNERABLE, true))));
-            pipeline.add(Aggregates.project(
-                    Projections.computed(computedFieldName,computedProjection)));
+            pipeline.add(Aggregates.project(computedProjection));
             pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
             pipeline.add(Aggregates.skip(skip));
             pipeline.add(Aggregates.limit(limit));
