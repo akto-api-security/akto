@@ -191,7 +191,7 @@ function TestRunResultPage(props) {
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
-      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
+      setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
       setIssueDetails(...[{}]);
     }
