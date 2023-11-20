@@ -17,6 +17,8 @@ import testingFunc from "../testing/transform"
 import InitialSteps from './components/InitialSteps';
 import CoverageCard from './components/CoverageCard';
 import PersistStore from '../../../main/PersistStore';
+import Pipeline from './components/Pipeline';
+import ActivityTracker from './components/ActivityTracker';
 
 function HomeDashboard() {
 
@@ -61,7 +63,7 @@ function HomeDashboard() {
         setSensitiveData(transform.getFormattedSensitiveData(sensitiveDataResp.response))
         setSubCategoryInfo(testingFunc.convertSubIntoSubcategory(subcategoryDataResp.subcategoryInfo))
 
-        const riskScoreObj = (await observeFunc.fetchRiskScoreInfo()).riskScoreObj ;
+        const riskScoreObj = (await observeFunc.fetchRiskScoreInfo()).riskScoreObj.riskScoreMap ;
         const sensitiveInfo = await observeFunc.fetchSensitiveInfo() ;
         setRiskScoreObj(riskScoreObj) ;
         setSensitiveArr(sensitiveInfo) ;
@@ -218,6 +220,25 @@ function HomeDashboard() {
 
     )
 
+    const latestActivity = [
+        {
+            title: 'Test run on Juice shop collection',
+            description: 'Please provide your name and email',
+        },
+        {
+            title: 'Sensitive data detected',
+            description: 'Juice shop collection',
+        },
+        {
+            title: 'Sensitive data detected',
+            description: 'collection #2',
+        },
+        {
+            title: 'Daily test completed',
+            description: 'collection #5',
+        }
+    ]
+
     const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
 
     return (
@@ -233,10 +254,12 @@ function HomeDashboard() {
                         components={components}
                 />
             </div>
-            <div style={{flex: 3}}>
+            <div style={{flex: 3, paddingRight: '32px'}}>
                 <VerticalStack gap={5}>
                     <InitialSteps />
+                    <ActivityTracker latestActivity={latestActivity} />
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
+                    <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>
             </div>
         </div>

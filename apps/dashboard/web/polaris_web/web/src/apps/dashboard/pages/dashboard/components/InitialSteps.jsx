@@ -87,7 +87,7 @@ function InitialSteps() {
     }
 
     return (
-        <div style={{paddingTop: '76px' , paddingRight: '32px'}}>
+        <div style={{paddingTop: '76px'}}>
             <Card padding={0}>
                 <VerticalStack gap={3}>
                     <Box padding={5} background="bg-info-subdued-hover">
