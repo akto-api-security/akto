@@ -119,8 +119,7 @@ public class ApiExecutor {
         return url;
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig) throws Exception {
-        // don't lowercase url because query params will change and will result in incorrect request
+    public static String prepareUrl(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
         String url = request.getUrl();
         url = url.trim();
 
@@ -128,7 +127,13 @@ public class ApiExecutor {
             url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
         }
 
-        url = replaceHostFromConfig(url, testingRunConfig);
+        return replaceHostFromConfig(url, testingRunConfig);
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig) throws Exception {
+        // don't lowercase url because query params will change and will result in incorrect request
+        
+        String url = prepareUrl(request, testingRunConfig);
 
         loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         request.setUrl(url);
