@@ -30,6 +30,8 @@ public class TestingRunResultSummary {
     private TestingRun.State state; 
     private int testResultsCount;
 
+    private int testIdConfig;
+
     @BsonIgnore
     private String hexId;
 
@@ -38,7 +40,8 @@ public class TestingRunResultSummary {
     public TestingRunResultSummary() {
     }
 
-    public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<String,Integer> countIssues, int totalApis, ObjectId testingRunId, String testingRunHexId, int testResultsCount) {
+    public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<String,Integer> countIssues, int totalApis,
+                                   ObjectId testingRunId, String testingRunHexId, int testResultsCount, int testIdConfig) {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.countIssues = countIssues;
@@ -47,6 +50,7 @@ public class TestingRunResultSummary {
         this.testingRunHexId = testingRunHexId;
         this.state = TestingRun.State.RUNNING;
         this.testResultsCount = testResultsCount;
+        this.testIdConfig = testIdConfig;
     }
 
     public ObjectId getId() {
@@ -134,6 +138,14 @@ public class TestingRunResultSummary {
         this.metadata = metadata;
     }
 
+    public int getTestIdConfig() {
+        return testIdConfig;
+    }
+
+    public void setTestIdConfig(int testIdConfig) {
+        this.testIdConfig = testIdConfig;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -141,6 +153,7 @@ public class TestingRunResultSummary {
             ", endTimestamp='" + getEndTimestamp() + "'" +
             ", countIssues='" + getCountIssues() + "'" +
             ", totalApis='" + getTotalApis() + "'" +
+            ", testIdConfig='" + getTestIdConfig() + "'" +
             ", testingRunId='" + getTestingRunId() + "'" +
             ", testingRunHexId='" + getTestingRunHexId() + "'" +
             ", state='" + getState() + "'" +
