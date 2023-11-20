@@ -320,6 +320,7 @@ public class AktoPolicyNew {
 
             // severityScore
             subUpdates.add(Updates.set(ApiInfo.SEVERITY_SCORE, apiInfo.getSeverityScore()));
+            subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
             updates.add(
                     new UpdateOneModel<>(

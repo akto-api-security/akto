@@ -6,6 +6,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -21,6 +22,7 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -41,7 +43,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
-        
+
         MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
         int counter = 0;
         while (cursor.hasNext()) {
@@ -78,6 +80,9 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
             counter++;
         }
+        
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
     }
 
     private boolean hasTestRunSuccessfullyOnApi(List<TestingRunResult> testingRunResults){
@@ -176,6 +181,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         );
         return pipeline;
     }
+
 
     @Override
     public String getCollName() {

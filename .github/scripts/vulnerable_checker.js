@@ -64,6 +64,10 @@ function logGithubStepSummary(message) {
   fs.appendFileSync(GITHUB_STEP_SUMMARY, `${message}\n`);
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
 
   logGithubStepSummary("### Vulnerable API's summary")
@@ -112,6 +116,8 @@ async function main() {
             counter += 1
           }
         }
+
+        await sleep(500)
       }
 
       logGithubStepSummary("#### Missing ")

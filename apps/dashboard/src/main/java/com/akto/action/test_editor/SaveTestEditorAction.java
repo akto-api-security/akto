@@ -33,6 +33,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
@@ -155,17 +157,30 @@ public class SaveTestEditorAction extends UserAction {
 
         YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));        
         if (template == null || template.getSource() == YamlTemplateSource.CUSTOM) {
-            YamlTemplateDao.instance.updateOne(
-                    Filters.eq("_id", id),
-                    Updates.combine(
+
+            List<Bson> updates = new ArrayList<>(
+                    Arrays.asList(
                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                             Updates.set(YamlTemplate.CONTENT, content),
                             Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-                            Updates.setOnInsert(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM)
-                    )
-            );
+                            Updates.setOnInsert(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM)));
+            
+            try {
+                // If the field does not exist in the template then we will not overwrite the existing value
+                Object inactiveObject = TestConfigYamlParser.getFieldIfExists(content, YamlTemplate.INACTIVE);
+                if (inactiveObject != null && inactiveObject instanceof Boolean) {
+                    boolean inactive = (boolean) inactiveObject;
+                    updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
+                }
+            } catch (Exception e) {
+            }
+
+            YamlTemplateDao.instance.updateOne(
+                    Filters.eq(Constants.ID, id),
+                    Updates.combine(updates));
+
         } else {
             addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
