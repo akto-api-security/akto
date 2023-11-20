@@ -1,12 +1,14 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import org.bson.Document;
+
 import org.bson.conversions.Bson;
 
 public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleData>{
@@ -56,7 +58,14 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
 
         if (counter == 1) {
             String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ApiInfo.ID_URL, SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_METHOD }, true);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+
     }
 }
