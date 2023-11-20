@@ -1,5 +1,7 @@
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
+import observeFunc from "../observe/transform"
+import { Badge, Text } from "@shopify/polaris";
 
 const subCategoryMap = PersistStore.getState().subCategoryMap;
 
@@ -202,6 +204,30 @@ const transform = {
         })
         return finalArr.sort((a, b) => a.coverage - b.coverage);
 
+    },
+
+    prepareTableData: (riskScoreObj, collections, collectionsMap) => {
+        let finalArr = [] ;
+        collections.forEach((c) => {
+            let score = riskScoreObj[c.id] || 0 
+            let obj = {
+                id: c.id,
+                score: score,
+                status: observeFunc.getStatus(score)
+            }
+            finalArr.push(obj)
+        })
+
+        finalArr.sort((a,b) => b.score - a.score) ;
+        let tableRows = []
+        finalArr.forEach((c)=> {
+            let tempRow = [
+                <Text>{collectionsMap[c.id]}</Text>,
+                <Badge status={c.status} size="small">{c.score.toString()}</Badge>
+            ]
+            tableRows.push(tempRow)
+        })
+        return tableRows
     }
 }
 export default transform;
