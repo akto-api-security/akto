@@ -250,35 +250,24 @@ public class TestExecutor {
         int skip = 0;
         int limit = 1000;
         boolean fetchMore = false;
-        BasicDBObject computedProjection = new BasicDBObject(GenericTestResult._CONFIDENCE, 
-            new BasicDBObject("$first", "$testResults.confidence"));
-        String computedFieldName = GenericTestResult._CONFIDENCE;
-
         do {
             fetchMore = false;
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(
-                    Filters.and(
-                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
-                            Filters.eq(TestingRunResult.VULNERABLE, true))));
-            pipeline.add(Aggregates.project(computedProjection));
-            pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
-            pipeline.add(Aggregates.skip(skip));
-            pipeline.add(Aggregates.limit(limit));
-            List<BasicDBObject> testingRunResults = TestingRunResultDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).into(new ArrayList<>());
+            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance
+                    .fetchLatestTestingRunResult(
+                            Filters.and(
+                                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
+                                    Filters.eq(TestingRunResult.VULNERABLE, true)),
+                            limit,
+                            skip,
+                            Projections.include("testResults.confidence"));
 
             loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
                     LogDb.TESTING);
 
-            for (BasicDBObject testingRunResult : testingRunResults) {
-                Severity severity = Severity.HIGH;
-                try {
-                    Confidence confidence = Confidence.valueOf(testingRunResult.getString(computedFieldName));
-                    severity = Severity.valueOf(confidence.toString());
-                } catch (Exception e) {
-                }
-                int initialCount = totalCountIssues.get(severity.toString());
-                totalCountIssues.put(severity.toString(), initialCount + 1);
+            for (TestingRunResult testingRunResult : testingRunResults) {
+                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
+                int initialCount = totalCountIssues.get(severity);
+                totalCountIssues.put(severity, initialCount + 1);
             }
 
             if (testingRunResults.size() == limit) {
