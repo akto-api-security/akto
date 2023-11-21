@@ -5,6 +5,7 @@ import java.util.*;
 import org.bson.conversions.Bson;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
@@ -98,6 +99,9 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
+
+        ActivitiesDao.instance.insertActivity("Collection created", "Collection named " + this.collectionName + "was created.");
+
         return Action.SUCCESS.toUpperCase();
     }
 
