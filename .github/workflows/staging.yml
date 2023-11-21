@@ -2,58 +2,29 @@ name: Staging
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-    inputs:
-      Tag:
-        required: true
-        type: choice
-        options:
-          - akto_staging1
-          - akto_staging2
-          - akto_staging3
-        default: akto_staging1
-      Environment:
-        required: true
-        type: choice
-        options:
-          - prod
-          - staging
-        default: staging
-      Deploy:
-        description: 'Deploy to flash staging'
-        required: false
-        type: boolean
-        default: false
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    outputs:
+      IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
           distribution: 'adopt'
           java-version: '8'
           architecture: x64
-
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
-        run: echo "IMAGE_TAG=${{ github.event.inputs.Tag }}_$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
+        run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
       - name: Download Akto templates zip
         working-directory: ./apps/dashboard/src/main/resources
         run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
@@ -64,7 +35,6 @@ jobs:
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Configure AWS Credentials
-        if: ${{ github.event.inputs.Environment == 'prod' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
@@ -72,22 +42,18 @@ jobs:
           aws-region: ap-south-1
 
       - name: Deploy static site to S3 bucket
-        if: ${{ github.event.inputs.Environment == 'prod' }}
         run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
       - name: Deploy polaris site to S3 bucket
-        if: ${{ github.event.inputs.Environment == 'prod' }}
         run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
 
       - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
       - name: DockerHub login
-        if: ${{ github.event.inputs.Environment == 'prod' }}
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       - name: Build, tag, and push the image to DockerHub
-        if: ${{ github.event.inputs.Environment == 'prod' }}
         id: build-image-dockerhub
         env:
           ECR_REGISTRY: aktosecurity
@@ -101,13 +67,10 @@ jobs:
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
           cd ../testing-cli
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG $IMAGE_TAG_TESTING_CLI . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
 
       - name: Set up JDK 11
         uses: actions/setup-java@v1
@@ -125,62 +88,152 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-
+      
   deploy:
-    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
     needs: build
     runs-on: ubuntu-latest
     environment: Dev
     permissions:
       id-token: write
       contents: read
+    env: 
+      IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
+      FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
+      FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
+
+
+
+    outputs:
+      lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
-    - uses: actions/checkout@v2
-    - uses: aws-actions/configure-aws-credentials@v1
-      with:
-        role-to-assume: ${{ secrets.IAMROLE_GITHUB }}
-        role-session-name: GitHub-Action-Role
-        aws-region: ${{ vars.AWS_REGION }}
-    - name: Deploy to flash
+    #revert branch name
+    - name: Setup mongo, akto-k8s-agent kube yaml's
       run: |
-        echo "Deploying branch ${{ env.GITHUB_REF }} to ${{ github.event.inputs.environment }}"
-        commit_hash=`git rev-parse HEAD`
-        aws deploy create-deployment --application-name flash-deploy --deployment-group-name flash-deployment-group --github-location repository=$GITHUB_REPOSITORY,commitId=$commit_hash --ignore-application-stop-failures
-      
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
+        cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
+        wget https://raw.githubusercontent.com/akto-api-security/infra/flash/akto_k8s_agent.yml
+        envsubst < akto_k8s_agent.yml > akto_k8s_agent_complete.yml
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+        aws-region: ap-south-1
+        
+    - name: deploy to cluster
+      id: deploy_cluster
+      uses: koslib/helm-eks-action@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+      with:
+        command: |
+          kubectl apply -n dev -f mongo_complete.yml
+
+          helm repo add akto https://akto-api-security.github.io/helm-charts
+          export AKTO_MONGO_IP=$(kubectl get services/mongo-${IMAGE_TAG} -n dev -o jsonpath="{.spec.clusterIP}")
+          
+          echo $AKTO_MONGO_IP >> $GITHUB_STEP_SUMMARY
+          echo "starting helm install..." >> $GITHUB_STEP_SUMMARY
+          
+          helm install ${IMAGE_TAG} akto/akto -n dev \
+            --set mongo.aktoMongoConn="mongodb://${AKTO_MONGO_IP}:27017/admini" \
+            --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
+            --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
+            --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
+            --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
+
+          echo "initiating patch..." >> $GITHUB_STEP_SUMMARY
+          kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
+
+          echo "current status..." >> $GITHUB_STEP_SUMMARY
+
+          echo $EXTERNAL_IP >> $GITHUB_STEP_SUMMARY
+          
+          while [[ "${EXTERNAL_IP}" == "<pending>" ]] ||  [ -z "${EXTERNAL_IP}" ]; do EXTERNAL_IP=$(kubectl get svc -n dev | grep ${IMAGE_TAG}-akto-dashboard | awk -F " " '{print $4;}'); sleep 1; done
+          export LB_NAME=$EXTERNAL_IP
+          echo $LB_NAME >> $GITHUB_STEP_SUMMARY
+          echo "lb_name=http://$LB_NAME:8080" >> $GITHUB_OUTPUT
+          while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' ${LB_NAME}:8080/metrics)" != "200" ]]; do sleep 5; done
+          echo "Dashboard running" >> $GITHUB_STEP_SUMMARY
+
+    - name: setup test environment
+      uses: koslib/helm-eks-action@master
+      env:
+        lb_name: ${{steps.deploy_cluster.outputs.lb_name}}
+        QA_EMAIL: ${{vars.QA_EMAIL}}
+        QA_PASSWORD: ${{secrets.QA_PASSWORD}}
+        QA_API_TOKEN: ${{secrets.QA_API_TOKEN}}
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+      with:
+        command: |
+          curl -X POST "$lb_name/signup-email" -H "Content-Type: application/json" -d "{\"email\":\"$QA_EMAIL\",\"password\":\"$QA_PASSWORD\",\"invitationCode\":\"\"}"
+          export staging_mongo=$(kubectl get pods -n dev -l app=mongo-${IMAGE_TAG} -o custom-columns=":metadata.name" --no-headers)
+          kubectl exec -i -n dev $staging_mongo -- env QA_API_TOKEN=$QA_API_TOKEN QA_EMAIL=$QA_EMAIL mongosh --eval 'use common;' --eval ' db.api_tokens.insertOne({ "_id": 1692262638, "_t": "com.akto.dto.ApiToken", "accountId": 1000000, "key": process.env.QA_API_TOKEN, "name": "external_api", "timestamp": 1692262638, "username": process.env.QA_EMAIL, "utility": "EXTERNAL_API" });' 
+          
+
   test:
-    if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v2
-      
-      - name: Run testsigma end to end tests
-        env:
-            TESTSIGMA_API_KEY: ${{ secrets.TESTSIGMA_API_KEY }}
-            TESTSIGMA_TEST_PLAN_ID: 789
-            TS_DASHBOARD_URL: ${{vars.TS_DASHBOARD_URL}}
-        run: bash ./.github/scripts/akto-testsigma.sh
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '17'
 
-      - name: Run Akto CI/CD tests
-        uses: akto-api-security/run-scan@v1.0.3
+      - uses: akto-api-security/run-scan@v1.0.10
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
-
-      - name: Check for Akto test completion
-        env:
-            AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-            AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-            AKTO_TEST_ID: 650d5bcb7bd5e15e3360553f
-        run: bash ./.github/scripts/akto-cicd.sh
+          AKTO_TEST_ID: 65590b1ce9fca33d79d45440
+          START_TIME_DELAY: 2
+          OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
+          WAIT_TIME_FOR_RESULT: 1200
+          BLOCK_LEVEL: NONE
 
       - name: Check Vulnerable API's
         working-directory: ./.github/scripts
         env:
-          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+          AKTO_DASHBOARD_URL: ${{needs.deploy.outputs.lb_name}}
+          AKTO_API_KEY: ${{secrets.QA_API_TOKEN}}
         run: |
           npm install axios
           node ./vulnerable_checker.js
+
+  delete:
+    if: ${{ always() }}
+    needs: [build, deploy, test]
+    runs-on: ubuntu-latest
+    environment: Dev
+    permissions:
+      id-token: write
+      contents: read
+    env: 
+      IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
+      FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
+      FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
+    steps:
+        
+    - name: Fetch kube yaml
+      #revert branch name
+      run: |
+        wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
+        cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
+        aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
+        aws-region: ap-south-1
+        
+    - name: delete cluster
+      uses: koslib/helm-eks-action@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.DEV_CLUSTER_02_KUBE_CONFIG }}
+        IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
+      with:
+        command: |
+          kubectl delete -n dev -f mongo_complete.yml
+          helm repo add akto https://akto-api-security.github.io/helm-charts
+          helm uninstall -n dev ${IMAGE_TAG}

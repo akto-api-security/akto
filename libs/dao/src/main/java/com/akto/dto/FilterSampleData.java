@@ -3,13 +3,14 @@ package com.akto.dto;
 
 import com.akto.types.CappedList;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class FilterSampleData {
     private FilterKey id;
     public static final String SAMPLES = "samples";
     private CappedList<String> samples;
+    List<Integer> collectionIds;
 
     public static final int cap = 10;
 
@@ -49,6 +50,9 @@ public class FilterSampleData {
     public FilterSampleData(ApiInfo.ApiInfoKey id, Integer filterId) {
         this.id = new FilterKey(id,filterId);
         this.samples = new CappedList<>(cap, true);
+        if(id != null){
+            this.collectionIds = Arrays.asList(id.getApiCollectionId());
+        }
     }
 
     public void merge(FilterSampleData that) {
@@ -74,5 +78,13 @@ public class FilterSampleData {
 
     public void setSamples(CappedList<String> samples) {
         this.samples = samples;
+    }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
     }
 }
