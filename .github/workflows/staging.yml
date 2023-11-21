@@ -64,9 +64,9 @@ jobs:
           
           helm install ${IMAGE_TAG} akto/akto -n dev \
             --set mongo.aktoMongoConn="mongodb://${AKTO_MONGO_IP}:27017/admini" \
-            --set dashboard.aktoApiSecurityDashboard.image.repository="public.ecr.aws/aktosecurity/akto-api-security-dashboard" \
+            --set dashboard.aktoApiSecurityDashboard.image.repository="aktosecurity/akto-api-security-dashboard" \
             --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
-            --set testing.aktoApiSecurityTesting.image.repository="public.ecr.aws/aktosecurity/akto-api-testing" \
+            --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
             --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
           kubectl delete deployment/${IMAGE_TAG}-akto-runtime  -n dev
           kubectl delete deployment/${IMAGE_TAG}-akto-keel  -n dev
