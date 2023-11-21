@@ -1172,6 +1172,7 @@ public class InitializerListener implements ServletContextListener {
         TestingRunResultDao.instance.createIndicesIfAbsent();
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
+        ActivitiesDao.instance.createIndicesIfAbsent();
         
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
