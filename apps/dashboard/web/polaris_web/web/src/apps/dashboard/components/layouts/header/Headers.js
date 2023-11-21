@@ -116,7 +116,7 @@ export default function Header() {
                 {
                     items: [
                         { id: "create_account", content: 'Create account', onAction: () => setShowCreateAccount(true)},
-                        { id: "manage", content: 'Manage account' },
+                        // { id: "manage", content: 'Manage account' },
                         { id: "log-out", content: 'Log out', onAction: handleLogOut }
                     ],
                 },
