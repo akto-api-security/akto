@@ -41,8 +41,14 @@ public class WebhookAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
+    private int customWebhookId;
+
     public String fetchCustomWebhooks() {
-        customWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
+        if (customWebhookId == 0) {
+            customWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
+        } else {
+            customWebhooks = CustomWebhooksDao.instance.findAll(Filters.eq("_id", customWebhookId));
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -63,7 +69,7 @@ public class WebhookAction extends UserAction {
             addActionError("Please enter valid headers");
             return ERROR.toUpperCase();
         }
-        if (selectedWebhookOptions == null) {
+        if (selectedWebhookOptions == null && body == null) {
             addActionError("Please select at least one option");
             return ERROR.toUpperCase();
         }
@@ -117,7 +123,7 @@ public class WebhookAction extends UserAction {
         } else if (frequencyInSeconds<=0){
             addActionError("Please enter a valid frequency");
             return ERROR.toUpperCase();
-        } else if (selectedWebhookOptions == null) {
+        } else if (selectedWebhookOptions == null && body == null) {
             addActionError("Please select at least one option");
             return ERROR.toUpperCase();
         } else {
@@ -325,5 +331,9 @@ public class WebhookAction extends UserAction {
 
     public void setNewSensitiveEndpointCollections(List<String> newSensitiveEndpointCollections) {
         this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
+    }
+
+    public void setCustomWebhookId(int customWebhookId) {
+        this.customWebhookId = customWebhookId;
     }
 }

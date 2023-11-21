@@ -1,7 +1,9 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -50,13 +52,16 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
 
         if (counter == 1) {
             String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
             counter++;
         }
 
         if (counter == 2) {
             instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
         }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD }, true);
 
     }
 

@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -9,6 +10,8 @@ import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
@@ -28,7 +31,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
-        
+
         MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
         int counter = 0;
         while (cursor.hasNext()) {
@@ -53,6 +56,10 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
         }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
+
     }
 
     @Override
