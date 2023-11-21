@@ -37,7 +37,10 @@ import java.util.regex.Pattern;
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class APICatalogSync {
-    
+
+    public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
+    public static final int LLM_API_COLLECTION_ID = 1222222222;
+
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
@@ -657,6 +660,9 @@ public class APICatalogSync {
 
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+
+        if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
+
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
