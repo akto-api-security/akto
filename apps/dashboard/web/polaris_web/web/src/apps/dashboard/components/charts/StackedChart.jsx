@@ -43,8 +43,8 @@ function StackedChart(props) {
                 }
             },
             series: {
-                minPointLength: 5,
-                pointWidth: 50,
+                minPointLength: 0,
+                pointWidth: 20,
                 cursor: 'pointer',
                 point: {
                     events: {

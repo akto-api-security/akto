@@ -63,3 +63,7 @@
 .Polaris-TopBar-UserMenu__Details{
     margin-right: 0px !important;
 }
+
+.reduce-size .Polaris-Avatar--sizeExtraSmall{
+    --pc-avatar-extra-small-size: 1.25rem;
+}
