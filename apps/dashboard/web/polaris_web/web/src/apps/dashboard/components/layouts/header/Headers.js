@@ -1,5 +1,5 @@
-import { TopBar, Icon, Text, Tooltip, Button, ActionList, Modal, TextField } from '@shopify/polaris';
-import { NotificationMajor, CircleChevronRightMinor, CircleChevronLeftMinor, StatusActiveMajor } from '@shopify/polaris-icons';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar } from '@shopify/polaris';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, ReplaceMajor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -105,7 +105,19 @@ export default function Header() {
 
           window.location.href="/dashboard/onboarding"
         })
-    }      
+    }
+    
+    function ContentWithIcon({icon,text, isAvatar= false}) {
+        return(
+            <HorizontalStack gap={2}>
+                <Box width='20px'>
+                    {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
+                    <Icon source={icon} color="base" />}
+                </Box>
+                <Text>{text}</Text>
+            </HorizontalStack>
+        )
+    }
 
     const userMenuMarkup = (
         <TopBar.UserMenu
@@ -115,19 +127,20 @@ export default function Header() {
                 },
                 {
                     items: [
-                        { id: "create_account", content: 'Create account', onAction: () => setShowCreateAccount(true)},
+                        (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM") ? {} :
+                        { id: "create_account", content: <ContentWithIcon icon={CustomerPlusMajor} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
                         // { id: "manage", content: 'Manage account' },
-                        { id: "log-out", content: 'Log out', onAction: handleLogOut }
+                        { id: "log-out", content: <ContentWithIcon icon={LogOutMinor} text={"Logout"} /> , onAction: handleLogOut }
                     ],
                 },
                 {
                     items: [
-                        { id: "switch-ui", content: 'Switch to legacy', onAction: handleSwitchUI },
-                        { content: 'Documentation', onAction: () => { window.open("https://docs.akto.io/readme") } },
-                        { content: 'Tutorials', onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
-                        { content: 'Changelog', onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
-                        { content: 'Discord Support', onAction: () => { window.open("https://discord.com/invite/Wpc6xVME4s") } },
-                        { content: 'Star On Github', onAction: () => { window.open("https://github.com/akto-api-security/akto") } }
+                        { id: "switch-ui", content: <ContentWithIcon text={"Switch to legacy"} icon={ReplaceMajor} />, onAction: handleSwitchUI },
+                        { content: <ContentWithIcon text={"Documentation"} icon={NoteMinor} />, onAction: () => { window.open("https://docs.akto.io/readme") } },
+                        { content: <ContentWithIcon text={"Tutorials"} icon={ResourcesMajor}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
+                        { content: <ContentWithIcon icon={UpdateInventoryMajor} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
+                        { content: <ContentWithIcon icon="/public/discord.svg" text={"Discord Support"} isAvatar={true}/>, onAction: () => { window.open("https://discord.com/invite/Wpc6xVME4s") } },
+                        { content: <ContentWithIcon icon="/public/github_icon.svg" text={"Star On Github"} isAvatar={true}/>, onAction: () => { window.open("https://github.com/akto-api-security/akto") } }
                     ],
                 },
             ]}
@@ -153,15 +166,17 @@ export default function Header() {
     }
 
     const searchItems = searchItemsArr.map((item) => {
+        const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
         return {
-            content: item.content,
+            value: item.content,
+            content: <ContentWithIcon text={item.content} icon={icon} />,
             onAction: () => handleNavigateSearch(item.url),
         }
     })
 
     const searchResultsMarkup = (
         <ActionList
-            items={searchItems.filter(x => x.content.toLowerCase().includes(searchValue.toLowerCase()))}
+            items={searchItems.filter(x => x.value.toLowerCase().includes(searchValue.toLowerCase()))}
         />
     );
 
