@@ -11,6 +11,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -25,6 +26,7 @@ import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -60,7 +62,7 @@ public class Main {
                     Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING));
         } catch (Exception e){
             TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
-            0, testingRun.getId(), testingRun.getId().toHexString(), 0);
+            0, testingRun.getId(), testingRun.getId().toHexString(), 0, 0);
 
             summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
         }
@@ -90,6 +92,75 @@ public class Main {
 
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
 
+    private static TestingRun findPendingTestingRun() {
+        int delta = Context.now() - 20*60;
+
+        Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
+        );
+        Bson filter2 = Filters.and(
+                Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
+        );
+
+        Bson update = Updates.combine(
+                Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+        );
+
+        return TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                Filters.or(filter1,filter2), update);
+    }
+
+    private static TestingRunResultSummary findPendingTestingRunResultSummary() {
+        int delta = Context.now() - 20*60;
+
+        Bson filter1 = Filters.and(
+            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, Context.now()),
+            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+        );
+
+        Bson filter2 = Filters.and(
+            Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+        );
+
+        Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
+
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
+
+        return trrs;
+    }
+
+    private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
+        long timestamp = testingRun.getId().getTimestamp();
+        long seconds = Context.now() - timestamp;
+        loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
+
+        TestingRunConfig configFromTrrs = null;
+        TestingRunConfig baseConfig = null;
+
+        if (trrs != null && trrs.getTestIdConfig() > 1) {
+            configFromTrrs = TestingRunConfigDao.instance.findOne(Constants.ID, trrs.getTestIdConfig());
+            loggerMaker.infoAndAddToDb("Found testing run trrs config with id :" + configFromTrrs.getId(), LogDb.TESTING);
+        }
+
+        if (testingRun.getTestIdConfig() > 1) {
+            baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+        }
+
+        if (configFromTrrs == null) {
+            testingRun.setTestingRunConfig(baseConfig);
+        } else {
+            configFromTrrs.rebaseOn(baseConfig);
+            testingRun.setTestingRunConfig(configFromTrrs);
+        }
+
+        System.out.println(testingRun.getTestingRunConfig());
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
@@ -115,65 +186,50 @@ public class Main {
 
         while (true) {
             AccountTask.instance.executeTask(account -> {
-                int delta = Context.now() - 20*60;
-
-                Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-                );
-                Bson filter2 = Filters.and(
-                        Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
-                );
-
-                Bson update = Updates.combine(
-                        Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                );
 
                 int start = Context.now();
 
-                TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                        Filters.or(filter1,filter2), update);
+                TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
+                TestingRun testingRun;
+                ObjectId summaryId = null;
+                if (trrs == null) {
+                    testingRun = findPendingTestingRun();
+                } else {
+                    summaryId = trrs.getId();
+                    testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
+                }
 
                 if (testingRun == null) {
                     return;
                 }
 
-
                 try {
-                    long timestamp = testingRun.getId().getTimestamp();
-                    long seconds = Context.now() - timestamp;
-                    loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
-                    if (testingRun.getTestIdConfig() > 1) {
-                        TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-                        if (testingRunConfig != null) {
-                            loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
-                            testingRun.setTestingRunConfig(testingRunConfig);
-                        }else {
-                            loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
-                        }
-                    }
-                    if(testingRun.getState().equals(TestingRun.State.RUNNING)){
-                        Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
-                        TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
-                        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
-                        if(testingRunResults != null && !testingRunResults.isEmpty()){
-                            TestingRunResult testingRunResult = testingRunResults.get(0);
-                            if(Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA){
-                                loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
-                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                return;
+                    setTestingRunConfig(testingRun, trrs);
+
+                    if (summaryId == null) {
+                        if (testingRun.getState().equals(TestingRun.State.RUNNING)) {
+                            Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
+                            TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
+                            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
+                            if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                                TestingRunResult testingRunResult = testingRunResults.get(0);
+                                if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
+                                    loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
+                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                    return;
+                                } else {
+                                    loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
+                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                    TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                                }
                             } else {
-                                loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
-                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
                             }
-                        } else {
-                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                            TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
                         }
+
+                        summaryId = createTRRSummaryIfAbsent(testingRun, start);
                     }
-                    ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
                     TestExecutor testExecutor = new TestExecutor();
                     testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
@@ -196,6 +252,10 @@ public class Main {
                 TestingRunDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", testingRun.getId()),  completedUpdate
                 );
+
+                if(summaryId != null && testingRun.getTestIdConfig() != 1){
+                    TestExecutor.updateTestSummary(summaryId);
+                }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
             }, "testing");

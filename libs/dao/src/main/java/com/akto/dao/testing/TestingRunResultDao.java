@@ -47,9 +47,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
-                .projection(
-                        Projections.include(
+        Bson projections = Projections.include(
                                 TestingRunResult.TEST_RUN_ID,
                                 TestingRunResult.API_INFO_KEY,
                                 TestingRunResult.TEST_SUPER_TYPE,
@@ -59,9 +57,16 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                                 TestingRunResult.START_TIMESTAMP,
                                 TestingRunResult.END_TIMESTAMP,
                                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
-                        )
-                )
+                        );
+
+        return fetchLatestTestingRunResult(filters, limit, 0, projections);
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
+                .projection(projections)
                 .sort(Sorts.descending("_id"))
+                .skip(skip)
                 .limit(limit)
                 .cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();

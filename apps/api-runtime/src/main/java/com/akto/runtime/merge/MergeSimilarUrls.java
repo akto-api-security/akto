@@ -43,6 +43,9 @@ public class MergeSimilarUrls {
         for (SingleTypeInfo singleTypeInfo: stiResult) {
             Bson filter = SingleTypeInfoDao.createFilters(singleTypeInfo);
             Bson update = Updates.set("count", 1);
+            update = Updates.combine(update,
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(singleTypeInfo.getApiCollectionId())));
+
             bulkUpdates.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));
         }
 
