@@ -69,7 +69,7 @@
 }
 
 .beamer_defaultBeamerSelector {
-    top: 1.5vh !important;
+    top: 12px !important;
     position: fixed !important;
     right: 4vw !important;
     width: 32px !important;
