@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -19,6 +19,7 @@ import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import TooltipText from "../../../components/shared/TooltipText"
 
 const headings = [
     {
@@ -424,7 +425,9 @@ function ApiEndpoints() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg' truncate>{pageTitle}</Text>
+                <Box maxWidth="35vw">
+                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
+                </Box>
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={secondaryActionsComponent}

@@ -359,6 +359,7 @@ const SummaryCardComponent = () =>{
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
+        {totalVulnerabilites > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
@@ -369,6 +370,7 @@ const SummaryCardComponent = () =>{
 
           </LegacyCard.Subsection>
         </Collapsible>
+        : null }
       </LegacyCard.Section>
     </LegacyCard>
   )

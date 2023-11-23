@@ -541,17 +541,25 @@ convertSubIntoSubcategory(resp){
   let obj = {}
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
-    if(!subCategoryMap[key]){
-      obj[key] = {
+    const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
+    if(obj.hasOwnProperty(objectKey)){
+      let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
+      let newObj = {
+        ...tempObj,
+        text: resp[key] + tempObj.text
+      }
+      obj[objectKey] = newObj;
+    }
+    else if(!subCategoryMap[key]){
+      obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(key)
       }
     }else{
-      let temp = {
+      obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
       }
-      obj[subCategoryMap[key].superCategory.shortName] = temp
     }
 
   })
