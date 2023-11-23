@@ -53,6 +53,8 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
+    public final String _HOST = "host";
+
     public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
         List<TestResult> result = new ArrayList<>();
@@ -95,8 +97,8 @@ public class Executor {
 
                     // change host header in case of override URL ( if not already changed by test template )
                     try {
-                        List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault("host", new ArrayList<>());
-                        List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault("host", new ArrayList<>());
+                        List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+                        List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
 
                         if (originalHostHeaders.get(0) != null
                             && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
@@ -109,7 +111,7 @@ public class Executor {
                             if (uri.getPort() != -1) {
                                 host += ":" + uri.getPort();
                             }
-                            testReq.getRequest().getHeaders().put("host", Collections.singletonList(host));
+                            testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
                         }
 
                     } catch (Exception e) {
