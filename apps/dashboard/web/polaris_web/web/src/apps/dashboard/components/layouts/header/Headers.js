@@ -10,7 +10,6 @@ import func from '@/util/func';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-    const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const [searchValue, setSearchValue] = useState('');
     const [newAccount, setNewAccount] = useState('')
@@ -40,11 +39,6 @@ export default function Header() {
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
-        [],
-    );
-
-    const toggleIsSecondaryMenuOpen = useCallback(
-        () => setIsSecondaryMenuOpen((isSecondaryMenuOpen) => !isSecondaryMenuOpen),
         [],
     );
 
@@ -189,35 +183,11 @@ export default function Header() {
         />
     );
 
-    const secondaryMenuMarkup = (
-        <TopBar.Menu
-            activatorContent={
-                <span>
-                    <Icon source={NotificationMajor} />
-                    <Text as="span" visuallyHidden>
-                        Secondary menu
-                    </Text>
-                </span>
-            }
-            open={isSecondaryMenuOpen}
-            onOpen={toggleIsSecondaryMenuOpen}
-            onClose={toggleIsSecondaryMenuOpen}
-            actions={[
-                {
-                    items: [{
-                        prefix: <div style={{ marginLeft: '14px' }} id='beamer-btn'>Updates</div>
-                    }],
-                },
-            ]}
-        />
-    );
-
     const topBarMarkup = (
         <div className='topbar'>
             <TopBar
                 showNavigationToggle
                 userMenu={userMenuMarkup}
-                secondaryMenu={secondaryMenuMarkup}
                 searchField={searchFieldMarkup}
                 searchResultsVisible={isSearchActive}
                 searchResults={searchResultsMarkup}

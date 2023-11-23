@@ -1,4 +1,4 @@
-import { Box, Button, Divider, HorizontalStack, LegacyCard, Page, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Page, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -80,18 +80,14 @@ function About() {
         return(
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
-                <HorizontalStack>
-                    <Button onClick={() => onToggle(true)} plain monochrome removeUnderline>
-                        <Box borderRadiusStartStart="1" borderRadiusEndStart="1" borderWidth='1' background={initial === true ? "bg-success" : ""} padding={2} paddingBlockEnd={1} paddingBlockStart={1}>
-                            <Text color={initial === true ? "subdued" : ""} fontWeight="medium">True</Text>
-                        </Box>
+                <ButtonGroup segmented>
+                    <Button size="slim" onClick={onToggle} pressed={initial === true}>
+                        True
                     </Button>
-                    <Button onClick={() => onToggle(false)} plain monochrome removeUnderline>
-                        <Box borderRadiusStartEnd='1' borderRadiusEndEnd="1" borderWidth="1" borderBlockStartWidth='0' background={initial === false ? "bg-critical" : ""} padding={2} paddingBlockEnd={1} paddingBlockStart={1}>
-                            <Text color={initial === false ? "subdued" : ""} fontWeight="medium">False</Text>
-                        </Box>
+                    <Button size="slim" onClick={onToggle} pressed={initial === false}>
+                        False
                     </Button>
-                </HorizontalStack>
+                </ButtonGroup>
             </VerticalStack>
         )
     }
