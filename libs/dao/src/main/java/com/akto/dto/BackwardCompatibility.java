@@ -44,12 +44,14 @@ public class BackwardCompatibility {
     public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
     private int aktoDefaultNewUI;
 
+    public static final String INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO = "initializeOrganizationAccountBelongsTo";
+    private int initializeOrganizationAccountBelongsTo;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory,
-                                 int aktoDefaultNewUI) {
+                                 int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -64,6 +66,7 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
         this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
         this.aktoDefaultNewUI = aktoDefaultNewUI;
+        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
     }
 
     public BackwardCompatibility() {
@@ -187,5 +190,13 @@ public class BackwardCompatibility {
 
     public void setAktoDefaultNewUI(int aktoDefaultNewUI) {
         this.aktoDefaultNewUI = aktoDefaultNewUI;
+    }
+
+    public int getInitializeOrganizationAccountBelongsTo() {
+        return initializeOrganizationAccountBelongsTo;
+    }
+
+    public void setInitializeOrganizationAccountBelongsTo(int initializeOrganizationAccountBelongsTo) {
+        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
     }
 }
