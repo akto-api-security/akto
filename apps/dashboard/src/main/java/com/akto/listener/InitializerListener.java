@@ -1240,6 +1240,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);
