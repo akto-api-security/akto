@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
@@ -15,7 +16,10 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dao.usage.UsageMetricInfoDao;
+import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
@@ -34,6 +38,9 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetric;
+import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -1092,6 +1099,98 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void initializeOrganizationAccountBelongsTo(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getInitializeOrganizationAccountBelongsTo() == 0) {
+            if (DashboardMode.isOnPremDeployment() || DashboardMode.isSaasDeployment()) {
+                try {
+                    // Get rbac document of admin of current account
+                    int accountId = Context.accountId.get();
+                
+                    loggerMaker.infoAndAddToDb(String.format("Initializing organization to which account %d belongs", accountId), LogDb.DASHBOARD);
+                    RBAC adminRbac = RBACDao.instance.findOne(
+                        Filters.and(
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId),  
+                            Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN)
+                        )
+                    );
+
+                    int adminUserId = adminRbac.getUserId();
+                    // Get admin user
+                    User admin = UsersDao.instance.findOne(
+                        Filters.eq(User.ID, adminUserId)
+                    );
+                    String adminEmail = admin.getLogin();
+                    loggerMaker.infoAndAddToDb(String.format("Organization admin email: %s", adminEmail), LogDb.DASHBOARD);
+
+                    // Get accounts belonging to organization
+                    Set<Integer> accounts = Organization.findAccountsBelongingToOrganization(adminUserId);
+
+                    // Check if organization exists
+                    Organization organization = OrganizationsDao.instance.findOne(
+                        Filters.eq(Organization.ADMIN_EMAIL, adminEmail) 
+                    );
+
+                    String organizationUUID;
+
+                    // Create organization if it doesn't exist
+                    if (organization == null) {
+                        String name = adminEmail;
+
+                        if (DashboardMode.isOnPremDeployment()) {
+                            name = Organization.determineEmailDomain(adminEmail);
+                        }
+
+                        loggerMaker.infoAndAddToDb(String.format("Organization %s does not exist, creating...", name), LogDb.DASHBOARD);
+
+                        // Insert organization
+                        organizationUUID = UUID.randomUUID().toString();
+                        organization = new Organization(organizationUUID, name, adminEmail, accounts);
+                        OrganizationsDao.instance.insertOne(organization);
+                    } 
+
+                    organizationUUID = organization.getId();
+
+                    // Update accounts if changed
+                    if (organization.getAccounts().size() != accounts.size()) {
+                        organization.setAccounts(accounts);
+                        OrganizationsDao.instance.updateOne(
+                            Filters.eq(Organization.ID, organizationUUID),
+                            Updates.set(Organization.ACCOUNTS, accounts)
+                        );
+                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Updating accounts list", organization.getName()), LogDb.DASHBOARD);
+                    }
+
+                    Boolean syncedWithAkto = organization.getSyncedWithAkto();
+                    Boolean attemptSyncWithAktoSuccess = false;
+
+                    // Attempt to sync organization with akto
+                    if (!syncedWithAkto) {
+                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Syncing with akto", organization.getName()), LogDb.DASHBOARD);
+                        attemptSyncWithAktoSuccess = Organization.syncWithAkto(organization);
+                        
+                        if (!attemptSyncWithAktoSuccess) {
+                            loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto failed", organization.getName()), LogDb.DASHBOARD);
+                            return;
+                        } 
+
+                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto successful", organization.getName()), LogDb.DASHBOARD);
+                    } else {
+                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Alredy Synced with akto. Skipping sync ... ", organization.getName()), LogDb.DASHBOARD);
+                    }
+                    
+                    // Set backward compatibility dao
+                    BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
+                    );
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while initializing organization account belongs to. Error: %s", e.getMessage()), LogDb.DASHBOARD);
+                }
+            }
+        }
+    }
+
+
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
 
@@ -1178,8 +1277,13 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
-                        //fetchGithubZip();
                         updateGlobalAktoVersion();
+
+                        if (DashboardMode.isSaasDeployment() || DashboardMode.isOnPremDeployment()) {
+                            setupUsageScheduler();
+                            setupUsageSyncScheduler();
+                        }
+
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -1251,6 +1355,7 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
+        initializeOrganizationAccountBelongsTo(backwardCompatibility);
     }
 
     public void runInitializerFunctions() {
@@ -1333,6 +1438,7 @@ public class InitializerListener implements ServletContextListener {
                 Updates.set(BackwardCompatibility.DEPLOYMENT_STATUS_UPDATED, true)
         );
     }
+
 
     private static String getUpdateDeploymentStatusUrl() {
         String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
@@ -1517,6 +1623,106 @@ public class InitializerListener implements ServletContextListener {
         in.close();
         reader.close();
         return stringbuilder.toString();
+    }
+
+        public void setupUsageScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account a) {
+                        int accountId = a.getId();
+
+                        try {
+                            // Get organization to which account belongs to
+                            Organization organization = OrganizationsDao.instance.findOne(
+                                Filters.eq(Organization.ACCOUNTS, accountId)
+                            );
+
+                            if (organization == null) {
+                                return;
+                            }
+
+                            loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
+
+                            String organizationId = organization.getId();
+
+                            for (MetricTypes metricType : MetricTypes.values()) {                            
+                                UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
+                                    UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
+                                );
+
+                                if (usageMetricInfo == null) {
+                                    usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
+                                    UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
+                                }
+
+                                int syncEpoch = usageMetricInfo.getSyncEpoch();
+                                int measureEpoch = usageMetricInfo.getMeasureEpoch();
+                                
+                                // Reset measureEpoch every month
+                                if (Context.now() - measureEpoch > 2629746) {
+                                    if (syncEpoch > Context.now() - 86400) {
+                                        measureEpoch = Context.now();
+
+                                        UsageMetricInfoDao.instance.updateOne(
+                                            UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                                            Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
+                                        );
+                                    } 
+                                
+                                }
+
+                                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                    AccountSettingsDao.generateFilter()
+                                );
+                                String dashboardMode = DashboardMode.getDashboardMode().toString();
+                                String dashboardVersion = accountSettings.getDashboardVersion();
+
+                                UsageMetric usageMetric = new UsageMetric(
+                                    organizationId, accountId, metricType, syncEpoch, measureEpoch, 
+                                    dashboardMode, dashboardVersion
+                                );
+
+                                //calculate usage for metric
+                                usageMetric.calculateUsage();
+                                UsageMetricsDao.instance.insertOne(usageMetric);
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "usage-scheduler");
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+    }
+
+    public void setupUsageSyncScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                System.out.println("Running usage sync scheduler");
+                try {
+                    List<UsageMetric> usageMetrics = UsageMetricsDao.instance.findAll(
+                        Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false)
+                    );
+
+                    loggerMaker.infoAndAddToDb(String.format("Syncing %d usage metrics", usageMetrics.size()), LogDb.DASHBOARD);
+
+                    for (UsageMetric usageMetric : usageMetrics) {
+                        loggerMaker.infoAndAddToDb(String.format("Syncing usage metric %s  %s/%d %s", 
+                            usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()), 
+                            LogDb.DASHBOARD
+                        );
+                        UsageMetric.syncWithAkto(usageMetric);
+
+                        // Send to mixpanel
+                        UsageMetric.syncWithMixpanel(usageMetric);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while syncing usage metrics. Error: %s", e.getMessage()), LogDb.DASHBOARD);
+                }
+            }
+        }, 0, 1, TimeUnit.MINUTES);
     }
 }
 

@@ -3,6 +3,7 @@ package com.akto.log;
 import com.akto.dao.DashboardLogsDao;
 import com.akto.dao.LogsDao;
 import com.akto.dao.RuntimeLogsDao;
+import com.akto.dao.BillingLogsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Log;
 import com.mongodb.client.model.Filters;
@@ -24,7 +25,7 @@ public class LoggerMaker  {
     private static final int oneMinute = 60; 
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD
+        TESTING,RUNTIME,DASHBOARD,BILLING
     }
 
     public LoggerMaker(Class<?> c) {
@@ -76,6 +77,8 @@ public class LoggerMaker  {
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                case BILLING:
+                    BillingLogsDao.instance.insertOne(log);
             }
             logCount++;
         }
@@ -102,6 +105,8 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+            case BILLING:
+                logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
         }
         return logs;
     }
