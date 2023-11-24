@@ -17,6 +17,9 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import io.micrometer.core.instrument.util.StringUtils;
+import org.apache.commons.codec.digest.HmacAlgorithms;
+import org.apache.commons.codec.digest.HmacUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -87,6 +90,7 @@ public class ProfileAction extends UserAction {
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -97,6 +101,14 @@ public class ProfileAction extends UserAction {
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+
+        if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
+            String orgID = "customer-69138d";
+            String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(orgID);
+            userDetails.append("stiggCustomerId", orgID);
+            userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + orgID + ":" + stiggSignature);
+        }
+
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");
