@@ -25,7 +25,6 @@ export function generateSearchData(routes) {
     }
   
     traverseRoutes(routes,"");
-  
     return searchData;
 }
   
