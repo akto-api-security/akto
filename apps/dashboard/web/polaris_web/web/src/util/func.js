@@ -1008,21 +1008,12 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
-  allRoutes.forEach((item)=>{
-    if(!(item.path.includes(":") || !(item.path.includes("/dashboard")))){
-      combinedArr.push({content: item.content, url: item.path, type: 'page'})
-    }
-  })
 
   let initialStr = "/dashboard/observe/inventory/"
 
   allCollections.forEach((item)=> {
     combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
-
-  // deleting page/testing and dashboard page, if somebody is changing the APP.js, please look here
-  combinedArr.splice(0,7);
-  combinedArr.push({content: 'Test results', url: '/dashboard/testing', type: 'page'})
 
   return combinedArr
  },
