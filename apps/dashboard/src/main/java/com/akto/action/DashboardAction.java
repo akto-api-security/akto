@@ -7,9 +7,11 @@ import java.util.Map;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.Activity;
 import com.akto.dto.IssueTrendType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -24,7 +26,9 @@ public class DashboardAction extends UserAction {
     private int startTimeStamp;
     private int endTimeStamp;
     private Map<Integer,List<IssueTrendType>> issuesTrendMap = new HashMap<>() ;
-
+    private int skip;
+    private List<Activity> recentActivities = new ArrayList<>();
+    private int totalActivities;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class);
 
@@ -92,6 +96,12 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchRecentActivities(){
+        List<Activity> activities = ActivitiesDao.instance.fetchRecentActivitiesFeed(skip, 10);
+        this.recentActivities = activities;
+        this.totalActivities = (int) ActivitiesDao.instance.getMCollection().countDocuments();
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
@@ -115,6 +125,26 @@ public class DashboardAction extends UserAction {
 
     public Map<Integer, List<IssueTrendType>> getIssuesTrendMap() {
         return issuesTrendMap;
+    }
+
+    public int getSkip() {
+        return skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
+    public List<Activity> getRecentActivities() {
+        return recentActivities;
+    }
+
+    public int getTotalActivities() {
+        return totalActivities;
+    }
+
+    public void setTotalActivities(int totalActivities) {
+        this.totalActivities = totalActivities;
     }
     
 }

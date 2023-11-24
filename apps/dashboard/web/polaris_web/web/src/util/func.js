@@ -1143,7 +1143,7 @@ mapCollectionIdToHostName(apiCollections){
         return "#8B008B"
 
       default:
-        return tokens.color["color-border"]
+        return  "#" + Math.floor(Math.random()*16777215).toString(16);
     }
   },
 

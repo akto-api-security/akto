@@ -52,12 +52,20 @@ public class AccountSettings {
         public static final String LAST_UPDATED_SENSITIVE_MAP = "lastUpdatedSensitiveMap";
         private int lastUpdatedSensitiveMap;
 
+        public static final String LAST_CHECKED_NEW_PARAMS = "lastCheckedNewParams";
+        private int lastCheckedNewParams;
+
+        public static final String LAST_CHECKED_NEW_ENDPOINTS = "lastCheckedNewEndpoints";
+        private int lastCheckedNewEndpoints;
+
         public LastCronRunInfo(){     
         }
 
-        public LastCronRunInfo(int lastUpdatedIssues, int lastUpdatedSensitiveMap){
+        public LastCronRunInfo(int lastUpdatedIssues, int lastUpdatedSensitiveMap, int lastCheckedNewParams, int lastCheckedNewEndpoints){
             this.lastUpdatedIssues = lastUpdatedIssues;
             this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
+            this.lastCheckedNewParams = lastCheckedNewParams;
+            this.lastCheckedNewEndpoints = lastCheckedNewEndpoints;
         }
 
         public int getLastUpdatedIssues() {
@@ -74,6 +82,22 @@ public class AccountSettings {
 
         public void setLastUpdatedSensitiveMap(int lastUpdatedSensitiveMap) {
             this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
+        }
+
+        public int getLastCheckedNewParams() {
+            return lastCheckedNewParams;
+        }
+
+        public void setLastCheckedNewParams(int lastCheckedNewParams) {
+            this.lastCheckedNewParams = lastCheckedNewParams;
+        }
+
+        public int getLastCheckedNewEndpoints() {
+            return lastCheckedNewEndpoints;
+        }
+
+        public void setLastCheckedNewEndpoints(int lastCheckedNewEndpoints) {
+            this.lastCheckedNewEndpoints = lastCheckedNewEndpoints;
         }
     }
 

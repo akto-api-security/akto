@@ -15,6 +15,7 @@ const api = {
             data: {startTimeStamp,endTimeStamp}
         })
     },
+
     fetchSubTypeCountMap(startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchSubTypeCountMap',
@@ -25,6 +26,16 @@ const api = {
             }
         })
     },
+
+    fetchRecentFeed(skip){
+        return request({
+            url: '/api/getRecentActivities',
+            method: 'post',
+            data: {
+                skip
+            }
+        })
+    }
 }
 
 export default api;

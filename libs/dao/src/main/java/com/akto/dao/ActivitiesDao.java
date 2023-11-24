@@ -49,10 +49,10 @@ public class ActivitiesDao extends AccountsContextDao<Activity> {
         instance.insertOne(activity);
     }
 
-    public List<Activity> fetchRecentActivities(int skip, int limit){
+    public List<Activity> fetchRecentActivitiesFeed(int skip, int limit){
         List<Activity> activities = new ArrayList<>();
         Bson sort = Sorts.orderBy(Sorts.descending(Activity.TIME_STAMP));
-        activities = instance.findAll(Filters.empty(), skip, limit,sort);
+        activities = instance.findAll(Filters.empty(), skip, limit, sort);
         return activities;
     }
 

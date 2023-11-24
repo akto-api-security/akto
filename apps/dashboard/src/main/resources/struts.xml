@@ -2173,6 +2173,16 @@
             </result>
         </action>
 
+        <action name="api/getRecentActivities" class="com.akto.action.DashboardAction" method="fetchRecentActivities">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>
