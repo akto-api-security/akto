@@ -115,7 +115,7 @@ export default {
                 this.$store.commit("onboarding/UPDATE_RUN_TEST_LOADING",true)
                 this.$store.dispatch("onboarding/runTestOnboarding")
             } else if (this.currentStep === 4) {
-                this.$router.push('/dashboard/testing/' + this.testingRunHexId + '/results')
+                this.$router.push('/dashboard/testing/' + this.testingRunHexId)
             }
             if (this.currentStep + 1 > this.totalSteps) return
             this.currentStep += 1
