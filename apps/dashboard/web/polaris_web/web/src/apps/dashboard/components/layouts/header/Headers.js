@@ -176,7 +176,7 @@ export default function Header() {
 
     const searchFieldMarkup = (
         <TopBar.SearchField
-            placeholder="Search for pages and API collections"
+            placeholder="Search for API collections"
             showFocusBorder
             onChange={handleSearchChange}
             value={searchValue}
