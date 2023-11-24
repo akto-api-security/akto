@@ -31,6 +31,10 @@ function HomeDashboard() {
     const [sensitiveData, setSensitiveData] = useState({request: {}, response: {}})
     const [subCategoryInfo, setSubCategoryInfo] = useState({});
     const [coverageObj, setCoverageObj] = useState({})
+    const [firstFive, setFirstFive] = useState(true);
+    const [recentActivities, setRecentActivities] = useState([])
+    const [totalActivities, setTotalActivities] = useState(0)
+    const [skip, setSkip] = useState(0)
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -45,7 +49,8 @@ function HomeDashboard() {
             api.getRiskScoreRangeMap(),
             api.getIssuesTrend((func.timeNow() - func.recencyPeriod), func.timeNow()),
             api.fetchSubTypeCountMap(0 , func.timeNow()),
-            testingApi.getSummaryInfo(0 , func.timeNow())
+            testingApi.getSummaryInfo(0 , func.timeNow()),
+            api.fetchRecentFeed(skip)
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -55,6 +60,7 @@ function HomeDashboard() {
         let issuesTrendResp = results[2].status === 'fulfilled' ? results[2].value : {};
         let sensitiveDataResp = results[3].status === 'fulfilled' ? results[3].value : {} ;
         let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
+        let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
 
         setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
         setCoverageObj(coverageInfo)
@@ -62,6 +68,8 @@ function HomeDashboard() {
         setIssuesTrendMap(transform.formatTrendData(issuesTrendResp));
         setSensitiveData(transform.getFormattedSensitiveData(sensitiveDataResp.response))
         setSubCategoryInfo(testingFunc.convertSubIntoSubcategory(subcategoryDataResp.subcategoryInfo))
+        setRecentActivities(recentActivitiesResp.recentActivities)
+        setTotalActivities(recentActivitiesResp.totalActivities)
 
         const riskScoreObj = (await observeFunc.fetchRiskScoreInfo()).riskScoreObj.riskScoreMap ;
         const sensitiveInfo = await observeFunc.fetchSensitiveInfo() ;
@@ -220,26 +228,27 @@ function HomeDashboard() {
 
     )
 
-    const latestActivity = [
-        {
-            title: 'Test run on Juice shop collection',
-            description: 'Please provide your name and email',
-        },
-        {
-            title: 'Sensitive data detected',
-            description: 'Juice shop collection',
-        },
-        {
-            title: 'Sensitive data detected',
-            description: 'collection #2',
-        },
-        {
-            title: 'Daily test completed',
-            description: 'collection #5',
+    const checkLoadMore = () => {
+        const calledActivitiesYet = skip * 10 + recentActivities.length;
+        return calledActivitiesYet < totalActivities;
+    }
+
+    const handleLoadMore = async() => {
+        if(firstFive){
+            setFirstFive(!firstFive);
+        }else{
+            if(checkLoadMore()){
+                await api.fetchRecentFeed(skip + 1).then((resp) => {
+                    setRecentActivities(resp.recentActivities)
+                })
+                setFirstFive(!firstFive);
+                setSkip(skip + 1);
+            }
         }
-    ]
+    }
 
     const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
+    console.log(recentActivities)
 
     return (
         <div style={{display: 'flex'}}>
@@ -257,7 +266,7 @@ function HomeDashboard() {
             <div style={{flex: 3, paddingRight: '32px'}}>
                 <VerticalStack gap={5}>
                     <InitialSteps />
-                    <ActivityTracker latestActivity={latestActivity} />
+                    <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>

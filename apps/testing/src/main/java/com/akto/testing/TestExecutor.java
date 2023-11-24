@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
@@ -238,6 +239,7 @@ public class TestExecutor {
                 loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
             }
         }
+        ActivitiesDao.instance.insertActivity("Test run", "Tests run on " + apiInfoKeyList.size() + " apis completed.");
 
         loggerMaker.infoAndAddToDb("Finished adding " + totalResults + " testingRunResults", LogDb.TESTING);
     }
@@ -297,6 +299,9 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)));
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
+        if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
+            ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " new HIGH vulnerabilites detected");
+        }
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){

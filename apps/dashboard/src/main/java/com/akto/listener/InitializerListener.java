@@ -16,7 +16,6 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
-import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.data_types.Conditions;
@@ -54,6 +53,8 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.crons.FetchRecentEndpointsCron;
+import com.akto.utils.crons.FetchRecentParamsCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.crons.UpdateSeverityScoreInApiInfo;
 import com.akto.utils.notifications.TrafficUpdates;
@@ -110,6 +111,8 @@ public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
     UpdateSeverityScoreInApiInfo updateSeverityScoreInApiInfo = new UpdateSeverityScoreInApiInfo();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
+    FetchRecentEndpointsCron fetchRecentEndpointsCron = new FetchRecentEndpointsCron();
+    FetchRecentParamsCron fetchRecentParamsCron = new FetchRecentParamsCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -1172,6 +1175,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         updateSeverityScoreInApiInfo.updateSeverityScoreScheduler();
+                        fetchRecentEndpointsCron.setUpRecentEndpointsActivityScheduler();
+                        fetchRecentParamsCron.setUpRecentParamsActivityScheduler();
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
                         if(isSaas){
