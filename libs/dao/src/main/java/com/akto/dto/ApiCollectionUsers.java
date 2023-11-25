@@ -68,8 +68,23 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static Set<String> getUrlsFromConditions(List<CollectionCondition> conditions){
+    public static Set<ApiInfoKey> getApisFromConditions(List<CollectionCondition> conditions) {
         Set<ApiInfoKey> apis = new HashSet<>();
+        
+        // all AND conditions should be last
+        conditions.sort((CollectionCondition c1, CollectionCondition c2) -> {
+            if(c1.getOperator().equals(c2.getOperator())){
+                return 0;
+            } else if(c1.getOperator().equals(CollectionCondition.Operator.OR)) {
+                return -1;
+            }
+            return 1;
+        });
+
+        if(!conditions.isEmpty()){
+            apis.addAll(conditions.get(0).returnApis());
+        }
+        
         conditions.forEach((condition) -> {
             if(CollectionCondition.Operator.AND.equals(condition.getOperator())){
                 apis.retainAll(condition.returnApis());
@@ -77,6 +92,12 @@ public class ApiCollectionUsers {
                 apis.addAll(condition.returnApis());
             }
         });
+
+        return apis;
+    }
+
+    public static Set<String> getUrlsFromConditions(List<CollectionCondition> conditions){
+        Set<ApiInfoKey> apis = getApisFromConditions(conditions);
 
         Set<String> urls = new HashSet<>();
         apis.forEach((api) -> {

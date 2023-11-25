@@ -247,14 +247,22 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+        Bson filter = null;
+        if (apiCollectionId != -1) {
+            filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        }
+        return fetchEndpointsInCollection(filter);
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
 
-        if (apiCollectionId != -1) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
+        if(filter != null){
+            pipeline.add(Aggregates.match(filter));
         }
 
         Bson projections = Projections.fields(

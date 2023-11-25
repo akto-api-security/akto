@@ -35,6 +35,9 @@ import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
+import com.akto.dto.CollectionConditions.MethodCondition;
+import com.akto.dto.CollectionConditions.ParamCondition;
+import com.akto.dto.CollectionConditions.TimestampCondition;
 import com.akto.dto.auth.APIAuth;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
@@ -180,6 +183,12 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<ApiListCondition> apiListConditionClassModel = ClassModel.builder(ApiListCondition.class)
                 .enableDiscriminator(true).build();
+        ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class)
+                .enableDiscriminator(true).build();
+        ClassModel<ParamCondition> paramConditionClassModel = ClassModel.builder(ParamCondition.class)
+                .enableDiscriminator(true).build();
+        ClassModel<TimestampCondition> timestampConditionClassModel = ClassModel.builder(TimestampCondition.class)
+                .enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
@@ -203,7 +212,8 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, 
-                collectionConditionClassModel, apiListConditionClassModel).automatic(true).build());
+                collectionConditionClassModel, apiListConditionClassModel, methodConditionClassModel,
+                paramConditionClassModel, timestampConditionClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -237,7 +247,8 @@ public class DaoInit {
                 new EnumCodec<>(AktoGptConfigState.class),
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(TrafficMetricsAlert.FilterType.class),
-                new EnumCodec<>(CollectionCondition.Type.class));
+                new EnumCodec<>(CollectionCondition.Type.class),
+                new EnumCodec<>(CollectionCondition.Operator.class));
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

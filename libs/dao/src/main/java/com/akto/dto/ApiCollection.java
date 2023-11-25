@@ -174,16 +174,19 @@ public class ApiCollection {
 
         boolean found = false;
 
-        for(CollectionCondition it : conditions){
-            switch(it.getType()){
-                case API_LIST:
-                    Set<ApiInfoKey> tmp = it.returnApis();
-                    tmp.addAll(condition.returnApis());
-                    ((ApiListCondition) it).setApiList(tmp);
-                    found = true;
-                    break;
-                default:
-                    break;
+        for (CollectionCondition it : conditions) {
+            boolean sameType = it.getType() == condition.getType();
+            if (sameType) {
+                switch (it.getType()) {
+                    case API_LIST:
+                        Set<ApiInfoKey> tmp = it.returnApis();
+                        tmp.addAll(condition.returnApis());
+                        ((ApiListCondition) it).setApiList(tmp);
+                        found = true;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         
@@ -199,14 +202,17 @@ public class ApiCollection {
         }
 
         for(CollectionCondition it : conditions){
-            switch(it.getType()){
-                case API_LIST:
-                    Set<ApiInfoKey> tmp = it.returnApis();
-                    tmp.removeAll(condition.returnApis());
-                    ((ApiListCondition) it).setApiList(tmp);
-                    break;
-                default:
-                    break;
+            boolean sameType = it.getType() == condition.getType();
+            if (sameType) {
+                switch (it.getType()) {
+                    case API_LIST:
+                        Set<ApiInfoKey> tmp = it.returnApis();
+                        tmp.removeAll(condition.returnApis());
+                        ((ApiListCondition) it).setApiList(tmp);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
     }

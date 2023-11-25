@@ -523,5 +523,23 @@ export default {
                 collectionName
             }
         })
+    },
+    async createCustomCollection(collectionName, conditions) {
+        return await request({
+            url: '/api/createCustomCollection',
+            method: 'post',
+            data: {
+                collectionName, conditions
+            }
+        })
+    },
+    async getEndpointsFromConditions(conditions) {
+        return await request({
+            url: '/api/getEndpointsFromConditions',
+            method: 'post',
+            data: {
+                conditions
+            }
+        })
     }
 }
