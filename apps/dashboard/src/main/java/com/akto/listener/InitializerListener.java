@@ -1628,104 +1628,112 @@ public class InitializerListener implements ServletContextListener {
         return stringbuilder.toString();
     }
 
-        public void setupUsageScheduler() {
+    public static void calcUsage() {
+        AccountTask.instance.executeTask(new Consumer<Account>() {
+            @Override
+            public void accept(Account a) {
+                int accountId = a.getId();
+
+                try {
+                    // Get organization to which account belongs to
+                    Organization organization = OrganizationsDao.instance.findOne(
+                            Filters.eq(Organization.ACCOUNTS, accountId)
+                    );
+
+                    if (organization == null) {
+                        return;
+                    }
+
+                    loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
+
+                    String organizationId = organization.getId();
+
+                    for (MetricTypes metricType : MetricTypes.values()) {
+                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
+                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
+                        );
+
+                        if (usageMetricInfo == null) {
+                            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
+                            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
+                        }
+
+                        int syncEpoch = usageMetricInfo.getSyncEpoch();
+                        int measureEpoch = usageMetricInfo.getMeasureEpoch();
+
+                        // Reset measureEpoch every month
+                        if (Context.now() - measureEpoch > 2629746) {
+                            if (syncEpoch > Context.now() - 86400) {
+                                measureEpoch = Context.now();
+
+                                UsageMetricInfoDao.instance.updateOne(
+                                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
+                                );
+                            }
+
+                        }
+
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                AccountSettingsDao.generateFilter()
+                        );
+                        String dashboardMode = DashboardMode.getDashboardMode().toString();
+                        String dashboardVersion = accountSettings.getDashboardVersion();
+
+                        UsageMetric usageMetric = new UsageMetric(
+                                organizationId, accountId, metricType, syncEpoch, measureEpoch,
+                                dashboardMode, dashboardVersion
+                        );
+
+                        //calculate usage for metric
+                        usageMetric.calculateUsage();
+                        UsageMetricsDao.instance.insertOne(usageMetric);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
+                }
+            }
+        }, "usage-scheduler");
+    }
+
+    public static void syncWithAkto() {
+        System.out.println("Running usage sync scheduler");
+        try {
+            List<UsageMetric> usageMetrics = UsageMetricsDao.instance.findAll(
+                    Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false)
+            );
+
+            loggerMaker.infoAndAddToDb(String.format("Syncing %d usage metrics", usageMetrics.size()), LogDb.DASHBOARD);
+
+            for (UsageMetric usageMetric : usageMetrics) {
+                loggerMaker.infoAndAddToDb(String.format("Syncing usage metric %s  %s/%d %s",
+                                usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()),
+                        LogDb.DASHBOARD
+                );
+                UsageMetric.syncWithAkto(usageMetric);
+
+                // Send to mixpanel
+                UsageMetric.syncWithMixpanel(usageMetric);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("Error while syncing usage metrics. Error: %s", e.getMessage()), LogDb.DASHBOARD);
+        }
+    }
+
+    public void setupUsageScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account a) {
-                        int accountId = a.getId();
-
-                        try {
-                            // Get organization to which account belongs to
-                            Organization organization = OrganizationsDao.instance.findOne(
-                                Filters.eq(Organization.ACCOUNTS, accountId)
-                            );
-
-                            if (organization == null) {
-                                return;
-                            }
-
-                            loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
-
-                            String organizationId = organization.getId();
-
-                            for (MetricTypes metricType : MetricTypes.values()) {                            
-                                UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                                    UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
-                                );
-
-                                if (usageMetricInfo == null) {
-                                    usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-                                    UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-                                }
-
-                                int syncEpoch = usageMetricInfo.getSyncEpoch();
-                                int measureEpoch = usageMetricInfo.getMeasureEpoch();
-                                
-                                // Reset measureEpoch every month
-                                if (Context.now() - measureEpoch > 2629746) {
-                                    if (syncEpoch > Context.now() - 86400) {
-                                        measureEpoch = Context.now();
-
-                                        UsageMetricInfoDao.instance.updateOne(
-                                            UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                                            Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
-                                        );
-                                    } 
-                                
-                                }
-
-                                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                                    AccountSettingsDao.generateFilter()
-                                );
-                                String dashboardMode = DashboardMode.getDashboardMode().toString();
-                                String dashboardVersion = accountSettings.getDashboardVersion();
-
-                                UsageMetric usageMetric = new UsageMetric(
-                                    organizationId, accountId, metricType, syncEpoch, measureEpoch, 
-                                    dashboardMode, dashboardVersion
-                                );
-
-                                //calculate usage for metric
-                                usageMetric.calculateUsage();
-                                UsageMetricsDao.instance.insertOne(usageMetric);
-                            }
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
-                        }
-                    }
-                }, "usage-scheduler");
+                calcUsage();
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     public void setupUsageSyncScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                System.out.println("Running usage sync scheduler");
-                try {
-                    List<UsageMetric> usageMetrics = UsageMetricsDao.instance.findAll(
-                        Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false)
-                    );
-
-                    loggerMaker.infoAndAddToDb(String.format("Syncing %d usage metrics", usageMetrics.size()), LogDb.DASHBOARD);
-
-                    for (UsageMetric usageMetric : usageMetrics) {
-                        loggerMaker.infoAndAddToDb(String.format("Syncing usage metric %s  %s/%d %s", 
-                            usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()), 
-                            LogDb.DASHBOARD
-                        );
-                        UsageMetric.syncWithAkto(usageMetric);
-
-                        // Send to mixpanel
-                        UsageMetric.syncWithMixpanel(usageMetric);
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while syncing usage metrics. Error: %s", e.getMessage()), LogDb.DASHBOARD);
-                }
+                syncWithAkto();
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 }
 

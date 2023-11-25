@@ -1,4 +1,4 @@
-import { Box, Card, Divider, LegacyCard, Page, Text } from '@shopify/polaris'
+import { Box, Card, Divider, LegacyCard, Page, Text, Button, HorizontalStack } from '@shopify/polaris'
 import { Paywall, StiggProvider } from '@stigg/react-sdk'
 import {
   CustomerPortalProvider,
@@ -12,8 +12,13 @@ import {
 
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
+import billingApi from './api'
 
 function Billing() {
+    async function syncUsage() {
+        await billingApi.syncUsage()
+    }
+
     const usageTitle = (
         <Box paddingBlockEnd="4">
             <Text variant="headingMd">Your plan</Text>
@@ -56,6 +61,9 @@ function Billing() {
         title="Billing"
         divider
     >
+        <HorizontalStack align='end'>
+            <Button onClick={syncUsage} style={{color: "white"}} size="small">Sync usage</Button>
+        </HorizontalStack>
         <LegacyCard title={usageTitle}>
             <Divider />
             <LegacyCard.Section  >
