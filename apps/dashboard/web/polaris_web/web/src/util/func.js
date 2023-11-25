@@ -1019,16 +1019,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
-  allRoutes.forEach((item)=>{
-    if(!(item.path.includes(":") || !(item.path.includes("/dashboard")))){
-      combinedArr.push({content: item.content, url: item.path})
-    }
-  })
 
   let initialStr = "/dashboard/observe/inventory/"
 
   allCollections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id})
+    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
 
   return combinedArr
