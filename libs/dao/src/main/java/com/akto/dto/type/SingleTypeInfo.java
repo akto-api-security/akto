@@ -451,6 +451,7 @@ public class SingleTypeInfo {
     boolean isUrlParam;
     public static final String _VALUES = "values";
     public static final int VALUES_LIMIT = 50;
+    public static final String _VALUES_ELEMENTS = "values.elements";
     CappedSet<String> values = new CappedSet<>();
     public static final String _DOMAIN = "domain";
     Domain domain = Domain.ENUM;

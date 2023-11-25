@@ -53,7 +53,7 @@ public class ApiCollectionsAction extends UserAction {
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 int urlsCount = 0;
                 try {
-                    urlsCount = ApiCollectionUsers.getUrlsFromConditions(apiCollection.getConditions()).size();
+                    urlsCount = ApiCollectionUsers.getApisFromConditions(apiCollection.getConditions()).size();
                 } catch (Exception e) {
                     urlsCount = fallbackCount;
                 }
@@ -191,7 +191,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList));
+        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList), ApiListCondition.Operator.OR);
         apiCollection.addToConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
@@ -214,12 +214,91 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList));
+        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList), ApiListCondition.Operator.OR);
         apiCollection.removeFromConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
         fetchAllCollections();
+    
+        return SUCCESS.toUpperCase();
+    }
+
+    List<ConditionUtils> conditions;
+
+    public static class ConditionUtils {
+        private CollectionCondition.Type type;
+        private CollectionCondition.Operator operator;
+        private BasicDBObject data;
+
+        public BasicDBObject getData() {
+            return data;
+        }
+
+        public void setData(BasicDBObject data) {
+            this.data = data;
+        }
+
+        public ConditionUtils() {
+        }
+
+        public CollectionCondition.Type getType() {
+            return type;
+        }
+
+        public void setType(CollectionCondition.Type type) {
+            this.type = type;
+        }
+
+        public CollectionCondition.Operator getOperator() {
+            return operator;
+        }
+
+        public void setOperator(CollectionCondition.Operator operator) {
+            this.operator = operator;
+        }
+        
+    }
+
+    private static List<CollectionCondition> generateConditions(List<ConditionUtils> conditions){
+        List<CollectionCondition> ret = new ArrayList<>();
+
+        if (conditions != null) {
+            for (ConditionUtils conditionUtils : conditions) {
+                CollectionCondition condition = CollectionCondition.generateCondition(conditionUtils.getType(),
+                        conditionUtils.getOperator(), conditionUtils.getData());
+                if (condition != null) {
+                    ret.add(condition);
+                }
+            }
+        }
+        return ret;
+    }
+
+    public String createCustomCollection() {
+        if (!isValidApiCollectionName()) {
+            return ERROR.toUpperCase();
+        }
+
+        List<CollectionCondition> conditions = generateConditions(this.conditions);
+
+        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+        
+        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+        
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(apiCollection);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    int apiCount;
+
+    public String getEndpointsFromConditions(){
+        List<CollectionCondition> conditions = generateConditions(this.conditions);
+
+        apiCount = ApiCollectionUsers.getApisFromConditions(conditions).size();
     
         return SUCCESS.toUpperCase();
     }
@@ -257,4 +336,19 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollectionId = apiCollectionId;
     } 
 
+    public List<ConditionUtils> getConditions() {
+        return conditions;
+    }
+
+    public void setConditions(List<ConditionUtils> conditions) {
+        this.conditions = conditions;
+    }
+
+    public int getApiCount() {
+        return apiCount;
+    }
+
+    public void setApiCount(int apiCount) {
+        this.apiCount = apiCount;
+    }
 }
