@@ -137,7 +137,7 @@ public class StartTestAction extends UserAction {
                 return null;
         }
         if (this.selectedTests != null) {
-            int id = UUID.randomUUID().hashCode();
+            int id = UUID.randomUUID().hashCode() & 0xfffffff;
             TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
@@ -194,7 +194,7 @@ public class StartTestAction extends UserAction {
                 ));
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                int id = UUID.randomUUID().hashCode();
+                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);

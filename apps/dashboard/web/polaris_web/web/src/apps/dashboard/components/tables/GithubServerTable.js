@@ -18,7 +18,7 @@ import func from '@/util/func';
 import { produce } from "immer"
 import values from "@/util/values"
 import transform from '../../pages/observe/transform';
-import SpinnerCentered from '../progress/SpinnerCentered';
+import DropdownSearch from '../shared/DropdownSearch';
 
 function GithubServerTable(props) {
 
@@ -101,25 +101,47 @@ function GithubServerTable(props) {
     handleFilterStatusChange("dateRange",obj)
   }
 
+  const getSortedChoices = (choices) => {
+    return choices.sort((a,b) => a.label.localeCompare(b.label));
+  }
+
   let filters = formatFilters(props.filters)
+
   function formatFilters(filters) {
-    return filters
+    return filters 
       .map((filter) => {
         return {
           key: filter.key,
           label: filter.label,
           filter: (
-            <ChoiceList
-              title={filter.title}
-              titleHidden
-              choices={filter.choices}
-              selected={
-                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
-                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
-              }
-              onChange={(value) => handleFilterStatusChange(filter.key,value)}
-              {...(filter.singleSelect ? {} : { allowMultiple: true })}
-            />
+              filter.choices.length < 10 ?       
+              <ChoiceList
+                title={filter.title}
+                titleHidden
+                choices={getSortedChoices(filter.choices)}
+                selected={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+                onChange={(value) => handleFilterStatusChange(filter.key,value)}
+                {...(filter.singleSelect ? {} : { allowMultiple: true })}
+              />
+              :
+              <DropdownSearch 
+                placeHoder={"Apply filters"} 
+                optionsList={getSortedChoices(filter.choices)}
+                setSelected={(value) => handleFilterStatusChange(filter.key,value)}
+                {...(filter.singleSelect ? {} : { allowMultiple: true })}
+                allowMultiple
+                preSelected={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+                value={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+              />
           ),
           // shortcut: true,
           pinned: true
@@ -131,7 +153,8 @@ function GithubServerTable(props) {
       key: "dateRange",
       label: props.calenderLabel || "Discovered",
       filter:
-        (<DateRangePicker ranges={values.ranges}
+        (
+          <DateRangePicker ranges={values.ranges}
           initialDispatch = {currDateRange} 
           dispatch={(dateObj) => getDate(dateObj)}
           setPopoverState={() => {}}

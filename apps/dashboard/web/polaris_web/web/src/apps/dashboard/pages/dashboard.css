@@ -77,3 +77,20 @@
 .Polaris-Tabs .Polaris-Badge--statusSuccess{
     background: rgba(221, 224, 228, 1) !important;
 }
+.Polaris-TopBar-UserMenu__Details{
+    margin-right: 0px !important;
+}
+
+.reduce-size .Polaris-Avatar--sizeExtraSmall{
+    --pc-avatar-extra-small-size: 1.25rem;
+}
+
+.beamer_defaultBeamerSelector {
+    top: 12px !important;
+    position: fixed !important;
+    right: 4vw !important;
+    width: 32px !important;
+    height: 32px !important;
+    left: unset !important;
+    background-color: #d2d5d7 !important;
+}
