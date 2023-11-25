@@ -195,7 +195,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "usage-reporting-scheduler");
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
 }
