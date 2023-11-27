@@ -111,7 +111,7 @@ public class InitializerListener implements ServletContextListener {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
 
-    public static final String STIGG_SIGNING_KEY = System.getenv("STIGG_SIGNING_KEY");
+    public static String STIGG_SIGNING_KEY = null;
 
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
@@ -1321,6 +1321,15 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
             }
         }, 0, TimeUnit.SECONDS);
+
+
+        Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");
+        if (config == null) {
+            loggerMaker.errorAndAddToDb("No stigg config found", LogDb.DASHBOARD);
+            STIGG_SIGNING_KEY = null;
+        } else {
+            STIGG_SIGNING_KEY = ((Config.StiggConfig) config).getSigningKey();
+        }
     }
 
     private void updateGlobalAktoVersion() throws Exception{
