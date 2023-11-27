@@ -61,7 +61,10 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.notifications.TrafficUpdates;
+import com.akto.utils.usage.UsageMetricCalculator;
+import com.akto.utils.usage.UsageMetricUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -1117,16 +1120,27 @@ public class InitializerListener implements ServletContextListener {
                         )
                     );
 
+                    if (adminRbac == null) {
+                        loggerMaker.infoAndAddToDb(String.format("Account %d does not have an admin user", accountId), LogDb.DASHBOARD);
+                        return;
+                    }
+
                     int adminUserId = adminRbac.getUserId();
                     // Get admin user
                     User admin = UsersDao.instance.findOne(
                         Filters.eq(User.ID, adminUserId)
                     );
+
+                    if (admin == null) {
+                        loggerMaker.infoAndAddToDb(String.format("Account %d admin user does not exist", accountId), LogDb.DASHBOARD);
+                        return;
+                    }
+
                     String adminEmail = admin.getLogin();
                     loggerMaker.infoAndAddToDb(String.format("Organization admin email: %s", adminEmail), LogDb.DASHBOARD);
 
                     // Get accounts belonging to organization
-                    Set<Integer> accounts = Organization.findAccountsBelongingToOrganization(adminUserId);
+                    Set<Integer> accounts = OrganizationUtils.findAccountsBelongingToOrganization(adminUserId);
 
                     // Check if organization exists
                     Organization organization = OrganizationsDao.instance.findOne(
@@ -1140,7 +1154,7 @@ public class InitializerListener implements ServletContextListener {
                         String name = adminEmail;
 
                         if (DashboardMode.isOnPremDeployment()) {
-                            name = Organization.determineEmailDomain(adminEmail);
+                            name = OrganizationUtils.determineEmailDomain(adminEmail);
                         }
 
                         loggerMaker.infoAndAddToDb(String.format("Organization %s does not exist, creating...", name), LogDb.DASHBOARD);
@@ -1169,7 +1183,7 @@ public class InitializerListener implements ServletContextListener {
                     // Attempt to sync organization with akto
                     if (!syncedWithAkto) {
                         loggerMaker.infoAndAddToDb(String.format("Organization %s - Syncing with akto", organization.getName()), LogDb.DASHBOARD);
-                        attemptSyncWithAktoSuccess = Organization.syncWithAkto(organization);
+                        attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
                         
                         if (!attemptSyncWithAktoSuccess) {
                             loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto failed", organization.getName()), LogDb.DASHBOARD);
@@ -1686,7 +1700,8 @@ public class InitializerListener implements ServletContextListener {
                         );
 
                         //calculate usage for metric
-                        usageMetric.calculateUsage();
+                        UsageMetricCalculator.calculateUsageMetric(usageMetric);
+
                         UsageMetricsDao.instance.insertOne(usageMetric);
                     }
                 } catch (Exception e) {
@@ -1710,10 +1725,10 @@ public class InitializerListener implements ServletContextListener {
                                 usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()),
                         LogDb.DASHBOARD
                 );
-                UsageMetric.syncWithAkto(usageMetric);
-
+                UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
+                
                 // Send to mixpanel
-                UsageMetric.syncWithMixpanel(usageMetric);
+                UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(String.format("Error while syncing usage metrics. Error: %s", e.getMessage()), LogDb.DASHBOARD);
