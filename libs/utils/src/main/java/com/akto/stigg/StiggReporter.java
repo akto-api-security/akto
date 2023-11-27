@@ -88,6 +88,31 @@ public class StiggReporter {
 
     }
 
+    public String provisionSubscription(String customerId, String planId, String billingPeriod, String successUrl, String cancelUrl) {
+        String mutationQ = "mutation ProvisionSubscription($input: ProvisionSubscription!) {\\n" +
+                "  provisionSubscription(input: $input) {\\n" +
+                "    status\\n" +
+                "    checkoutUrl\\n" +
+                "    subscription {\\n" +
+                "      plan {\\n" +
+                "        id\\n" +
+                "      }}}}";
+
+        String inputVariables = new BasicDBObject("input",
+            new BasicDBObject("customerId", customerId)
+            .append("planId", planId)
+            .append("billingPeriod", billingPeriod)
+            .append("checkoutOptions",
+                    new BasicDBObject("successUrl", successUrl)
+                    .append("cancelUrl", cancelUrl)
+                    .append("allowPromoCodes", true)
+                    .append("collectBillingAddress", true)
+            )
+        ).toString();
+
+        return executeGraphQL(mutationQ, inputVariables);
+    }
+
     public String provisionCustomer(Organization organization) {
         String mutationQ = "mutation ProvisionCustomer($input: ProvisionCustomerInput!) {\\n" +
                 "  provisionCustomer(input: $input) {\\n" +

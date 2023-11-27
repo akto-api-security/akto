@@ -7,6 +7,14 @@ const billingApi = {
             method: 'post',
             data: {}
         })
+    },
+
+    provisionSubscription({billingPeriod, customerId, planId, successUrl, cancelUrl}) {
+        return request({
+            url: '/api/provisionSubscription',
+            method: 'post',
+            data: {billingPeriod, customerId, planId, successUrl, cancelUrl}
+        })
     }
 }
 
