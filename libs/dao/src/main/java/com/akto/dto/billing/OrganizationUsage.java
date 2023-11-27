@@ -1,8 +1,14 @@
 package com.akto.dto.billing;
 
+import com.akto.dto.usage.MetricTypes;
+
 import java.util.Map;
 
 public class OrganizationUsage {
+
+    public static enum DataSink {
+        MIXPANEL, SLACK, STIGG;
+    }
 
     public static final String ORG_ID = "orgId";
     private String orgId;
@@ -10,13 +16,18 @@ public class OrganizationUsage {
     public static final String DATE = "date";
     private int date;
     private int creationEpoch;
-    private Map<String, Integer> metricMap;
+    private Map<MetricTypes, Integer> metricMap;
 
-    public OrganizationUsage(String orgId, int date, int creationEpoch, Map<String, Integer> metricMap) {
+    public static final String SINKS = "sinks";
+
+    private Map<DataSink, Integer> sinks;
+
+    public OrganizationUsage(String orgId, int date, int creationEpoch, Map<MetricTypes, Integer> metricMap, Map<DataSink, Integer> sinks) {
         this.orgId = orgId;
         this.date = date;
         this.creationEpoch = creationEpoch;
         this.metricMap = metricMap;
+        this.sinks = sinks;
     }
 
     public String getOrgId() {
@@ -43,21 +54,30 @@ public class OrganizationUsage {
         this.creationEpoch = creationEpoch;
     }
 
-    public Map<String, Integer> getMetricMap() {
+    public Map<MetricTypes, Integer> getMetricMap() {
         return metricMap;
     }
 
-    public void setMetricMap(Map<String, Integer> metricMap) {
+    public void setMetricMap(Map<MetricTypes, Integer> metricMap) {
         this.metricMap = metricMap;
+    }
+
+    public Map<DataSink, Integer> getSinks() {
+        return sinks;
+    }
+
+    public void setSinks(Map<DataSink, Integer> sinks) {
+        this.sinks = sinks;
     }
 
     @Override
     public String toString() {
         return "OrganizationUsage{" +
-                "orgId=" + orgId +
+                "orgId='" + orgId + '\'' +
                 ", date=" + date +
                 ", creationEpoch=" + creationEpoch +
                 ", metricMap=" + metricMap +
+                ", sinks=" + sinks +
                 '}';
     }
 }
