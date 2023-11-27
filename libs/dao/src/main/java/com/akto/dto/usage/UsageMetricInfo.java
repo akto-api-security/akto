@@ -66,16 +66,4 @@ public class UsageMetricInfo {
     public void setMeasureEpoch(int measureEpoch) {
         this.measureEpoch = measureEpoch;
     }
-
-    public int initializeMeasureEpoch() {
-        int now = Context.now();
-
-        // Average number of seconds in a month (30.44 days)
-        int averageSecondsInMonth = 2629746;
-
-        // Calculate the timestamp for one month before
-        int oneMonthBefore = now - averageSecondsInMonth;
-
-        return oneMonthBefore;
-    }
 }
