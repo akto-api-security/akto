@@ -137,6 +137,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void syncBillingEodWithSlack(OrganizationUsage lastUsageItem) {
+
     }
 
     private void syncBillingEodWithMixpanel(OrganizationUsage lastUsageItem) {
