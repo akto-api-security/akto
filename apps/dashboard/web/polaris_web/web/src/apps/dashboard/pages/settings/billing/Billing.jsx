@@ -1,5 +1,5 @@
 import { Box, Card, Divider, LegacyCard, Page, Text, Button, HorizontalStack } from '@shopify/polaris'
-import { Paywall, StiggProvider } from '@stigg/react-sdk'
+import { Paywall, StiggProvider, SubscribeIntentionType } from '@stigg/react-sdk'
 import {
   CustomerPortalProvider,
   CustomerUsageData,
@@ -13,6 +13,8 @@ import {
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import billingApi from './api'
+
+import "./billing.css"
 
 function Billing() {
     async function syncUsage() {
@@ -49,10 +51,35 @@ function Billing() {
             <Box>
                   <Paywall
                     productId="product-akto"
-                    onPlanSelected={({ plan, customer, intentionType }) => {
+                    onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
                         console.log(plan, customer, intentionType);
+                        switch (intentionType) {
+
+                            case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
+                              window.location.href = "https://calendly.com/ankita-akto/akto-demo?month=2023-11"
+                              break;
+                            case SubscribeIntentionType.CHANGE_UNIT_QUANTITY:
+                            case SubscribeIntentionType.UPGRADE_PLAN:
+                            case SubscribeIntentionType.DOWNGRADE_PLAN:
+                                const checkoutResult = await billingApi.provisionSubscription({
+                                  billingPeriod: selectedBillingPeriod,
+                                  customerId: customer.id,
+                                  planId: plan.id,
+                                  successUrl: window.location.href,
+                                  cancelUrl: window.location.href
+                                });
+
+                                console.log("checkoutResult", checkoutResult);
+                                if (checkoutResult.data.provisionSubscription.status === 'PAYMENT_REQUIRED') {
+                                  window.location.href = checkoutResult.data.provisionSubscription.checkoutUrl;
+                                } else {
+                                    console.log("some error happened!")
+                                }
+                              break;
+                        }
                     }}
                   />
+
             </Box>
     )
 
@@ -61,9 +88,6 @@ function Billing() {
         title="Billing"
         divider
     >
-        <HorizontalStack align='end'>
-            <Button onClick={syncUsage} style={{color: "white"}} size="small">Sync usage</Button>
-        </HorizontalStack>
         <LegacyCard title={usageTitle}>
             <Divider />
             <LegacyCard.Section  >
