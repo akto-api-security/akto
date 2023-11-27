@@ -1301,6 +1301,14 @@ public class InitializerListener implements ServletContextListener {
                             setupUsageSyncScheduler();
                         }
 
+                        Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");
+                        if (config == null) {
+                            loggerMaker.errorAndAddToDb("No stigg config found", LogDb.DASHBOARD);
+                            STIGG_SIGNING_KEY = null;
+                        } else {
+                            STIGG_SIGNING_KEY = ((Config.StiggConfig) config).getSigningKey();
+                        }
+
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -1323,13 +1331,6 @@ public class InitializerListener implements ServletContextListener {
         }, 0, TimeUnit.SECONDS);
 
 
-        Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");
-        if (config == null) {
-            loggerMaker.errorAndAddToDb("No stigg config found", LogDb.DASHBOARD);
-            STIGG_SIGNING_KEY = null;
-        } else {
-            STIGG_SIGNING_KEY = ((Config.StiggConfig) config).getSigningKey();
-        }
     }
 
     private void updateGlobalAktoVersion() throws Exception{
