@@ -1,17 +1,12 @@
-package com.akto.util;
+package com.akto.util.tasks;
 
 import java.util.List;
 import java.util.function.Consumer;
 
-import com.akto.dao.AccountsDao;
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.context.Context;
-import com.akto.dto.Account;
 import com.akto.dto.billing.Organization;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 
-import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

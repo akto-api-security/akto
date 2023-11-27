@@ -16,22 +16,37 @@ import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dao.usage.UsageSyncDao;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationUsage;
+import com.akto.dto.billing.OrganizationUsage.DataSink;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.OrganizationTask;
+import com.akto.util.tasks.OrganizationTask;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
+
+import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
+import static com.akto.dto.billing.OrganizationUsage.SINKS;
 
 public class InitializerListener implements ServletContextListener {
     
     public static boolean connectedToMongo = false;
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+
+    private static int epochToDateInt(int epoch) {
+        Date dateFromEpoch = new Date( epoch * 1000L );
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(dateFromEpoch);
+        return cal.get(Calendar.YEAR) * 1000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH);
+
+    }
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
@@ -81,6 +96,54 @@ public class InitializerListener implements ServletContextListener {
         // override
     }
 
+    private void sendOrgUsageDataToAllSinks(Organization o) {
+        Bson filterQ =
+                Filters.and(
+                    Filters.eq(ORG_ID, o.getId()),
+                    Filters.or(
+                        Filters.exists(SINKS, false),
+                        Filters.eq(SINKS, new BasicDBObject())
+                    )
+                );
+        List<OrganizationUsage> pendingUsages =
+            OrganizationUsageDao.instance.findAll(filterQ);
+
+
+        for (OrganizationUsage lastUsageItem: pendingUsages) {
+
+            int today = epochToDateInt(Context.now());
+            if (lastUsageItem.getDate() == today) return;
+
+            for (DataSink dataSink : DataSink.values()) {
+                switch (dataSink) {
+                    case STIGG:
+                        syncBillingEodWithStigg(lastUsageItem);
+                        break;
+                    case MIXPANEL:
+                        syncBillingEodWithMixpanel(lastUsageItem);
+                        break;
+                    case SLACK:
+                        syncBillingEodWithSlack(lastUsageItem);
+                        break;
+                    default:
+                        throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
+                }
+            }
+        }
+
+    }
+
+    private void syncBillingEodWithSlack(OrganizationUsage lastUsageItem) {
+    }
+
+    private void syncBillingEodWithMixpanel(OrganizationUsage lastUsageItem) {
+        
+    }
+
+    private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
+        
+    }
+
     private void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {
         String organizationId = o.getId();
         String organizationName = o.getName();
@@ -90,11 +153,11 @@ public class InitializerListener implements ServletContextListener {
 
         loggerMaker.infoAndAddToDb(String.format("Calculating Consolidated and account wise usage for organization %s - %s", organizationId, organizationName), LogDb.BILLING);
 
-        Map<String, Integer> consolidatedUsage = new HashMap<String, Integer>();
+        Map<MetricTypes, Integer> consolidatedUsage = new HashMap<MetricTypes, Integer>();
 
         // Calculate account wise usage and consolidated usage
         for (MetricTypes metricType : MetricTypes.values()) {
-            consolidatedUsage.put(metricType.toString(), 0);
+            consolidatedUsage.put(metricType, 0);
 
             for (int account : accounts) {
                 UsageMetric usageMetric = UsageMetricsDao.instance.findLatestOne(
@@ -115,26 +178,23 @@ public class InitializerListener implements ServletContextListener {
                     usage = usageMetric.getUsage();
                 }
 
-                int currentConsolidateUsage = consolidatedUsage.get(metricType.toString());
+                int currentConsolidateUsage = consolidatedUsage.get(metricType);
                 int updatedConsolidateUsage = currentConsolidateUsage + usage;
 
-                consolidatedUsage.put(metricType.toString(), updatedConsolidateUsage);
+                consolidatedUsage.put(metricType, updatedConsolidateUsage);
             }
         }
 
-        Date dateFromEpoch = new Date( usageLowerBound * 1000L );
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(dateFromEpoch);
-        int date = cal.get(Calendar.YEAR) * 1000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH);
+        int date = epochToDateInt(usageLowerBound);
 
         OrganizationUsageDao.instance.insertOne(
-            new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage)
+            new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
         );
 
         loggerMaker.infoAndAddToDb(String.format("Consolidated and account wise usage for organization %s - %s calculated", organizationId, organizationName), LogDb.BILLING);
     }
 
-     public void setupUsageReportingScheduler() {
+    public void setupUsageReportingScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
 
