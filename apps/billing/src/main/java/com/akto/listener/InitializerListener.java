@@ -1,5 +1,6 @@
 package com.akto.listener;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -9,6 +10,7 @@ import java.util.function.Consumer;
 import javax.servlet.ServletContextListener;
 
 import com.akto.DaoInit;
+import com.akto.action.usage.UsageAction;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.billing.OrganizationUsageDao;
@@ -22,6 +24,8 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.stigg.Stigg;
+import com.akto.stigg.StiggReporter;
 import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -34,7 +38,6 @@ import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
 import static com.akto.dto.billing.OrganizationUsage.SINKS;
 
 public class InitializerListener implements ServletContextListener {
-    
     public static boolean connectedToMongo = false;
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -141,7 +144,18 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
-        
+
+        for(Map.Entry<MetricTypes, Integer> entry: lastUsageItem.getMetricMap().entrySet()) {
+            String featureId =  entry.getKey().getLabel();
+            int value = entry.getValue();
+
+            try {
+                StiggReporter.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
+            } catch (IOException e) {
+                String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
+                loggerMaker.errorAndAddToDb(errLog, LogDb.BILLING);
+            }
+        }
     }
 
     private void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {
