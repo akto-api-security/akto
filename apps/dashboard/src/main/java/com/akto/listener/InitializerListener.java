@@ -47,6 +47,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.stigg.StiggReporter;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
@@ -1107,7 +1108,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void initializeOrganizationAccountBelongsTo(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getInitializeOrganizationAccountBelongsTo() == 0) {
-            if (DashboardMode.isOnPremDeployment() || DashboardMode.isSaasDeployment()) {
+            if (DashboardMode.isSaasDeployment()) {
                 try {
                     // Get rbac document of admin of current account
                     int accountId = Context.accountId.get();
@@ -1162,6 +1163,9 @@ public class InitializerListener implements ServletContextListener {
                         // Insert organization
                         organizationUUID = UUID.randomUUID().toString();
                         organization = new Organization(organizationUUID, name, adminEmail, accounts);
+                        StiggReporter.instance.provisionCustomer(organization);
+                        StiggReporter.instance.provisionSubscription(organization.getId(), "plan-akto-test", "ANNUALY", "https://some.checkout.url", "https://some.checkout.url");
+
                         OrganizationsDao.instance.insertOne(organization);
                     } 
 
