@@ -26,10 +26,9 @@ function ActivityTracker({latestActivity, onLoadMore, showLoadMore}) {
                             })}
                             </VerticalStack>
                         </HorizontalStack>
-
-                        {showLoadMore ? <Button plain removeUnderline onClick={onLoadMore} /> : null}
                     </VerticalStack>
                 </Scrollable>
+                {showLoadMore() ? <Button plain removeUnderline onClick={onLoadMore}>Load more</Button> : null}
             </VerticalStack>
         </Card>
     )

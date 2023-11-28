@@ -19,6 +19,7 @@ import CoverageCard from './components/CoverageCard';
 import PersistStore from '../../../main/PersistStore';
 import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
+import NullData from './components/NullData';
 
 function HomeDashboard() {
 
@@ -31,10 +32,11 @@ function HomeDashboard() {
     const [sensitiveData, setSensitiveData] = useState({request: {}, response: {}})
     const [subCategoryInfo, setSubCategoryInfo] = useState({});
     const [coverageObj, setCoverageObj] = useState({})
-    const [firstFive, setFirstFive] = useState(true);
     const [recentActivities, setRecentActivities] = useState([])
     const [totalActivities, setTotalActivities] = useState(0)
     const [skip, setSkip] = useState(0)
+    const [criticalUrls, setCriticalUrls] = useState(0);
+    const [initialSteps, setInitialSteps] = useState({}) ;
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -50,7 +52,8 @@ function HomeDashboard() {
             api.getIssuesTrend((func.timeNow() - func.recencyPeriod), func.timeNow()),
             api.fetchSubTypeCountMap(0 , func.timeNow()),
             testingApi.getSummaryInfo(0 , func.timeNow()),
-            api.fetchRecentFeed(skip)
+            api.fetchRecentFeed(skip),
+            api.getIntegratedConnections(),
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -61,6 +64,7 @@ function HomeDashboard() {
         let sensitiveDataResp = results[3].status === 'fulfilled' ? results[3].value : {} ;
         let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
         let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
+        let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
 
         setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
         setCoverageObj(coverageInfo)
@@ -70,10 +74,15 @@ function HomeDashboard() {
         setSubCategoryInfo(testingFunc.convertSubIntoSubcategory(subcategoryDataResp.subcategoryInfo))
         setRecentActivities(recentActivitiesResp.recentActivities)
         setTotalActivities(recentActivitiesResp.totalActivities)
+        setInitialSteps(connectionsInfo)
 
-        const riskScoreObj = (await observeFunc.fetchRiskScoreInfo()).riskScoreObj.riskScoreMap ;
+        const riskScoreObj = (await observeFunc.fetchRiskScoreInfo()).riskScoreObj
+        const riskScoreMap = riskScoreObj.riskScoreMap || {};
+        const endpoints = riskScoreObj.criticalUrls;
+        setCriticalUrls(endpoints)
+
         const sensitiveInfo = await observeFunc.fetchSensitiveInfo() ;
-        setRiskScoreObj(riskScoreObj) ;
+        setRiskScoreObj(riskScoreMap) ;
         setSensitiveArr(sensitiveInfo) ;
 
         setLoading(false)
@@ -92,7 +101,7 @@ function HomeDashboard() {
         },
         {
             title: 'Critical endpoints',
-            data: observeFunc.formatNumberWithCommas(riskScoreObj.criticalUrls || 0),
+            data: observeFunc.formatNumberWithCommas(criticalUrls),
             variant: 'headingLg'
         },
         {
@@ -118,13 +127,16 @@ function HomeDashboard() {
     }
 
     const subcategoryInfoComp = (
-        <Card key="subcategoryTrend">
-            <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
-                <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
-            </VerticalStack>
-        </Card>
-    )
+        Object.keys(subCategoryInfo).length > 0 ? 
+            <Card key="subcategoryTrend">
+                <VerticalStack gap={5}>
+                    <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
+                    <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
+                </VerticalStack>
+            </Card>
+
+        : <NullData text={"Issues by category"} url={"/dashboard/observe/inventory/1111111111"} urlText={"to run a test."} description={"No test categories found."} key={"subcategoryTrend"}/>
+     )
 
     const riskScoreRanges = [
         {
@@ -187,6 +199,7 @@ function HomeDashboard() {
     )
 
     const issuesTrendComp = (
+        (issuesTrendMap.allSubCategories.length > 0 && issuesTrendMap.trend.length > 0) ? 
         <Card key="issuesTrend">
             <VerticalStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">Issues timeline</Text>
@@ -225,31 +238,24 @@ function HomeDashboard() {
                 </VerticalStack>
             </VerticalStack>
         </Card>
-
+        :  <NullData text={"Issues timeline."} url={"/dashboard/observe/inventory/1111111111"} urlText={"to run a test."} description={"No issues found."} key={"issuesTrend"}/>
     )
 
     const checkLoadMore = () => {
-        const calledActivitiesYet = skip * 10 + recentActivities.length;
+        const calledActivitiesYet = recentActivities.length;
         return calledActivitiesYet < totalActivities;
     }
 
     const handleLoadMore = async() => {
-        if(firstFive){
-            setFirstFive(!firstFive);
-        }else{
-            if(checkLoadMore()){
-                await api.fetchRecentFeed(skip + 1).then((resp) => {
-                    setRecentActivities(resp.recentActivities)
-                })
-                setFirstFive(!firstFive);
-                setSkip(skip + 1);
-            }
+        if(checkLoadMore()){
+            await api.fetchRecentFeed(skip + 1).then((resp) => {
+                setRecentActivities([...recentActivities,...resp.recentActivities])
+            })
+            setSkip(skip + 1);
         }
     }
 
     const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
-    console.log(recentActivities)
-
     return (
         <div style={{display: 'flex'}}>
             <div style={{flex: 7}}>
@@ -265,7 +271,7 @@ function HomeDashboard() {
             </div>
             <div style={{flex: 3, paddingRight: '32px'}}>
                 <VerticalStack gap={5}>
-                    <InitialSteps />
+                    <InitialSteps initialSteps={initialSteps}/>
                     <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 

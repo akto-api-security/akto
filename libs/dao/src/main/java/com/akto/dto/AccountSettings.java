@@ -1,6 +1,8 @@
 package com.akto.dto;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AccountSettings {
     private int id;
@@ -43,7 +45,10 @@ public class AccountSettings {
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
 
     public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
-    private LastCronRunInfo lastUpdatedCronInfo; 
+    private LastCronRunInfo lastUpdatedCronInfo;
+    
+    public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
+    private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
 
     public static class LastCronRunInfo{
         public static final String LAST_UPDATED_ISSUES = "lastUpdatedIssues";
@@ -98,6 +103,44 @@ public class AccountSettings {
 
         public void setLastCheckedNewEndpoints(int lastCheckedNewEndpoints) {
             this.lastCheckedNewEndpoints = lastCheckedNewEndpoints;
+        }
+    }
+
+    public static class ConnectionInfo {
+        
+        public static final String GITHUB_SSO = "githubSso";
+        public static final String CI_CD_INTEGRATIONS = "cicdIntegrations";
+        public static final String AUTOMATED_TRAFFIC = "automatedTraffic";
+        public static final String SLACK_ALERTS = "slackAlerts";
+        public static final String INVITE_MEMBERS = "inviteMembers";
+
+        public static final String IS_INTEGRATED = "isIntegrated";
+        private boolean isIntegrated;
+
+        public static final String LAST_SKIPPED = "lastSkipped";
+        private int lastSkipped;
+
+        public ConnectionInfo(){}
+
+        public ConnectionInfo(int lastSkipped, boolean isIntegrated){
+            this.lastSkipped = lastSkipped;
+            this.isIntegrated = isIntegrated;
+        }
+
+        public int getLastSkipped() {
+            return lastSkipped;
+        }
+
+        public void setLastSkipped(int lastSkipped) {
+            this.lastSkipped = lastSkipped;
+        }
+
+        public boolean isIntegrated() {
+            return isIntegrated;
+        }
+
+        public void setIntegrated(boolean isIntegrated) {
+            this.isIntegrated = isIntegrated;
         }
     }
 
@@ -244,5 +287,13 @@ public class AccountSettings {
 
     public void setLastUpdatedCronInfo(LastCronRunInfo lastUpdatedCronInfo) {
         this.lastUpdatedCronInfo = lastUpdatedCronInfo;
+    }
+
+    public Map<String, ConnectionInfo> getConnectionIntegrationsInfo() {
+        return connectionIntegrationsInfo;
+    }
+
+    public void setConnectionIntegrationsInfo(Map<String, ConnectionInfo> connectionIntegrationsInfo) {
+        this.connectionIntegrationsInfo = connectionIntegrationsInfo;
     }
 }

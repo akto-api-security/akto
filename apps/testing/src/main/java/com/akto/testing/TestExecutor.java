@@ -300,7 +300,7 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
         if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
-            ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " new HIGH vulnerabilites detected");
+            ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
         }
     }
 

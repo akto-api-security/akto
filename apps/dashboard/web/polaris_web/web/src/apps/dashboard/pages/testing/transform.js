@@ -178,7 +178,7 @@ const transform = {
       return(
         <HorizontalStack gap={4}>
           {iconComp}
-          <Box maxWidth="400px">
+          <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
         </HorizontalStack>

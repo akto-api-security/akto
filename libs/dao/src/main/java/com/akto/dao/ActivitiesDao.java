@@ -29,7 +29,7 @@ public class ActivitiesDao extends AccountsContextDao<Activity> {
         };
 
         if (!exists) {
-            db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100_000).sizeInBytes(100_000_000));
+            db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(1000).sizeInBytes(100_000_000));
         }
         
         MongoCursor<Document> cursor = db.getCollection(getCollName()).listIndexes().cursor();

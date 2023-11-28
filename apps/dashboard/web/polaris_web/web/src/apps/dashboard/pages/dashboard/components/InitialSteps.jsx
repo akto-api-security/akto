@@ -1,49 +1,58 @@
 import { Avatar, Box, Button, Card, Divider, HorizontalStack, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import { useNavigate } from 'react-router-dom';
+import api from '../api';
+import transform from '../transform';
+import func from '@/util/func';
 
-function InitialSteps() {
+function InitialSteps({initialSteps}) {
 
     const [stepsCompleted, setStepsCompleted] = useState(0) ;
     const [dropdownActive, setDropdownActive] = useState(-1) ;
     const navigate = useNavigate() ;
 
+    const [connectionsSteps, setConnectionSteps] = useState({}) 
+
     const steps = [
         {
-            text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras ac ipsum pellentesque sem sagittis scelerisque. Maecenas pharetra nulla vel risus hendrerit, sit amet scelerisque leo varius. Mauris vel egestas quam, a vulputate tellus. Etiam a lacus ex. Aenean porttitor odio vel tortor ornare pulvinar 1',
+            text: 'Use mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs.',
             title: 'Automated traffic',
-            url: '/dashboard/quick-start'
+            url: '/dashboard/quick-start',
+            id: 'automatedTraffic',
         },
         {
-            text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras ac ipsum pellentesque sem sagittis scelerisque. Maecenas pharetra nulla vel risus hendrerit, sit amet scelerisque leo varius. Mauris vel egestas quam, a vulputate tellus. Etiam a lacus ex. Aenean porttitor odio vel tortor ornare pulvinar 2',
+            id: 'cicdIntegrations',
+            text: 'Send alerts to your slack to get notified when new endpoints are discovered.',
             title: 'Slack alerts',
             url: '/dashboard/settings/integrations/slack'
         },
         {
-            text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras ac ipsum pellentesque sem sagittis scelerisque. Maecenas pharetra nulla vel risus hendrerit, sit amet scelerisque leo varius. Mauris vel egestas quam, a vulputate tellus. Etiam a lacus ex. Aenean porttitor odio vel tortor ornare pulvinar 3',
+            id: 'githubSso',
+            text: 'Enable Login via GitHub on your Akto dashboard.',
             title: 'SSO',
             url: '/dashboard/settings/integrations/github_sso'
         },
         {
-            text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras ac ipsum pellentesque sem sagittis scelerisque. Maecenas pharetra nulla vel risus hendrerit, sit amet scelerisque leo varius. Mauris vel egestas quam, a vulputate tellus. Etiam a lacus ex. Aenean porttitor odio vel tortor ornare pulvinar 4',
+            id: 'inviteMembers',
+            text: 'You can invite your team members to Akto.',
             title: 'Invite team members',
             url: '/dashboard/settings/users'
         },
         {
-            text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras ac ipsum pellentesque sem sagittis scelerisque. Maecenas pharetra nulla vel risus hendrerit, sit amet scelerisque leo varius. Mauris vel egestas quam, a vulputate tellus. Etiam a lacus ex. Aenean porttitor odio vel tortor ornare pulvinar 5',
+            id: 'slackAlerts',
+            text: 'Seamlessly enhance your web application security with CI/CD integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses.',
             title: 'CI/CD',
             url: '/dashboard/settings/integrations/ci-cd',
         }
     ]
 
-    const markAsComplete = (index) => {
-        if(index === stepsCompleted){
-            setStepsCompleted(index + 1) ;
-            setDropdownActive(index + 1)
-        }else{
-            return ;
-        }
+    const markAsComplete = async(id) => {
+        console.log(id)
+        await api.skipConnection(id) ;
+        await api.getIntegratedConnections().then((resp)=> {
+            setConnectionSteps(resp);
+        })
     }
 
     const expandContent = (index) => {
@@ -54,16 +63,29 @@ function InitialSteps() {
         }
     }
 
+    useEffect(()=> {
+        setConnectionSteps(initialSteps)
+    },[initialSteps])
+
+    useEffect(()=> {
+        setStepsCompleted(transform.getConnectedSteps(connectionsSteps))
+    },[connectionsSteps])
+
+    const isCompleted = (id) => {
+        if(!connectionsSteps || Object.keys(connectionsSteps).length === 0) return false
+        return connectionsSteps[id].integrated || ((func.timeNow() - connectionsSteps[id].lastSkipped) <= func.recencyPeriod)
+    }
+
     function StepConnection({step,index}) {
         return(
             <VerticalStack gap={4}>
                 <HorizontalStack gap={2}>
                     <Avatar customer name='circle' size="extraSmall"
-                        source={stepsCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
+                        source={isCompleted(step.id) ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                     />
                     <Box width="85%">
                         <HorizontalStack align="space-between">
-                            <Text variant="bodyMd" color={stepsCompleted > index ? 'subdued' : ''} fontWeight={stepsCompleted > index ? "" : 'medium'}>
+                            <Text variant="bodyMd" color={isCompleted(step.id) ? 'subdued' : ''} fontWeight={isCompleted(step.id) ? "" : 'medium'}>
                                 {step.title}
                             </Text>
                             <Button plain monochrome icon={index === dropdownActive ? ChevronUpMinor : ChevronDownMinor} onClick={()=> expandContent(index)} />        
@@ -76,7 +98,7 @@ function InitialSteps() {
                             <Text variant="bodyMd">{step.text}</Text>
                         <HorizontalStack gap={2}>
                             <Button onClick={()=> navigate(step.url)} size="slim">Configure now</Button>
-                            <Button plain onClick={()=> markAsComplete(index)} size="slim">Skip step</Button>
+                            <Button plain onClick={()=> markAsComplete(step.id)} size="slim">Skip step</Button>
                         </HorizontalStack>
                         <br/>
                     </VerticalStack>

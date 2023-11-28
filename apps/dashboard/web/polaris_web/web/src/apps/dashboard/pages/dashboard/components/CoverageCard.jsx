@@ -9,7 +9,7 @@ function CoverageCard({coverageObj, collections, collectionsMap}) {
         <Card>
             <VerticalStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">Test coverage</Text>
-                <Scrollable style={{height: '400px'}} shadow> 
+                <Scrollable style={{maxHeight: '400px'}} shadow> 
                     <Box>
                     {sortedCollectionElements.map((collectionObj,index)=> (
                         <Box padding={2} key={collectionObj.id}>

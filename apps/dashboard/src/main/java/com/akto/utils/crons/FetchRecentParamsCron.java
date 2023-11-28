@@ -52,7 +52,7 @@ public class FetchRecentParamsCron {
                             long newParams = SingleTypeInfoDao.instance.getMCollection().countDocuments(filter);
                             
                             if(newParams > 0){
-                                ActivitiesDao.instance.insertActivity("Parameters detected",newParams + " new parameters detected in dashboard");
+                                ActivitiesDao.instance.insertActivity("Parameters detected",newParams + " new parameters detected.");
                             }
 
                             AccountSettingsDao.instance.getMCollection().updateOne(
@@ -64,7 +64,7 @@ public class FetchRecentParamsCron {
                            e.printStackTrace();
                         }
                     }
-                }, "fetched-recent-endpoints-count");
+                }, "fetched-recent-params-count");
             }
         }, 0, 5, TimeUnit.MINUTES);
     }

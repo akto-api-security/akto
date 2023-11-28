@@ -7,17 +7,21 @@ import java.util.Map;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.Activity;
 import com.akto.dto.IssueTrendType;
+import com.akto.dto.AccountSettings.ConnectionInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
 public class DashboardAction extends UserAction {
@@ -29,6 +33,8 @@ public class DashboardAction extends UserAction {
     private int skip;
     private List<Activity> recentActivities = new ArrayList<>();
     private int totalActivities;
+    private Map<String,ConnectionInfo> integratedConnectionsInfo = new HashMap<>();
+    private String connectionSkipped;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class);
 
@@ -97,10 +103,33 @@ public class DashboardAction extends UserAction {
     }
 
     public String fetchRecentActivities(){
-        List<Activity> activities = ActivitiesDao.instance.fetchRecentActivitiesFeed(skip, 10);
+        List<Activity> activities = ActivitiesDao.instance.fetchRecentActivitiesFeed((skip * 5), 5);
         this.recentActivities = activities;
         this.totalActivities = (int) ActivitiesDao.instance.getMCollection().countDocuments();
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchIntegratedConnections(){
+        Map<String,ConnectionInfo> infoMap = AccountSettingsDao.instance.getIntegratedConnectionsInfo();
+        Map<String,ConnectionInfo> finalMap = new HashMap<>();
+        finalMap.put(ConnectionInfo.AUTOMATED_TRAFFIC,infoMap.getOrDefault(ConnectionInfo.AUTOMATED_TRAFFIC, new ConnectionInfo(0, false)));
+        finalMap.put(ConnectionInfo.GITHUB_SSO,infoMap.getOrDefault(ConnectionInfo.GITHUB_SSO, new ConnectionInfo(0, false)));
+        finalMap.put(ConnectionInfo.SLACK_ALERTS,infoMap.getOrDefault(ConnectionInfo.SLACK_ALERTS, new ConnectionInfo(0, false)));
+        finalMap.put(ConnectionInfo.CI_CD_INTEGRATIONS,infoMap.getOrDefault(ConnectionInfo.CI_CD_INTEGRATIONS, new ConnectionInfo(0, false)));
+        finalMap.put(ConnectionInfo.INVITE_MEMBERS,infoMap.getOrDefault(ConnectionInfo.INVITE_MEMBERS, new ConnectionInfo(0, false)));
+
+        this.integratedConnectionsInfo = finalMap;
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String markConnectionAsSkipped(){
+        if(connectionSkipped != null){
+            AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.CONNECTION_INTEGRATIONS_INFO + "." + connectionSkipped + "." + "lastSkipped", Context.now()));
+            return Action.SUCCESS.toUpperCase();
+        }else{
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public Map<Integer, Integer> getRiskScoreCountMap() {
@@ -145,6 +174,22 @@ public class DashboardAction extends UserAction {
 
     public void setTotalActivities(int totalActivities) {
         this.totalActivities = totalActivities;
+    }
+
+    public Map<String, ConnectionInfo> getIntegratedConnectionsInfo() {
+        return integratedConnectionsInfo;
+    }
+
+    public void setIntegratedConnectionsInfo(Map<String, ConnectionInfo> integratedConnectionsInfo) {
+        this.integratedConnectionsInfo = integratedConnectionsInfo;
+    }
+
+    public String getConnectionSkipped() {
+        return connectionSkipped;
+    }
+
+    public void setConnectionSkipped(String connectionSkipped) {
+        this.connectionSkipped = connectionSkipped;
     }
     
 }
