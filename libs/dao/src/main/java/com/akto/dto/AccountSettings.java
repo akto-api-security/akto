@@ -2,6 +2,8 @@ package com.akto.dto;
 
 import java.util.List;
 
+import com.akto.dto.test_editor.TestLibrary;
+
 public class AccountSettings {
     private int id;
     public static final String PRIVATE_CIDR_LIST = "privateCidrList";
@@ -41,6 +43,17 @@ public class AccountSettings {
     private int trafficAlertThresholdSeconds = defaultTrafficAlertThresholdSeconds;
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
+
+    private List<TestLibrary> testLibraries;
+    public static final String TEST_LIBRARIES = "testLibraries";
+
+    public List<TestLibrary> getTestLibraries() {
+        return testLibraries;
+    }
+
+    public void setTestLibraries(List<TestLibrary> testLibraries) {
+        this.testLibraries = testLibraries;
+    }
 
     public AccountSettings() {
     }

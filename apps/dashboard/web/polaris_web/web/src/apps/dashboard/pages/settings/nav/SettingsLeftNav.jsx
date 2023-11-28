@@ -1,5 +1,5 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor} from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, VocabularyMajor} from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 
 const SettingsLeftNav = () => {
@@ -71,6 +71,12 @@ const SettingsLeftNav = () => {
                         icon: CollectionsFilledMajor,
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
+                    },
+                    {
+                        label: 'Test library',
+                        icon: VocabularyMajor,
+                        selected: page === "test-library",
+                        onClick: () => navigate("/dashboard/settings/test-library")
                     },
                 ]}
             />

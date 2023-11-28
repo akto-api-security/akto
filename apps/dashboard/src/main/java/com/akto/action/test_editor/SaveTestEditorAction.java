@@ -3,17 +3,21 @@ package com.akto.action.test_editor;
 import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_editor.Repository;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AuthMechanism;
@@ -21,17 +25,22 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
@@ -42,10 +51,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 
 public class SaveTestEditorAction extends UserAction {
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
 
     @Override
     public String execute() throws Exception {
@@ -62,6 +77,10 @@ public class SaveTestEditorAction extends UserAction {
     private TestingRunIssues testingRunIssues;
     private Map<String, BasicDBObject> subCategoryMap;
     private boolean inactive;
+    private String repository;
+    private String branch;
+    private HashMap<String, Integer> testCountMap;
+
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -280,6 +299,141 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private void updateTemplates(int accountId, String author, Repository repoObj){
+    executorService.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+                    GithubSync githubSync = new GithubSync();
+                    byte[] repoZip = githubSync.syncRepo(repository, branch);
+                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s:%s for account: %d", repository, branch, accountId), LogDb.DASHBOARD);
+                    InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repoObj);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s:%s for account %d, Error: %s", repository, branch, accountId, e.getMessage()), LogDb.DASHBOARD);
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
+    }
+
+    private boolean checkRepoValues(){
+        return repository == null || branch == null || repository.isEmpty() || branch.isEmpty();
+    }
+
+    public String syncCustomLibrary(){
+
+        if (checkRepoValues()) {
+            addActionError("Repository or branch cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+        List<TestLibrary> testLibraries = accountSettings.getTestLibraries();
+        TestLibrary testLibrary = null;
+
+        if(testLibraries != null){
+            testLibrary = testLibraries.stream()
+                    .filter(testLibrary1 -> testLibrary1.getRepository().getName().equals(repository) &&
+                            testLibrary1.getRepository().getBranch().equals(branch))
+                    .findFirst().orElse(null);
+        }
+
+        if(testLibrary == null){
+            addActionError("Test library not found");
+            return ERROR.toUpperCase();
+        }
+
+        int accountId = Context.accountId.get();
+        String author = testLibrary.getAuthor();
+        Repository repoObj = testLibrary.getRepository();
+
+        updateTemplates(accountId, author, repoObj);
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    public String addTestLibrary(){
+
+        if (checkRepoValues()) {
+            addActionError("Repository or branch cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+        if (accountSettings.getTestLibraries() != null &&
+                accountSettings.getTestLibraries().stream()
+                        .anyMatch(testLibrary -> testLibrary.getRepository().getName().equals(repository) &&
+                                testLibrary.getRepository().getBranch().equals(branch))) {
+            addActionError("Test library already exists");
+            return ERROR.toUpperCase();
+        }
+
+        int accountId = Context.accountId.get();
+        String author = getSUser().getLogin();
+
+        Repository repoObj = new Repository(repository, branch);
+        TestLibrary testLibrary = new TestLibrary(repoObj, author, Context.now());
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.addToSet(AccountSettings.TEST_LIBRARIES, testLibrary));
+
+        updateTemplates(accountId, author, repoObj);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String removeTestLibrary(){
+
+        if (checkRepoValues()) {
+            addActionError("Repository or branch cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        String author = getSUser().getLogin();
+
+        Repository repoObj = new Repository(repository, branch);
+        
+        BasicDBObject repoPullObj = new BasicDBObject();
+        repoPullObj.put("repository.name", repository);
+        repoPullObj.put("repository.branch", branch);
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.pull(AccountSettings.TEST_LIBRARIES, repoPullObj ));
+        
+        YamlTemplateDao.instance.deleteAll(
+                Filters.and(
+                    Filters.eq(YamlTemplate.AUTHOR, author),
+                    Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM),
+                    Filters.eq(YamlTemplate.REPOSITORY, repoObj)));
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchCustomTestsCount(){
+
+        List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
+            Filters.exists(YamlTemplate.REPOSITORY),
+            Projections.include(YamlTemplate.REPOSITORY));
+        
+        if(testCountMap == null){
+            testCountMap = new HashMap<>();
+        }
+
+        for(YamlTemplate template : templates){
+            String repo = template.getRepository().toString();
+            if(testCountMap.containsKey(repo)){
+                testCountMap.put(repo, testCountMap.get(repo) + 1);
+            }else{
+                testCountMap.put(repo, 1);
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public static void main(String[] args) throws Exception {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
@@ -377,6 +531,30 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setInactive(boolean inactive) {
         this.inactive = inactive;
+    }
+
+    public String getRepository() {
+        return repository;
+    }
+
+    public void setRepository(String repository) {
+        this.repository = repository;
+    }
+
+    public String getBranch() {
+        return branch;
+    }
+
+    public void setBranch(String branch) {
+        this.branch = branch;
+    }
+
+    public HashMap<String, Integer> getTestCountMap() {
+        return testCountMap;
+    }
+
+    public void setTestCountMap(HashMap<String, Integer> testCountMap) {
+        this.testCountMap = testCountMap;
     }
 
 }
