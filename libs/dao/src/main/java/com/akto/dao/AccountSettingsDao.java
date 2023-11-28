@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.AccountSettings.ConnectionInfo;
 import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.util.VersionUtil;
 import com.mongodb.client.model.Filters;
@@ -9,6 +10,7 @@ import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
 import java.io.InputStream;
+import java.util.Map;
 
 public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
 
@@ -60,5 +62,11 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
             return new LastCronRunInfo(0, 0, 0 , 0);
         }
         return timerInfo;
+    }
+
+    public Map<String,ConnectionInfo> getIntegratedConnectionsInfo(){
+        AccountSettings account = instance.findOne(AccountSettingsDao.generateFilter());
+        Map<String,ConnectionInfo> connectionInfo = account.getConnectionIntegrationsInfo();
+        return connectionInfo;
     }
 }

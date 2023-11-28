@@ -3,6 +3,7 @@ package com.akto.listener;
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
+import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -16,6 +17,7 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.AccountSettings.ConnectionInfo;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
@@ -1129,6 +1131,51 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getComputeIntegratedConnections() == 0){
+            Map<String,ConnectionInfo> infoMap = new HashMap<>();
+            
+            // check if mirroring is enabled for getting traffic.
+            if(DashboardMode.isOnPremDeployment()) {
+                infoMap.put(ConnectionInfo.AUTOMATED_TRAFFIC, new ConnectionInfo(0,true));
+            }
+
+            // check if slack alerts are activated
+            int countWebhooks = (int) SlackWebhooksDao.instance.getMCollection().countDocuments();
+            if (countWebhooks > 0) {
+                infoMap.put(ConnectionInfo.SLACK_ALERTS, new ConnectionInfo(0,true));
+            }
+
+            //check for github SSO,
+            if (ConfigsDao.instance.findOne("_id", "GITHUB-ankush") != null) {
+                infoMap.put(ConnectionInfo.GITHUB_SSO, new ConnectionInfo(0,true));
+            }
+
+            //check for team members
+            if(UsersDao.instance.getMCollection().countDocuments() > 1){
+                infoMap.put(ConnectionInfo.INVITE_MEMBERS, new ConnectionInfo(0,true));
+            }
+
+            //check for CI/CD pipeline
+            StartTestAction testAction = new StartTestAction();
+            int cicdRunsCount = (int) TestingRunDao.instance.getMCollection().countDocuments(Filters.in(Constants.ID, testAction.getCicdTests()));
+            if(cicdRunsCount > 0){
+                infoMap.put(ConnectionInfo.CI_CD_INTEGRATIONS, new ConnectionInfo(0,true));
+            }
+
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.CONNECTION_INTEGRATIONS_INFO, infoMap),
+                new UpdateOptions().upsert(true)
+            );
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.COMPUTE_INTEGRATED_CONNECTIONS, Context.now())
+            );
+        }
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1253,6 +1300,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         setAktoDefaultNewUI(backwardCompatibility);
+        fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);

@@ -77,7 +77,7 @@ public class StartTestAction extends UserAction {
                 .collect(Collectors.toList());
     }
 
-    private static List<ObjectId> getCicdTests(){
+    public List<ObjectId> getCicdTests(){
         return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
     }
 

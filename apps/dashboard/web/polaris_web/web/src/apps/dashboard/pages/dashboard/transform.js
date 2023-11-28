@@ -228,6 +228,17 @@ const transform = {
             tableRows.push(tempRow)
         })
         return tableRows
+    },
+
+    getConnectedSteps: (stepsObj) => {
+        let count = 0 ;
+        const oneMonth = func.recencyPeriod / 2
+        Object.keys(stepsObj).forEach((x)=>{
+            if(stepsObj[x].integrated || ((func.timeNow() - stepsObj[x].lastSkipped) <= oneMonth)){
+                count++;
+            }
+        })
+        return count
     }
 }
 export default transform;

@@ -2183,6 +2183,27 @@
             </result>
         </action>
 
+        <action name="api/getIntegratedConnectionsInfo" class="com.akto.action.DashboardAction" method="fetchIntegratedConnections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">integratedConnectionsInfo</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/markConnectionAsSkipped" class="com.akto.action.DashboardAction" method="markConnectionAsSkipped">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

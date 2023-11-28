@@ -44,12 +44,14 @@ public class BackwardCompatibility {
     public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
     private int aktoDefaultNewUI;
 
+    public static final String COMPUTE_INTEGRATED_CONNECTIONS = "computeIntegratedConnections";
+    private int computeIntegratedConnections;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory,
-                                 int aktoDefaultNewUI) {
+                                 int aktoDefaultNewUI, int computeIntegratedConnections) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -64,6 +66,7 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
         this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
         this.aktoDefaultNewUI = aktoDefaultNewUI;
+        this.computeIntegratedConnections = computeIntegratedConnections;
     }
 
     public BackwardCompatibility() {
@@ -187,5 +190,13 @@ public class BackwardCompatibility {
 
     public void setAktoDefaultNewUI(int aktoDefaultNewUI) {
         this.aktoDefaultNewUI = aktoDefaultNewUI;
+    }
+
+    public int getComputeIntegratedConnections() {
+        return computeIntegratedConnections;
+    }
+
+    public void setComputeIntegratedConnections(int computeIntegratedConnections) {
+        this.computeIntegratedConnections = computeIntegratedConnections;
     }
 }

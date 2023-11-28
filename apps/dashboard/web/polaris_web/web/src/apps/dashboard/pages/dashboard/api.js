@@ -35,7 +35,25 @@ const api = {
                 skip
             }
         })
-    }
+    },
+
+    getIntegratedConnections: async() =>{
+        return await request({
+            url: '/api/getIntegratedConnectionsInfo',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    skipConnection: async(skippedConnection) =>{
+        return request({
+            url: '/api/markConnectionAsSkipped',
+            method: 'post',
+            data: {
+                connectionSkipped: skippedConnection
+            }
+        })
+    },
 }
 
 export default api;
