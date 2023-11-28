@@ -55,6 +55,7 @@ public class UsageAction implements ServletRequestAware {
                     String metadata = usageMetric.getMetadata();
                     ActiveAccounts activeAccounts = gson.fromJson(metadata, ActiveAccounts.class);
                     Set<Integer> activeAccountsSet = activeAccounts.getActiveAccounts();
+                    loggerMaker.infoAndAddToDb(String.format("ACTIVE_ACCOUNTS organization %s - %s", organizationId, activeAccountsSet), LogDb.BILLING);
 
                     OrganizationsDao.instance.updateOne(
                         Filters.eq(Organization.ID, organizationId),
