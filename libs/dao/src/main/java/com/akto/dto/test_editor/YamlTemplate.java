@@ -19,6 +19,8 @@ public class YamlTemplate {
     public static final String INFO = "info";
     private boolean inactive;
     public static final String INACTIVE = "inactive";
+    private Repository repository;
+    public static final String REPOSITORY = "repository";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
         this.id = id;
@@ -97,5 +99,13 @@ public class YamlTemplate {
 
     public void setSource(GlobalEnums.YamlTemplateSource source) {
         this.source = source;
+    }
+
+    public Repository getRepository() {
+        return repository;
+    }
+
+    public void setRepository(Repository repository) {
+        this.repository = repository;
     }
 }
