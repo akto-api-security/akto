@@ -1,7 +1,5 @@
 package com.akto.dto.billing;
 
-import com.akto.dto.usage.MetricTypes;
-
 import java.util.Map;
 
 public class OrganizationUsage {
@@ -16,17 +14,17 @@ public class OrganizationUsage {
     public static final String DATE = "date";
     private int date;
     private int creationEpoch;
-    private Map<MetricTypes, Integer> metricMap;
+    private Map<String, Integer> orgMetricMap;
 
     public static final String SINKS = "sinks";
 
-    private Map<DataSink, Integer> sinks;
+    private Map<String, Integer> sinks;
 
-    public OrganizationUsage(String orgId, int date, int creationEpoch, Map<MetricTypes, Integer> metricMap, Map<DataSink, Integer> sinks) {
+    public OrganizationUsage(String orgId, int date, int creationEpoch, Map<String, Integer> orgMetricMap, Map<String, Integer> sinks) {
         this.orgId = orgId;
         this.date = date;
         this.creationEpoch = creationEpoch;
-        this.metricMap = metricMap;
+        this.orgMetricMap = orgMetricMap;
         this.sinks = sinks;
     }
 
@@ -54,19 +52,19 @@ public class OrganizationUsage {
         this.creationEpoch = creationEpoch;
     }
 
-    public Map<MetricTypes, Integer> getMetricMap() {
-        return metricMap;
+    public Map<String, Integer> getOrgMetricMap() {
+        return orgMetricMap;
     }
 
-    public void setMetricMap(Map<MetricTypes, Integer> metricMap) {
-        this.metricMap = metricMap;
+    public void setOrgMetricMap(Map<String, Integer> orgMetricMap) {
+        this.orgMetricMap = orgMetricMap;
     }
 
-    public Map<DataSink, Integer> getSinks() {
+    public Map<String, Integer> getSinks() {
         return sinks;
     }
 
-    public void setSinks(Map<DataSink, Integer> sinks) {
+    public void setSinks(Map<String, Integer> sinks) {
         this.sinks = sinks;
     }
 
@@ -76,7 +74,7 @@ public class OrganizationUsage {
                 "orgId='" + orgId + '\'' +
                 ", date=" + date +
                 ", creationEpoch=" + creationEpoch +
-                ", metricMap=" + metricMap +
+                ", metricMap=" + orgMetricMap +
                 ", sinks=" + sinks +
                 '}';
     }
