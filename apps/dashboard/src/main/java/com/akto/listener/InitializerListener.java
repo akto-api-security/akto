@@ -18,6 +18,7 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -1079,6 +1080,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAktoDefaultNewUI() == 0){
+
+            UsersDao.instance.updateMany(Filters.empty(), Updates.set(User.AKTO_UI_MODE, AktoUIMode.VERSION_2));
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DEFAULT_NEW_UI, Context.now())
+            );
+        }
+    }
+
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
 
@@ -1227,6 +1240,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);
@@ -1263,7 +1277,6 @@ public class InitializerListener implements ServletContextListener {
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
-
             insertPiiSources();
 
 //            setUpPiiCleanerScheduler();
