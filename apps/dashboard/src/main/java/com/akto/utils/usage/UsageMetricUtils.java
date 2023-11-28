@@ -4,11 +4,17 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.json.JSONObject;
+
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
+import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
@@ -69,7 +75,35 @@ public class UsageMetricUtils {
     }
 
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
-        // todo: Implement sync with Mixpanel
+        String organizatioinId = usageMetric.getOrganizationId();
+        Organization organization = OrganizationsDao.instance.findOne(
+            Filters.and(
+                Filters.eq(Organization.ID, organizatioinId)
+            )
+        );
+
+        String adminEmail = organization.getAdminEmail();
+        String dashboardMode = usageMetric.getDashboardMode();
+        String eventName = String.valueOf(usageMetric.getMetricType());
+        String distinct_id = adminEmail + "_" + dashboardMode;
+
+        EmailAccountName emailAccountName = new EmailAccountName(adminEmail);
+        String accountName = emailAccountName.getAccountName();
+
+        JSONObject props = new JSONObject();
+        props.put("Email ID", adminEmail);
+        props.put("Account Name", accountName);
+        props.put("Organization Id", organizatioinId);
+        props.put("Account Id", usageMetric.getAccountId());
+        props.put("Metric Type", usageMetric.getMetricType());
+        props.put("Dashboard Version", usageMetric.getDashboardVersion());
+        props.put("Dashboard Mode", usageMetric.getDashboardMode());
+        props.put("Usage", usageMetric.getUsage());
+        props.put("Organization Name", organization.getName());
+        props.put("Source", "Dashboard");
+
+        AktoMixpanel aktoMixpanel = new AktoMixpanel();
+        aktoMixpanel.sendEvent(distinct_id, eventName, props);
     }
 
 }
