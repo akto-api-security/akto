@@ -2,6 +2,7 @@ package com.akto.utils;
 
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -324,11 +325,18 @@ public class Utils {
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
                 info.setPolicy(new AktoPolicyNew(false));
+                info.setDependencyAnalyser(new DependencyAnalyser());
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             info.getHttpCallParser().syncFunction(responses, true, false);
             info.getPolicy().main(responses, true, false);
+
+            for (HttpResponseParams responseParams: responses)  {
+                responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
+                info.getDependencyAnalyser().analyse(responseParams);
+            }
+            info.getDependencyAnalyser().syncWithDb();
         }
     }
 
