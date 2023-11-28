@@ -496,4 +496,14 @@ export default {
             }
         })
     },
+
+    fetchApiDependencies(apiCollectionId, url, method) {
+        return request({
+            url: '/api/fetchApiDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
 }

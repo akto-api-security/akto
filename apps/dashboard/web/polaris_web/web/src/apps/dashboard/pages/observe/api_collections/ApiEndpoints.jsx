@@ -4,7 +4,7 @@ import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { useParams } from "react-router-dom"
+import {useLocation, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
 import {
     ClockMinor,
@@ -105,6 +105,7 @@ const sortOptions = [
 function ApiEndpoints() {
 
     const params = useParams()
+    const location = useLocation()
     const apiCollectionId = params.apiCollectionId
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
@@ -130,6 +131,10 @@ function ApiEndpoints() {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
+
+    const queryParams = new URLSearchParams(location.search);
+    const selectedUrl = queryParams.get('selected_url')
+    const selectedMethod = queryParams.get('selected_method')
 
     async function fetchData() {
         setLoading(true)
@@ -174,6 +179,21 @@ function ApiEndpoints() {
 
         setLoading(false)
     }
+
+    useEffect(() => {
+        if (!endpointData || !endpointData["All"] || !selectedUrl || !selectedMethod) return
+        let allData = endpointData["All"]
+
+        const selectedApiDetail = allData.filter((x) => {
+            return selectedUrl === x.endpoint && selectedMethod === x.method
+        })
+
+        if (!selectedApiDetail || selectedApiDetail.length === 0)  return
+
+        setApiDetail(selectedApiDetail[0])
+        setShowDetails(true)
+
+    }, [selectedUrl, selectedMethod, endpointData])
 
     const checkGptActive = async() => {
         await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
@@ -463,7 +483,7 @@ function ApiEndpoints() {
                         </div>,
                         <ApiDetails
                             key="details"
-                            showDetails={showDetails}
+                            showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
                             setShowDetails={setShowDetails}
                             apiDetail={apiDetail}
                             headers={headers}
