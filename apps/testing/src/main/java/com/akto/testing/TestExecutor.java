@@ -510,15 +510,17 @@ public class TestExecutor {
     }
 
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults) {
-        String size = testingRunResults.size() + "";
-        loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
-        trim(testingRunResults);
-        TestingRunResultDao.instance.insertMany(testingRunResults);
-        loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
-        TestingIssuesHandler handler = new TestingIssuesHandler();
-        boolean triggeredByTestEditor = false;
-        handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
-        testingRunResults.clear();
+        int resultSize = testingRunResults.size();
+        if (resultSize > 0) {
+            loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
+            trim(testingRunResults);
+            TestingRunResultDao.instance.insertMany(testingRunResults);
+            loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+            TestingIssuesHandler handler = new TestingIssuesHandler();
+            boolean triggeredByTestEditor = false;
+            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+            testingRunResults.clear();
+        }
     }
 
     public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
