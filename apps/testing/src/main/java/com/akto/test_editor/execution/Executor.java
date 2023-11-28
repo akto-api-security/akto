@@ -80,8 +80,8 @@ public class Executor {
                     }
                     vulnerable = res.getVulnerable();
                 } catch(Exception e) {
-                    error_messages.add("error executing test request: " + e.getMessage());
-                    loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
             }
         }
