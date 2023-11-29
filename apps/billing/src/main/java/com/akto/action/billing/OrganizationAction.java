@@ -1,11 +1,10 @@
 package com.akto.action.billing;
 
-import com.akto.action.usage.UsageAction;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.stigg.StiggReporter;
+import com.akto.stigg.StiggReporterClient;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
@@ -29,7 +28,8 @@ public class OrganizationAction {
             if (existingOrganization == null) {
                 loggerMaker.infoAndAddToDb(String.format("Organization - (%s / %s) does not exist. Creating ...", organizationName, organizationId), LogDb.BILLING);
                 organization.setSyncedWithAkto(true);
-                StiggReporter.instance.provisionCustomer(organization);
+                StiggReporterClient.instance.provisionCustomer(organization);
+                StiggReporterClient.instance.provisionSubscription(organization.getId(), "plan-akto-test", "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
                 OrganizationsDao.instance.insertOne(organization);
             }
         } catch (Exception e) {
