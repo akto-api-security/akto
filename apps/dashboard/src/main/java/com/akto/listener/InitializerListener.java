@@ -1290,7 +1290,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                         updateGlobalAktoVersion();
 
-                        if (DashboardMode.isSaasDeployment() || DashboardMode.isOnPremDeployment()) {
+                        if (DashboardMode.isSaasDeployment()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
                         }

@@ -1,13 +1,16 @@
 package com.akto.action;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
@@ -25,11 +28,14 @@ import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.*;
 import com.amazonaws.util.EC2MetadataUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -216,6 +222,31 @@ public class AccountAction extends UserAction {
         }
         String email = sessionUser.getLogin();
         int newAccountId = createAccountRecord(newAccountName);
+
+        if (DashboardMode.isSaasDeployment()) {
+            // Add new account to a organization
+            // The account from which create new account was clicked, that account's organization will be used
+            try {
+                int organizationAccountId = Context.accountId.get();
+                Organization organization = OrganizationsDao.instance.findOne(
+                        Filters.eq(Organization.ACCOUNTS, organizationAccountId)
+                );
+
+                if (organization != null) {
+                    Set<Integer> organizationAccountsSet = organization.getAccounts();
+                    organizationAccountsSet.add(newAccountId);
+
+                    OrganizationsDao.instance.updateOne(
+                        Filters.eq(Organization.ID, organization.getId()),
+                        Updates.set(Organization.ACCOUNTS, organizationAccountsSet)
+                    );
+                    loggerMaker.infoAndAddToDb(String.format("Added account %d to organization %s", newAccountId, organization.getId()), LogDb.DASHBOARD);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(String.format("Error while adding account %d to organization", newAccountId), LogDb.DASHBOARD);
+            }
+        }
+   
         User user = initializeAccount(email, newAccountId, newAccountName,true);
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
@@ -284,6 +315,7 @@ public class AccountAction extends UserAction {
     public String goToAccount() {
         if (getSUser().getAccounts().containsKey(newAccountId+"")) {
             getSession().put("accountId", newAccountId);
+
             Context.accountId.set(newAccountId);
             return SUCCESS.toUpperCase();
         }
