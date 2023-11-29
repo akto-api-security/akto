@@ -41,13 +41,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
-import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
-import com.akto.stigg.StiggReporter;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
@@ -77,13 +75,7 @@ import com.mongodb.client.model.*;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -1164,9 +1156,6 @@ public class InitializerListener implements ServletContextListener {
                         // Insert organization
                         organizationUUID = UUID.randomUUID().toString();
                         organization = new Organization(organizationUUID, name, adminEmail, accounts);
-                        StiggReporter.instance.provisionCustomer(organization);
-                        StiggReporter.instance.provisionSubscription(organization.getId(), "plan-akto-test", "ANNUALY", "https://some.checkout.url", "https://some.checkout.url");
-
                         OrganizationsDao.instance.insertOne(organization);
                     } 
 
@@ -1301,7 +1290,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                         updateGlobalAktoVersion();
 
-                        if (DashboardMode.isSaasDeployment() || DashboardMode.isOnPremDeployment()) {
+                        if (DashboardMode.isSaasDeployment()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
                         }
