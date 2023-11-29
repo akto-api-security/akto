@@ -104,11 +104,19 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
 
-        if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
-            String orgID = OrganizationsDao.instance.findOne(Filters.empty()).getId();
-            String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(orgID);
-            userDetails.append("stiggCustomerId", orgID);
-            userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + orgID + ":" + stiggSignature);
+        if (DashboardMode.isSaasDeployment()) {            
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.eq(Organization.ACCOUNTS, sessionAccId)
+            ); 
+            String organizationId = organization.getId();
+            userDetails.append("organizationId", organizationId);
+            userDetails.append("organizationName", organization.getName());
+
+            if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
+                String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
+                userDetails.append("stiggCustomerId", organizationId);
+                userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + organizationId + ":" + stiggSignature);
+            }
         }
 
         if (versions.length > 2) {
