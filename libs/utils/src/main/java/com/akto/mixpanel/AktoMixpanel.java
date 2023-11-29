@@ -19,7 +19,7 @@ public class AktoMixpanel {
             synchronized (AktoMixpanel.class) {
                 if (mixpanelConfig == null) {
                     try {
-                        Config config = ConfigsDao.instance.findOne("_id", Config.ConfigType.MIXPANEL.name());
+                        Config config = ConfigsDao.instance.findOne("_id", "MIXPANEL-ankush");
                         if (config == null) {
                             logger.error("No mixpanel config found");
                         } else {
