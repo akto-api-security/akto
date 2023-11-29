@@ -39,7 +39,7 @@ public class DependencyAnalyser {
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
 
-        int apiCollectionId = requestParams.getApiCollectionId(); // todo: assuming it has right apiCollectionId
+        int apiCollectionId = requestParams.getApiCollectionId();
         String method = requestParams.getMethod();
 
         // get actual url (without any query params)
@@ -50,7 +50,6 @@ public class DependencyAnalyser {
 
         // different URL variables and corresponding examples. Use accordingly
         // urlWithParams : /api/books/2?user=User1
-        // todo: baseUrl: /api/books/2
         // url: api/books/INTEGER
 
 
@@ -171,11 +170,11 @@ public class DependencyAnalyser {
 
                 Bson update1 = Updates.push(DependencyNode.PARAM_INFOS, new Document("$each", Collections.emptyList()));
 
+                // this update is to make sure the document exist else create new one
                 UpdateOneModel<DependencyNode> updateOneModel1 = new UpdateOneModel<>(
                         filter1, update1, new UpdateOptions().upsert(true)
                 );
 
-                //
 
                 Bson filter2 = Filters.and(
                         Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, dependencyNode.getApiCollectionIdReq()),
@@ -198,11 +197,10 @@ public class DependencyAnalyser {
                                 .append(DependencyNode.ParamInfo.COUNT, 0)
                 );
 
+                // this update is to add paramInfo if it doesn't exist. If exists nothing happens
                 UpdateOneModel<DependencyNode> updateOneModel2 = new UpdateOneModel<>(
                         filter2, update2, new UpdateOptions().upsert(false)
                 );
-
-                //
 
                 Bson filter3 = Filters.and(
                         Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, dependencyNode.getApiCollectionIdReq()),
@@ -217,6 +215,7 @@ public class DependencyAnalyser {
 
                 Bson update3 = Updates.inc(DependencyNode.PARAM_INFOS + ".$." + DependencyNode.ParamInfo.COUNT, paramInfo.getCount());
 
+                // this update runs everytime to update the count
                 UpdateOneModel<DependencyNode> updateOneModel3 = new UpdateOneModel<>(
                         filter3, update3,  new UpdateOptions().upsert(false)
                 );
@@ -228,6 +227,7 @@ public class DependencyAnalyser {
             }
         }
 
+        // ordered has to be true or else won't work
         if (bulkUpdates.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(true));
 
         nodes = new HashMap<>();

@@ -73,18 +73,25 @@ public class DependencyNodeDao extends AccountsContextDao<DependencyNode>{
         return result;
     }
 
-    public static List<DependencyNode> fetchParentAndChildrenNodes(int apiCollectionId, String url, URLMethods.Method method) {
-        Bson childrenFilter = Filters.and(
-                Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionId+""),
-                Filters.eq(DependencyNode.URL_RESP, url),
-                Filters.eq(DependencyNode.METHOD_RESP, method.name())
-        );
-
-        Bson parentFilter  = Filters.and(
+    public static Bson generateParentsFilter(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
                 Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionId+""),
                 Filters.eq(DependencyNode.URL_REQ, url),
                 Filters.eq(DependencyNode.METHOD_REQ, method.name())
         );
+    }
+
+    public static Bson generateChildrenFilter(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
+                Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionId+""),
+                Filters.eq(DependencyNode.URL_RESP, url),
+                Filters.eq(DependencyNode.METHOD_RESP, method.name())
+        );
+    }
+
+    public static List<DependencyNode> fetchParentAndChildrenNodes(int apiCollectionId, String url, URLMethods.Method method) {
+        Bson childrenFilter = generateChildrenFilter(apiCollectionId, url, method);
+        Bson parentFilter  = generateParentsFilter(apiCollectionId, url, method);
 
         return DependencyNodeDao.instance.findAll(
                 Filters.or(parentFilter, childrenFilter)
