@@ -75,12 +75,16 @@ public class UsageMetricUtils {
     }
 
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
-        String organizatioinId = usageMetric.getOrganizationId();
+        String organizationId = usageMetric.getOrganizationId();
         Organization organization = OrganizationsDao.instance.findOne(
             Filters.and(
-                Filters.eq(Organization.ID, organizatioinId)
+                Filters.eq(Organization.ID, organizationId)
             )
         );
+
+        if (organization == null) {
+            return;
+        }
 
         String adminEmail = organization.getAdminEmail();
         String dashboardMode = usageMetric.getDashboardMode();
@@ -93,7 +97,7 @@ public class UsageMetricUtils {
         JSONObject props = new JSONObject();
         props.put("Email ID", adminEmail);
         props.put("Account Name", accountName);
-        props.put("Organization Id", organizatioinId);
+        props.put("Organization Id", organizationId);
         props.put("Account Id", usageMetric.getAccountId());
         props.put("Metric Type", usageMetric.getMetricType());
         props.put("Dashboard Version", usageMetric.getDashboardVersion());
@@ -101,6 +105,8 @@ public class UsageMetricUtils {
         props.put("Usage", usageMetric.getUsage());
         props.put("Organization Name", organization.getName());
         props.put("Source", "Dashboard");
+
+        System.out.println("Sending event to mixpanel: " + eventName);
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, eventName, props);

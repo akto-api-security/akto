@@ -370,9 +370,11 @@ public abstract class Config {
     public static class MixpanelConfig extends Config {
         private String projectToken;
 
+        public static final String CONFIG_ID = ConfigType.STIGG.name() + CONFIG_SALT;
+
         public MixpanelConfig() {
             this.configType = ConfigType.MIXPANEL;
-            this.id = configType.name();
+            this.id = CONFIG_ID;
         }
 
         public MixpanelConfig(String projectToken) {
