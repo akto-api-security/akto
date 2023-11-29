@@ -1,24 +1,22 @@
 import { Box, Card, Text, VerticalStack } from '@shopify/polaris';
 import { useState } from 'react';
-import { getMarkerEnd, getBezierPath, getEdgeCenter, MarkerType} from 'react-flow-renderer';
+import {  getBezierPath } from 'react-flow-renderer';
 
 
 export default function ApiDependencyEdge({ id,
-                                              sourceX,
-                                              sourceY,
-                                              targetX,
-                                              targetY,
-                                              sourcePosition,
-                                              targetPosition,
-                                              style = {},
-                                              data,
-                                              arrowHeadType,
-                                              markerEndId,
-                                              borderRadius = 5, }) {
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    style = {},
+    data,
+    arrowHeadType,
+    markerEndId,
+    borderRadius = 5, }) {
     const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
     const [show, setShow] = useState(false);
-    const [centerX, centerY] = getEdgeCenter({ sourceX, sourceY, targetX, targetY });
-    const foreignObjectSize = 100
 
     const { parameters } = data
 
@@ -31,7 +29,7 @@ export default function ApiDependencyEdge({ id,
                 <svg>
                     <defs>
                         <marker id="arrow" markerWidth="14" markerHeight="14" refX="9" refY="7" orient="auto" markerUnits="strokeWidth">
-                            <path d="M0,0 L9,7 L0,14" fill='none' stroke='grey'/>
+                            <path d="M0,0 L9,7 L0,14" fill='none' stroke='grey' />
                         </marker>
                     </defs>
                 </svg>
