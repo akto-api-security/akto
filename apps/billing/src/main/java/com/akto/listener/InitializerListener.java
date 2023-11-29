@@ -24,6 +24,7 @@ import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.stigg.StiggReporterClient;
+import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -143,8 +144,9 @@ public class InitializerListener implements ServletContextListener {
 
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
 
-        for(Map.Entry<MetricTypes, Integer> entry: lastUsageItem.getMetricMap().entrySet()) {
-            String featureId =  entry.getKey().getLabel();
+        for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
+            MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
+            String featureId =  metricType.getLabel();
             int value = entry.getValue();
 
             try {
@@ -165,11 +167,12 @@ public class InitializerListener implements ServletContextListener {
 
         loggerMaker.infoAndAddToDb(String.format("Calculating Consolidated and account wise usage for organization %s - %s", organizationId, organizationName), LogDb.BILLING);
 
-        Map<MetricTypes, Integer> consolidatedUsage = new HashMap<MetricTypes, Integer>();
+        Map<String, Integer> consolidatedUsage = new HashMap<String, Integer>();
 
         // Calculate account wise usage and consolidated usage
         for (MetricTypes metricType : MetricTypes.values()) {
-            consolidatedUsage.put(metricType, 0);
+            String metricTypeString = metricType.toString();
+            consolidatedUsage.put(metricTypeString, 0);
 
             for (int account : accounts) {
                 UsageMetric usageMetric = UsageMetricsDao.instance.findLatestOne(
@@ -190,10 +193,10 @@ public class InitializerListener implements ServletContextListener {
                     usage = usageMetric.getUsage();
                 }
 
-                int currentConsolidateUsage = consolidatedUsage.get(metricType);
+                int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
                 int updatedConsolidateUsage = currentConsolidateUsage + usage;
 
-                consolidatedUsage.put(metricType, updatedConsolidateUsage);
+                consolidatedUsage.put(metricTypeString, updatedConsolidateUsage);
             }
         }
 
@@ -225,7 +228,7 @@ public class InitializerListener implements ServletContextListener {
 
                 int usageLowerBound = usageSync.getLastSyncStartEpoch();
                 int usageMaxUpperBound = Context.now();
-                int usageUpperBound = usageLowerBound + 86400;
+                int usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
 
                 while (usageUpperBound < usageMaxUpperBound) {
                     int finalUsageLowerBound = usageLowerBound;
@@ -245,7 +248,7 @@ public class InitializerListener implements ServletContextListener {
                     usageUpperBound += 86400;
                 }
             }
-        }, 0, 1, TimeUnit.HOURS);
+        }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
 
 }
