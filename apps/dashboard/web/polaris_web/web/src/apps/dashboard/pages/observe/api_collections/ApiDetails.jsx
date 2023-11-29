@@ -120,7 +120,7 @@ function ApiDetails(props) {
     const DependencyTab = {
         id: 'dependency',
         content: "Dependency Graph",
-        component: <Box paddingBlockStart={"0"}>
+        component: <Box paddingBlockStart={"2"}>
             <ApiDependency
                 apiCollectionId={apiDetail['apiCollectionId']}
                 endpoint={apiDetail['endpoint']}

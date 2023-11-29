@@ -33,6 +33,7 @@ import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
+import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.auth.APIAuth;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
@@ -175,6 +176,7 @@ public class DaoInit {
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
+        ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
@@ -197,7 +199,7 @@ public class DaoInit {
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, dependencyNodeClassModel).automatic(true).build());
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, dependencyNodeClassModel, paramInfoClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
