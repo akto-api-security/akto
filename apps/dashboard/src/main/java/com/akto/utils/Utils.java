@@ -333,7 +333,6 @@ public class Utils {
             info.getPolicy().main(responses, true, false);
 
             for (HttpResponseParams responseParams: responses)  {
-                responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
                 info.getDependencyAnalyser().analyse(responseParams);
             }
             info.getDependencyAnalyser().syncWithDb();
