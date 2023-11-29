@@ -19,12 +19,3 @@
     padding-top: 16px !important;
     padding-bottom: 16px !important;
 }
-
-.dependency-node-box {
-    display: flex;
-    padding: 12px;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    align-self: stretch;
-}
