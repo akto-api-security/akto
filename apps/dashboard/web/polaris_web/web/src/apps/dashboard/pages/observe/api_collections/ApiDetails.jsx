@@ -120,7 +120,7 @@ function ApiDetails(props) {
     const DependencyTab = {
         id: 'dependency',
         content: "Dependency Graph",
-        component: <Box paddingBlockStart={"4"}>
+        component: <Box paddingBlockStart={"0"}>
             <ApiDependency
                 apiCollectionId={apiDetail['apiCollectionId']}
                 endpoint={apiDetail['endpoint']}
@@ -141,7 +141,7 @@ function ApiDetails(props) {
         />,
         <LayoutWithTabs
             key="tabs"
-            tabs={[DependencyTab, SchemaTab, ValuesTab]}
+            tabs={[SchemaTab, ValuesTab, DependencyTab]}
             currTab={() => { }}
         />
     ]
