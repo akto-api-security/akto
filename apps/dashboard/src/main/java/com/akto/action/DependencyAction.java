@@ -16,10 +16,11 @@ public class DependencyAction extends UserAction {
     private String url;
     private URLMethods.Method method;
 
-    private final List<BasicDBObject> result = new ArrayList<>();
+    private List<BasicDBObject> result;
 
     @Override
     public String execute()  {
+        result = new ArrayList<>();
         List<DependencyNode> nodes = DependencyNodeDao.fetchParentAndChildrenNodes(apiCollectionId, url, method);
 
         List<ApiInfo.ApiInfoKey> apiInfoKeysParent = new ArrayList<>();
