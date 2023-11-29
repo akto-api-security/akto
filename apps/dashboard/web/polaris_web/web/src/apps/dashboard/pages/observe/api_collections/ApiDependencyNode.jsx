@@ -29,7 +29,7 @@ function ApiDependencyNode({ data }) {
             {type !== "input" ? <Handle type="target" position={Position.Top} /> : null}
             <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
                 <VerticalStack gap={2}>
-                    {type === "input" && dependents ? <div style={{ "textAlign": "center", "fontSize": "12px", "color": "#8C9196" }}> {dependents} more {parentText} </div> : null}
+                    {type === "input" && dependents ? <Text color='subdued' variant='bodySm' alignment="center">{dependents} more {parentText}</Text> : null}
                     <Card padding={0}>
                         <Box padding={3}>
                             <VerticalStack gap={1}>
@@ -48,7 +48,7 @@ function ApiDependencyNode({ data }) {
                             </VerticalStack>
                         </Box>
                     </Card>
-                    {type === "output" && dependents ? <div style={{ "textAlign": "center", "fontSize": "12px", "color": "#8C9196" }}> {dependents} more {childText} </div> : null}
+                    {type === "output" && dependents ? <Text color='subdued' variant='bodySm' alignment="center">{dependents} more {childText}</Text> : null}
                 </VerticalStack>
             </div>
             {type !== "output" ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
