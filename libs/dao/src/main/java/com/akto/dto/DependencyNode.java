@@ -70,6 +70,23 @@ public class DependencyNode {
         public void setCount(int count) {
             this.count = count;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ParamInfo paramInfo = (ParamInfo) o;
+            return requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(requestParam, responseParam);
+        }
+
+        public ParamInfo copy() {
+            return new ParamInfo(requestParam, responseParam, count);
+        }
     }
 
 
@@ -106,11 +123,12 @@ public class DependencyNode {
         for (ParamInfo thisParamInfo: paramInfos) {
             if (thisParamInfo.equals(thatParamInfo)) {
                 thisParamInfo.setCount(thisParamInfo.getCount() + thatParamInfo.getCount());
+                matched = true;
             }
         }
 
         if (!matched) {
-            this.paramInfos.add(thatParamInfo);
+            this.paramInfos.add(thatParamInfo.copy());
         }
     }
 
@@ -182,8 +200,5 @@ public class DependencyNode {
     }
 
 
-    public void setHexId(String hexId) {
-        this.hexId = hexId;
-    }
 
 }
