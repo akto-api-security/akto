@@ -10,9 +10,6 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLStatic;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
-import com.google.common.base.Charsets;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.Document;
@@ -21,9 +18,9 @@ import org.bson.conversions.Bson;
 import java.util.*;
 
 public class DependencyAnalyser {
-    Store valueStore;
-    Store urlValueStore;
-    Store urlParamValueStore;
+    Store valueStore; // this is to store all the values seen in response payload
+    Store urlValueStore; // this is to store all the url$value seen in response payload
+    Store urlParamValueStore; // this is to store all the url$param$value seen in response payload
 
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
@@ -31,10 +28,9 @@ public class DependencyAnalyser {
 
 
     public DependencyAnalyser() {
-        // todo: values
-        valueStore = new HashSetStore();
-        urlValueStore= new HashSetStore();
-        urlParamValueStore = new HashSetStore();
+        valueStore = new HashSetStore(10_000);
+        urlValueStore= new HashSetStore(10_000);
+        urlParamValueStore = new HashSetStore(10_000);
     }
 
     public void analyse(HttpResponseParams responseParams) {
