@@ -54,6 +54,7 @@ import com.akto.util.EmailAccountName;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
+import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
@@ -1743,7 +1744,7 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
                 calcUsage();
             }
-        }, 0, 1, TimeUnit.HOURS);
+        }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
 
     public void setupUsageSyncScheduler() {
@@ -1751,7 +1752,7 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
                 syncWithAkto();
             }
-        }, 0, 1, TimeUnit.HOURS);
+        }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
 }
 

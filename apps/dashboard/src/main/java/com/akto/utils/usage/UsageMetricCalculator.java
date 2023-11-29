@@ -12,6 +12,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
@@ -44,10 +45,11 @@ public class UsageMetricCalculator {
     }
 
     public static int calculateTestRuns(UsageMetric usageMetric) {
-        /*
-         * Compute metric according to definition
-         */
-        int testRuns = (int) TestingRunResultDao.instance.count(new BasicDBObject());
+        int measureEpoch = usageMetric.getMeasureEpoch();
+
+        int testRuns = (int) TestingRunResultDao.instance.count(
+            Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch)
+        );
         return testRuns;
     }
 
