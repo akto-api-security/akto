@@ -8,15 +8,15 @@ import com.mongodb.BasicDBObject;
 import okhttp3.*;
 import java.io.IOException;
 
-public class StiggReporter {
+public class StiggReporterClient {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StiggReporter.class);
-    public static final StiggReporter instance = new StiggReporter();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StiggReporterClient.class);
+    public static final StiggReporterClient instance = new StiggReporterClient();
 
     private Config.StiggConfig stiggConfig = null;
-    private StiggReporter() {
+    private StiggReporterClient() {
         if (stiggConfig == null) {
-            synchronized (StiggReporter.class) {
+            synchronized (StiggReporterClient.class) {
                 if (stiggConfig == null) {
                     try {
                         Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");

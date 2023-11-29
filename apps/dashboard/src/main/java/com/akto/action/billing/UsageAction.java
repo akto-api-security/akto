@@ -2,7 +2,7 @@ package com.akto.action.billing;
 
 import com.akto.action.UserAction;
 import com.akto.listener.InitializerListener;
-import com.akto.stigg.StiggReporter;
+import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBObject;
 
 import java.util.concurrent.ExecutorService;
@@ -33,7 +33,7 @@ public class UsageAction extends UserAction {
 
     BasicDBObject checkoutResult = new BasicDBObject();
     public String provisionSubscription() {
-        String ret = StiggReporter.instance.provisionSubscription(customerId, planId, billingPeriod, successUrl, cancelUrl);
+        String ret = StiggReporterClient.instance.provisionSubscription(customerId, planId, billingPeriod, successUrl, cancelUrl);
 
         checkoutResult = BasicDBObject.parse(ret);
 

@@ -10,7 +10,6 @@ import java.util.function.Consumer;
 import javax.servlet.ServletContextListener;
 
 import com.akto.DaoInit;
-import com.akto.action.usage.UsageAction;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.billing.OrganizationUsageDao;
@@ -24,14 +23,12 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.stigg.Stigg;
-import com.akto.stigg.StiggReporter;
+import com.akto.stigg.StiggReporterClient;
 import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
@@ -153,7 +150,7 @@ public class InitializerListener implements ServletContextListener {
             int value = entry.getValue();
 
             try {
-                StiggReporter.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
+                StiggReporterClient.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
             } catch (IOException e) {
                 String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
                 loggerMaker.errorAndAddToDb(errLog, LogDb.BILLING);

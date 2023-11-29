@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit;
 
 public class UsageUtils {
 
-    public static final TimeUnit USAGE_CRON_PERIOD = TimeUnit.MINUTES;
+    public static final TimeUnit USAGE_CRON_PERIOD = TimeUnit.HOURS;
     public static final int USAGE_UPPER_BOUND_DL = 86400;
     
     public static String getUsageServiceUrl() {

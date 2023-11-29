@@ -4,11 +4,13 @@ package com.akto.action;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
@@ -102,11 +104,19 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
 
-        if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
-            String orgID = "customer-69138d";
-            String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(orgID);
-            userDetails.append("stiggCustomerId", orgID);
-            userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + orgID + ":" + stiggSignature);
+        if (DashboardMode.isSaasDeployment()) {            
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.eq(Organization.ACCOUNTS, sessionAccId)
+            ); 
+            String organizationId = organization.getId();
+            userDetails.append("organizationId", organizationId);
+            userDetails.append("organizationName", organization.getName());
+
+            if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
+                String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
+                userDetails.append("stiggCustomerId", organizationId);
+                userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + organizationId + ":" + stiggSignature);
+            }
         }
 
         if (versions.length > 2) {
