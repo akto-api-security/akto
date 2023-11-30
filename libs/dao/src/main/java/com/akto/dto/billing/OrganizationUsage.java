@@ -20,6 +20,8 @@ public class OrganizationUsage {
 
     private Map<String, Integer> sinks;
 
+    public OrganizationUsage() { }
+
     public OrganizationUsage(String orgId, int date, int creationEpoch, Map<String, Integer> orgMetricMap, Map<String, Integer> sinks) {
         this.orgId = orgId;
         this.date = date;
