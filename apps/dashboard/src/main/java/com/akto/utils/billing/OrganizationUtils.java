@@ -99,5 +99,4 @@ public class OrganizationUtils {
 
         return domainParts[0];
     }
-
 }

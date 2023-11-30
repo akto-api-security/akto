@@ -1101,103 +1101,111 @@ public class InitializerListener implements ServletContextListener {
 
     public static void initializeOrganizationAccountBelongsTo(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getInitializeOrganizationAccountBelongsTo() == 0) {
-            if (DashboardMode.isSaasDeployment()) {
-                try {
-                    // Get rbac document of admin of current account
-                    int accountId = Context.accountId.get();
-                
-                    loggerMaker.infoAndAddToDb(String.format("Initializing organization to which account %d belongs", accountId), LogDb.DASHBOARD);
-                    RBAC adminRbac = RBACDao.instance.findOne(
-                        Filters.and(
-                            Filters.eq(RBAC.ACCOUNT_ID, accountId),  
-                            Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN)
-                        )
-                    );
-
-                    if (adminRbac == null) {
-                        loggerMaker.infoAndAddToDb(String.format("Account %d does not have an admin user", accountId), LogDb.DASHBOARD);
-                        return;
-                    }
-
-                    int adminUserId = adminRbac.getUserId();
-                    // Get admin user
-                    User admin = UsersDao.instance.findOne(
-                        Filters.eq(User.ID, adminUserId)
-                    );
-
-                    if (admin == null) {
-                        loggerMaker.infoAndAddToDb(String.format("Account %d admin user does not exist", accountId), LogDb.DASHBOARD);
-                        return;
-                    }
-
-                    String adminEmail = admin.getLogin();
-                    loggerMaker.infoAndAddToDb(String.format("Organization admin email: %s", adminEmail), LogDb.DASHBOARD);
-
-                    // Get accounts belonging to organization
-                    Set<Integer> accounts = OrganizationUtils.findAccountsBelongingToOrganization(adminUserId);
-
-                    // Check if organization exists
-                    Organization organization = OrganizationsDao.instance.findOne(
-                        Filters.eq(Organization.ADMIN_EMAIL, adminEmail) 
-                    );
-
-                    String organizationUUID;
-
-                    // Create organization if it doesn't exist
-                    if (organization == null) {
-                        String name = adminEmail;
-
-                        if (DashboardMode.isOnPremDeployment()) {
-                            name = OrganizationUtils.determineEmailDomain(adminEmail);
-                        }
-
-                        loggerMaker.infoAndAddToDb(String.format("Organization %s does not exist, creating...", name), LogDb.DASHBOARD);
-
-                        // Insert organization
-                        organizationUUID = UUID.randomUUID().toString();
-                        organization = new Organization(organizationUUID, name, adminEmail, accounts);
-                        OrganizationsDao.instance.insertOne(organization);
-                    } 
-
-                    organizationUUID = organization.getId();
-
-                    // Update accounts if changed
-                    if (organization.getAccounts().size() != accounts.size()) {
-                        organization.setAccounts(accounts);
-                        OrganizationsDao.instance.updateOne(
-                            Filters.eq(Organization.ID, organizationUUID),
-                            Updates.set(Organization.ACCOUNTS, accounts)
-                        );
-                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Updating accounts list", organization.getName()), LogDb.DASHBOARD);
-                    }
-
-                    Boolean syncedWithAkto = organization.getSyncedWithAkto();
-                    Boolean attemptSyncWithAktoSuccess = false;
-
-                    // Attempt to sync organization with akto
-                    if (!syncedWithAkto) {
-                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Syncing with akto", organization.getName()), LogDb.DASHBOARD);
-                        attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
-                        
-                        if (!attemptSyncWithAktoSuccess) {
-                            loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto failed", organization.getName()), LogDb.DASHBOARD);
-                            return;
-                        } 
-
-                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto successful", organization.getName()), LogDb.DASHBOARD);
-                    } else {
-                        loggerMaker.infoAndAddToDb(String.format("Organization %s - Alredy Synced with akto. Skipping sync ... ", organization.getName()), LogDb.DASHBOARD);
-                    }
-                    
-                    // Set backward compatibility dao
-                    BackwardCompatibilityDao.instance.updateOne(
+             BackwardCompatibilityDao.instance.updateOne(
                         Filters.eq("_id", backwardCompatibility.getId()),
                         Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
                     );
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while initializing organization account belongs to. Error: %s", e.getMessage()), LogDb.DASHBOARD);
-                }
-            }
+
+            // if (DashboardMode.isSaasDeployment()) {
+            //     try {
+            //         // Get rbac document of admin of current account
+            //         int accountId = Context.accountId.get();
+
+            //         // Check if account has already been assigned to an organization
+            //         //Boolean isNewAccountOnSaaS = OrganizationUtils.checkIsNewAccountOnSaaS(accountId);
+                
+            //         loggerMaker.infoAndAddToDb(String.format("Initializing organization to which account %d belongs", accountId), LogDb.DASHBOARD);
+            //         RBAC adminRbac = RBACDao.instance.findOne(
+            //             Filters.and(
+            //                 Filters.eq(RBAC.ACCOUNT_ID, accountId),  
+            //                 Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN)
+            //             )
+            //         );
+
+            //         if (adminRbac == null) {
+            //             loggerMaker.infoAndAddToDb(String.format("Account %d does not have an admin user", accountId), LogDb.DASHBOARD);
+            //             return;
+            //         }
+
+            //         int adminUserId = adminRbac.getUserId();
+            //         // Get admin user
+            //         User admin = UsersDao.instance.findOne(
+            //             Filters.eq(User.ID, adminUserId)
+            //         );
+
+            //         if (admin == null) {
+            //             loggerMaker.infoAndAddToDb(String.format("Account %d admin user does not exist", accountId), LogDb.DASHBOARD);
+            //             return;
+            //         }
+
+            //         String adminEmail = admin.getLogin();
+            //         loggerMaker.infoAndAddToDb(String.format("Organization admin email: %s", adminEmail), LogDb.DASHBOARD);
+
+            //         // Get accounts belonging to organization
+            //         Set<Integer> accounts = OrganizationUtils.findAccountsBelongingToOrganization(adminUserId);
+
+            //         // Check if organization exists
+            //         Organization organization = OrganizationsDao.instance.findOne(
+            //             Filters.eq(Organization.ADMIN_EMAIL, adminEmail) 
+            //         );
+
+            //         String organizationUUID;
+
+            //         // Create organization if it doesn't exist
+            //         if (organization == null) {
+            //             String name = adminEmail;
+
+            //             if (DashboardMode.isOnPremDeployment()) {
+            //                 name = OrganizationUtils.determineEmailDomain(adminEmail);
+            //             }
+
+            //             loggerMaker.infoAndAddToDb(String.format("Organization %s does not exist, creating...", name), LogDb.DASHBOARD);
+
+            //             // Insert organization
+            //             organizationUUID = UUID.randomUUID().toString();
+            //             organization = new Organization(organizationUUID, name, adminEmail, accounts);
+            //             OrganizationsDao.instance.insertOne(organization);
+            //         } 
+
+            //         organizationUUID = organization.getId();
+
+            //         // Update accounts if changed
+            //         if (organization.getAccounts().size() != accounts.size()) {
+            //             organization.setAccounts(accounts);
+            //             OrganizationsDao.instance.updateOne(
+            //                 Filters.eq(Organization.ID, organizationUUID),
+            //                 Updates.set(Organization.ACCOUNTS, accounts)
+            //             );
+            //             loggerMaker.infoAndAddToDb(String.format("Organization %s - Updating accounts list", organization.getName()), LogDb.DASHBOARD);
+            //         }
+
+            //         Boolean syncedWithAkto = organization.getSyncedWithAkto();
+            //         Boolean attemptSyncWithAktoSuccess = false;
+
+            //         // Attempt to sync organization with akto
+            //         if (!syncedWithAkto) {
+            //             loggerMaker.infoAndAddToDb(String.format("Organization %s - Syncing with akto", organization.getName()), LogDb.DASHBOARD);
+            //             attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
+                        
+            //             if (!attemptSyncWithAktoSuccess) {
+            //                 loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto failed", organization.getName()), LogDb.DASHBOARD);
+            //                 return;
+            //             } 
+
+            //             loggerMaker.infoAndAddToDb(String.format("Organization %s - Sync with akto successful", organization.getName()), LogDb.DASHBOARD);
+            //         } else {
+            //             loggerMaker.infoAndAddToDb(String.format("Organization %s - Alredy Synced with akto. Skipping sync ... ", organization.getName()), LogDb.DASHBOARD);
+            //         }
+                    
+            //         // Set backward compatibility dao
+            //         BackwardCompatibilityDao.instance.updateOne(
+            //             Filters.eq("_id", backwardCompatibility.getId()),
+            //             Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
+            //         );
+            //     } catch (Exception e) {
+            //         loggerMaker.errorAndAddToDb(String.format("Error while initializing organization account belongs to. Error: %s", e.getMessage()), LogDb.DASHBOARD);
+            //     }
+            // }
         }
     }
 
