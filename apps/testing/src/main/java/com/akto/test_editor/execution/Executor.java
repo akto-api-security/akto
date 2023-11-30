@@ -50,6 +50,8 @@ public class Executor {
 
         boolean requestSent = false;
 
+        List<String> error_messages = new ArrayList<>();
+
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
             List<RawApi> sampleRawApis = new ArrayList<>();
@@ -59,6 +61,7 @@ public class Executor {
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
             if (testRawApis == null) {
+                error_messages.add(singleReq.getErrMsg());
                 continue;
             }
             boolean vulnerable = false;
@@ -77,17 +80,19 @@ public class Executor {
                     }
                     vulnerable = res.getVulnerable();
                 } catch(Exception e) {
-                    loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
             }
         }
 
         if(result.isEmpty()){
             if(requestSent){
-                result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.API_REQUEST_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+                error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
             } else {
-                result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.NO_API_REQUEST.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+                error_messages.add(TestError.NO_API_REQUEST.getMessage());
             }
+            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         return result;
