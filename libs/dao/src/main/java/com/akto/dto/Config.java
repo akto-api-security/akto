@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL;
     }
 
     ConfigType configType;
@@ -363,6 +363,32 @@ public abstract class Config {
 
         public void setSigningKey(String signingKey) {
             this.signingKey = signingKey;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class MixpanelConfig extends Config {
+        private String projectToken;
+
+        public static final String CONFIG_ID = ConfigType.STIGG.name() + CONFIG_SALT;
+
+        public MixpanelConfig() {
+            this.configType = ConfigType.MIXPANEL;
+            this.id = CONFIG_ID;
+        }
+
+        public MixpanelConfig(String projectToken) {
+            this.configType = ConfigType.MIXPANEL;
+            this.id = configType.name();
+            this.projectToken = projectToken;
+        }
+
+        public String getProjectToken() {
+            return projectToken;
+        }
+
+        public void setProjectToken(String projectToken) {
+            this.projectToken = projectToken;
         }
     }
 }
