@@ -44,7 +44,7 @@ export default function Header() {
 
     const handleLogOut = async () => {
         storeAccessToken(null)
-        await api.logout().then(res => {
+        api.logout().then(res => {
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
             } else {
