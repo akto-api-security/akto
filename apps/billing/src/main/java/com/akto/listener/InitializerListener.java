@@ -55,7 +55,6 @@ public class InitializerListener implements ServletContextListener {
 
         String mongoURI = System.getenv("BILLING_DB_CONN_URL");
         System.out.println("MONGO URI " + mongoURI);
-        DaoInit.init(new ConnectionString(mongoURI));
 
         executorService.schedule(new Runnable() {
             public void run() {
