@@ -69,21 +69,22 @@ public class UsageMetricCalculator {
             return 0;
         }
 
-        String adminEmail = organization.getAdminEmail();
+        // String adminEmail = organization.getAdminEmail();
 
-        // Get admin user id
-        User admin = UsersDao.instance.findOne(
-            Filters.eq(User.LOGIN, adminEmail)
-        );
+        // // Get admin user id
+        // User admin = UsersDao.instance.findOne(
+        //     Filters.eq(User.LOGIN, adminEmail)
+        // );
 
-        if (admin == null) {
-            return 0;
-        }
+        // if (admin == null) {
+        //     return 0;
+        // }
 
-        int adminUserId = admin.getId();
+        // int adminUserId = admin.getId();
 
         // Get accounts belonging to organization
-        Set<Integer> accounts = OrganizationUtils.findAccountsBelongingToOrganization(adminUserId);
+        //Set<Integer> accounts = OrganizationUtils.findAccountsBelongingToOrganization(adminUserId);
+        Set<Integer> accounts = organization.getAccounts();
 
         Gson gson = new Gson();
         ActiveAccounts activeAccounts = new ActiveAccounts(accounts);
