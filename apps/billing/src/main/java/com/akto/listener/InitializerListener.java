@@ -31,6 +31,7 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
+import org.mockito.internal.matchers.Or;
 
 import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
 import static com.akto.dto.billing.OrganizationUsage.SINKS;
@@ -45,7 +46,7 @@ public class InitializerListener implements ServletContextListener {
         Date dateFromEpoch = new Date( epoch * 1000L );
         Calendar cal = Calendar.getInstance();
         cal.setTime(dateFromEpoch);
-        return cal.get(Calendar.YEAR) * 1000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH);
+        return cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH);
 
     }
 
@@ -68,6 +69,7 @@ public class InitializerListener implements ServletContextListener {
                         checkMongoConnection();
                         runInitializerFunctions();
                         setupUsageReportingScheduler();
+                        //test();
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(String.format("Error: %s", e.getMessage()), LogDb.BILLING);
                     } finally {
@@ -101,10 +103,7 @@ public class InitializerListener implements ServletContextListener {
         Bson filterQ =
                 Filters.and(
                     Filters.eq(ORG_ID, o.getId()),
-                    Filters.or(
-                        Filters.exists(SINKS, false),
-                        Filters.eq(SINKS, new BasicDBObject())
-                    )
+                    Filters.eq(SINKS, new BasicDBObject())
                 );
         List<OrganizationUsage> pendingUsages =
             OrganizationUsageDao.instance.findAll(filterQ);
@@ -113,7 +112,7 @@ public class InitializerListener implements ServletContextListener {
         for (OrganizationUsage lastUsageItem: pendingUsages) {
 
             int today = epochToDateInt(Context.now());
-            if (lastUsageItem.getDate() == today) return;
+            //if (lastUsageItem.getDate() == today) return;
 
             for (DataSink dataSink : DataSink.values()) {
                 switch (dataSink) {
@@ -121,10 +120,10 @@ public class InitializerListener implements ServletContextListener {
                         syncBillingEodWithStigg(lastUsageItem);
                         break;
                     case MIXPANEL:
-                        syncBillingEodWithMixpanel(lastUsageItem);
+                        //syncBillingEodWithMixpanel(lastUsageItem);
                         break;
                     case SLACK:
-                        syncBillingEodWithSlack(lastUsageItem);
+                        //syncBillingEodWithSlack(lastUsageItem);
                         break;
                     default:
                         throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
@@ -143,6 +142,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
+        loggerMaker.infoAndAddToDb(String.format("Syncing usage for organization %s to Stigg", lastUsageItem.getOrgId()), LogDb.BILLING);
 
         for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
             MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
@@ -151,6 +151,17 @@ public class InitializerListener implements ServletContextListener {
 
             try {
                 StiggReporterClient.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
+
+                Map<String, Integer> sinks = lastUsageItem.getSinks();
+                sinks.put(DataSink.STIGG.toString(), Context.now());
+
+                OrganizationUsageDao.instance.updateOne(
+                        Filters.and(
+                                Filters.eq(OrganizationUsage.ORG_ID, lastUsageItem.getOrgId()),
+                                Filters.eq(OrganizationUsage.DATE, lastUsageItem.getDate())
+                        ),
+                        Updates.set(SINKS, sinks)
+                );
             } catch (IOException e) {
                 String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
                 loggerMaker.errorAndAddToDb(errLog, LogDb.BILLING);
@@ -159,54 +170,58 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {
-        String organizationId = o.getId();
-        String organizationName = o.getName();
-        Set<Integer> accounts = o.getAccounts();
+        try {
+            String organizationId = o.getId();
+            String organizationName = o.getName();
+            Set<Integer> accounts = o.getAccounts();
 
-        loggerMaker.infoAndAddToDb(String.format("Reporting usage for organization %s - %s", organizationId, organizationName), LogDb.BILLING);
+            loggerMaker.infoAndAddToDb(String.format("Reporting usage for organization %s - %s", organizationId, organizationName), LogDb.BILLING);
 
-        loggerMaker.infoAndAddToDb(String.format("Calculating Consolidated and account wise usage for organization %s - %s", organizationId, organizationName), LogDb.BILLING);
+            loggerMaker.infoAndAddToDb(String.format("Calculating Consolidated and account wise usage for organization %s - %s", organizationId, organizationName), LogDb.BILLING);
 
-        Map<String, Integer> consolidatedUsage = new HashMap<String, Integer>();
+            Map<String, Integer> consolidatedUsage = new HashMap<String, Integer>();
 
-        // Calculate account wise usage and consolidated usage
-        for (MetricTypes metricType : MetricTypes.values()) {
-            String metricTypeString = metricType.toString();
-            consolidatedUsage.put(metricTypeString, 0);
+            // Calculate account wise usage and consolidated usage
+            for (MetricTypes metricType : MetricTypes.values()) {
+                String metricTypeString = metricType.toString();
+                consolidatedUsage.put(metricTypeString, 0);
 
-            for (int account : accounts) {
-                UsageMetric usageMetric = UsageMetricsDao.instance.findLatestOne(
-                        Filters.and(
-                                Filters.eq(UsageMetric.ORGANIZATION_ID, organizationId),
-                                Filters.eq(UsageMetric.ACCOUNT_ID, account),
-                                Filters.eq(UsageMetric.METRIC_TYPE, metricType),
-                                Filters.and(
-                                        Filters.gte(UsageMetric.AKTO_SAVE_EPOCH, usageLowerBound),
-                                        Filters.lt(UsageMetric.AKTO_SAVE_EPOCH, usageUpperBound)
-                                )
-                        )
-                );
+                for (int account : accounts) {
+                    UsageMetric usageMetric = UsageMetricsDao.instance.findLatestOne(
+                            Filters.and(
+                                    Filters.eq(UsageMetric.ORGANIZATION_ID, organizationId),
+                                    Filters.eq(UsageMetric.ACCOUNT_ID, account),
+                                    Filters.eq(UsageMetric.METRIC_TYPE, metricType),
+                                    Filters.and(
+                                            Filters.gte(UsageMetric.AKTO_SAVE_EPOCH, usageLowerBound),
+                                            Filters.lt(UsageMetric.AKTO_SAVE_EPOCH, usageUpperBound)
+                                    )
+                            )
+                    );
 
-                int usage = 0;
+                    int usage = 0;
 
-                if (usageMetric != null) {
-                    usage = usageMetric.getUsage();
+                    if (usageMetric != null) {
+                        usage = usageMetric.getUsage();
+                    }
+
+                    int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
+                    int updatedConsolidateUsage = currentConsolidateUsage + usage;
+
+                    consolidatedUsage.put(metricTypeString, updatedConsolidateUsage);
                 }
-
-                int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
-                int updatedConsolidateUsage = currentConsolidateUsage + usage;
-
-                consolidatedUsage.put(metricTypeString, updatedConsolidateUsage);
             }
+
+            int date = epochToDateInt(usageLowerBound);
+
+            OrganizationUsageDao.instance.insertOne(
+                new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
+            );
+
+            loggerMaker.infoAndAddToDb(String.format("Consolidated and account wise usage for organization %s - %s calculated", organizationId, organizationName), LogDb.BILLING);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("Error while reporting usage for organization %s - %s. Error: %s", o.getId(), o.getName(), e.getMessage()), LogDb.BILLING);
         }
-
-        int date = epochToDateInt(usageLowerBound);
-
-        OrganizationUsageDao.instance.insertOne(
-            new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
-        );
-
-        loggerMaker.infoAndAddToDb(String.format("Consolidated and account wise usage for organization %s - %s calculated", organizationId, organizationName), LogDb.BILLING);
     }
 
     public void setupUsageReportingScheduler() {
@@ -233,9 +248,12 @@ public class InitializerListener implements ServletContextListener {
                 while (usageUpperBound < usageMaxUpperBound) {
                     int finalUsageLowerBound = usageLowerBound;
                     int finalUsageUpperBound = usageUpperBound;
+
+                    loggerMaker.infoAndAddToDb(String.format("Lower Bound: %d Upper bound: %d", usageLowerBound, usageUpperBound), LogDb.BILLING);
                     OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                         @Override
                         public void accept(Organization o) {
+                            sendOrgUsageDataToAllSinks(o);
                             aggregateUsageForOrg(o, finalUsageLowerBound, finalUsageUpperBound);
                         }
                     }, "usage-reporting-scheduler");
