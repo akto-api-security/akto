@@ -234,15 +234,15 @@ public class InitializerListener implements ServletContextListener {
                 );
 
                 if (usageSync == null) {
-                    usageSync = new UsageSync();
                     int now = Context.now();
-                    int startOfDayEpoch = now - (now % 86400);
-                    usageSync.setLastSyncStartEpoch(startOfDayEpoch);
+                    int startOfDayEpoch = now - (now % 86400) - 86400;
+                    usageSync = new UsageSync("billing", startOfDayEpoch);
+                    UsageSyncDao.instance.insertOne(usageSync);
                 }
 
-                int usageLowerBound = usageSync.getLastSyncStartEpoch();
-                int usageMaxUpperBound = Context.now();
-                int usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
+                int usageLowerBound = usageSync.getLastSyncStartEpoch(); // START OF THE DAY
+                int usageMaxUpperBound = Context.now(); // NOW
+                int usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL; // END OF THE DAY
 
                 while (usageUpperBound < usageMaxUpperBound) {
                     int finalUsageLowerBound = usageLowerBound;
