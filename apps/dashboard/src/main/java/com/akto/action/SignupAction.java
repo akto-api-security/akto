@@ -7,6 +7,7 @@ import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
+import com.akto.utils.OktaLogin;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
@@ -14,6 +15,7 @@ import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -33,6 +35,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -428,6 +432,49 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             System.out.println("Executed registerViaGithub");
 
         } catch (IOException e) {
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String registerViaOkta() throws IOException{
+        OktaLogin oktaLoginInstance = OktaLogin.getInstance();
+        if(oktaLoginInstance == null){
+            return ERROR.toUpperCase();
+        }
+
+        Config.OktaConfig oktaConfig = OktaLogin.getInstance().getOktaConfig();
+        if (oktaConfig == null) {
+            return ERROR.toUpperCase();
+        }
+
+        String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+        String clientId = oktaConfig.getClientId();
+        String clientSecret = oktaConfig.getClientSecret();
+        String redirectUri = oktaConfig.getRedirectUri();
+
+        List<NameValuePair> params = new ArrayList<>();
+        params.add(new BasicNameValuePair("grant_type", "authorization_code"));
+        params.add(new BasicNameValuePair("code", this.code));
+        params.add(new BasicNameValuePair("client_id", clientId));
+        params.add(new BasicNameValuePair("client_secret", clientSecret));
+        params.add(new BasicNameValuePair("redirect_uri", redirectUri));
+
+        try {
+            Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
+            String accessToken = tokenData.get("access_token").toString();
+            Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
+            String email = userInfo.get("email").toString();
+            String username = userInfo.get("preferred_username").toString();
+
+            SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
+            
+            shouldLogin = "true";
+            createUserAndRedirect(email, username, oktaSignupInfo, 1000000);
+            code = "";
+        } catch (Exception e) {
+            e.printStackTrace();
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();

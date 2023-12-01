@@ -235,6 +235,15 @@
             </result>
         </action>
 
+        <action name="authorization-code/callback" class="com.akto.action.SignupAction" method="registerViaOkta">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
         <action name="api/deleteGithubSso" class="com.akto.action.user.GithubSsoAction" method="deleteGithubSso">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -258,6 +267,39 @@
         </action>
 
         <action name="api/fetchGithubSso" class="com.akto.action.user.GithubSsoAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addOktaSso" class="com.akto.action.user.OktaSsoAction" method="addOktaSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteOktaSso" class="com.akto.action.user.OktaSsoAction" method="deleteOktaSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+         <action name="api/fetchOktaSso" class="com.akto.action.user.OktaSsoAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json"/>
