@@ -135,9 +135,10 @@ service.interceptors.response.use((response) => {
   return response.data
 }, err)
 
+const black_list_apis = ['dashboard/accesstoken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories']
 async function raiseMixpanelEvent(api){
-  if (api && api.indexOf("/api/fetchActiveLoaders")==-1) {
-    window.mixpanel.track(api)
+  if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
+    window.mixpanel.track(api);
   }
 }
 
