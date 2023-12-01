@@ -59,13 +59,18 @@ function Integrations() {
       name:'Github SSO',
       source: '/public/github_icon.svg'
     }
+    let oktaSsoObj={
+      id: 'okta_sso',
+      name: 'Okta SSO',
+      source: '/public/okta_logo.svg'
+    }
 
-    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj]
+    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj, oktaSsoObj]
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>7</Badge></span>,
+            content: <span>All <Badge status='new'>9</Badge></span>,
             component: <TabsList />
         },
         {
@@ -90,7 +95,7 @@ function Integrations() {
         },
         {
           id: 'sso',
-          content: <span>SSO <Badge status='new'>1</Badge></span>,
+          content: <span>SSO <Badge status='new'>2</Badge></span>,
           component: <TabsList />
         },
         {
@@ -118,7 +123,7 @@ function Integrations() {
                 break;
 
             case 'sso':
-                currObjs= [githubSsoObj]
+                currObjs= [githubSsoObj, oktaSsoObj]
                 setCurrentItems(currObjs)
                 break;
 
@@ -133,7 +138,6 @@ function Integrations() {
                 break;
 
             default:
-                currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj]
                 setCurrentItems(currObjs)
                 break;
           }

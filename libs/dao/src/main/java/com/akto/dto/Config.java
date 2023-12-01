@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, OKTA;
     }
 
     ConfigType configType;
@@ -323,6 +323,58 @@ public abstract class Config {
 
         public void setClientSecret(String clientSecret) {
             this.clientSecret = clientSecret;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class OktaConfig extends Config {
+        private String clientId;
+        private String clientSecret;
+        private String oktaDomainUrl;
+        private String authorisationServerId;
+        private String redirectUri;
+        
+        public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
+
+        public OktaConfig() {
+            this.configType = ConfigType.OKTA;
+            this.id = CONFIG_ID;
+        }
+        
+        public String getClientId() {
+            return clientId;
+        }
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+        
+        public String getClientSecret() {
+            return clientSecret;
+        }
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+        
+        public String getOktaDomainUrl() {
+            return oktaDomainUrl;
+        }
+        public void setOktaDomainUrl(String oktaDomainUrl) {
+            this.oktaDomainUrl = oktaDomainUrl;
+        }
+
+        public String getAuthorisationServerId() {
+            return authorisationServerId;
+        }
+        public void setAuthorisationServerId(String authorisationServerId) {
+            this.authorisationServerId = authorisationServerId;
+        }
+
+        public String getRedirectUri() {
+            return redirectUri;
+        }
+
+        public void setRedirectUri(String redirectUri) {
+            this.redirectUri = redirectUri;
         }
     }
 

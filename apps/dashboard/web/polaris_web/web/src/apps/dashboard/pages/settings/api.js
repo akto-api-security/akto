@@ -226,7 +226,69 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
-    }
+    },
+
+    fetchOktaSso() {
+        return request({
+            url: '/api/fetchOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+        return request({
+            url: '/api/addOktaSso',
+            method: 'post',
+            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+        })
+    },
+
+    deleteOktaSso() {
+        return request({
+            url: '/api/deleteOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    toggleRedactFeature(redactPayload) {
+        return request({
+            url: '/api/toggleRedactFeature',
+            method: 'post',
+            data: {
+                redactPayload
+            }
+        })
+    },
+
+    toggleNewMergingEnabled(newMergingEnabled) {
+        return request({
+            url: '/api/toggleNewMergingEnabled',
+            method: 'post',
+            data: {
+                newMergingEnabled
+            }
+        });
+    },
+
+    updateSetupType(setupType) {
+        return request({
+            url: '/api/updateSetupType',
+            method: 'post',
+            data: {
+                setupType
+            }
+        })
+    },
+
+    updateTrafficAlertThresholdSeconds(trafficAlertThresholdSeconds) {
+        return request({
+            url: '/api/updateTrafficAlertThresholdSeconds',
+            method: 'post',
+            data: {trafficAlertThresholdSeconds}
+        })
+    },
 }
 
 export default settingRequests
