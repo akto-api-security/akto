@@ -8,7 +8,12 @@ public class UsageSync {
     public static final String LAST_SYNC_START_EPOCH = "lastSyncStartEpoch";
 
     public UsageSync() {
-        service = "billing";
+
+    }
+
+    public UsageSync(String service, int lastSyncStartEpoch) {
+        this.service = service;
+        this.lastSyncStartEpoch = lastSyncStartEpoch;
     }
 
     public String getService() {
