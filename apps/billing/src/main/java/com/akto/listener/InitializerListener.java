@@ -101,16 +101,22 @@ public class InitializerListener implements ServletContextListener {
                         Filters.eq(UsageSync.SERVICE, "billing")
                 );
 
+
                 if (usageSync == null) {
                     int now = Context.now();
                     int startOfDayEpoch = now - (now % 86400) - 86400;
                     usageSync = new UsageSync("billing", startOfDayEpoch);
+                    loggerMaker.infoAndAddToDb("Usage sync absent. Inserting now...: " + startOfDayEpoch, LogDb.BILLING);
                     UsageSyncDao.instance.insertOne(usageSync);
+                } else {
+                    loggerMaker.infoAndAddToDb("Found usage sync: " + usageSync.getLastSyncStartEpoch(), LogDb.BILLING);
                 }
 
                 int usageLowerBound = usageSync.getLastSyncStartEpoch(); // START OF THE DAY
                 int usageMaxUpperBound = Context.now(); // NOW
                 int usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL; // END OF THE DAY
+
+                loggerMaker.infoAndAddToDb("Time bounds - " + usageLowerBound + " " + usageMaxUpperBound + " " + usageUpperBound, LogDb.BILLING);
 
                 while (usageUpperBound < usageMaxUpperBound) {
                     int finalUsageLowerBound = usageLowerBound;
@@ -122,6 +128,7 @@ public class InitializerListener implements ServletContextListener {
                         public void accept(Organization o) {
                             UsageCalculator.instance.sendOrgUsageDataToAllSinks(o);
                             UsageCalculator.instance.aggregateUsageForOrg(o, finalUsageLowerBound, finalUsageUpperBound);
+                            UsageCalculator.instance.sendOrgUsageDataToAllSinks(o);
                         }
                     }, "usage-reporting-scheduler");
 
