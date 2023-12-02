@@ -46,7 +46,7 @@ public class UsageCalculator {
             Bson filterQ =
                     Filters.and(
                             Filters.eq(ORG_ID, o.getId()),
-                            Filters.eq(SINKS, new BasicDBObject())
+                            Filters.or(Filters.eq(SINKS, new BasicDBObject()), Filters.exists(SINKS, false))
                     );
             List<OrganizationUsage> pendingUsages =
                     OrganizationUsageDao.instance.findAll(filterQ);
