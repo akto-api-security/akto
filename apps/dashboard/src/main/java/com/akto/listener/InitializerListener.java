@@ -1723,7 +1723,13 @@ public class InitializerListener implements ServletContextListener {
         return stringbuilder.toString();
     }
 
+    static boolean isCalcUsageRunning = false;
     public static void calcUsage() {
+        if (isCalcUsageRunning) {
+            return;
+        }
+
+        isCalcUsageRunning = true;
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account a) {
@@ -1790,9 +1796,16 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
         }, "usage-scheduler");
+
+        isCalcUsageRunning = false;
     }
 
+
+    static boolean isSyncWithAktoRunning = false;
     public static void syncWithAkto() {
+        if (isSyncWithAktoRunning) return;
+
+        isSyncWithAktoRunning = true;
         System.out.println("Running usage sync scheduler");
         try {
             List<UsageMetric> usageMetrics = UsageMetricsDao.instance.findAll(
@@ -1813,6 +1826,8 @@ public class InitializerListener implements ServletContextListener {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(String.format("Error while syncing usage metrics. Error: %s", e.getMessage()), LogDb.DASHBOARD);
+        } finally {
+            isSyncWithAktoRunning = false;
         }
     }
 

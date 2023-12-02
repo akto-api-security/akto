@@ -2061,10 +2061,11 @@
             </result>
         </action>
 
-        <action name="api/syncUsage" class="com.akto.action.billing.UsageAction" method="syncUsage">
+        <action name="api/provisionSubscription" class="com.akto.action.billing.UsageAction" method="provisionSubscription">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
+                <param name="root">checkoutResult</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2073,7 +2074,20 @@
             </result>
         </action>
 
-        <action name="api/provisionSubscription" class="com.akto.action.billing.UsageAction" method="provisionSubscription">
+        <action name="api/calcUsage" class="com.akto.action.billing.UsageAction" method="calcUsage">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">checkoutResult</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/syncWithAkto" class="com.akto.action.billing.UsageAction" method="syncWithAkto">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
