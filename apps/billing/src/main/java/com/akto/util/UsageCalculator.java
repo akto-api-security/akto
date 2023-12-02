@@ -17,8 +17,7 @@ import org.bson.conversions.Bson;
 import java.io.IOException;
 import java.util.*;
 
-import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
-import static com.akto.dto.billing.OrganizationUsage.SINKS;
+import static com.akto.dto.billing.OrganizationUsage.*;
 
 public class UsageCalculator {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageCalculator.class);
@@ -165,9 +164,18 @@ public class UsageCalculator {
 
             int date = epochToDateInt(usageLowerBound);
 
-            OrganizationUsageDao.instance.insertOne(
-                    new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
-            );
+            OrganizationUsage usage = OrganizationUsageDao.instance.findOne(ORG_ID, organizationId, DATE, date);
+
+            if (usage == null) {
+                loggerMaker.infoAndAddToDb("Inserting new usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
+                OrganizationUsageDao.instance.insertOne(
+                        new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
+                );
+            } else {
+                loggerMaker.infoAndAddToDb("Found usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
+                Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage));
+                OrganizationUsageDao.instance.updateOne(ORG_ID, organizationId, DATE, date, updates);
+            }
 
             loggerMaker.infoAndAddToDb(String.format("Consolidated and account wise usage for organization %s - %s calculated", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
         } catch (Exception e) {
