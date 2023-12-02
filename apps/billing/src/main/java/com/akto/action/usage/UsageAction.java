@@ -1,9 +1,12 @@
 package com.akto.action.usage;
 
 import java.util.Set;
+import java.util.function.Consumer;
 
 import javax.servlet.http.HttpServletRequest;
 
+import com.akto.util.UsageCalculator;
+import com.akto.util.tasks.OrganizationTask;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
 import com.akto.dao.context.Context;
@@ -22,12 +25,40 @@ import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import static com.opensymphony.xwork2.Action.SUCCESS;
 
 public class UsageAction implements ServletRequestAware {
     private UsageMetric usageMetric;
     private HttpServletRequest request;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
+    private int usageLowerBound;
+    private int usageUpperBound;
+
+    public String aggregateAccountWiseUsage() {
+
+        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
+            @Override
+            public void accept(Organization organization) {
+
+                UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
+            }
+        }, "aggregateAccountWiseUsage");
+
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String sendDataToSinks() {
+        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
+            @Override
+            public void accept(Organization organization) {
+                UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
+            }
+        }, "aggregateAccountWiseUsage");
+
+        return SUCCESS.toUpperCase();
+    }
 
     public String ingestUsage() {
         try {
@@ -75,7 +106,7 @@ public class UsageAction implements ServletRequestAware {
             return Action.ERROR.toUpperCase();
         }
     
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     public void setUsageMetric(UsageMetric usageMetric) {
@@ -87,4 +118,19 @@ public class UsageAction implements ServletRequestAware {
         this.request = request;
     }
 
+    public int getUsageLowerBound() {
+        return usageLowerBound;
+    }
+
+    public void setUsageLowerBound(int usageLowerBound) {
+        this.usageLowerBound = usageLowerBound;
+    }
+
+    public int getUsageUpperBound() {
+        return usageUpperBound;
+    }
+
+    public void setUsageUpperBound(int usageUpperBound) {
+        this.usageUpperBound = usageUpperBound;
+    }
 }

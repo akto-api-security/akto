@@ -56,6 +56,7 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
@@ -97,6 +98,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
+import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -1100,11 +1102,51 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void initializeOrganizationAccountBelongsTo(BackwardCompatibility backwardCompatibility) {
+        backwardCompatibility.setInitializeOrganizationAccountBelongsTo(0);
         if (backwardCompatibility.getInitializeOrganizationAccountBelongsTo() == 0) {
-             BackwardCompatibilityDao.instance.updateOne(
-                        Filters.eq("_id", backwardCompatibility.getId()),
-                        Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
-                    );
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
+            );
+
+            int accountId = Context.accountId.get();
+
+            Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
+            boolean alreadyExists = OrganizationsDao.instance.findOne(filterQ) != null;
+            if (alreadyExists) {
+                loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
+            }
+
+            RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+
+            if (rbac == null) {
+                loggerMaker.errorAndAddToDb("Account "+ accountId +" has no admin! Unable to make org.", LogDb.DASHBOARD);
+                return;
+            }
+
+            int userId = rbac.getUserId();
+
+            User user = UsersDao.instance.findOne(User.ID, userId);
+            if (user == null) {
+                loggerMaker.errorAndAddToDb("User "+ userId +" is absent! Unable to make org.", LogDb.DASHBOARD);
+                return;
+            }
+
+            Organization org = OrganizationsDao.instance.findOne(Organization.ADMIN_EMAIL, user.getLogin());
+
+            if (org == null) {
+                loggerMaker.infoAndAddToDb("Creating a new org for email id: " + user.getLogin() + " and acc: " + accountId, LogDb.DASHBOARD);
+                Set<Integer> accountIds = new HashSet<>();
+                accountIds.add(accountId);
+                org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(), accountIds);
+                OrganizationsDao.instance.insertOne(org);
+                OrganizationUtils.syncOrganizationWithAkto(org);
+            } else {
+                loggerMaker.infoAndAddToDb("Found a new org for acc: " + accountId + " org="+org.getId(), LogDb.DASHBOARD);
+            }
+
+            Bson updates = Updates.addToSet(Organization.ACCOUNTS, accountId);
+            OrganizationsDao.instance.updateOne(Organization.ID, org.getId(), updates);
 
             // if (DashboardMode.isSaasDeployment()) {
             //     try {
@@ -1372,7 +1414,33 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    static boolean executedOnce = false;
+
+    private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {
+        System.out.println("in setOrganizationsInBilling");
+        backwardCompatibility.setOrgsInBilling(0);
+        if (backwardCompatibility.getOrgsInBilling() == 0) {
+            System.out.println("in execute setOrganizationsInBilling: " + executedOnce);
+            if (!executedOnce) {
+                OrganizationTask.instance.executeTask(new Consumer<Organization>() {
+                    @Override
+                    public void accept(Organization organization) {
+                        syncOrganizationWithAkto(organization);
+                    }
+                }, "set-orgs-in-billing");
+
+                executedOnce = true;
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ORGS_IN_BILLING, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        setOrganizationsInBilling(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);

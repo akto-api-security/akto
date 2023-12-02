@@ -19,6 +19,7 @@ public class OrganizationTask {
         List<Organization> organizations = OrganizationsDao.instance.findAll(new BasicDBObject());
         for(Organization organization: organizations) {
             try {
+                logger.info("executing " + taskName + " for org: " + organization.getName() + ": " + organization.getId());
                 consumeOrganization.accept(organization);
             } catch (Exception e) {
                 String msgString = String.format("Error in executing task %s for organizatons %s - %s", taskName, organization.getId(), organization.getName());
