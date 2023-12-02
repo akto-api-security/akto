@@ -529,7 +529,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             if (user == null) {
 
-                if (accountId == 0 || invitationToAccount == 0) {
+                if (accountId == 0) {
                     accountId = AccountAction.createAccountRecord("My account");
 
                     // Create organization for new user
