@@ -1,10 +1,12 @@
 package com.akto.stigg;
 
+import com.akto.DaoInit;
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import okhttp3.*;
 import java.io.IOException;
 
@@ -78,6 +80,7 @@ public class StiggReporterClient {
                 new BasicDBObject("customerId", customerId)
                 .append("featureId", featureId)
                 .append("value", value)
+                .append("updateBehavior", "SET")
         );
 
         String inputVariables = varsObj.toString();
