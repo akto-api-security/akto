@@ -12,19 +12,6 @@ public class UsageAction extends UserAction {
 
     public static final ExecutorService ex = Executors.newFixedThreadPool(1);
 
-    public String syncUsage() {
-
-        ex.submit(new Runnable() {
-            @Override
-            public void run() {
-                InitializerListener.calcUsage();
-                InitializerListener.syncWithAkto();
-            }
-        });
-
-        return SUCCESS.toUpperCase();
-    }
-
     String customerId;
     String planId;
     String billingPeriod;
@@ -36,6 +23,17 @@ public class UsageAction extends UserAction {
         String ret = StiggReporterClient.instance.provisionSubscription(customerId, planId, billingPeriod, successUrl, cancelUrl);
 
         checkoutResult = BasicDBObject.parse(ret);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String calcUsage() {
+        InitializerListener.calcUsage();
+
+        return SUCCESS.toUpperCase();
+    }
+    public String syncWithAkto() {
+        InitializerListener.syncWithAkto();
 
         return SUCCESS.toUpperCase();
     }
