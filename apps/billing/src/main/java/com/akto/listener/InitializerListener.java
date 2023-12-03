@@ -129,7 +129,6 @@ public class InitializerListener implements ServletContextListener {
                     OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                         @Override
                         public void accept(Organization o) {
-                            UsageCalculator.instance.sendOrgUsageDataToAllSinks(o);
                             UsageCalculator.instance.aggregateUsageForOrg(o, finalUsageLowerBound, finalUsageUpperBound);
                             UsageCalculator.instance.sendOrgUsageDataToAllSinks(o);
                         }
