@@ -9,6 +9,7 @@ import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.log.LoggerMaker;
+import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -197,6 +198,18 @@ public class UsageCalculator {
                 OrganizationUsageDao.instance.insertOne(
                         new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
                 );
+
+                if (date % 100 > 24 || organizationName.endsWith("@akto.io")) {
+                    SendgridEmail.getInstance().send(SendgridEmail.getInstance().buildBillingEmail(
+                        o.getAdminEmail(),
+                        o.getAdminEmail(),
+                        consolidatedUsage.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.toString(), 0),
+                        consolidatedUsage.getOrDefault(MetricTypes.TEST_RUNS.toString(), 0),
+                        consolidatedUsage.getOrDefault(MetricTypes.CUSTOM_TESTS.toString(), 0),
+                        consolidatedUsage.getOrDefault(MetricTypes.ACTIVE_ACCOUNTS.toString(), 0)
+                    ));
+                }
+
             } else {
                 loggerMaker.infoAndAddToDb("Found usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
                 Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage));
