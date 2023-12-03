@@ -1,5 +1,6 @@
 package com.akto.util;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricsDao;
@@ -70,9 +71,6 @@ public class UsageCalculator {
                     case STIGG:
                         syncBillingEodWithStigg(lastUsageItem);
                         break;
-                    case MIXPANEL:
-                        //syncBillingEodWithMixpanel(lastUsageItem);
-                        break;
                     case SLACK:
                         //syncBillingEodWithSlack(lastUsageItem);
                         break;
@@ -95,8 +93,22 @@ public class UsageCalculator {
 
     }
 
-    private void syncBillingEodWithMixpanel(OrganizationUsage lastUsageItem) {
-
+    private void syncBillingEodWithMixpanel(OrganizationUsage ou, MetricTypes metricTypes, int usage) {
+        try {
+            UsageMetric usageMetric = new UsageMetric(
+                    ou.getOrgId(),
+                    -1,
+                    metricTypes,
+                    ou.getCreationEpoch(),
+                    Context.now(),
+                    "SAAS",
+                    "billing"
+            );
+            usageMetric.setUsage(usage);
+            UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
+        }
     }
 
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
@@ -110,9 +122,8 @@ public class UsageCalculator {
 
             try {
                 StiggReporterClient.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
-
                 sinks.put(OrganizationUsage.DataSink.STIGG.toString(), Context.now());
-
+                syncBillingEodWithMixpanel(lastUsageItem, metricType, value);
             } catch (IOException e) {
                 String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
                 loggerMaker.errorAndAddToDb(errLog, LoggerMaker.LogDb.BILLING);
