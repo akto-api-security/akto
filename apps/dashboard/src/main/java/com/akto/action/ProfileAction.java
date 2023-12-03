@@ -12,6 +12,7 @@ import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
+import com.akto.stigg.StiggReporterClient;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
@@ -111,6 +112,9 @@ public class ProfileAction extends UserAction {
             String organizationId = organization.getId();
             userDetails.append("organizationId", organizationId);
             userDetails.append("organizationName", organization.getName());
+            userDetails.append("stiggIsOverage", StiggReporterClient.instance.isOverage(organizationId));
+
+
 
             if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
                 String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
