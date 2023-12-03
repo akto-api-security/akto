@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT;
     }
 
     ConfigType configType;
@@ -396,6 +396,33 @@ public abstract class Config {
 
         public void setProjectToken(String projectToken) {
             this.projectToken = projectToken;
+        }
+    }
+
+
+    @BsonDiscriminator
+    public static class SlackAlertConfig extends Config {
+        private String slackWebhookUrl;
+
+        public static final String CONFIG_ID = ConfigType.SLACK_ALERT.name() + CONFIG_SALT;
+
+        public SlackAlertConfig() {
+            this.configType = ConfigType.SLACK_ALERT;
+            this.id = CONFIG_ID;
+        }
+
+        public SlackAlertConfig(String slackWebhookUrl) {
+            this.configType = ConfigType.SLACK_ALERT;
+            this.id = configType.name();
+            this.slackWebhookUrl = slackWebhookUrl;
+        }
+
+        public String getSlackWebhookUrl() {
+            return slackWebhookUrl;
+        }
+
+        public void setSlackWebhookUrl(String slackWebhookUrl) {
+            this.slackWebhookUrl = slackWebhookUrl;
         }
     }
 }
