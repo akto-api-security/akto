@@ -330,10 +330,9 @@ public abstract class Config {
     @BsonDiscriminator
     public static class StiggConfig extends Config {
         private String clientKey;
-
         private String serverKey;
-
         private String signingKey;
+        private String freePlanId;
         public static final String CONFIG_ID = ConfigType.STIGG.name() + CONFIG_SALT;
 
         public StiggConfig() {
@@ -363,6 +362,14 @@ public abstract class Config {
 
         public void setSigningKey(String signingKey) {
             this.signingKey = signingKey;
+        }
+
+        public String getFreePlanId() {
+            return freePlanId;
+        }
+
+        public void setFreePlanId(String freePlanId) {
+            this.freePlanId = freePlanId;
         }
     }
 

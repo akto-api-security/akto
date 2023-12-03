@@ -12,6 +12,7 @@ import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;
@@ -51,28 +52,39 @@ public class UsageCalculator {
             List<OrganizationUsage> pendingUsages =
                     OrganizationUsageDao.instance.findAll(filterQ);
 
+            loggerMaker.infoAndAddToDb("Found "+pendingUsages.size()+" items for org: " + o.getId(), LoggerMaker.LogDb.BILLING);
 
-            for (OrganizationUsage lastUsageItem : pendingUsages) {
+            pendingUsages.sort(
+                    (o1, o2)->
+                            o2.getDate() == o1.getDate() ?
+                                    (o2.getCreationEpoch() - o1.getCreationEpoch()) :
+                                    (o2.getDate() - o1.getDate()));
 
-                int today = epochToDateInt(Context.now());
-                //if (lastUsageItem.getDate() == today) return;
+            OrganizationUsage lastUsageItem = pendingUsages.get(0);
+            loggerMaker.infoAndAddToDb("Shortlisting: " + lastUsageItem, LoggerMaker.LogDb.BILLING);
+            int today = epochToDateInt(Context.now());
+            //if (lastUsageItem.getDate() == today) return;
 
-                for (OrganizationUsage.DataSink dataSink : OrganizationUsage.DataSink.values()) {
-                    switch (dataSink) {
-                        case STIGG:
-                            syncBillingEodWithStigg(lastUsageItem);
-                            break;
-                        case MIXPANEL:
-                            //syncBillingEodWithMixpanel(lastUsageItem);
-                            break;
-                        case SLACK:
-                            //syncBillingEodWithSlack(lastUsageItem);
-                            break;
-                        default:
-                            throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
-                    }
+            for (OrganizationUsage.DataSink dataSink : OrganizationUsage.DataSink.values()) {
+                switch (dataSink) {
+                    case STIGG:
+                        syncBillingEodWithStigg(lastUsageItem);
+                        break;
+                    case MIXPANEL:
+                        //syncBillingEodWithMixpanel(lastUsageItem);
+                        break;
+                    case SLACK:
+                        //syncBillingEodWithSlack(lastUsageItem);
+                        break;
+                    default:
+                        throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
                 }
             }
+
+            Bson ignoreFilterQ = Filters.and(filterQ, Filters.ne(OrganizationUsage.CREATION_EPOCH, lastUsageItem.getCreationEpoch()));
+            Bson ignoreUpdateQ = Updates.set(SINKS, new BasicDBObject("ignore", Context.now()));
+            UpdateResult updateResult = OrganizationUsageDao.instance.updateMany(ignoreFilterQ, ignoreUpdateQ);
+            loggerMaker.infoAndAddToDb("marked "+updateResult.getModifiedCount()+" items as ignored", LoggerMaker.LogDb.BILLING);
         } finally {
             statusDataSinks = false;
         }
@@ -89,6 +101,7 @@ public class UsageCalculator {
 
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
         loggerMaker.infoAndAddToDb(String.format("Syncing usage for organization %s to Stigg", lastUsageItem.getOrgId()), LoggerMaker.LogDb.BILLING);
+        Map<String, Integer> sinks = lastUsageItem.getSinks();
 
         for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
             MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
@@ -98,21 +111,23 @@ public class UsageCalculator {
             try {
                 StiggReporterClient.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
 
-                Map<String, Integer> sinks = lastUsageItem.getSinks();
                 sinks.put(OrganizationUsage.DataSink.STIGG.toString(), Context.now());
 
-                OrganizationUsageDao.instance.updateOne(
-                        Filters.and(
-                                Filters.eq(OrganizationUsage.ORG_ID, lastUsageItem.getOrgId()),
-                                Filters.eq(OrganizationUsage.DATE, lastUsageItem.getDate())
-                        ),
-                        Updates.set(SINKS, sinks)
-                );
             } catch (IOException e) {
                 String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
                 loggerMaker.errorAndAddToDb(errLog, LoggerMaker.LogDb.BILLING);
             }
         }
+
+        OrganizationUsageDao.instance.updateOne(
+            Filters.and(
+                Filters.eq(OrganizationUsage.ORG_ID, lastUsageItem.getOrgId()),
+                Filters.eq(OrganizationUsage.DATE, lastUsageItem.getDate()),
+                Filters.eq(CREATION_EPOCH, lastUsageItem.getCreationEpoch())
+            ),
+            Updates.set(SINKS, sinks)
+        );
+
     }
 
     public void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {

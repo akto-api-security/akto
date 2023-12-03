@@ -30,6 +30,10 @@ public class StiggReporterClient {
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error while fetching stigg config: " + e.getMessage(), LoggerMaker.LogDb.BILLING);
                     }
+
+                    if (stiggConfig != null && stiggConfig.getFreePlanId() == null) {
+                        loggerMaker.errorAndAddToDb("No free planId found in stigg config", LoggerMaker.LogDb.BILLING);
+                    }
                 }
             }
         }
@@ -129,9 +133,11 @@ public class StiggReporterClient {
             new BasicDBObject("customerId", organization.getId())
             .append("name", organization.getName())
             .append("email", organization.getAdminEmail())
-            .append("subscriptionParams", new BasicDBObject("planId", "plan-akto-test"))
+            .append("subscriptionParams", new BasicDBObject("planId", stiggConfig.getFreePlanId()))
         ).toString();
 
-        return executeGraphQL(mutationQ, inputVariables);
+        executeGraphQL(mutationQ, inputVariables);
+
+        return provisionSubscription(organization.getId(), stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
     }
 }

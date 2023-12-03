@@ -1,5 +1,5 @@
 import { Box, Card, Divider, LegacyCard, Page, Text, Button, HorizontalStack } from '@shopify/polaris'
-import { Paywall, StiggProvider, SubscribeIntentionType } from '@stigg/react-sdk'
+import { Paywall, StiggProvider, SubscribeIntentionType, useStiggContext } from '@stigg/react-sdk'
 import {
   CustomerPortalProvider,
   CustomerUsageData,
@@ -13,10 +13,43 @@ import {
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import billingApi from './api'
+import func from "@/util/func"
 
 import "./billing.css"
 
 function Billing() {
+
+    const { stigg, refreshData } = useStiggContext();
+
+    const searchParams = new URLSearchParams(document.location.search)
+
+    function removeSearchParams() {
+        const newUrl = '/dashboard/settings/billing'
+        window.history.pushState({path:newUrl},'',newUrl);
+    }
+
+    useEffect(() => {
+        const checkoutCompleted = searchParams.get('checkoutCompleted')
+        switch (checkoutCompleted) {
+            case "true":
+                func.setToast(true,  false, `Checkout completed successfully!`)
+                removeSearchParams();
+                refreshData();
+
+                break;
+            case "false":
+                func.setToast(true,  true, `There was an error during checkout!`)
+                removeSearchParams();
+                refreshData();
+                break;
+
+            default:
+        }
+    })
+
+
+
+
     async function syncUsage() {
         await billingApi.syncUsage()
     }
