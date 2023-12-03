@@ -229,7 +229,7 @@ public class AccountAction extends UserAction {
             try {
                 int organizationAccountId = Context.accountId.get();
                 Organization organization = OrganizationsDao.instance.findOne(
-                        Filters.eq(Organization.ACCOUNTS, organizationAccountId)
+                        Filters.in(Organization.ACCOUNTS, organizationAccountId)
                 );
 
                 if (organization != null) {
