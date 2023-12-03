@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -1458,6 +1459,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
+        OrganizationsDao.createIndexIfAbsent();
+        UsageMetricsDao.createIndexIfAbsent();
+
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
@@ -1739,7 +1743,7 @@ public class InitializerListener implements ServletContextListener {
                 try {
                     // Get organization to which account belongs to
                     Organization organization = OrganizationsDao.instance.findOne(
-                            Filters.eq(Organization.ACCOUNTS, accountId)
+                            Filters.in(Organization.ACCOUNTS, accountId)
                     );
 
                     if (organization == null) {

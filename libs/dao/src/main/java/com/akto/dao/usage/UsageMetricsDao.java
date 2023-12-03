@@ -1,5 +1,7 @@
 package com.akto.dao.usage;
 
+import com.akto.dao.MCollection;
+import com.akto.dto.billing.Organization;
 import org.bson.conversions.Bson;
 import org.springframework.jmx.support.MetricType;
 
@@ -12,6 +14,17 @@ import com.mongodb.client.model.Filters;
 public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
 
     public static final UsageMetricsDao instance = new UsageMetricsDao();
+
+    public static void createIndexIfAbsent() {
+        {
+            String[] fieldNames = {UsageMetric.ACCOUNT_ID, UsageMetric.AKTO_SAVE_EPOCH};
+            MCollection.createIndexIfAbsent(instance.getDBName(), instance.getCollName(), fieldNames, true);
+        }
+        {
+            String[] fieldNames = {UsageMetric.SYNCED_WITH_AKTO};
+            MCollection.createIndexIfAbsent(instance.getDBName(), instance.getCollName(), fieldNames, true);
+        }
+    }
 
     @Override
     public String getCollName() {

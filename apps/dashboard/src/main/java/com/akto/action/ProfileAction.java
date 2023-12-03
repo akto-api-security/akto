@@ -106,7 +106,7 @@ public class ProfileAction extends UserAction {
 
         if (DashboardMode.isSaasDeployment()) {            
             Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.eq(Organization.ACCOUNTS, sessionAccId)
+                    Filters.in(Organization.ACCOUNTS, sessionAccId)
             ); 
             String organizationId = organization.getId();
             userDetails.append("organizationId", organizationId);

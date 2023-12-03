@@ -11,6 +11,7 @@ import javax.servlet.ServletContextListener;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.usage.UsageMetricsDao;
@@ -83,6 +84,8 @@ public class InitializerListener implements ServletContextListener {
 
     public static void runInitializerFunctions() {
         OrganizationUsageDao.createIndexIfAbsent();
+        OrganizationsDao.createIndexIfAbsent();
+        UsageMetricsDao.createIndexIfAbsent();
         System.out.println("Running initializer functions");
     }
 
