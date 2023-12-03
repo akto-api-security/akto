@@ -64,7 +64,7 @@
                     window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
                     window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
-
+                    window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'
@@ -93,7 +93,8 @@
                         window.intercomSettings = {
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
-                            created_at: new Date().getTime()
+                            created_at: new Date().getTime(),
+                            show_overage: window.STIGG_IS_OVERAGE || false
                         };
                     }
    // mixpanel.track('Login');

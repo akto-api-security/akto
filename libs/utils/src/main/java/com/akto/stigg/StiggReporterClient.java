@@ -5,9 +5,12 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import okhttp3.*;
+import org.apache.commons.lang3.StringUtils;
+
 import java.io.IOException;
 
 public class StiggReporterClient {
@@ -72,6 +75,57 @@ public class StiggReporterClient {
             return new BasicDBObject("err", e.getMessage()).toJson();
         }
 
+    }
+
+    public boolean isOverage(String customerId) {
+        BasicDBList l = fetchEntitlements(customerId);
+        if (l.size() == 0) return false;
+
+        boolean result = false;
+
+        for(Object o: l) {
+            try {
+                BasicDBObject bO = (BasicDBObject) o;
+                Object usageLimitObj = bO.get("usageLimit");
+
+                if (usageLimitObj == null) {
+                    continue;
+                }
+
+                if (StringUtils.isNumeric(usageLimitObj.toString())) {
+                    int usageLimit = Integer.parseInt(usageLimitObj.toString());
+                    int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
+                    if (usage > usageLimit) {
+                        return true;
+                    }
+
+                }
+            } catch (Exception e) {
+                loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
+                continue;
+            }
+        }
+
+        return result;
+    }
+
+    public BasicDBList fetchEntitlements(String customerId) {
+        BasicDBObject varsObj = new BasicDBObject("input", new BasicDBObject("customerId", customerId));
+
+        String inputVariables = varsObj.toString();
+
+        String queryQ =
+            "query Entitlements($input: FetchEntitlementsQuery!) {entitlements(query: $input) {" +
+                "    currentUsage\\n" +
+                "    customerId\\n" +
+                "    entitlementUpdatedAt\\n" +
+                "    usageLimit\\n" +
+            "}}";
+
+        BasicDBObject obj = BasicDBObject.parse(executeGraphQL(queryQ, inputVariables));
+
+        BasicDBObject data = (BasicDBObject) obj.getOrDefault("data", new BasicDBObject());
+        return (BasicDBList) data.getOrDefault("entitlements", new BasicDBList());
     }
 
     public String reportUsage(int value, String customerId, String featureId) throws IOException {
