@@ -66,7 +66,7 @@ import com.akto.utils.RedactSampleData;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.akto.utils.usage.UsageMetricCalculator;
-import com.akto.utils.usage.UsageMetricUtils;
+import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
