@@ -1,13 +1,16 @@
 package com.akto.utils.usage;
 
+import java.util.ArrayList;
 import java.util.Set;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
@@ -21,17 +24,27 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
 
+    public static Bson excludeDemos(String key) {
+        ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+
+        ArrayList<Integer> demos = new ArrayList<>();
+        demos.add(1111111111);
+
+        if (juiceShop != null) {
+            demos.add(juiceShop.getId());
+        }
+
+        return Filters.nin(key, demos);
+    }
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
-        /* todo:
-         * Active endpoints def - endpoints which have been tested
-         */
         int measureEpoch = usageMetric.getMeasureEpoch();
 
         int activeEndpoints = (int) ApiInfoDao.instance.count(
-            Filters.gt(ApiInfo.LAST_SEEN, measureEpoch)
+            Filters.and(Filters.gt(ApiInfo.LAST_SEEN, measureEpoch), excludeDemos(ApiInfo.ID_API_COLLECTION_ID))
         );
         
         return activeEndpoints;
@@ -47,8 +60,10 @@ public class UsageMetricCalculator {
     public static int calculateTestRuns(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
 
+        Bson demoCollFilter = excludeDemos(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+
         int testRuns = (int) TestingRunResultDao.instance.count(
-            Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch)
+            Filters.and(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch), demoCollFilter)
         );
         return testRuns;
     }
