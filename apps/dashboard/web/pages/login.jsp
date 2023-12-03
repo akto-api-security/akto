@@ -94,7 +94,7 @@
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
                             created_at: new Date().getTime(),
-                            show_overage: window.STIGG_IS_OVERAGE || false
+                            show_overage: window.STIGG_IS_OVERAGE==='true'
                         };
                     }
    // mixpanel.track('Login');
