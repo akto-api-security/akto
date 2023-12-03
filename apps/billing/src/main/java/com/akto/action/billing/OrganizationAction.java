@@ -29,7 +29,6 @@ public class OrganizationAction {
                 loggerMaker.infoAndAddToDb(String.format("Organization - (%s / %s) does not exist. Creating ...", organizationName, organizationId), LogDb.BILLING);
                 organization.setSyncedWithAkto(true);
                 StiggReporterClient.instance.provisionCustomer(organization);
-                StiggReporterClient.instance.provisionSubscription(organization.getId(), "plan-akto-test", "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
                 OrganizationsDao.instance.insertOne(organization);
             }
         } catch (Exception e) {

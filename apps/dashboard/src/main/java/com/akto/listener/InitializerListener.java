@@ -1102,12 +1102,13 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void initializeOrganizationAccountBelongsTo(BackwardCompatibility backwardCompatibility) {
+        // lets keep this for now. This function is re-entrant.
         backwardCompatibility.setInitializeOrganizationAccountBelongsTo(0);
         if (backwardCompatibility.getInitializeOrganizationAccountBelongsTo() == 0) {
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
-            );
+//            BackwardCompatibilityDao.instance.updateOne(
+//                Filters.eq("_id", backwardCompatibility.getId()),
+//                Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
+//            );
 
             int accountId = Context.accountId.get();
 
@@ -1115,6 +1116,7 @@ public class InitializerListener implements ServletContextListener {
             boolean alreadyExists = OrganizationsDao.instance.findOne(filterQ) != null;
             if (alreadyExists) {
                 loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
+                return;
             }
 
             RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
@@ -1136,9 +1138,7 @@ public class InitializerListener implements ServletContextListener {
 
             if (org == null) {
                 loggerMaker.infoAndAddToDb("Creating a new org for email id: " + user.getLogin() + " and acc: " + accountId, LogDb.DASHBOARD);
-                Set<Integer> accountIds = new HashSet<>();
-                accountIds.add(accountId);
-                org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(), accountIds);
+                org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(), new HashSet<>());
                 OrganizationsDao.instance.insertOne(org);
                 OrganizationUtils.syncOrganizationWithAkto(org);
             } else {
@@ -1417,25 +1417,26 @@ public class InitializerListener implements ServletContextListener {
     static boolean executedOnce = false;
 
     private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {
-        System.out.println("in setOrganizationsInBilling");
         backwardCompatibility.setOrgsInBilling(0);
         if (backwardCompatibility.getOrgsInBilling() == 0) {
-            System.out.println("in execute setOrganizationsInBilling: " + executedOnce);
             if (!executedOnce) {
+                loggerMaker.infoAndAddToDb("in execute setOrganizationsInBilling", LogDb.DASHBOARD);
                 OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                     @Override
                     public void accept(Organization organization) {
-                        syncOrganizationWithAkto(organization);
+                        if (!organization.getSyncedWithAkto()) {
+                            loggerMaker.infoAndAddToDb("Syncing Akto billing for org: " + organization.getId(), LogDb.DASHBOARD);
+                            syncOrganizationWithAkto(organization);
+                        }
                     }
                 }, "set-orgs-in-billing");
 
                 executedOnce = true;
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.ORGS_IN_BILLING, Context.now())
+                );
             }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.ORGS_IN_BILLING, Context.now())
-            );
         }
     }
 

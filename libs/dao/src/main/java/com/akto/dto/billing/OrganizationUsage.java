@@ -13,6 +13,7 @@ public class OrganizationUsage {
 
     public static final String DATE = "date";
     private int date;
+    public static final String CREATION_EPOCH = "creationEpoch";
     private int creationEpoch;
     public static final String ORG_METRIC_MAP = "orgMetricMap";
     private Map<String, Integer> orgMetricMap;
