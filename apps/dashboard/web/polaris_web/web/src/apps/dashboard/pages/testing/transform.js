@@ -341,8 +341,24 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints) {
-
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    var key = /[^/]*$/.exec(jiraIssueUrl)[0];
+    const jiraComponent = jiraIssueUrl.length > 0 ? (
+      <Box>
+              <Tag>
+                  <HorizontalStack gap={1}>
+                    <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                    <Link url={jiraIssueUrl}>
+                      <Text>
+                        {key}
+                      </Text>
+                    </Link>
+                  </HorizontalStack>
+                </Tag>
+          </Box>
+    ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+    
+    //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
       let sectionLocal = {}
@@ -350,11 +366,9 @@ const transform = {
       sectionLocal.title = section.title
       switch (section.title) {
         case "Description":
-
-          if (category?.issueDetails == null || category?.issueDetails == undefined) {
-            return;
-          }
-
+        if(category?.issueDetails == null || category?.issueDetails == undefined){
+          return;
+        }
           sectionLocal.content = (
             <Text color='subdued'>
               {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
@@ -362,11 +376,9 @@ const transform = {
           )
           break;
         case "Impact":
-
-          if (category?.issueImpact == null || category?.issueImpact == undefined) {
+          if(category?.issueImpact == null || category?.issueImpact == undefined){
             return;
           }
-
           sectionLocal.content = (
             <Text color='subdued'>
               {category?.issueImpact || "No impact found"}
@@ -377,7 +389,6 @@ const transform = {
           if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <HorizontalStack gap="2">
               {
@@ -385,7 +396,6 @@ const transform = {
               }
             </HorizontalStack>
           )
-
           break;
         case "CWE":
           if (category?.cwe == null || category?.cwe == undefined || category?.cwe.length == 0) {
@@ -412,11 +422,9 @@ const transform = {
           )
           break;
         case "References":
-
           if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet' spacing="extraTight">
               {
@@ -436,11 +444,9 @@ const transform = {
           )
           break;
         case "API endpoints affected":
-
           if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet'>
               {
@@ -456,12 +462,14 @@ const transform = {
             </List>
           )
           break;
+          case "Jira":
+              sectionLocal.content = jiraComponent
+              break;
           default:
             sectionLocal.content = section.content
       }
       filledSection.push(sectionLocal)
     })
-
     return filledSection;
   },
 
@@ -607,112 +615,7 @@ convertSubIntoSubcategory(resp){
 
 },
 
-getUrlComp(url){
-  let arr = url.split(' ')
-  const method = arr[0]
-  const endpoint = arr[1]
-
-  return(
-    <HorizontalStack gap={1}>
-      <Box width="54px">
-        <HorizontalStack align="end">
-          <Text variant="bodyMd" color="subdued">{method}</Text>
-        </HorizontalStack>
-      </Box>
-      <Text variant="bodyMd">{endpoint}</Text>
-    </HorizontalStack>
-  )
-},
-
-getCollapsibleRow(urls){
-  return(
-    <tr style={{background: "#EDEEEF"}}>
-      <td colSpan={7}>
-        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-          <VerticalStack gap={2}>
-            {urls.map((ele,index)=>{
-              return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
-                  {this.getUrlComp(ele.url)}
-                </Link>
-              )
-            })}
-          </VerticalStack>
-        </Box>
-      </td>
-    </tr>
-  )
-},
-
-getPrettifiedTestRunResults(testRunResults){
-  let testRunResultsObj = {}
-  testRunResults.forEach((test)=>{
-    const key = test.name + ': ' + test.vulnerable
-    if(testRunResultsObj.hasOwnProperty(key)){
-      let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
-      let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl})
-      let obj = {
-        ...test,
-        urls: urls,
-        endTimestamp: endTimestamp
-      }
-      delete obj["nextUrl"]
-      delete obj["url"]
-      testRunResultsObj[key] = obj
-    }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl}]
-      let obj={
-        ...test,
-        urls:urls,
-      }
-      delete obj["nextUrl"]
-      delete obj["url"]
-      testRunResultsObj[key] = obj
-    }
-  })
-  let prettifiedResults = []
-  Object.keys(testRunResultsObj).forEach((key)=>{
-    let obj = testRunResultsObj[key]
-    let prettifiedObj = {
-      ...obj,
-      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box>,
-      severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
-      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
-        {obj.cweDisplay.map((ele,index)=>{
-          return(
-            <Badge size="small" status={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
-          )
-        })}
-      </HorizontalStack> : <Text>-</Text>,
-      totalUrls: obj.urls.length,
-      scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapsibleRow(obj.urls),
-      urlFilters: obj.urls.map((ele) => ele.url)
-    }
-    prettifiedResults.push(prettifiedObj)
-  })
-  return prettifiedResults
-},
-getInfoSectionsHeaders(jiraIssueUrl){
-  const jiraComponent = jiraIssueUrl.length > 0 ? (
-    <Box>
-
-            <Tag>
-                <HorizontalStack gap={1}>
-                  <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" /> 
-                  <Link url={jiraIssueUrl}>
-                    <Text>
-                      {jiraIssueUrl}
-                    </Text>
-                  </Link>
-                </HorizontalStack>
-              </Tag>
-
-
-
-        </Box>
-  ) : <Text>Jira Issue Not Created. Click on the "Create Jira Ticket" button at the top right section to create a new ticket</Text>
+getInfoSectionsHeaders(){
   let moreInfoSections = [
     {
       icon: FlagMajor,
@@ -747,9 +650,8 @@ getInfoSectionsHeaders(jiraIssueUrl){
     {
       icon: ResourcesMajor,
       title: "Jira",
-      content: jiraComponent
-        
-    },
+      content: ""
+    }
   ]
   return moreInfoSections
 }
