@@ -4,6 +4,7 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.Config;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
@@ -125,7 +126,32 @@ public class UsageCalculator {
 
         for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
             MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
-            String featureId =  metricType.getLabel();
+            String featureId = null;
+            Config.StiggConfig stiggConfig = StiggReporterClient.instance.getStiggConfig();
+            switch (metricType) {
+                case ACTIVE_ENDPOINTS:
+                    featureId = stiggConfig.getActiveEndpointsLabel();
+                    break;
+                case ACTIVE_ACCOUNTS:
+                    featureId = stiggConfig.getActiveAccountsLabel();
+                    break;
+                case TEST_RUNS:
+                    featureId = stiggConfig.getTestRunsLabel();
+                    break;
+                case CUSTOM_TESTS:
+                    featureId = stiggConfig.getCustomTestsLabel();
+                    break;
+
+                default:
+
+                    loggerMaker.errorAndAddToDb("This is not a standard metric type: " + metricType, LoggerMaker.LogDb.BILLING);
+            }
+
+            if (featureId == null) {
+                loggerMaker.errorAndAddToDb("Feature id not found for metric: " + metricType, LoggerMaker.LogDb.BILLING);
+                return;
+            }
+
             int value = entry.getValue();
 
             try {

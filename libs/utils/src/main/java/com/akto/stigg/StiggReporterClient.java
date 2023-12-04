@@ -194,4 +194,8 @@ public class StiggReporterClient {
 
         return provisionSubscription(organization.getId(), stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
     }
+
+    public Config.StiggConfig getStiggConfig() {
+        return this.stiggConfig;
+    }
 }
