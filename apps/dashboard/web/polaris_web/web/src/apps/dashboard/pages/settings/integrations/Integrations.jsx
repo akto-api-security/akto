@@ -12,7 +12,7 @@ import {
 import {useState} from 'react';
 import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
-import {Outlet, useNavigate} from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 function Integrations() {
 
@@ -64,13 +64,18 @@ function Integrations() {
       name: 'Okta SSO',
       source: '/public/okta_logo.svg'
     }
+    let azureAdSsoObj={
+      id: 'azure_sso',
+      name: 'Azure AD SSO',
+      source: '/public/azure_logo.svg'
+    }
 
-    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj, oktaSsoObj]
+    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj,azureAdSsoObj, oktaSsoObj]
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>9</Badge></span>,
+            content: <span>All <Badge status='new'>10</Badge></span>,
             component: <TabsList />
         },
         {
@@ -95,7 +100,7 @@ function Integrations() {
         },
         {
           id: 'sso',
-          content: <span>SSO <Badge status='new'>2</Badge></span>,
+          content: <span>SSO <Badge status='new'>3</Badge></span>,
           component: <TabsList />
         },
         {
@@ -123,7 +128,7 @@ function Integrations() {
                 break;
 
             case 'sso':
-                currObjs= [githubSsoObj, oktaSsoObj]
+                currObjs= [githubSsoObj, oktaSsoObj, azureAdSsoObj]
                 setCurrentItems(currObjs)
                 break;
 
