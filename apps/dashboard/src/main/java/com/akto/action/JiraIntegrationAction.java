@@ -1,9 +1,6 @@
 package com.akto.action;
 
 import java.io.File;
-import java.io.UnsupportedEncodingException;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,16 +9,12 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
-import org.apache.http.entity.FileEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
 
@@ -35,7 +28,6 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBList;
@@ -146,6 +138,7 @@ public class JiraIntegrationAction extends UserAction {
 
     public String fetchIntegration() {
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        jiraIntegration.setApiToken("****************************");
         return Action.SUCCESS.toUpperCase();
     }
 
