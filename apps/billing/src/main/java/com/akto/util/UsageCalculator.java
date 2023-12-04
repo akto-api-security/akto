@@ -119,6 +119,10 @@ public class UsageCalculator {
         loggerMaker.infoAndAddToDb(String.format("Syncing usage for organization %s to Stigg", lastUsageItem.getOrgId()), LoggerMaker.LogDb.BILLING);
         Map<String, Integer> sinks = lastUsageItem.getSinks();
 
+        if (sinks == null) {
+            sinks = new HashMap<>();
+        }
+
         for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
             MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
             String featureId =  metricType.getLabel();
