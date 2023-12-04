@@ -59,13 +59,18 @@ function Integrations() {
       name:'Github SSO',
       source: '/public/github_icon.svg'
     }
+    let jiraObj={
+      id: 'jira',
+      name:'Jira',
+      source: '/public/logo_jira.svg'
+  }
 
-    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj]
+    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj, jiraObj]
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>7</Badge></span>,
+            content: <span>All <Badge status='new'>9</Badge></span>,
             component: <TabsList />
         },
         {
@@ -95,7 +100,7 @@ function Integrations() {
         },
         {
             id: 'automation',
-            content: <span>Automation <Badge status='new'>2</Badge></span>,
+            content: <span>Automation <Badge status='new'>3</Badge></span>,
             component: <TabsList />
         }
     ]
@@ -128,7 +133,7 @@ function Integrations() {
                 break;
 
             case 'automation':
-                currObjs= [aktoApiObj,ciCdObj]
+                currObjs= [aktoApiObj,ciCdObj, jiraObj]
                 setCurrentItems(currObjs)
                 break;
 

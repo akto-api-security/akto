@@ -2,10 +2,16 @@ import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
 import {
-  Text,
-  HorizontalStack, Badge, Link, List
+  Text, Tag,
+  HorizontalStack, Badge, Link, List, Avatar, Box
   } from '@shopify/polaris';
   import PersistStore from "../../../main/PersistStore";
+  import {ResourcesMajor,
+    CollectionsMajor,
+    FlagMajor,
+    CreditCardSecureMajor,
+    MarketingMajor,
+    FraudProtectMajor} from '@shopify/polaris-icons';
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -403,6 +409,8 @@ const transform = {
             </List>
           )
           break;
+          default:
+            sectionLocal.content = section.content
       }
       filledSection.push(sectionLocal)
     })
@@ -491,6 +499,66 @@ setTestMetadata () {
     PersistStore.getState().setSubCategoryMap(subCategoryMap)
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
 })
+},
+
+getInfoSectionsHeaders(jiraIssueUrl){
+  const jiraComponent = jiraIssueUrl.length > 0 ? (
+    <Box>
+
+            <Tag>
+                <HorizontalStack gap={1}>
+                  <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" /> 
+                  <Link url={jiraIssueUrl}>
+                    <Text>
+                      {jiraIssueUrl}
+                    </Text>
+                  </Link>
+                </HorizontalStack>
+              </Tag>
+
+
+
+        </Box>
+  ) : <Text>Jira Issue Not Created. Click on the "Create Jira Ticket" button at the top right section to create a new ticket</Text>
+  let moreInfoSections = [
+    {
+      icon: FlagMajor,
+      title: "Impact",
+      content: ""
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Tags",
+      content: ""
+    },
+    {
+      icon: CreditCardSecureMajor,
+      title: "CWE",
+      content: ""
+    },
+    {
+      icon: FraudProtectMajor,
+      title: "CVE",
+      content: ""
+    },
+    {
+      icon: MarketingMajor,
+      title: "API endpoints affected",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "References",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "Jira",
+      content: jiraComponent
+        
+    },
+  ]
+  return moreInfoSections
 }
 
 }

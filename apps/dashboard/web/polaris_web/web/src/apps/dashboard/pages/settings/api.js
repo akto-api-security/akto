@@ -217,7 +217,31 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
-    }
+    },
+
+    testJiraIntegration(userEmail, apiToken, baseUrl, projId) {
+        return request({
+            url: '/api/testIntegration',
+            method: 'post',
+            data: {userEmail, apiToken, baseUrl, projId}
+        })
+    },
+
+    fetchJiraIntegration() {
+        return request({
+            url: '/api/fetchIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
+        return request({
+            url: '/api/addIntegration',
+            method: 'post',
+            data: {userEmail, apiToken, baseUrl, projId, issueType}
+        })
+    },
 }
 
 export default settingRequests
