@@ -12,6 +12,8 @@ import static com.akto.util.Constants.ID;
 
 public class TestRoles {
     private ObjectId id;
+    @BsonIgnore
+    private String hexId;
     public static final String NAME = "name";
     private String name;
     private ObjectId endpointLogicalGroupId;
@@ -102,5 +104,25 @@ public class TestRoles {
 
     public void setAuthWithCondList(List<AuthWithCond> authWithCondList) {
         this.authWithCondList = authWithCondList;
+    }
+
+    public String getHexId() {
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
+    }
+
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
+    }
+
+    public AuthMechanism getDefaultAuthMechanism(){
+        if(this.getAuthWithCondList() != null && !this.getAuthWithCondList().isEmpty()){
+            for (AuthWithCond authWithCond : this.getAuthWithCondList()) {
+                if(authWithCond.getHeaderKVPairs() != null && authWithCond.getHeaderKVPairs().isEmpty()){
+                    return authWithCond.getAuthMechanism();
+                }
+            }
+        }
+        return null;
     }
 }

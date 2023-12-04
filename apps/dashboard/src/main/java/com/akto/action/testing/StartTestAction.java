@@ -69,6 +69,8 @@ public class StartTestAction extends UserAction {
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
+    private String testRoleId;
+
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
                 Projections.excludeId(),
@@ -138,7 +140,7 @@ public class StartTestAction extends UserAction {
                 return null;
         }
         if (this.selectedTests != null) {
-            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -813,5 +815,13 @@ public class StartTestAction extends UserAction {
         public boolean isCallFromAktoGpt(){
             return AKTO_GPT.equals(this);
         }
+    }
+
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }
