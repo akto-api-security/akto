@@ -180,8 +180,12 @@ function TestRunResultPage(props) {
     setLoading(false);
   }, 500)
 }
-  async function createJiraTicket(){
+  async function createJiraTicket(issueDetails){
 
+    console.log(issueDetails)
+    if (Object.keys(issueDetails).length == 0) {
+      return
+    }
     let url = issueDetails.id.apiInfoKey.url
     let issueId = issueDetails.id
     let pathname = "Endpoint - " + new URL(url).pathname;
@@ -223,16 +227,22 @@ function TestRunResultPage(props) {
       setSelectedTestRunResult({})
     }
     if (runIssues) {
+      const onClickButton = () => {
+        createJiraTicket(...[runIssues])
+      }
       setIssueDetails(...[runIssues]);
       let runIssuesArr = []
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
-      let jiraIssueUrl = runIssues.jiraIssueUrl || "";
-      //console.log(runIssues)
-      const moreInfoSections = transform.getInfoSectionsHeaders(jiraIssueUrl)
-      setJiraIssueUrl(jiraIssueUrl)
-      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
+      let jiraIssueCopy = runIssues.jiraIssueUrl || "";
+      console.log("runIssues", runIssues)
+      const moreInfoSections = transform.getInfoSectionsHeaders()
+      console.log("jiraIssueCopy" + jiraIssueCopy)
+      setJiraIssueUrl(jiraIssueCopy)
+      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
+      // setJiraIssueUrl(jiraIssueUrl)
+      // setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
       setIssueDetails(...[{}]);
     }
@@ -297,7 +307,7 @@ function TestRunResultPage(props) {
     divider= {true}
     backUrl = {props?.source == "editor" ? undefined : (hexId=="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
     isFirstPage = {props?.source == "editor"}
-    primaryAction = {<Button primary onClick={createJiraTicket} disabled={jiraIssueUrl != ""} >Create Jira Ticket</Button>}
+    primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl != "" || window.JIRA_INTEGRATED != "true"} >Create Jira Ticket</Button>}
     // secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {components}
     />
