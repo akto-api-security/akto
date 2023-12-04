@@ -3,14 +3,8 @@ import {
   CircleTickMajor,
   ArchiveMinor,
   LinkMinor,
-  ResourcesMajor,
-  CollectionsMajor,
-  FlagMajor,
-  CreditCardSecureMajor,
-  MarketingMajor,
   ChevronDownMinor,
-  ChevronUpMinor,
-  FraudProtectMajor} from '@shopify/polaris-icons';
+  ChevronUpMinor} from '@shopify/polaris-icons';
 import {
   Text,
   Button,
@@ -29,6 +23,7 @@ import SampleDataList from '../../../components/shared/SampleDataList';
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import PersistStore from '../../../../main/PersistStore';
+import Store from '../../../store';
 
 const headerDetails = [
   {
@@ -71,39 +66,6 @@ const headerDetails = [
   },
 ]
 
-let moreInfoSections = [
-  {
-    icon: FlagMajor,
-    title: "Impact",
-    content: ""
-  },
-  {
-    icon: CollectionsMajor,
-    title: "Tags",
-    content: ""
-  },
-  {
-    icon: CreditCardSecureMajor,
-    title: "CWE",
-    content: ""
-  },
-  {
-    icon: FraudProtectMajor,
-    title: "CVE",
-    content: ""
-  },
-  {
-    icon: MarketingMajor,
-    title: "API endpoints affected",
-    content: ""
-  },
-  {
-    icon: ResourcesMajor,
-    title: "References",
-    content: ""
-  }
-]
-
 function MoreInformationComponent(props) {
   return (
     <VerticalStack gap={"4"}>
@@ -140,9 +102,12 @@ function TestRunResultPage(props) {
   let {testingRunResult, runIssues, testSubCategoryMap} = props;
 
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
+  console.log("selected run res")
+  console.log(selectedTestRunResult)
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
+  const [jiraIssueUrl, setJiraIssueUrl] = useState({});
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params = useParams()
   const hexId = params.hexId;
@@ -150,6 +115,15 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [fullDescription, setFullDescription] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const setToastConfig = Store(state => state.setToastConfig)
+  const setToast = (isActive, isError, message) => {
+      setToastConfig({
+        isActive: isActive,
+        isError: isError,
+        message: message
+      })
+  }
   
   function getDescriptionText(fullDescription){
 
@@ -178,6 +152,63 @@ function TestRunResultPage(props) {
     
   }
 
+  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+    let jiraInteg = await api.createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId);
+    return jiraInteg.jiraTicketKey
+  }
+
+  async function attachFileToIssue(origReq, testReq, issueId) {
+    let jiraInteg = await api.attachFileToIssue(origReq, testReq, issueId);
+  }
+
+  async function fetchData() {
+    if (hexId2 != undefined) {
+      if (testingRunResult == undefined) {
+        let res = await api.fetchTestRunResultDetails(hexId2)
+        testingRunResult = res.testingRunResult;
+      }
+      if (runIssues == undefined) {
+        let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
+        runIssues = res.runIssues;
+      }
+    }
+    setData(testingRunResult, runIssues);
+  setTimeout(() => {
+    setLoading(false);
+  }, 500)
+}
+  async function createJiraTicket(){
+
+    let url = issueDetails.id.apiInfoKey.url
+    let issueId = issueDetails.id
+    let pathname = "Endpoint - " + new URL(url).pathname;
+    let host =  "Host - " + new URL(url).host
+    // break into host and path
+    let description = "Description - " + getDescriptionText(true)
+    
+    let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
+    let issueTitle = tmp[issueDetails.id?.testSubCategory]?.testName
+
+    setToast(true,false,"Creating Jira Ticket")
+
+    let jiraTicketKey = ""
+    await createJiraTicketApiCall(host, pathname, window.location.href, description, issueTitle, issueDetails.id).then(async(res)=> {
+      jiraTicketKey = res
+      await fetchData();
+      setToast(true,false,"Jira Ticket Created, scroll down to view")
+    })
+
+    console.log("jira ticket " + jiraTicketKey)
+
+    if (selectedTestRunResult == null || selectedTestRunResult.testResults == null || selectedTestRunResult.testResults.length == 0) {
+      return
+    }
+
+    let sampleData = selectedTestRunResult.testResults[0]
+    attachFileToIssue(sampleData.originalMessage, sampleData.message, jiraTicketKey)
+
+  }
+
   async function setData(testingRunResult, runIssues) {
     
     let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
@@ -194,29 +225,17 @@ function TestRunResultPage(props) {
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
-      setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
+      let jiraIssueUrl = runIssues.jiraIssueUrl || "";
+      //console.log(runIssues)
+      const moreInfoSections = transform.getInfoSectionsHeaders(jiraIssueUrl)
+      setJiraIssueUrl(jiraIssueUrl)
+      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
       setIssueDetails(...[{}]);
     }
   }
 
   useEffect(() => {
-    async function fetchData() {
-        if (hexId2 != undefined) {
-          if (testingRunResult == undefined) {
-            let res = await api.fetchTestRunResultDetails(hexId2)
-            testingRunResult = res.testingRunResult;
-          }
-          if (runIssues == undefined) {
-            let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
-            runIssues = res.runIssues;
-          }
-        }
-        setData(testingRunResult, runIssues);
-      setTimeout(() => {
-        setLoading(false);
-      }, 500)
-    }
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
 
@@ -303,7 +322,7 @@ function TestRunResultPage(props) {
     divider= {true}
     backUrl = {props?.source == "editor" ? undefined : (hexId=="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
     isFirstPage = {props?.source == "editor"}
-    // primaryAction = {props.source == "editor" ? "" : <Button primary>Create issue</Button>}
+    primaryAction = {<Button primary onClick={createJiraTicket} disabled={jiraIssueUrl != ""} >Create Jira Ticket</Button>}
     // secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {components}
     />
