@@ -1,12 +1,18 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
 import { circle_cancel, circle_tick_minor } from "../../components/icons";
+import {ResourcesMajor,
+  CollectionsMajor,
+  FlagMajor,
+  CreditCardSecureMajor,
+  MarketingMajor,
+  FraudProtectMajor} from '@shopify/polaris-icons';
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -451,7 +457,7 @@ const transform = {
           )
           break;
           default:
-            break;
+            sectionLocal.content = section.content
       }
       filledSection.push(sectionLocal)
     })
@@ -562,7 +568,6 @@ convertSubIntoSubcategory(resp){
   }
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
-
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
@@ -688,6 +693,65 @@ getPrettifiedTestRunResults(testRunResults){
     prettifiedResults.push(prettifiedObj)
   })
   return prettifiedResults
+},
+getInfoSectionsHeaders(jiraIssueUrl){
+  const jiraComponent = jiraIssueUrl.length > 0 ? (
+    <Box>
+
+            <Tag>
+                <HorizontalStack gap={1}>
+                  <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" /> 
+                  <Link url={jiraIssueUrl}>
+                    <Text>
+                      {jiraIssueUrl}
+                    </Text>
+                  </Link>
+                </HorizontalStack>
+              </Tag>
+
+
+
+        </Box>
+  ) : <Text>Jira Issue Not Created. Click on the "Create Jira Ticket" button at the top right section to create a new ticket</Text>
+  let moreInfoSections = [
+    {
+      icon: FlagMajor,
+      title: "Impact",
+      content: ""
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Tags",
+      content: ""
+    },
+    {
+      icon: CreditCardSecureMajor,
+      title: "CWE",
+      content: ""
+    },
+    {
+      icon: FraudProtectMajor,
+      title: "CVE",
+      content: ""
+    },
+    {
+      icon: MarketingMajor,
+      title: "API endpoints affected",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "References",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "Jira",
+      content: jiraComponent
+        
+    },
+  ]
+  return moreInfoSections
 }
 }
 
