@@ -120,6 +120,7 @@ public class ProfileAction extends UserAction {
                 String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
                 userDetails.append("stiggCustomerId", organizationId);
                 userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + organizationId + ":" + stiggSignature);
+                userDetails.append("stiggClientKey", StiggReporterClient.instance.getStiggConfig().getClientKey());
             }
         }
 

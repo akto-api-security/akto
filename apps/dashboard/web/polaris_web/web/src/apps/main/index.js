@@ -9,9 +9,8 @@ const container = document.getElementById("root");
 const root = createRoot(container);
 import { StiggProvider } from '@stigg/react-sdk';
 
-
 root.render(
-    <StiggProvider apiKey="client-6a4ba680-5ad9-4697-9e5a-4d8f242aaf5f:0cf27534-96ba-4c60-8239-a264f71bfe26">
+    <StiggProvider apiKey={window.STIGG_CLIENT_KEY}>
       <AppProvider i18n={en}>
         <App />
       </AppProvider>
