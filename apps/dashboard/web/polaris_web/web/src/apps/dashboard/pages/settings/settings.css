@@ -11,3 +11,7 @@
 .Polaris-LegacyCard__Header > .Polaris-LegacyStack--alignmentBaseline {
     align-items: center;
 }
+
+.Polaris-Label__Text{
+    color: #1f2124 !important;
+}

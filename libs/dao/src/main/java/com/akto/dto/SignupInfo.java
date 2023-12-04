@@ -435,4 +435,36 @@ public abstract class SignupInfo {
             this.username = username;
         }
     }
+
+    public static class OktaSignupInfo extends SignupInfo {
+        private String accessToken;
+        private String username;
+
+        public OktaSignupInfo() {
+
+        }
+
+        public OktaSignupInfo(String accessToken, String username) {
+            this.accessToken = accessToken;
+            this.username = username;
+            this.configType = Config.ConfigType.OKTA;
+            this.key = this.configType.name();
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+        
+        public String getAccessToken() {
+            return accessToken;
+        }
+
+        public void setAccessToken(String accessToken) {
+            this.accessToken = accessToken;
+        }
+    }
 }
