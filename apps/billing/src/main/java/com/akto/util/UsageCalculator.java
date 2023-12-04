@@ -75,6 +75,9 @@ public class UsageCalculator {
                     case SLACK:
                         //syncBillingEodWithSlack(lastUsageItem);
                         break;
+                    case MIXPANEL:
+
+                        break;
                     default:
                         throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
                 }
