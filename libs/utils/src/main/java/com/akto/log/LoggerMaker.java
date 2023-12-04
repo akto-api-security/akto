@@ -36,13 +36,17 @@ public class LoggerMaker  {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                Config config = ConfigsDao.instance.findOne("_id", Config.SlackAlertConfig.CONFIG_ID);
-                if (config == null) {
-                    return;
-                }
+                try {
+                    Config config = ConfigsDao.instance.findOne("_id", Config.SlackAlertConfig.CONFIG_ID);
+                    if (config == null) {
+                        return;
+                    }
 
-                Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
-                slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
+                    Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
+                    slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
+                } catch (Exception e) {
+                    System.out.println("error in getting config: " + e.getMessage());
+                }
             }
         }, 0, 1, TimeUnit.MINUTES);
     }
