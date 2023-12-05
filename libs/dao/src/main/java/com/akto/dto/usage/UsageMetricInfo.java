@@ -24,7 +24,7 @@ public class UsageMetricInfo {
         this.syncEpoch = -1;
         // Initialize to start date of customers current billing cycle after billing is configured
         // For now initialize to 10 days ago to collect initial usage
-        this.measureEpoch = Context.now() - 864000; 
+        this.measureEpoch = Context.now() - 864000*2;
     }
 
     public String getOrganizationId() {

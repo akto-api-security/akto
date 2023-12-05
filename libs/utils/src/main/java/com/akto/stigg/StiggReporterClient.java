@@ -124,6 +124,8 @@ public class StiggReporterClient {
 
         BasicDBObject obj = BasicDBObject.parse(executeGraphQL(queryQ, inputVariables));
 
+        loggerMaker.infoAndAddToDb("Entitlements for customerId: " + customerId + " " + obj.toJson(), LoggerMaker.LogDb.BILLING);
+
         BasicDBObject data = (BasicDBObject) obj.getOrDefault("data", new BasicDBObject());
         return (BasicDBList) data.getOrDefault("entitlements", new BasicDBList());
     }
@@ -145,7 +147,11 @@ public class StiggReporterClient {
 
         String mutationQ = "mutation CreateUsageMeasurement($input: UsageMeasurementCreateInput!) {  createUsageMeasurement(usageMeasurement: $input) {    id}}";
 
-        return executeGraphQL(mutationQ, inputVariables);
+        String ret = executeGraphQL(mutationQ, inputVariables);
+
+        loggerMaker.infoAndAddToDb("Reporting usage for customerId: " + customerId + " featureId: " + featureId + " value: " + value + " " + ret, LoggerMaker.LogDb.BILLING);
+
+        return ret;
 
     }
 
@@ -171,7 +177,12 @@ public class StiggReporterClient {
             )
         ).toString();
 
-        return executeGraphQL(mutationQ, inputVariables);
+        String ret = executeGraphQL(mutationQ, inputVariables);
+
+        loggerMaker.infoAndAddToDb("Provisioning subscription customerId: " + customerId + " planId: " + planId + " " + ret, LoggerMaker.LogDb.BILLING);
+
+
+        return ret;
     }
 
     public String provisionCustomer(Organization organization) {
@@ -190,7 +201,9 @@ public class StiggReporterClient {
             .append("subscriptionParams", new BasicDBObject("planId", stiggConfig.getFreePlanId()))
         ).toString();
 
-        executeGraphQL(mutationQ, inputVariables);
+        String out = executeGraphQL(mutationQ, inputVariables);
+
+        loggerMaker.infoAndAddToDb("Provisioning customer organization: " + organization.getId() + " " + out, LoggerMaker.LogDb.BILLING);
 
         return provisionSubscription(organization.getId(), stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
     }
