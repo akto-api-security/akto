@@ -21,6 +21,9 @@ import java.util.*;
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
 
+    // Load only first 1 MiB of response body into memory.
+    private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    
     private static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         Integer accountId = Context.accountId.get();
@@ -57,7 +60,7 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
-            ResponseBody responseBody = response.body();
+            ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
             if (responseBody == null) {
                 throw new Exception("Couldn't read response body");
             }

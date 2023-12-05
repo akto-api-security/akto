@@ -42,7 +42,10 @@ import java.util.regex.Pattern;
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class APICatalogSync {
-    
+
+    public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
+    public static final int LLM_API_COLLECTION_ID = 1222222222;
+
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
@@ -676,6 +679,8 @@ public class APICatalogSync {
 
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
+        if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
+        
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic);
 
         String deletedStaticUrlsString = "";
@@ -706,7 +711,6 @@ public class APICatalogSync {
                 loggerMaker.debugInfoAddToDb( tempUrl, LogDb.RUNTIME);
             }
         }
-
 
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
@@ -1012,7 +1016,10 @@ public class APICatalogSync {
                     e.printStackTrace();
                 }
             }
-            Bson bson = Updates.pushEach("samples", finalSamples, new PushOptions().slice(-10));
+            Bson bson = Updates.combine(
+                Updates.pushEach("samples", finalSamples, new PushOptions().slice(-10)),
+                Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(sample.getId().getApiCollectionId()))
+            );
 
             bulkUpdates.add(
                 new UpdateOneModel<>(Filters.eq("_id", sample.getId()), bson, new UpdateOptions().upsert(true))
@@ -1043,6 +1050,7 @@ public class APICatalogSync {
             for (Map.Entry<String, Integer> entry: trafficInfo.mapHoursToCount.entrySet()) {
                 updates.add(Updates.inc("mapHoursToCount."+entry.getKey(), entry.getValue())); 
             }
+            updates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(trafficInfo.getId().getApiCollectionId())));
 
             bulkUpdates.add(
                 new UpdateOneModel<>(Filters.eq("_id", trafficInfo.getId()), Updates.combine(updates), new UpdateOptions().upsert(true))
@@ -1133,7 +1141,10 @@ public class APICatalogSync {
 
 
             if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
-                Bson bson = Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap));
+                Bson bson = Updates.combine(
+                    Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap)),
+                    Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()))
+                );
                 bulkUpdatesForSampleData.add(
                         new UpdateOneModel<>(
                                 SensitiveSampleDataDao.getFilters(deltaInfo),
@@ -1144,6 +1155,8 @@ public class APICatalogSync {
             }
 
             Bson updateKey = SingleTypeInfoDao.createFilters(deltaInfo);
+            update = Updates.combine(update,
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId())));
 
             bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
         }

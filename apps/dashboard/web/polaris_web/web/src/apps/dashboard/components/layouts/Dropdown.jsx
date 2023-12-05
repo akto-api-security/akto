@@ -15,7 +15,10 @@ function Dropdown(props) {
     const updateSelection = useCallback(selected => {
         const selectedValue = selected.map((selectedItem) => {
             const matchedOption = options.find((option) => {
-                return option.value.match(selectedItem);
+                if (typeof option.value === "string")
+                    return option.value.match(selectedItem);
+                else 
+                    return option.value === selectedItem
             });
             return matchedOption && matchedOption.label;
         });
