@@ -129,6 +129,7 @@ public class LoggerMaker  {
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                    break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
             }
@@ -157,6 +158,7 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
         }
