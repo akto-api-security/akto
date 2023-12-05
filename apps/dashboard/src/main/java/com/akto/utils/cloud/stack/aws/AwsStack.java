@@ -69,7 +69,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             loggerMaker.infoAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
             return createStackResult.getStackId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Create stack failed: " + e.toString(), LogDb.DASHBOARD);
             throw e;
         }
     }

@@ -199,7 +199,7 @@ public class InitializerListener implements ServletContextListener {
                                 trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds);
                             }
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb("Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
+                            loggerMaker.errorAndAddToDb("Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD, true);
                         }
                     }
                 }, "traffic-alerts-scheduler");
@@ -1567,7 +1567,7 @@ public class InitializerListener implements ServletContextListener {
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(
                                         String.format("Error while updating Test Editor Files %s", e.toString()),
-                                        LogDb.DASHBOARD);
+                                        LogDb.DASHBOARD, true);
                             }
                         }
                     }, "update-test-editor-templates-github");
@@ -1649,7 +1649,7 @@ public class InitializerListener implements ServletContextListener {
             } catch (Exception ex) {
                 loggerMaker.errorAndAddToDb(
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
-                        LogDb.DASHBOARD);
+                        LogDb.DASHBOARD, true);
             }
         }
     }

@@ -67,14 +67,14 @@ public class UsageMetricUtils {
                         Updates.set(UsageMetricInfo.SYNC_EPOCH, Context.now())
                 );
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Failed to sync usage metric with Akto. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Failed to sync usage metric with Akto. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD, true);
             } finally {
                 if (response != null) {
                     response.close(); // Manually close the response body
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to execute usage metric. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Failed to execute usage metric. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD, true);
         }
     }
 
@@ -116,7 +116,7 @@ public class UsageMetricUtils {
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, eventName, props);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD, true);
         }
     }
 
