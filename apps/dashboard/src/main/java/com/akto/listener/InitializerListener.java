@@ -1747,6 +1747,7 @@ public class InitializerListener implements ServletContextListener {
                     );
 
                     if (organization == null) {
+                        loggerMaker.errorAndAddToDb("Organization not found for account: " + accountId, LogDb.DASHBOARD);
                         return;
                     }
 
