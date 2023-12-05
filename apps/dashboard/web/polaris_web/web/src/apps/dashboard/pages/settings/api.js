@@ -252,6 +252,30 @@ const settingRequests = {
         })
     },
 
+    fetchAzureSso() {
+        return request({
+            url: '/api/fetchAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+        return request({
+            url: '/api/addAzureSso',
+            method: 'post',
+            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+        })
+    },
+
+    deleteAzureSso() {
+        return request({
+            url: '/api/deleteAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
     toggleRedactFeature(redactPayload) {
         return request({
             url: '/api/toggleRedactFeature',

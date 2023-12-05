@@ -254,6 +254,24 @@
             </result>
         </action>
 
+        <action name="signup-azure-request" class="com.akto.action.SignupAction" method="sendRequestToAzure">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="signup-azure-saml" class="com.akto.action.SignupAction" method="registerViaAzure">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
         <action name="api/deleteGithubSso" class="com.akto.action.user.GithubSsoAction" method="deleteGithubSso">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -375,6 +393,39 @@
         </action>
 
          <action name="api/fetchOktaSso" class="com.akto.action.user.OktaSsoAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addAzureSso" class="com.akto.action.user.AzureSsoAction" method="addAzureSsoInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteAzureSso" class="com.akto.action.user.AzureSsoAction" method="deleteAzureSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+         <action name="api/fetchAzureSso" class="com.akto.action.user.AzureSsoAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json"/>

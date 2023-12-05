@@ -68,6 +68,16 @@
 
               <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
             </div>
+            <div v-if="azureRequestUrl">
+              <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px" @click="loginViaAzure">
+                <div>
+                  <img src="/public/azure_logo.svg" alt="Okta" class="logo" />
+                  <span class="text">Sign in with Azure SSO</span>
+                </div>
+              </v-btn>
+
+              <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
+            </div>
               <div class="ma-4">
                 <login-fields @fieldsChanged="fieldsChanged" @enterPressed="login" :isSignUp="false" />
               </div>
@@ -110,6 +120,7 @@ export default {
       isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
       githubClientId: window.GITHUB_CLIENT_ID,
       oktaAuthorisationUrl: window.OKTA_AUTH_URL,
+      azureRequestUrl: window.AZURE_REQUEST_URL,
     }
   },
   methods: {
@@ -133,6 +144,9 @@ export default {
     },
     loginViaOkta(){
       window.location.href = this.oktaAuthorisationUrl
+    },
+    loginViaAzure(){
+      window.location.href = this.azureRequestUrl
     }
   },
   async mounted() {

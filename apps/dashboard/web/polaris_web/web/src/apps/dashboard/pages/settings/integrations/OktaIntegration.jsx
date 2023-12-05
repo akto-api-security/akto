@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Box, Button, Form, FormLayout, HorizontalStack, LegacyCard, Modal, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Text, TextField } from '@shopify/polaris';
 import func from "@/util/func"
 import settingRequests from '../api';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import StepsComponent from './components/StepsComponent';
+import Details from './components/Details';
+import DeleteModal from './components/DeleteModal';
 
 function OktaIntegration() {
 
@@ -86,27 +89,6 @@ function OktaIntegration() {
         </LegacyCard.Section>
     )
 
-    const stepsComponent = (
-        <LegacyCard.Section title="Follow steps">
-            <VerticalStack gap={3}>
-                {integrationSteps.map((x,index)=> {
-                    return(
-                        <VerticalStack gap={2} key={index}>
-                            <HorizontalStack gap={1}>
-                                <Text fontWeight="semibold" variant="bodyLg">{index + 1}.</Text>
-                                <Text variant="bodyLg">{x.text}</Text>
-                            </HorizontalStack>
-                            {x?.component}
-                        </VerticalStack>
-                    )
-                })}
-                <HorizontalStack align="end">
-                    <Button primary size="medium" onClick={() => setComponentType(1)}>Next</Button>
-                </HorizontalStack>
-            </VerticalStack>
-        </LegacyCard.Section>
-    )
-
     const fetchData = async() => {
         setLoading(true)
         await settingRequests.fetchOktaSso().then((resp) => {
@@ -126,51 +108,20 @@ function OktaIntegration() {
         setShowDeleteModal(false)
         setComponentType(0)
     }
-
-    const modalComponent = (
-        <Modal
-            open={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            title="Are you sure?"
-            primaryAction={{
-                content: 'Delete Okta SSO',
-                onAction: handleDelete
-            }}
-        >
-            <Modal.Section>
-                <Text variant="bodyMd">Are you sure you want to remove Okta SSO Integration? This might take away access from existing Akto users. This action cannot be undone.</Text>
-            </Modal.Section>
-        </Modal>
-    )
-
-    function LineComponent({title,value}){
-        return(
-            <HorizontalStack gap={5}>
-                <Box width='180px'>
-                    <HorizontalStack align="end">
-                        <Text variant="headingSm">{title}: </Text>
-                    </HorizontalStack>
-                </Box>
-                <Text variant="bodyLg">{value}</Text>
-            </HorizontalStack>
-        )
-    }
-
-    const valueComponent = (
-        <LegacyCard.Section title="Integration details">
-            <br/>
-            <VerticalStack gap={3}>
-                <VerticalStack gap={2}>
-                    <LineComponent title={"Client Id"} value={clientId}/>
-                    <LineComponent title={"Authorisation server Id"} value={authorizationServerId} />
-                    <LineComponent title={"Domain name"} value={oktaDomain} />
-                </VerticalStack>
-                <HorizontalStack align="end">
-                    <Button primary onClick={()=> setShowDeleteModal(true)} >Delete SSO</Button>
-                </HorizontalStack>
-            </VerticalStack>
-        </LegacyCard.Section>
-    )
+    const listValues = [
+        {
+            title: "Client Id",
+            value: clientId
+        },
+        {
+            title: "Authorisation server Id",
+            value: authorizationServerId
+        },
+        {
+            title: "Domain name",
+            value: oktaDomain
+        }
+    ]
 
     useEffect(()=> {
         fetchData()
@@ -180,14 +131,15 @@ function OktaIntegration() {
     const oktaSSOComponent = (
         loading ? <SpinnerCentered /> :
         <LegacyCard title="Okta SSO">
-            {componentType === 0 ? stepsComponent : componentType === 1 ? formComponent : valueComponent }
+            {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} /> 
+            : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
         </LegacyCard>
     )
 
     return (
         <>
-        <IntegrationsLayout title="Okta SSO" cardContent={cardContent} component={oktaSSOComponent} />
-        {modalComponent}
+            <IntegrationsLayout title="Okta SSO" cardContent={cardContent} component={oktaSSOComponent} />
+            <DeleteModal showDeleteModal={showDeleteModal} setShowDeleteModal={setShowDeleteModal} SsoType={"Okta"} onAction={handleDelete} />
         </>
     )
 }
