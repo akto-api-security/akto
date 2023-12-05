@@ -31,6 +31,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
+import com.akto.util.DbMode;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -237,6 +238,7 @@ public class DaoInit {
     }
 
     public static void init(ConnectionString connectionString) {
+        DbMode.refreshDbType(connectionString.getConnectionString());
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
