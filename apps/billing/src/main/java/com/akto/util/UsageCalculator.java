@@ -112,7 +112,7 @@ public class UsageCalculator {
             usageMetric.setUsage(usage);
             UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
+            loggerMaker.errorAndAddToDb("can't sync to mixpanel", LoggerMaker.LogDb.BILLING, true);
         }
     }
 

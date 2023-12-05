@@ -131,10 +131,10 @@ public class GithubSync {
                 response.getEntity().writeTo(outputStream);
                 repoZip = outputStream.toByteArray();
             } else {
-                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD, true);
             }
         } catch (Exception ex) {
-            loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD, true);
         } 
         finally {
             httpGet.releaseConnection();

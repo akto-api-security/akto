@@ -160,17 +160,17 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("ERROR in converting testingRunHexId to objectId: " + e.toString(), LogDb.DASHBOARD);
             }
         }
         if(localTestingRun==null){
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
-                if (triggeredBy.length() > 0) {
+                if (triggeredBy!=null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Unable to create test run - " + e.toString(), LogDb.DASHBOARD);
             }
 
             if (localTestingRun == null) {
@@ -236,7 +236,7 @@ public class StartTestAction extends UserAction {
                     }
                 }
                 if (testSubCategories.isEmpty()) {
-                    loggerMaker.errorAndAddToDb("Test not found for " + selectedTest, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("ERROR: Test not found for " + selectedTest, LoggerMaker.LogDb.DASHBOARD);
                 } else {
                     loggerMaker.infoAndAddToDb(String.format("Category: %s, tests: %s", selectedTest, testSubCategories), LoggerMaker.LogDb.DASHBOARD);
                     tests.addAll(testSubCategories);
@@ -246,7 +246,7 @@ public class StartTestAction extends UserAction {
                 this.selectedTests = tests;
                 loggerMaker.infoAndAddToDb("Tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             } else {
-                loggerMaker.errorAndAddToDb("No tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("ERROR: No tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             }
         }
     }
@@ -545,7 +545,7 @@ public class StartTestAction extends UserAction {
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 return SUCCESS.toUpperCase();
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("ERROR: Stop test failed - " + e.toString(), LogDb.DASHBOARD);
             }
         }
 

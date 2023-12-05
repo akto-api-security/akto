@@ -37,7 +37,7 @@ public class UserInfoAction extends UserAction {
             UsersDao.instance.updateOne(Filters.eq("_id", user.getId()),
                     Updates.set(User.AKTO_UI_MODE, mode.name()));
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Unable to update akto UI mode: " + e.toString(), LoggerMaker.LogDb.DASHBOARD);
         }
         return Action.SUCCESS.toUpperCase();
     }

@@ -4,7 +4,6 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
-import com.akto.notifications.slack.DailyUpdate;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -12,8 +11,9 @@ import com.mongodb.client.model.Projections;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +32,11 @@ public class LoggerMaker  {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+    private static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+
+    private static final int CACHE_LIMIT = 50;
+    private static HashMap<String, Integer> errorLogCache = new HashMap<>();
+
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -45,10 +50,31 @@ public class LoggerMaker  {
                     Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
                     slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
                 } catch (Exception e) {
-                    System.out.println("error in getting config: " + e.getMessage());
+                    internalLogger.error("error in getting config: " + e.toString());
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    clearErrorCache();
+                } catch (Exception e) {
+                    internalLogger.error("ERROR: In clearing log cache: " + e.toString());
+                }
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    public static void clearErrorCache(){
+
+        for(Map.Entry<String, Integer> err : errorLogCache.entrySet()){
+            String errorMessage = err.getKey() + " : logged " + err.getValue() + " times";
+            sendToSlack(errorMessage);
+        }
+
+        errorLogCache.clear();
     }
 
     private static int logCount = 0;
@@ -64,7 +90,7 @@ public class LoggerMaker  {
         logger = LoggerFactory.getLogger(c);
     }
 
-    private void sendToSlack(String err) {
+    private static void sendToSlack(String err) {
         if (slackWebhookUrl != null) {
             try {
                 Slack slack = Slack.getInstance();
@@ -76,12 +102,16 @@ public class LoggerMaker  {
                 slack.send(slackWebhookUrl, ret.toJson());
 
             } catch (IOException e) {
-                logger.error("Can't send to Slack: " + e.getMessage(), e);
+                internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
+        errorAndAddToDb(err, db, false);
+    }
+
+    public void errorAndAddToDb(String err, LogDb db, boolean cache) {
         logger.error(err);
         try{
             insert(err, "error", db);
@@ -90,7 +120,27 @@ public class LoggerMaker  {
         }
 
         if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
-            sendToSlack(err);
+            if (cache) {
+                try {
+                    if (errorLogCache.containsKey(err)) {
+                        errorLogCache.put(err, errorLogCache.get(err) + 1);
+                    } else {
+                        errorLogCache.put(err, 1);
+                    }
+                } catch (Exception e) {
+                    internalLogger.error("ERROR: In adding to log cache: " + e.toString());
+                }
+            } else {
+                sendToSlack(err);
+            }
+        }
+
+        if (errorLogCache.size() > CACHE_LIMIT) {
+            try {
+                clearErrorCache();
+            } catch (Exception e) {
+                internalLogger.error("ERROR: In clearing log cache: " + e.toString());
+            }
         }
     }
 

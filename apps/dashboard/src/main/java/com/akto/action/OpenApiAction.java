@@ -58,7 +58,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
 
