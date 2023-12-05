@@ -20,6 +20,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
+import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.billing.OrganizationUtils;
 import com.google.gson.Gson;
@@ -28,7 +29,7 @@ import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
-
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricCalculator.class);
     public static Bson excludeDemos(String key) {
         ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
 
@@ -117,6 +118,9 @@ public class UsageMetricCalculator {
         int usage = 0;
 
         usageMetric.setRecordedAt(Context.now());
+        int now = Context.now();
+        loggerMaker.infoAndAddToDb("calculating as of measure-epoch: " + usageMetric.getMeasureEpoch() + " " + (now-usageMetric.getMeasureEpoch())/60 + " minutes ago", LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("calculate "+metricType+" for account: "+ Context.accountId.get() +" org: " + usageMetric.getOrganizationId(), LoggerMaker.LogDb.DASHBOARD);
 
         if (metricType != null) {
             switch (metricType) {
@@ -137,6 +141,8 @@ public class UsageMetricCalculator {
                     break;
             }
         }
+
+        loggerMaker.infoAndAddToDb("measured "+metricType+": " + usage +" for account: "+ Context.accountId.get() +" epoch: " + usageMetric.getMeasureEpoch(), LoggerMaker.LogDb.DASHBOARD);
 
         usageMetric.setUsage(usage);
     }      
