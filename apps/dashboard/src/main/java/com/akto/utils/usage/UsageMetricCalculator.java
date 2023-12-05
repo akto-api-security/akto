@@ -3,6 +3,7 @@ package com.akto.utils.usage;
 import java.util.ArrayList;
 import java.util.Set;
 
+import com.akto.action.observe.Utils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.UsersDao;
@@ -43,9 +44,11 @@ public class UsageMetricCalculator {
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
 
-        int activeEndpoints = (int) ApiInfoDao.instance.count(
-            Filters.and(Filters.gt(ApiInfo.LAST_SEEN, measureEpoch), excludeDemos(ApiInfo.ID_API_COLLECTION_ID))
-        );
+        int activeEndpoints = Utils.countEndpoints(
+                Filters.and(Filters.or(
+                        Filters.gt(Utils._START_TS, measureEpoch),
+                        Filters.gt(Utils._LAST_SEEN_TS, measureEpoch)),
+                excludeDemos(ApiInfo.ID_API_COLLECTION_ID)));
         
         return activeEndpoints;
     }
