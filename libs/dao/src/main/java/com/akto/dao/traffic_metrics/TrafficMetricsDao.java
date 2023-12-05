@@ -53,26 +53,16 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(30_000).sizeInBytes(100_000_000));
         }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
 
-
-        if (counter == 1) {
-            String[] fieldNames = {
-                    ID+ TrafficMetrics.Key.NAME,
-                    ID+ TrafficMetrics.Key.BUCKET_START_EPOCH,
-                    ID+ TrafficMetrics.Key.BUCKET_END_EPOCH,
-                    ID+ TrafficMetrics.Key.IP,
-                    ID+ TrafficMetrics.Key.HOST,
-                    ID+ TrafficMetrics.Key.VXLAN_ID,
-            };
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-        }
+        String[] fieldNames = {
+                ID+ TrafficMetrics.Key.NAME,
+                ID+ TrafficMetrics.Key.BUCKET_START_EPOCH,
+                ID+ TrafficMetrics.Key.BUCKET_END_EPOCH,
+                ID+ TrafficMetrics.Key.IP,
+                ID+ TrafficMetrics.Key.HOST,
+                ID+ TrafficMetrics.Key.VXLAN_ID,
+        };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
 
     }

@@ -40,4 +40,8 @@ public class DbMode {
 
     }
 
+    public static boolean allowCappedCollections() {
+        return dbType.equals(DbType.MONGO_DB);
+    }
+
 }

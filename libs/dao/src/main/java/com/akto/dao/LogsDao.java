@@ -30,16 +30,8 @@ public class LogsDao extends AccountsContextDao<Log> {
             db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100_000).sizeInBytes(100_000_000));
         }
         
-        MongoCursor<Document> cursor = db.getCollection(getCollName()).listIndexes().cursor();
-        List<Document> indices = new ArrayList<>();
-
-        while (cursor.hasNext()) {
-            indices.add(cursor.next());
-        }
-
-        if (indices.size() == 1) {
-            instance.getMCollection().createIndex(Indexes.descending(Log.TIMESTAMP));
-        }
+        String[] fieldNames = {Log.TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
     }
 
     @Override
