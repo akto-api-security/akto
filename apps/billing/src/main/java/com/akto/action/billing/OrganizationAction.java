@@ -6,7 +6,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.stigg.StiggReporterClient;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
 public class OrganizationAction {
 
@@ -30,6 +32,10 @@ public class OrganizationAction {
                 organization.setSyncedWithAkto(true);
                 StiggReporterClient.instance.provisionCustomer(organization);
                 OrganizationsDao.instance.insertOne(organization);
+            } else {
+                loggerMaker.infoAndAddToDb(String.format("Organization - (%s / %s) exists. Updating ...", organizationName, organizationId), LogDb.BILLING);
+                Bson updatesQ = Updates.set(Organization.ACCOUNTS, organization.getAccounts());
+                OrganizationsDao.instance.updateOne(Organization.ID, organization.getId(), updatesQ);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(String.format("Error while creating organization. Error: %s", e.getMessage()), LogDb.BILLING);
