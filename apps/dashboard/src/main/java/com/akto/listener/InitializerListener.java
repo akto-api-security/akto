@@ -1141,13 +1141,14 @@ public class InitializerListener implements ServletContextListener {
                 loggerMaker.infoAndAddToDb("Creating a new org for email id: " + user.getLogin() + " and acc: " + accountId, LogDb.DASHBOARD);
                 org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(), new HashSet<>());
                 OrganizationsDao.instance.insertOne(org);
-                OrganizationUtils.syncOrganizationWithAkto(org);
             } else {
                 loggerMaker.infoAndAddToDb("Found a new org for acc: " + accountId + " org="+org.getId(), LogDb.DASHBOARD);
             }
 
             Bson updates = Updates.addToSet(Organization.ACCOUNTS, accountId);
             OrganizationsDao.instance.updateOne(Organization.ID, org.getId(), updates);
+            org = OrganizationsDao.instance.findOne(Organization.ID, org.getId());
+            OrganizationUtils.syncOrganizationWithAkto(org);
 
             // if (DashboardMode.isSaasDeployment()) {
             //     try {
@@ -1325,6 +1326,7 @@ public class InitializerListener implements ServletContextListener {
                             calledOnce = true;
                         }
                         checkMongoConnection();
+/**
                         AccountTask.instance.executeTask(new Consumer<Account>() {
                             @Override
                             public void accept(Account account) {
@@ -1340,7 +1342,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
                         updateGlobalAktoVersion();
-
+**/
                         if (DashboardMode.isSaasDeployment()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
