@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -7,6 +7,10 @@ import api from '../api';
 import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
 import {produce} from "immer"
+import Automated from '../user_config/Automated';
+import HardCoded from '../user_config/HardCoded';
+import LoginStepBuilder from '../user_config/LoginStepBuilder';
+import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
 
 const selectOptions = [
     {
@@ -44,7 +48,10 @@ function TestRoleSettings() {
     const initialItems = isNew ? { name: "" } : location.state;
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [roleName, setRoleName] = useState("");
-    const [change, setChange] = useState(false)
+    const [change, setChange] = useState(false);
+    const [initial , setInitial] = useState(false);
+    const [initialInfo, setInitialInfo] = useState({steps: [], userConfig: {}});
+    const [currentInfo, setCurrentInfo] = useState({steps: [], userConfig: {}});
     const resetFunc = () => {
         setChange(false);
         setRoleName(initialItems.name ? initialItems.name : "");
@@ -67,6 +74,7 @@ function TestRoleSettings() {
     }
 
     const saveAction = async () => {
+        console.log("save action",currentInfo)
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
         if (!(andConditions || orConditions) || roleName.length == 0) {
@@ -150,7 +158,104 @@ function TestRoleSettings() {
         </LegacyCard>
     )
 
-    let components = [descriptionCard, conditionsCard]
+    const [hardcodedOpen, setHardcodedOpen] = useState(true);
+
+    const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
+
+    const handleLoginInfo = (obj) => {
+        if(!initial){
+            setInitialInfo(obj);
+            setInitial(true);
+            setCurrentInfo(obj);
+        }else{
+            setCurrentInfo(obj);
+            setChange(func.deepComparison(initialInfo, currentInfo))
+        }
+    }
+
+    const authCard = (
+            <LegacyCard title="Authentication details" key="auth">
+                <LegacyCard.Section title="Header details">
+                    <div>
+                        <Text variant="headingMd">Api header conditions</Text>
+                        <br />
+                        <FormLayout>
+                            <FormLayout.Group>
+                            <TextField
+                                id={"auth-header-key-field"}
+                                label={(
+                                    <HorizontalStack gap="2">
+                                        <Text>Header key</Text>
+                                        <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
+                                            <Icon source={InfoMinor} color="base" />
+                                        </Tooltip>
+                                    </HorizontalStack>
+                                )}
+                                // value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />   
+                                />
+                            <TextField 
+                                id={"auth-header-value-field"}
+                                label={(
+                                    <HorizontalStack gap="2">
+                                        <Text>Header value</Text>
+                                        <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
+                                            <Icon source={InfoMinor} color="base" />
+                                        </Tooltip>
+                                    </HorizontalStack>
+                                )}
+                                //value={userConfig.authHeaderValue} placeholder='' onChange={(authHeaderValue) => updateUserConfig("authHeaderValue", authHeaderValue)} />`
+                                />
+                            </FormLayout.Group>
+                        </FormLayout>
+                        <br />
+                    </div>
+                </LegacyCard.Section>
+                <LegacyCard.Section title="Token details">
+                    <LegacyStack vertical>
+                        <Button
+                            id={"hardcoded-token-expand-button"}
+                            onClick={handleToggleHardcodedOpen}
+                            ariaExpanded={hardcodedOpen}
+                            icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            ariaControls="hardcoded"
+                        >
+                            Hard coded
+                        </Button>
+                        <Collapsible
+                            open={hardcodedOpen}
+                            id="hardcoded"
+                            transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
+                            expandOnPrint
+                        >
+                            <HardCoded />
+                        </Collapsible>
+                    </LegacyStack>
+                
+                    <LegacyStack vertical>
+                        <Button
+                            id={"automated-token-expand-button"}
+                            onClick={handleToggleHardcodedOpen}
+                            ariaExpanded={!hardcodedOpen}
+                            icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            ariaControls="automated"
+                        >
+                            Automated
+                        </Button>
+                        <Collapsible
+                            open={!hardcodedOpen}
+                            id="automated"
+                            transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
+                            expandOnPrint
+                        >
+                            <LoginStepBuilder extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/> 
+                        </Collapsible>
+                    </LegacyStack>
+                </LegacyCard.Section>
+
+            </LegacyCard>
+    )
+
+    let components = [descriptionCard, conditionsCard, authCard]
 
     return (
         <DetailsPage
