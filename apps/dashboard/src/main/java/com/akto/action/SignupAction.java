@@ -5,6 +5,7 @@ import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
+import com.akto.utils.AzureLogin;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
@@ -24,6 +25,9 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.onelogin.saml2.Auth;
+import com.onelogin.saml2.settings.Saml2Settings;
+import com.onelogin.saml2.settings.SettingsBuilder;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -45,7 +49,10 @@ import org.json.JSONObject;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
@@ -480,6 +487,66 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
+    public String sendRequestToAzure () throws IOException{
+        if(AzureLogin.getInstance() == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = AzureLogin.getSamlSettings();
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+        try {
+            Auth auth = new Auth(settings, servletRequest, servletResponse);
+            auth.login( AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+        } catch (Exception e) {
+            servletResponse.sendRedirect("/login");
+            e.printStackTrace();
+        }
+
+        
+        return SUCCESS.toUpperCase();
+    }
+
+    public String registerViaAzure(){
+        if(AzureLogin.getInstance() == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = AzureLogin.getSamlSettings();
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+
+        Auth auth;
+        try {
+            auth = new Auth(settings, servletRequest, servletResponse);
+            auth.processResponse();
+            if (!auth.isAuthenticated()) {
+                servletResponse.sendRedirect("/login");
+            }
+            String useremail = null;
+            String username = null;
+            List<String> errors = auth.getErrors();
+            if (!errors.isEmpty()) {
+                return ERROR.toUpperCase();
+            } else {
+                Map<String, List<String>> attributes = auth.getAttributes();
+                if (attributes.isEmpty()) {
+                    return ERROR.toUpperCase();
+                }
+                String nameId = auth.getNameId();
+                useremail = nameId;
+                username = nameId;
+            }
+            shouldLogin = "true";
+            SignupInfo.AzureSignupInfo signUpInfo = new SignupInfo.AzureSignupInfo(username, useremail);
+            createUserAndRedirect(useremail, username, signUpInfo, 1000000);
+        } catch (Exception e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
     public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
     public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
     public static final String INVALID_CHAR = "Invalid character";

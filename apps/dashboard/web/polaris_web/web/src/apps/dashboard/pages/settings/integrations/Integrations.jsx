@@ -61,7 +61,7 @@ function Integrations() {
     }
     let azureAdSsoObj={
       id: 'azure_sso',
-      name: 'Azure AD SSO',
+      name: 'Azure AD SSO SAML',
       source: '/public/azure_logo.svg'
     }
     let oktaSsoObj={

@@ -1,53 +1,154 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
+import CopyCommand from '../../../components/shared/CopyCommand';
+import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Tag, Text } from '@shopify/polaris';
+import { CancelMajor } from "@shopify/polaris-icons"
+import FileUpload from '../../../components/shared/FileUpload';
+import settingFunctions from '../module';
+import settingRequests from '../api';
+import func from "@/util/func"
+import StepsComponent from './components/StepsComponent';
+import DeleteModal from './components/DeleteModal';
+import Details from './components/Details';
 
 function AzureSso() {
 
     const location = window.location ;
     const hostname = location.origin;
     const entityId = hostname ;
-    const AcsUrl = hostname + "/signup-azure-saml"
+    const AcsUrl = hostname + "/signup-azure-saml";
+    const signonUrl = hostname + "/signup-azure-request";
     
-    const [certificate, setCertificate] = useState('');
-    const [xmlFile, setXmlFile] = useState('');
     const [componentType, setComponentType] = useState(0) ;
     const [loading, setLoading] = useState(false)
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [loginUrl, setLoginUrl] = useState('')
+    const [azureIdentity, setAzureIdentity] = useState('')
+    const [files, setFiles] = useState(null)
 
     const cardContent = "Enable Login via Azure AD on your Akto dashboard";
 
     const integrationSteps = [
         {
-            text: "Go to your Okta admin console. Go inside 'Applications' tab and click on 'Create App Integration' button.",
+            text: "Go to your Azure AD home page. Go inside 'Enterprise Applications' click on 'Create your own Application' button.",
         },
         {
-            text: "In 'Sign-in Method', choose 'OIDC - OpenID Connect' and in 'Application type', choose 'Web Application'.",
+            text: "You will see a tab in right. Write Application name 'Akto-Sign-up' and click on 3rd button which has 'Non-gallery' option.",
         },
         {
-            text: "In 'App integration name' field, fill 'Akto'.",
+            text: "In getting started page, Assign users and groups accordingly.",
         },
         {
-            text: "In 'Sign-in redirect URIs' field, fill the below URL below",
-            component: <CopyCommand command={redirectUri} />
+            text: "Next click on 'Set up single sign on' and then click on 'SAML'.",
         },
         {
-            text: "In 'Assignments' choose the access you required and then click on 'Save'."
+            text: "In 'Entity ID', fill the below text",
+            component: <CopyCommand command={entityId} />
         },
         {
-            text: "Copy the 'CLIENT_ID' and 'CLIENT_SECRET'."
+            text: "In 'Assertion Consumer Service URL', fill the below text.",
+            component: <CopyCommand command={AcsUrl} />
+        },
+        {
+            text: "In 'Sign on URL', fill the below text and then click on save.",
+            component: <CopyCommand command={signonUrl} />
+        },
+        {
+            text: "Download the Federation Metadata XML file."
         }
     ]
 
-    const oktaSSOComponent = (
+    const stepsComponent = (
+        <StepsComponent integrationSteps={integrationSteps} onClickFunc={() => setComponentType(1)} />
+    )
+
+    const setFilesCheck = (file) => {
+        var reader = new FileReader()
+        reader.readAsText(file)
+        reader.onload = async () => {
+            setFiles({content: reader.result, name: file.name})
+        }
+    }
+
+    const handleSubmit = async() => {
+        const infoObj = settingFunctions.getParsedXml(files.content)
+        setLoading(true)
+        await settingRequests.addAzureSso(infoObj.loginUrl, infoObj.certificate, infoObj.entityId, entityId, AcsUrl);
+        setComponentType(2)
+        setLoading(false)
+    }
+
+    const fetchData = async () => {
+        setLoading(true)
+        await settingRequests.fetchAzureSso().then((resp)=> {
+            setLoginUrl(resp.loginUrl)
+            setAzureIdentity(resp.azureEntityId)
+        })
+        setComponentType(2)
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        fetchData()
+    },[])
+
+    const formComponent = (
+        <LegacyCard.Section>
+            <Form onSubmit={handleSubmit}>
+                <FormLayout>
+                <HorizontalStack gap="3">
+                    {files ? 
+                        <Tag>
+                            <HorizontalStack gap={1}>
+                                <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
+                                <Button onClick={() => setFiles(null)} plain icon={CancelMajor} />
+                            </HorizontalStack>
+                        </Tag>
+                    : <Text variant="bodyLg" fontWeight="medium" color="subdued">Drop your Federation Metadata XML file here.</Text>}
+                    <FileUpload fileType="file" acceptString=".xml" setSelectedFile={setFilesCheck} allowMultiple={false} />
+                </HorizontalStack>
+                    <HorizontalStack align="end">
+                        <Button submit primary size="medium">Submit</Button>
+                    </HorizontalStack>
+                </FormLayout>
+            </Form>
+        </LegacyCard.Section>
+    )
+
+    const handleDelete = async() => {
+        await settingRequests.deleteAzureSso()
+        func.setToast(true,false, "Azure SSO credentials deleted successfully.")
+        setShowDeleteModal(false)
+        setComponentType(0)
+    }
+
+    const listValues = [
+        {
+            title: 'Login Url',
+            value: loginUrl,
+        },
+        {
+            title: 'Sign on Url',
+            value: signonUrl,
+        },
+        {
+            title: 'Microsoft Entra Identifier',
+            value: azureIdentity,
+        }
+    ]
+
+    const azureSSOComponent = (
         loading ? <SpinnerCentered /> :
-        <LegacyCard title="Azure AD SSO">
-            {componentType === 0 ? stepsComponent : componentType === 1 ? formComponent : valueComponent }
+        <LegacyCard title="Azure AD SSO SAML">
+            {componentType === 0 ? stepsComponent : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
         </LegacyCard>
     )
     
     return (
         <>
-            <IntegrationsLayout title="GitHub SSO" cardContent={cardContent} component= docsUrl="" />
+            <IntegrationsLayout title="Azure AD SSO SAML" cardContent={cardContent} component={azureSSOComponent} docsUrl="" />
+            <DeleteModal setShowDeleteModal={setShowDeleteModal} showDeleteModal={showDeleteModal} SsoType={"Azure"} onAction={handleDelete} />
         </>
     )
 }
