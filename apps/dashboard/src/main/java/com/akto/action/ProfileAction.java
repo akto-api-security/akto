@@ -12,6 +12,7 @@ import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
@@ -33,6 +34,8 @@ import java.util.List;
 import static com.mongodb.client.model.Filters.in;
 
 public class ProfileAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ProfileAction.class);
 
     private int accountId;
 
@@ -110,9 +113,17 @@ public class ProfileAction extends UserAction {
                     Filters.in(Organization.ACCOUNTS, sessionAccId)
             ); 
             String organizationId = organization.getId();
+
+            boolean isOverage = false;
+            try {
+                isOverage = StiggReporterClient.instance.isOverage(organizationId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+            }
+
             userDetails.append("organizationId", organizationId);
             userDetails.append("organizationName", organization.getName());
-            userDetails.append("stiggIsOverage", StiggReporterClient.instance.isOverage(organizationId));
+            userDetails.append("stiggIsOverage", isOverage);
 
 
 
