@@ -32,6 +32,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.github.GithubFile;
@@ -1253,17 +1254,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        TrafficMetricsDao.instance.createIndicesIfAbsent();
-        TestRolesDao.instance.createIndicesIfAbsent();
-
-        ApiInfoDao.instance.createIndicesIfAbsent();
-        RuntimeLogsDao.instance.createIndicesIfAbsent();
-        LogsDao.instance.createIndicesIfAbsent();
-        DashboardLogsDao.instance.createIndicesIfAbsent();
-        LoadersDao.instance.createIndicesIfAbsent();
-        TestingRunResultDao.instance.createIndicesIfAbsent();
-        TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        DaoInit.createIndices();
         fillCollectionIdArray();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
