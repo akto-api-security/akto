@@ -175,15 +175,16 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         try {
                             // look back period 6 days
-                            loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
-                            TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
-                            trafficUpdates.populate();
-
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
                             if (listWebhooks == null || listWebhooks.isEmpty()) {
                                 loggerMaker.infoAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
                                 return;
                             }
+
+                            loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
+                            TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
+                            trafficUpdates.populate();
+
                             SlackWebhook webhook = listWebhooks.get(0);
                             loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(), LogDb.DASHBOARD);
 
@@ -1327,7 +1328,7 @@ public class InitializerListener implements ServletContextListener {
                             calledOnce = true;
                         }
                         checkMongoConnection();
-/**
+
                         AccountTask.instance.executeTask(new Consumer<Account>() {
                             @Override
                             public void accept(Account account) {
@@ -1343,7 +1344,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
                         updateGlobalAktoVersion();
-**/
+
                         if (DashboardMode.isSaasDeployment()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
