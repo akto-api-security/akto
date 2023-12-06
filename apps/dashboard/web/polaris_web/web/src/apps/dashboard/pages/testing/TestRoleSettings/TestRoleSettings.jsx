@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text, VerticalStack, Modal } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -7,10 +7,10 @@ import api from '../api';
 import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
 import {produce} from "immer"
-import Automated from '../user_config/Automated';
 import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
 import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
+import ParamsCard from './ParamsCard';
 
 const selectOptions = [
     {
@@ -49,9 +49,15 @@ function TestRoleSettings() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [roleName, setRoleName] = useState("");
     const [change, setChange] = useState(false);
-    const [initial , setInitial] = useState(false);
-    const [initialInfo, setInitialInfo] = useState({steps: [], userConfig: {}});
-    const [currentInfo, setCurrentInfo] = useState({steps: [], userConfig: {}});
+    const [currentInfo, setCurrentInfo] = useState({steps: [], authParams: {}});
+    const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authHeaderKey: '',authHeaderValue: ''})
+    const [showAuthComponent, setShowAuthComponent] = useState(false)
+    const [showAuthDeleteModal, setShowAuthDeleteModal] = useState(false)
+    const [deletedIndex, setDeletedIndex] = useState(-1);
+    const [headerKey, setHeaderKey] = useState('') ;
+    const [headerValue, setHeaderValue] = useState('');
+
+    const authWithCondList = isNew ? null : location.state.authWithCondList;
     const resetFunc = () => {
         setChange(false);
         setRoleName(initialItems.name ? initialItems.name : "");
@@ -73,8 +79,7 @@ function TestRoleSettings() {
         return !change
     }
 
-    const saveAction = async () => {
-        console.log("save action",currentInfo)
+    const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
         if (!(andConditions || orConditions) || roleName.length == 0) {
@@ -91,13 +96,16 @@ function TestRoleSettings() {
                 })
             } else {
                 api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
-                    func.setToast(true, false, "Test role updated")
                     setChange(false);
-                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } },
+                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists},
                         replace:true })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
                 })
+                
+                if(!updatedAuth){
+                    func.setToast(true, false, "Test role updated successfully.")
+                }
             }
         }
     }
@@ -109,6 +117,22 @@ function TestRoleSettings() {
         } else {
             setChange(true);
         }
+    }
+
+    const setHardCodedInfo = (obj) => {
+        setHardCodeAuthInfo(prev => ({
+            ...prev,
+            authHeaderKey: obj.authHeaderKey,
+            authHeaderValue: obj.authHeaderValue,
+        }))
+    }
+
+    const handleDeleteAuth = async() => {
+        const resp = await api.deleteAuthFromRole(initialItems.name,deletedIndex)
+        setShowAuthDeleteModal(false)
+        setDeletedIndex(-1);
+        await saveAction(true, resp.selectedRole.authWithCondList)
+        func.setToast(true, false, "Auth mechanism removed from role successfully.")
     }
 
     const descriptionCard = (
@@ -158,23 +182,87 @@ function TestRoleSettings() {
         </LegacyCard>
     )
 
+    const deleteModalComp = (
+        <Modal
+            open={showAuthDeleteModal}
+            onClose={() => {setShowAuthDeleteModal(false); setDeletedIndex(-1)}}
+            title="Are you sure?"
+            primaryAction={{
+                content: 'Delete auth mechanism',
+                onAction: handleDeleteAuth
+            }}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">Are you sure you want to this auth mechanism.</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    const savedParamComponent = (
+        authWithCondList ? 
+        <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
+            <br/>
+            <Divider />
+            <LegacyCard.Section>
+                <VerticalStack gap={6}>
+                    {authWithCondList.map((authObj,index)=> {
+                        return(
+                            <ParamsCard dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
+                        )
+                    })}
+                </VerticalStack>
+            </LegacyCard.Section>
+            {deleteModalComp}
+        </LegacyCard> 
+        : null
+    )
+
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
 
     const handleLoginInfo = (obj) => {
-        if(!initial){
-            setInitialInfo(obj);
-            setInitial(true);
-            setCurrentInfo(obj);
+        setCurrentInfo(prev => ({
+            ...prev,
+            steps: obj.steps,
+            authParams: obj.authParams
+        }))
+    
+    }
+
+    const addAuthButton = (
+        <HorizontalStack align="end" key="auth-button">
+            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}>Add auth</Button>}
+        </HorizontalStack>
+    )
+
+    const handleCancel = () => {
+        setShowAuthComponent(false)
+        setCurrentInfo({})
+        setHeaderKey('')
+        setHeaderValue('')
+        setHardCodeAuthInfo({})
+    }
+
+    const handleSaveAuthMechanism = async() => {
+        const apiCond = {[headerKey] : headerValue};
+        let resp = {}
+        if(hardcodedOpen){
+            const automationType = "HardCoded";
+            const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
+            resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
+            
         }else{
-            setCurrentInfo(obj);
-            setChange(func.deepComparison(initialInfo, currentInfo))
+            const automationType = "LOGIN_REQUEST";
+            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps)
         }
+        handleCancel()
+        await saveAction(true, resp.selectedRole.authWithCondList)
+        func.setToast(true, false, "Auth mechanism added to role successfully.")
     }
 
     const authCard = (
-            <LegacyCard title="Authentication details" key="auth">
+            <LegacyCard title="Authentication details" key="auth" secondaryFooterActions={[{content: 'Cancel' ,destructive: true, onAction: handleCancel}]} primaryFooterAction={{content: 'Save', onAction: handleSaveAuthMechanism}}>
                 <LegacyCard.Section title="Header details">
                     <div>
                         <Text variant="headingMd">Api header conditions</Text>
@@ -191,7 +279,8 @@ function TestRoleSettings() {
                                         </Tooltip>
                                     </HorizontalStack>
                                 )}
-                                // value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />   
+                                value={headerKey}
+                                onChange={setHeaderKey}
                                 />
                             <TextField 
                                 id={"auth-header-value-field"}
@@ -203,7 +292,8 @@ function TestRoleSettings() {
                                         </Tooltip>
                                     </HorizontalStack>
                                 )}
-                                //value={userConfig.authHeaderValue} placeholder='' onChange={(authHeaderValue) => updateUserConfig("authHeaderValue", authHeaderValue)} />`
+                                value={headerValue}
+                                onChange={setHeaderValue}
                                 />
                             </FormLayout.Group>
                         </FormLayout>
@@ -227,7 +317,7 @@ function TestRoleSettings() {
                             transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
                             expandOnPrint
                         >
-                            <HardCoded />
+                            <HardCoded showOnlyApi={true} extractInformation={true} setInformation={setHardCodedInfo}/>
                         </Collapsible>
                     </LegacyStack>
                 
@@ -255,7 +345,9 @@ function TestRoleSettings() {
             </LegacyCard>
     )
 
-    let components = [descriptionCard, conditionsCard, authCard]
+    const authComponent = showAuthComponent ? authCard : addAuthButton
+
+    let components = [descriptionCard, conditionsCard, authComponent, savedParamComponent]
 
     return (
         <DetailsPage
