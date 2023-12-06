@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -166,8 +167,7 @@ public class Main {
         boolean connectedToMongo = false;
         do {
             try {
-                AccountsDao.instance.getStats();
-                connectedToMongo = true;
+                connectedToMongo = MCollection.checkConnection();
             } catch (Exception ignored) {
             } finally {
                 try {

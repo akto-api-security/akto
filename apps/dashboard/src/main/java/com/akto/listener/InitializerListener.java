@@ -1122,8 +1122,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void checkMongoConnection() throws Exception {
-        AccountsDao.instance.getStats();
-        connectedToMongo = true;
+        connectedToMongo = MCollection.checkConnection();
     }
 
     public static void setSubdomain(){
@@ -1167,7 +1166,6 @@ public class InitializerListener implements ServletContextListener {
                         AccountTask.instance.executeTask(new Consumer<Account>() {
                             @Override
                             public void accept(Account account) {
-                                AccountSettingsDao.instance.getStats();
                                 runInitializerFunctions();
                             }
                         }, "context-initializer");
