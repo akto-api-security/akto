@@ -17,6 +17,7 @@ import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
@@ -47,9 +48,9 @@ public class UsageMetricCalculator {
 
         int activeEndpoints = Utils.countEndpoints(
                 Filters.and(Filters.or(
-                        Filters.gt(Utils._START_TS, measureEpoch),
-                        Filters.gt(Utils._LAST_SEEN_TS, measureEpoch)),
-                excludeDemos(ApiInfo.ID_API_COLLECTION_ID)));
+                        Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
+                        Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
+                excludeDemos(SingleTypeInfo._API_COLLECTION_ID)));
         
         return activeEndpoints;
     }

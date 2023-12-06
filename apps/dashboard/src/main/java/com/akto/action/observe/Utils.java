@@ -55,10 +55,8 @@ public class Utils {
                 Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method"));
 
         pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.group(groupedId,
-                Accumulators.max(_START_TS, "$timestamp"),
-                Accumulators.max(_LAST_SEEN_TS, "$lastSeen")));
         pipeline.add(Aggregates.match(filters));
+        pipeline.add(Aggregates.group(groupedId));
         pipeline.add(Aggregates.limit(LARGE_LIMIT));
         pipeline.add(Aggregates.count());
 
