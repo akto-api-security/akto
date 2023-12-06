@@ -5,7 +5,9 @@ import com.akto.dao.MCollection;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.util.DbMode;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -43,7 +45,9 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
 
     public void createIndicesIfAbsent() {
         boolean exists = false;
-        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+        String dbName = Context.accountId.get()+"";
+        MongoDatabase db = clients[0].getDatabase(dbName);
+        for (String col: db.listCollectionNames()){
             if (getCollName().equalsIgnoreCase(col)){
                 exists = true;
                 break;
@@ -51,7 +55,11 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
         };
 
         if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(30_000).sizeInBytes(100_000_000));
+            if (DbMode.allowCappedCollections()) {
+                clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(30_000).sizeInBytes(100_000_000));
+            } else {
+                db.createCollection(getCollName());
+            }
         }
 
         String[] fieldNames = {
