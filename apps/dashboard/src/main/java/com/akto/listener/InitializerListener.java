@@ -95,6 +95,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -1563,7 +1564,7 @@ public class InitializerListener implements ServletContextListener {
                             try {
                                 int accountId = t.getId();
                                 loggerMaker.infoAndAddToDb(
-                                        String.format("Updating akto test templates for account: %d", accountId),
+                                        String.format("Updating Akto test templates for account: %d", accountId),
                                         LogDb.DASHBOARD);
                                 processTemplateFilesZip(repoZip);
                             } catch (Exception e) {
@@ -1587,6 +1588,12 @@ public class InitializerListener implements ServletContextListener {
                     ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
 
                 ZipEntry entry;
+
+                Bson proj = Projections.include(YamlTemplate.HASH);
+                List<YamlTemplate> hashValueTemplates = YamlTemplateDao.instance.findAll(Filters.empty(), proj);
+
+                Map<String, List<YamlTemplate>> mapIdToHash = hashValueTemplates.stream().collect(Collectors.groupingBy(YamlTemplate::getId));
+
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
@@ -1608,6 +1615,20 @@ public class InitializerListener implements ServletContextListener {
 
                         try {
                             testConfig = TestConfigYamlParser.parseTemplate(templateContent);
+                            String testConfigId = testConfig.getId();
+
+                            List<YamlTemplate> existingTemplatesInDb = mapIdToHash.get(testConfigId);
+
+                            if (existingTemplatesInDb != null && existingTemplatesInDb.size() == 1) {
+                                int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
+                                if (existingTemplateHash == templateContent.hashCode()) {
+                                    loggerMaker.infoAndAddToDb("Skipping test yaml: " + testConfigId, LogDb.DASHBOARD);
+                                    continue;
+                                } else {
+                                    loggerMaker.infoAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
+                                }
+                            }
+
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(
                                     String.format("Error parsing yaml template file %s %s", entryName, e.toString()),
@@ -1625,6 +1646,7 @@ public class InitializerListener implements ServletContextListener {
                                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                            Updates.set(YamlTemplate.HASH, templateContent.hashCode()),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
                                             Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
                             
