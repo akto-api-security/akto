@@ -40,6 +40,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
@@ -126,7 +127,7 @@ public class TestExecutor {
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
         String testRoleId = testingRun.getTestingRunConfig().getTestRoleId();
-        if(testRoleId != null){
+        if(StringUtils.isNotBlank(testRoleId)){
             TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testRoleId)));
             if(testRole != null && testRole.getDefaultAuthMechanism() != null) {
                 loggerMaker.infoAndAddToDb("Default auth mechanism exists, using it", LogDb.TESTING);

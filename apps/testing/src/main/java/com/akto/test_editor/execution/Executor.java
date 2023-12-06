@@ -78,7 +78,7 @@ public class Executor {
             result.add(invalidExecutionResult);
             return result;
         }
-        if (testingRunConfig.getTestRoleId() != null) {
+        if (StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
             if (role != null && role.getDefaultAuthMechanism() != null) {
                 loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
