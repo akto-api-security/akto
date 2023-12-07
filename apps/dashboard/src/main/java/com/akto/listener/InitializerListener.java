@@ -1675,7 +1675,9 @@ public class InitializerListener implements ServletContextListener {
                     zipInputStream.closeEntry();
                 }
 
-                loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
+                if (countTotalTemplates != countUnchangedTemplates) {
+                    loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
+                }
             } catch (Exception ex) {
                 loggerMaker.errorAndAddToDb(
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
