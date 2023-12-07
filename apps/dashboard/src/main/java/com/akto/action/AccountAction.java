@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
+import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
@@ -31,6 +32,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -236,11 +238,20 @@ public class AccountAction extends UserAction {
                     Set<Integer> organizationAccountsSet = organization.getAccounts();
                     organizationAccountsSet.add(newAccountId);
 
+                    Bson updatesQ = Updates.combine(
+                        Updates.set(Organization.ACCOUNTS, organizationAccountsSet),
+                        Updates.set(Organization.SYNCED_WITH_AKTO, false)
+                    );
+
                     OrganizationsDao.instance.updateOne(
                         Filters.eq(Organization.ID, organization.getId()),
-                        Updates.set(Organization.ACCOUNTS, organizationAccountsSet)
+                        updatesQ
                     );
                     loggerMaker.infoAndAddToDb(String.format("Added account %d to organization %s", newAccountId, organization.getId()), LogDb.DASHBOARD);
+
+                    OrganizationUtils.syncOrganizationWithAkto(organization);
+                    loggerMaker.infoAndAddToDb(String.format("Synced with billing service successfully %d to organization %s", newAccountId, organization.getId()), LogDb.DASHBOARD);
+
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(String.format("Error while adding account %d to organization", newAccountId), LogDb.DASHBOARD);
