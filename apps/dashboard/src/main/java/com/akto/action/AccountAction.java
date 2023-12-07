@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -256,7 +257,7 @@ public class AccountAction extends UserAction {
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
                 InitializerListener.setBackwardCompatibilities(backwardCompatibility);
-                Main.createIndices();
+                DaoInit.createIndices();
                 Main.insertRuntimeFilters();
                 RuntimeListener.initialiseDemoCollections();
                 RuntimeListener.addSampleData();

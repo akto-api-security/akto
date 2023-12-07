@@ -45,9 +45,16 @@ export default function Header() {
 
     const handleLogOut = async () => {
         storeAccessToken(null)
-        resetAll();
-        await api.logout()
-        navigate("/login")
+        api.logout().then(res => {
+            if(res.logoutUrl){
+                window.location.href = res.logoutUrl
+            } else {
+                navigate("/login")
+            }
+            resetAll();
+        }).catch(err => {
+            navigate("/");
+        })
     }
 
     const handleSwitchUI = async () => {

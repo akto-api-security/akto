@@ -11,7 +11,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountsContextDao;
-import com.akto.dao.ApiInfoDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.util.enums.MongoDBEnums;
@@ -20,7 +20,6 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 
 public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
@@ -40,30 +39,19 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
 
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiInfoKey.apiCollectionId", TestingRunIssues.TEST_RUN_ISSUES_STATUS};
-            TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.CREATION_TIME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if(counter == 2){
-            String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS};
-            TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
-        if(counter == 3){
-            String[] fieldNames = {TestingRunIssues.LAST_SEEN};
-            TestingRunIssuesDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
-            counter++;
-        }
+        fieldNames = new String[]{"_id.apiInfoKey.apiCollectionId", TestingRunIssues.TEST_RUN_ISSUES_STATUS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[]{ TestingRunIssues.TEST_RUN_ISSUES_STATUS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[]{TestingRunIssues.LAST_SEEN};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){

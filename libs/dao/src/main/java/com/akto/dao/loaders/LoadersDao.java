@@ -4,6 +4,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
+import com.akto.util.DbMode;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
@@ -17,6 +18,9 @@ import java.util.List;
 public class LoadersDao extends AccountsContextDao<Loader> {
 
     public static final LoadersDao instance = new LoadersDao();
+
+    public static final int maxDocuments = 100;
+    public static final int sizeInBytes = 100_000;
 
     public void updateIncrementalCount(ObjectId id,int count) {
         instance.getMCollection().findOneAndUpdate(
@@ -72,7 +76,11 @@ public class LoadersDao extends AccountsContextDao<Loader> {
         };
 
         if (!exists) {
-            db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100).sizeInBytes(100_000));
+            if (DbMode.allowCappedCollections()) {
+                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
+            } else {
+                db.createCollection(getCollName());
+            }
         }
     }
 

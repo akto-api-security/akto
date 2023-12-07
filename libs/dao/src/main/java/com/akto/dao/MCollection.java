@@ -35,6 +35,16 @@ public abstract class MCollection<T> {
         return mongoDatabase.runCommand(new Document("serverStatus",1));
     }
 
+    public static boolean checkConnection() {
+        try {
+            clients[0].listDatabaseNames().first();
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public MongoCollection<T> getMCollection() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
         return mongoDatabase.getCollection(getCollName(), getClassT());
