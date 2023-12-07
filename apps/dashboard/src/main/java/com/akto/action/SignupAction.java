@@ -12,16 +12,12 @@ import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
-import com.auth0.client.auth.AuthAPI;
-import com.auth0.exception.Auth0Exception;
-import com.auth0.json.auth.TokenHolder;
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
 import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
-import com.auth0.net.TokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -189,12 +185,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return url;
     }
 
-    private Tokens getAuth0Tokens(String redirectUri) throws Auth0Exception {
-        AuthAPI api = new AuthAPI(Auth0.getDomain(), Auth0.getClientId(), Auth0.getClientSecret());
-        TokenHolder holder = api.exchangeCode(code, redirectUri).execute();
-        return new Tokens(holder.getAccessToken(), holder.getIdToken(), holder.getRefreshToken(), holder.getTokenType(), holder.getExpiresIn());
-    }
-
     public String registerViaAuth0() throws Exception {
         String error = servletRequest.getParameter(ERROR_STR);
         String errorDescription = servletRequest.getParameter(ERROR_DESCRIPTION);
@@ -213,7 +203,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             }
         }
-        Tokens tokens = getAuth0Tokens(Auth0.getRedirectUrl());
+        Tokens tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
         String accessToken = tokens.getAccessToken();
         String refreshToken = tokens.getRefreshToken();
         String idToken = tokens.getIdToken();
