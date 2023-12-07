@@ -79,18 +79,18 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
         if (servletRequest.getSession() != null) {
             servletRequest.getSession().invalidate();
         }
-        String returnUrl = Auth0.getRedirectUrl().substring(0, Auth0.getRedirectUrl().length() - 8);
-//        returnUrl = String.format("%s://%s", servletRequest.getScheme(), servletRequest.getServerName());
+        String returnUrl = "";
+        returnUrl = String.format("%s://%s", servletRequest.getScheme(), servletRequest.getServerName());
 
-//        if ((servletRequest.getScheme().equals("http") && servletRequest.getServerPort() != 80)
-//                || (servletRequest.getScheme().equals("https") && servletRequest.getServerPort() != 443)) {
-//            returnUrl += ":" + servletRequest.getServerPort();
-//        }
-//        if(redirectUrl != null) {
-//            returnUrl += redirectUrl;
-//        } else {
-//            returnUrl += "/";
-//        }
+        if ((servletRequest.getScheme().equals("http") && servletRequest.getServerPort() != 80)
+                || (servletRequest.getScheme().equals("https") && servletRequest.getServerPort() != 443)) {
+            returnUrl += ":" + servletRequest.getServerPort();
+        }
+        if(redirectUrl != null) {
+            returnUrl += redirectUrl;
+        } else {
+            returnUrl += "/";
+        }
 
         String encoded = URLEncoder.encode(returnUrl, "UTF-8")
                 .replaceAll("\\+", "%20")
@@ -105,8 +105,6 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
                 Auth0.getDomain(),
                 Auth0.getClientId(),
                 encoded);
-
-        System.out.println("logout url:" + logoutUrl);
 
         return SUCCESS.toUpperCase();
     }

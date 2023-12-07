@@ -81,7 +81,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             return "SUCCESS";
         }
 
-        String redirectUri = Auth0.getRedirectUrl();
+        String redirectUri = servletRequest.getScheme() + "://" + servletRequest.getServerName();
+        if ((servletRequest.getScheme().equals("http") && servletRequest.getServerPort() != 80) ||
+                (servletRequest.getScheme().equals("https") && servletRequest.getServerPort() != 443)) {
+            redirectUri += ":" + servletRequest.getServerPort();
+        }
+        redirectUri += "/callback";
 
         String authorizeUrlStr;
         try {
