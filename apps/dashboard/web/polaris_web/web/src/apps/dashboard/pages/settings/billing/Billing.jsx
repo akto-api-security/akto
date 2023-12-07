@@ -83,7 +83,7 @@ function Billing() {
     const planInfo = (
             <Box>
                   <Paywall
-                    productId="product-akto"
+                    productId="product-akto-saa-s"
                     onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
                         console.log(plan, customer, intentionType);
                         switch (intentionType) {
