@@ -6,6 +6,7 @@ import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
 import FutureConnection from "./components/shared/FutureConnection"
 import BannerComponent from "./components/shared/BannerComponent"
+import OpenApiSource from "./components/OpenApiSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -134,6 +135,15 @@ const postmanObj = {
     docsUrl: 'https://docs.akto.io/traffic-connections/postman',
     component: <PostmanSource/>,
     key: "POSTMAN"
+}
+
+const openApiObj = {
+    icon: '/public/openApi.svg',
+    label: 'OpenAPI',
+    text: 'Upload Open API/Swagger specification file to Akto to create an API inventory.',
+    docsUrl: '#',
+    component: <OpenApiSource/>,
+    key: "OPENAPI"
 }
 
 const tcpObj = {
@@ -677,7 +687,7 @@ const yaml_kubernetes = [
 const quickStartFunc = {
     getConnectorsList: function (){
         const connectorsList = [mirroringObj, gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-           beanStalkObj, eksObj, dockerObj, envoyObj, ebpfObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, ebpfObj,
            harFileUploadObj, kongObj, tcpObj
         ]
         return connectorsList
