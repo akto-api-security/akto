@@ -1337,7 +1337,7 @@ public class InitializerListener implements ServletContextListener {
                             }
                         }, "context-initializer");
                         setUpTrafficAlertScheduler();
-                        setUpAktoMixpanelEndpointsScheduler();
+//                        setUpAktoMixpanelEndpointsScheduler();
                         SingleTypeInfo.init();
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
