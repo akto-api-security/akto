@@ -55,11 +55,22 @@ const transform = {
     getFirstLine(original,current,originalParams,currentParams){
         let ogFirstLine = original
         let firstLine = current
+        let first = true;
         originalParams && Object.keys(originalParams).forEach((key) => {
-            ogFirstLine = ogFirstLine + '?' + key + '=' + encodeURI(originalParams[key])
+            if(first){
+                ogFirstLine = ogFirstLine + '?' + key + '=' + encodeURI(originalParams[key])
+            }else{
+                ogFirstLine = ogFirstLine + '&' + key + '=' + encodeURI(originalParams[key])
+            }
+            first = false;
         })
+        first = true;
         currentParams && Object.keys(currentParams).forEach((key) => {
-            firstLine = firstLine + '?' + key + '=' + encodeURI(currentParams[key])
+            if(first){  
+                firstLine = firstLine + '?' + key + '=' + encodeURI(currentParams[key])
+            } else {
+                firstLine = firstLine + '&' + key + '=' + encodeURI(currentParams[key])
+            }
         })
     
         return{
