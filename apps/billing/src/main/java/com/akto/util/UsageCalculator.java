@@ -65,24 +65,10 @@ public class UsageCalculator {
 
             OrganizationUsage lastUsageItem = pendingUsages.get(0);
             loggerMaker.infoAndAddToDb("Shortlisting: " + lastUsageItem, LoggerMaker.LogDb.BILLING);
-            int today = epochToDateInt(Context.now());
-            //if (lastUsageItem.getDate() == today) return;
 
-            for (OrganizationUsage.DataSink dataSink : OrganizationUsage.DataSink.values()) {
-                switch (dataSink) {
-                    case STIGG:
-                        syncBillingEodWithStigg(lastUsageItem);
-                        break;
-                    case SLACK:
-                        //syncBillingEodWithSlack(lastUsageItem);
-                        break;
-                    case MIXPANEL:
 
-                        break;
-                    default:
-                        throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
-                }
-            }
+            syncBillingEodWithStigg(lastUsageItem);
+
 
             Bson ignoreFilterQ = Filters.and(filterQ, Filters.ne(OrganizationUsage.CREATION_EPOCH, lastUsageItem.getCreationEpoch()));
             Bson ignoreUpdateQ = Updates.set(SINKS, new BasicDBObject("ignore", Context.now()));
@@ -213,6 +199,10 @@ public class UsageCalculator {
 
                     if (usageMetric != null) {
                         usage = usageMetric.getUsage();
+                    } else {
+                        String err = "Missing account id: " + account + " orgId: " + organizationId;
+                        loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
+                        throw new Exception(err);
                     }
 
                     int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
