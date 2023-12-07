@@ -72,6 +72,10 @@
                         window.IS_SAAS='true'
                     }
 
+                    if(!window.STIGG_CLIENT_KEY){
+                        window.STIGG_CLIENT_KEY='invalid-key'
+                    }
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 
