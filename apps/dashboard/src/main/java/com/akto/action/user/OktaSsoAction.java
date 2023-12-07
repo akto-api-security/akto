@@ -9,6 +9,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -23,6 +24,11 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
 
     public String addOktaSso() {
+
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
 
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
@@ -50,7 +56,11 @@ public class OktaSsoAction extends UserAction {
     }
 
     public String deleteOktaSso() {
-        
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
         boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
@@ -74,6 +84,11 @@ public class OktaSsoAction extends UserAction {
 
     @Override
     public String execute() throws Exception {
+
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
 
         Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
 

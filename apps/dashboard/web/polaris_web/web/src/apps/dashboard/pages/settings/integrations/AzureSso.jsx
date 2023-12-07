@@ -81,12 +81,20 @@ function AzureSso() {
 
     const fetchData = async () => {
         setLoading(true)
-        await settingRequests.fetchAzureSso().then((resp)=> {
-            setLoginUrl(resp.loginUrl)
-            setAzureIdentity(resp.azureEntityId)
-        })
-        setComponentType(2)
-        setLoading(false)
+        try {
+            await settingRequests.fetchAzureSso().then((resp)=> {
+                setLoginUrl(resp.loginUrl)
+                setAzureIdentity(resp.azureEntityId)
+                if(resp.loginUrl == null){
+                    setComponentType(0)
+                }else{
+                    setComponentType(2)
+                }
+            })
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)   
+        }
     }
 
     useEffect(() => {

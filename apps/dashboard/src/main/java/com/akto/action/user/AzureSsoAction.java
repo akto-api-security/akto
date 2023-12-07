@@ -11,6 +11,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.utils.DashboardMode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -25,6 +26,12 @@ public class AzureSsoAction extends UserAction{
     private String applicationIdentifier;
 
     public String addAzureSsoInfo(){
+
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
         boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
@@ -52,6 +59,11 @@ public class AzureSsoAction extends UserAction{
 
     public String deleteAzureSso(){
 
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
         boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
@@ -76,6 +88,11 @@ public class AzureSsoAction extends UserAction{
     @Override
     public String execute() throws Exception {
 
+        if(!DashboardMode.isOnPremDeployment()){
+            addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+        
         Config.AzureConfig azureConfig = (Config.AzureConfig) ConfigsDao.instance.findOne("_id", "AZURE-ankush");
 
         if (azureConfig != null) {
