@@ -68,26 +68,11 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     }
 
-    private boolean hasTestRunSuccessfullyOnApi(List<TestingRunResult> testingRunResults){
-        for(TestingRunResult result : testingRunResults){
-            List<TestResult> testResults = result.getTestResults() ;
-            for(TestResult singleTestResult : testResults){
-                List<String> errors = singleTestResult.getErrors();
-                if(errors.size() == 0 && singleTestResult.getMessage().length() > 0){
-                    return true ;
-                }
-            }
-        }
-        return false;
-    }
-
-    public void updateLastTestedField(List<TestingRunResult> testingRunResults, ApiInfo.ApiInfoKey apiInfoKey){
-        if(hasTestRunSuccessfullyOnApi(testingRunResults)){
-            instance.getMCollection().updateOne(
-                getFilter(apiInfoKey), 
-                Updates.set("lastTested", Context.now())
-            );
-        }
+    public void updateLastTestedField(ApiInfo.ApiInfoKey apiInfoKey){
+        instance.getMCollection().updateOne(
+            getFilter(apiInfoKey), 
+            Updates.set("lastTested", Context.now())
+        );
     }
 
     public Map<Integer,Integer> getCoverageCount(){
