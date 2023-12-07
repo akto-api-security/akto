@@ -1328,6 +1328,7 @@ public class InitializerListener implements ServletContextListener {
                             calledOnce = true;
                         }
                         checkMongoConnection();
+                        updateGlobalAktoVersion();
                         Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");
                         if (config == null) {
                             loggerMaker.errorAndAddToDb("No stigg config found", LogDb.DASHBOARD);
@@ -1350,7 +1351,6 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
-                        updateGlobalAktoVersion();
 
                         if (DashboardMode.isSaasDeployment()) {
                             setupUsageScheduler();
