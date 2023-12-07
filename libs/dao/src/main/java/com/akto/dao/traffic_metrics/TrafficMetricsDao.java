@@ -23,6 +23,9 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
     public static final TrafficMetricsDao instance = new TrafficMetricsDao();
     public static final String ID = "_id.";
 
+    public static final int maxDocuments = 30_000;
+    public static final int sizeInBytes = 100_000_000;
+
     public List<Bson> basicFilters(List<TrafficMetrics.Name> names, int startTimestamp, int endTimestamp) {
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.in(ID + TrafficMetrics.Key.NAME, names));
@@ -56,7 +59,7 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
 
         if (!exists) {
             if (DbMode.allowCappedCollections()) {
-                clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(30_000).sizeInBytes(100_000_000));
+                clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
             } else {
                 db.createCollection(getCollName());
             }

@@ -44,17 +44,9 @@ import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
-import com.akto.util.AccountTask;
-import com.akto.util.EmailAccountName;
-import com.akto.util.Constants;
-import com.akto.util.JSONUtils;
-import com.akto.util.Pair;
+import com.akto.util.*;
 import com.akto.util.enums.GlobalEnums.TestCategory;
-import com.akto.utils.Auth0;
-import com.akto.utils.DashboardMode;
-import com.akto.utils.GithubSync;
-import com.akto.utils.HttpUtils;
-import com.akto.utils.RedactSampleData;
+import com.akto.utils.*;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -1179,6 +1171,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
+                        trimCappedCollections();
                         if(isSaas){
                             try {
                                 Auth0.getInstance();
@@ -1211,6 +1204,24 @@ public class InitializerListener implements ServletContextListener {
             } else  {
                 throw new Exception("Input stream null");
             }
+        }
+    }
+
+    public static void trimCappedCollections() {
+        if (DbMode.allowCappedCollections()) return;
+
+        clear(LoadersDao.instance, LoadersDao.maxDocuments);
+        clear(RuntimeLogsDao.instance, RuntimeLogsDao.maxDocuments);
+        clear(LogsDao.instance, LogsDao.maxDocuments);
+        clear(DashboardLogsDao.instance, DashboardLogsDao.maxDocuments);
+        clear(TrafficMetricsDao.instance, TrafficMetricsDao.maxDocuments);
+    }
+
+    public static void clear(AccountsContextDao mCollection, int maxDocuments) {
+        try {
+            mCollection.trimCollection(maxDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
 
