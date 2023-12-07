@@ -23,6 +23,8 @@ public class LoggerMaker  {
     private static int logCountResetTimestamp = Context.now();
     private static final int oneMinute = 60; 
 
+    private LogDb db;
+
     public enum LogDb {
         TESTING,RUNTIME,DASHBOARD
     }
@@ -30,6 +32,12 @@ public class LoggerMaker  {
     public LoggerMaker(Class<?> c) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
+    }
+
+    public LoggerMaker(Class<?> c, LogDb db) {
+        aClass = c;
+        logger = LoggerFactory.getLogger(c);
+        this.db = db;
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
@@ -50,6 +58,14 @@ public class LoggerMaker  {
         }
     }
 
+    public void errorAndAddToDb(String err) {
+        errorAndAddToDb(err, this.db);
+    }
+
+    public void infoAndAddToDb(String info) {
+        infoAndAddToDb(info, this.db);
+    }
+
     private Boolean checkUpdate(){
         if(logCount>=1000){
             if((logCountResetTimestamp + oneMinute) >= Context.now()){
@@ -66,7 +82,7 @@ public class LoggerMaker  {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         
-        if(checkUpdate()){
+        if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
                     LogsDao.instance.insertOne(log);
@@ -76,6 +92,9 @@ public class LoggerMaker  {
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                    break;
+                default:
+                    break;
             }
             logCount++;
         }
@@ -102,6 +121,9 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            default:
+                break;
         }
         return logs;
     }
