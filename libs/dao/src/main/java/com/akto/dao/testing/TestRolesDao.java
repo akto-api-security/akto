@@ -37,7 +37,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         }
 
         String[] fieldNames = {TestRoles.NAME};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+        instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
     }
 
     public TestRoles createTestRole (String roleName, ObjectId endpointLogicalGroupId, String userName) {
