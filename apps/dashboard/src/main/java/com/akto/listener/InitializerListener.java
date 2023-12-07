@@ -1595,6 +1595,9 @@ public class InitializerListener implements ServletContextListener {
 
                 Map<String, List<YamlTemplate>> mapIdToHash = hashValueTemplates.stream().collect(Collectors.groupingBy(YamlTemplate::getId));
 
+                int countTotalTemplates = 0;
+                int countUnchangedTemplates = 0;
+
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
@@ -1613,7 +1616,7 @@ public class InitializerListener implements ServletContextListener {
                         String templateContent = new String(outputStream.toByteArray(), "UTF-8");
 
                         TestConfig testConfig = null;
-
+                        countTotalTemplates++;
                         try {
                             testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                             String testConfigId = testConfig.getId();
@@ -1623,7 +1626,7 @@ public class InitializerListener implements ServletContextListener {
                             if (existingTemplatesInDb != null && existingTemplatesInDb.size() == 1) {
                                 int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
                                 if (existingTemplateHash == templateContent.hashCode()) {
-                                    loggerMaker.infoAndAddToDb("Skipping test yaml: " + testConfigId, LogDb.DASHBOARD);
+                                    countUnchangedTemplates++;
                                     continue;
                                 } else {
                                     loggerMaker.infoAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
@@ -1671,6 +1674,8 @@ public class InitializerListener implements ServletContextListener {
                     // Close the current entry to proceed to the next one
                     zipInputStream.closeEntry();
                 }
+
+                loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
             } catch (Exception ex) {
                 loggerMaker.errorAndAddToDb(
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
