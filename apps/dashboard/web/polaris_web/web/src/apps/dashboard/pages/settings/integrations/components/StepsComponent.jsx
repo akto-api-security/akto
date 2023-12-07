@@ -17,7 +17,7 @@ function StepsComponent({integrationSteps, onClickFunc}) {
                     )
                 })}
                 <HorizontalStack align="end">
-                    <Button primary size="medium" onClick={onClickFunc}>Next</Button>
+                    <Button primary size="medium" onClick={onClickFunc} disabled={window.DASHBOARD_MODE !== "ON_PREM"}>Next</Button>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>

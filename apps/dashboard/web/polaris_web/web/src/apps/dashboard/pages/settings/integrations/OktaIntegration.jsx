@@ -91,15 +91,20 @@ function OktaIntegration() {
 
     const fetchData = async() => {
         setLoading(true)
-        await settingRequests.fetchOktaSso().then((resp) => {
-            if(resp.clientId !== null && resp.clientId.length > 0){
-                setClientId(resp.clientId)
-                setAuthorizationServerId(resp.authorisationServerId)
-                setOktaDomain(resp.oktaDomain)
-                setComponentType(2)
-            }
-        })
-        setLoading(false)
+        try {
+            await settingRequests.fetchOktaSso().then((resp) => {
+                if(resp.clientId !== null && resp.clientId.length > 0){
+                    setClientId(resp.clientId)
+                    setAuthorizationServerId(resp.authorisationServerId)
+                    setOktaDomain(resp.oktaDomain)
+                    setComponentType(2)
+                }
+            })
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
+        
     }
 
     const handleDelete = async() => {
