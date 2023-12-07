@@ -1328,6 +1328,13 @@ public class InitializerListener implements ServletContextListener {
                             calledOnce = true;
                         }
                         checkMongoConnection();
+                        Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");
+                        if (config == null) {
+                            loggerMaker.errorAndAddToDb("No stigg config found", LogDb.DASHBOARD);
+                            STIGG_SIGNING_KEY = null;
+                        } else {
+                            STIGG_SIGNING_KEY = ((Config.StiggConfig) config).getSigningKey();
+                        }
 
                         AccountTask.instance.executeTask(new Consumer<Account>() {
                             @Override
@@ -1350,13 +1357,6 @@ public class InitializerListener implements ServletContextListener {
                             setupUsageSyncScheduler();
                         }
 
-                        Config config = ConfigsDao.instance.findOne("_id", "STIGG-ankush");
-                        if (config == null) {
-                            loggerMaker.errorAndAddToDb("No stigg config found", LogDb.DASHBOARD);
-                            STIGG_SIGNING_KEY = null;
-                        } else {
-                            STIGG_SIGNING_KEY = ((Config.StiggConfig) config).getSigningKey();
-                        }
 
                         if(isSaas){
                             try {
