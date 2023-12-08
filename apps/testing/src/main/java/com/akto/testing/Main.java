@@ -166,15 +166,11 @@ public class Main {
 
         boolean connectedToMongo = false;
         do {
+            connectedToMongo = MCollection.checkConnection();
             try {
-                connectedToMongo = MCollection.checkConnection();
-            } catch (Exception ignored) {
-            } finally {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         } while (!connectedToMongo);
 
