@@ -399,7 +399,20 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    public String registerViaGithub() {
+    private static String getPrimaryEmail(List<Map<String, String>> emailResp){
+        if(emailResp == null){
+            return  "";
+        }else{
+            for (Map<String, String> entryMap : emailResp) {
+                if(entryMap.get("primary") == "true"){
+                    return entryMap.get("email");
+                }
+            }
+        }
+        return null;
+    }
+
+    public String registerViaGithub() throws Exception{
 
         GithubLogin ghLoginInstance = GithubLogin.getInstance();
         if (ghLoginInstance == null) {
@@ -419,15 +432,20 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String refreshToken = tokenData.getOrDefault("refresh_token", "").toString();
             int refreshTokenExpiry = Integer.parseInt(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
             Map<String,Object> userData = CustomHttpRequest.getRequest("https://api.github.com/user", "Bearer " + accessToken);
-            String company = "sso";
-            String username = userData.get("login").toString() + "@" + company;
-            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
+            String emailsUrl = "https://api.github.com/user/emails";
+            List<Map<String, String>> emailResp = GithubLogin.getEmailRequest(emailsUrl, accessToken);
+
+            String primaryEmail = getPrimaryEmail(emailResp);
+
+            String username = userData.get("login").toString() ;
+            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username, primaryEmail);
             shouldLogin = "true";
-            createUserAndRedirect(username, username, ghSignupInfo, 1000000);
+            createUserAndRedirect(primaryEmail, username, ghSignupInfo, 1000000);
             code = "";
             System.out.println("Executed registerViaGithub");
 
         } catch (IOException e) {
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();

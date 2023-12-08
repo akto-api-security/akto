@@ -1,9 +1,19 @@
 package com.akto.utils;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.GithubConfig;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.testing.ApiExecutor;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class GithubLogin {
 
@@ -38,6 +48,32 @@ public class GithubLogin {
         if (ghConfig == null) return null;
 
         return ghConfig.getClientId();
+    }
+
+    public static String getAuthorisationUrl() {
+        if (getInstance() == null) return null;
+
+        GithubConfig ghConfig = getInstance().getGithubConfig();
+        if (ghConfig == null) return null;
+
+        String authUrl = "https://github.com/login/oauth/authorize?scope=user,user:email&client_id=" + ghConfig.getClientId();
+        return authUrl;
+    }
+
+    public static List<Map<String, String>> getEmailRequest(String emailsUrl, String accessToken){
+        ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Content-Type", Collections.singletonList("application/json"));
+        headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(emailsUrl, "", "GET", null, headers, "");
+        OriginalHttpResponse response = null;
+        try {
+            response = ApiExecutor.sendRequest(request, false, null);
+            return objectMapper.readValue(response.getBody(), new TypeReference<List<Map<String, String>>>() {});
+        }catch(Exception e){
+            return null;
+        }
     }
 
     private GithubLogin() {
