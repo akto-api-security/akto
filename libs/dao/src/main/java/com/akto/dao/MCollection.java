@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -7,11 +8,11 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import org.bson.BsonDocument;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -272,6 +273,30 @@ public abstract class MCollection<T> {
         name += (isAscending ? "1" : "-1");
 
         return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
+    }
+
+    public ObjectId findNthDocumentIdFromEnd(int n) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        MongoCursor<Document> cursor = mongoDatabase.getCollection(getCollName(), Document.class).find(new BasicDBObject())
+                .sort(Sorts.descending(ID))
+                .skip(n)
+                .limit(1)
+                .cursor();
+
+        return cursor.hasNext() ? cursor.next().getObjectId(ID) : null;
+    }
+
+
+
+    public void trimCollection(int maxDocuments) {
+        long count = this.getMCollection().estimatedDocumentCount();
+        if (count <= maxDocuments) return;
+        long deleteCount =  maxDocuments / 2;
+        ObjectId objectId = findNthDocumentIdFromEnd((int) deleteCount);
+        if (objectId == null) return;
+
+        DeleteResult deleteResult = this.getMCollection().deleteMany(lt(ID, objectId));
+        System.out.println("Trimmed : " + deleteResult.getDeletedCount());
     }
 
 }

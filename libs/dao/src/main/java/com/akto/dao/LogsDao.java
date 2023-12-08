@@ -16,6 +16,9 @@ import org.bson.Document;
 public class LogsDao extends AccountsContextDao<Log> {
 
     public static final LogsDao instance = new LogsDao();
+
+    public static final int maxDocuments = 100_000;
+    public static final int sizeInBytes = 100_000_000;
     public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
@@ -29,7 +32,7 @@ public class LogsDao extends AccountsContextDao<Log> {
 
         if (!exists) {
             if (DbMode.allowCappedCollections()) {
-                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100_000).sizeInBytes(100_000_000));
+                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
             } else {
                 db.createCollection(getCollName());
             }
