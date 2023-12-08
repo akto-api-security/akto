@@ -80,7 +80,6 @@ public class TestInventoryAction extends MongoBasedTest {
         AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
         HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
         info.setHttpCallParser(callParser);
-        info.setPolicy(new AktoPolicyNew(false));
         int accountId = Context.accountId.get();
         RuntimeListener.accountHTTPParserMap.put(accountId, info);
 

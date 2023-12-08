@@ -1227,6 +1227,10 @@ public class InitializerListener implements ServletContextListener {
                 //fetchGithubZip();
                 updateGlobalAktoVersion();
                 trimCappedCollections();
+                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                updateSeverityScoreInApiInfo.updateSeverityScoreScheduler();
+                fetchRecentEndpointsCron.setUpRecentEndpointsActivityScheduler();
+                fetchRecentParamsCron.setUpRecentParamsActivityScheduler();
                 if(isSaas){
                     try {
                         Auth0.getInstance();
