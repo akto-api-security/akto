@@ -107,7 +107,7 @@ public class InitializerListener implements ServletContextListener {
 
                 if (usageSync == null) {
                     int now = Context.now();
-                    int startOfDayEpoch = now - (now % 86400) - 86400;
+                    int startOfDayEpoch = now - (now % UsageUtils.USAGE_UPPER_BOUND_DL) - UsageUtils.USAGE_UPPER_BOUND_DL;
                     usageSync = new UsageSync("billing", startOfDayEpoch);
                     loggerMaker.infoAndAddToDb("Usage sync absent. Inserting now...: " + startOfDayEpoch, LogDb.BILLING);
                     UsageSyncDao.instance.insertOne(usageSync);

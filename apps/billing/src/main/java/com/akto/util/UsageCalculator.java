@@ -170,8 +170,9 @@ public class UsageCalculator {
             String organizationId = o.getId();
             String organizationName = o.getName();
             Set<Integer> accounts = o.getAccounts();
+            int hour = DateUtils.getHour(usageLowerBound + 1000);
 
-            loggerMaker.infoAndAddToDb(String.format("Reporting usage for organization %s - %s", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
+            loggerMaker.infoAndAddToDb(String.format("Reporting usage for organization %s - %s for hour %d", organizationId, organizationName, hour), LoggerMaker.LogDb.BILLING);
 
             loggerMaker.infoAndAddToDb(String.format("Calculating Consolidated and account wise usage for organization %s - %s", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
 
@@ -200,7 +201,7 @@ public class UsageCalculator {
                     if (usageMetric != null) {
                         usage = usageMetric.getUsage();
                     } else {
-                        String err = "Missing account id: " + account + " orgId: " + organizationId;
+                        String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
                         loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
                         throw new Exception(err);
                     }
@@ -218,8 +219,10 @@ public class UsageCalculator {
 
             if (usage == null) {
                 loggerMaker.infoAndAddToDb("Inserting new usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
+                Map<Integer, Map<String, Integer>> hourlyUsage = new HashMap<>();
+                hourlyUsage.put(hour, consolidatedUsage);
                 OrganizationUsageDao.instance.insertOne(
-                        new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
+                        new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>(), hourlyUsage)
                 );
 
                 if (date % 100 > 24 || organizationName.endsWith("@akto.io")) {
@@ -235,7 +238,9 @@ public class UsageCalculator {
 
             } else {
                 loggerMaker.infoAndAddToDb("Found usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
-                Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage));
+                Map<Integer, Map<String, Integer>> hourlyUsage = usage.getHourlyUsage();
+                hourlyUsage.put(hour, consolidatedUsage);
+                Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage), Updates.set(HOURLY_USAGE, hourlyUsage));
                 OrganizationUsageDao.instance.updateOne(ORG_ID, organizationId, DATE, date, updates);
             }
 
