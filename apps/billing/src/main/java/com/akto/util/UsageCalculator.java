@@ -219,8 +219,8 @@ public class UsageCalculator {
 
             if (usage == null) {
                 loggerMaker.infoAndAddToDb("Inserting new usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
-                Map<Integer, Map<String, Integer>> hourlyUsage = new HashMap<>();
-                hourlyUsage.put(hour, consolidatedUsage);
+                Map<String, Map<String, Integer>> hourlyUsage = new HashMap<>();
+                hourlyUsage.put(String.valueOf(hour), consolidatedUsage);
                 OrganizationUsageDao.instance.insertOne(
                         new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>(), hourlyUsage)
                 );
@@ -238,8 +238,8 @@ public class UsageCalculator {
 
             } else {
                 loggerMaker.infoAndAddToDb("Found usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
-                Map<Integer, Map<String, Integer>> hourlyUsage = usage.getHourlyUsage();
-                hourlyUsage.put(hour, consolidatedUsage);
+                Map<String, Map<String, Integer>> hourlyUsage = usage.getHourlyUsage();
+                hourlyUsage.put(String.valueOf(hour), consolidatedUsage);
                 Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage), Updates.set(HOURLY_USAGE, hourlyUsage));
                 OrganizationUsageDao.instance.updateOne(ORG_ID, organizationId, DATE, date, updates);
             }
