@@ -1828,6 +1828,15 @@ public class InitializerListener implements ServletContextListener {
                         UsageMetricCalculator.calculateUsageMetric(usageMetric);
 
                         UsageMetricsDao.instance.insertOne(usageMetric);
+                        loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
+
+                        UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
+
+                        UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
+                        loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
+                                        usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()),
+                                LogDb.DASHBOARD
+                        );
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
