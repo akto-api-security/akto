@@ -37,6 +37,9 @@ function OpenApiSource() {
                 </HorizontalStack>
             )
             func.setToast(true, false, forwardLink);
+
+            func.refreshApiCollections();
+
         }).catch((err) => {
             setLoading(false)
         })
