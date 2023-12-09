@@ -26,6 +26,8 @@ function AzureSso() {
     const [loginUrl, setLoginUrl] = useState('')
     const [azureIdentity, setAzureIdentity] = useState('')
     const [files, setFiles] = useState(null)
+    const [nextButtonActive,setNextButtonActive] = useState(window.DASHBOARD_MODE === "ON_PREM")
+
 
     const cardContent = "Enable Login via Azure AD on your Akto dashboard";
 
@@ -60,7 +62,7 @@ function AzureSso() {
     ]
 
     const stepsComponent = (
-        <StepsComponent integrationSteps={integrationSteps} onClickFunc={() => setComponentType(1)} />
+        <StepsComponent integrationSteps={integrationSteps} onClickFunc={() => setComponentType(1)} buttonActive={nextButtonActive}/>
     )
 
     const setFilesCheck = (file) => {
@@ -76,6 +78,7 @@ function AzureSso() {
         setLoading(true)
         await settingRequests.addAzureSso(infoObj.loginUrl, infoObj.certificate, infoObj.entityId, entityId, AcsUrl);
         setComponentType(2)
+        fetchData();
         setLoading(false)
     }
 
@@ -93,7 +96,8 @@ function AzureSso() {
             })
             setLoading(false)
         } catch (error) {
-            setLoading(false)   
+            setLoading(false)
+            setNextButtonActive(false)   
         }
     }
 

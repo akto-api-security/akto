@@ -22,6 +22,7 @@ function OktaIntegration() {
     const [oktaDomain, setOktaDomain] = useState('')
     const [authorizationServerId, setAuthorizationServerId] = useState('')
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [nextButtonActive,setNextButtonActive] = useState(window.DASHBOARD_MODE === "ON_PREM")
 
     const redirectUri = hostname + "/authorization-code/callback"
 
@@ -102,6 +103,7 @@ function OktaIntegration() {
             })
             setLoading(false)
         } catch (error) {
+            setNextButtonActive(false)
             setLoading(false)
         }
         
@@ -136,7 +138,7 @@ function OktaIntegration() {
     const oktaSSOComponent = (
         loading ? <SpinnerCentered /> :
         <LegacyCard title="Okta SSO">
-            {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} /> 
+            {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} buttonActive={nextButtonActive}/> 
             : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
         </LegacyCard>
     )

@@ -12,6 +12,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -40,9 +41,9 @@ public class AzureSsoAction extends UserAction{
             return Action.ERROR.toUpperCase();
         }
 
-        if (ConfigsDao.instance.findOne("_id", "AZURE-ankush") != null) {
-            addActionError("An Azure SSO Integration already exists");
-            return Action.ERROR.toUpperCase();
+        if (SsoUtils.isAnySsoActive()) {
+            addActionError("A SSO Integration already exists.");
+            return ERROR.toUpperCase();
         }
 
         Config.AzureConfig azureConfig = new Config.AzureConfig();
@@ -94,6 +95,10 @@ public class AzureSsoAction extends UserAction{
         }
         
         Config.AzureConfig azureConfig = (Config.AzureConfig) ConfigsDao.instance.findOne("_id", "AZURE-ankush");
+        if (SsoUtils.isAnySsoActive() && azureConfig == null) {
+            addActionError("A different SSO Integration already exists.");
+            return ERROR.toUpperCase();
+        }
 
         if (azureConfig != null) {
             this.loginUrl = azureConfig.getLoginUrl();
