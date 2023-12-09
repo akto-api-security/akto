@@ -403,8 +403,8 @@ const transform = {
     },
     
     getPrettifyEndpoint(method,url, isNew){
-        return(
-            <HorizontalStack gap={1}>
+        return(   
+            <div style={{display: 'flex', gap: '4px'}}>
                 <Box width="54px">
                     <HorizontalStack align="end">
                         <span style={{color: tranform.getTextColor(method), fontSize: "14px", fontWeight: 500}}>{method}</span>
@@ -418,7 +418,7 @@ const transform = {
                         {isNew ? <Badge size="small">New</Badge> : null}
                     </HorizontalStack>
                 </Box>
-            </HorizontalStack>
+            </div> 
         )
     },
 
