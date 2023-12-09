@@ -8,13 +8,15 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 
 public class CookieParser {
 
+    public static final String COOKIE = "cookie";
+
     public static Map<String, String> getCookieHeader(List<List<Parameter>> parametersList) {
         Map<String, String> cookieMap = new HashMap<>();
 
         for (List<Parameter> parameters : parametersList) {
             if (parameters != null) {
                 for (Parameter parameter : parameters) {
-                    if (parameter.getIn().equals("cookie")) {
+                    if (parameter.getIn().equals(COOKIE)) {
                         cookieMap.put(parameter.getName(), parameter.getExample().toString());
                     }
                 }
@@ -36,7 +38,7 @@ public class CookieParser {
         final String CookieString = cookieString;
         return new HashMap<String, String>() {
             {
-                put("cookie", CookieString);
+                put(COOKIE, CookieString);
             }
         };
     }
