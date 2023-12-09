@@ -9,6 +9,7 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.OktaConfig;
+import com.akto.utils.sso.SsoUtils;
 
 public class OktaLogin {
     public static final int PROBE_PERIOD_IN_SECS = 60;
@@ -35,12 +36,6 @@ public class OktaLogin {
         return instance;
     }
 
-    public String getQueryString(Map<String,String> paramMap){
-        return paramMap.entrySet().stream()
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .collect(Collectors.joining("&"));
-    }
-
     public static String getAuthorisationUrl() {
         if (getInstance() == null) return null;
 
@@ -54,7 +49,7 @@ public class OktaLogin {
         paramMap.put("scope", "openid%20email%20profile");
         paramMap.put("state", "login");
 
-        String queryString = instance.getQueryString(paramMap);
+        String queryString = SsoUtils.getQueryString(paramMap);
 
         String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1/authorize?" + queryString;
         return authUrl;
