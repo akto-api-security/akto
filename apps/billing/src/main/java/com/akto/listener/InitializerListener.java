@@ -139,7 +139,7 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(UsageSync.LAST_SYNC_START_EPOCH, usageUpperBound)
                     );
                     usageLowerBound = usageUpperBound;
-                    usageUpperBound += 86400;
+                    usageUpperBound += UsageUtils.USAGE_UPPER_BOUND_DL;
                 }
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
