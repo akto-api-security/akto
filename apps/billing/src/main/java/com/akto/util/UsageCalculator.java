@@ -55,6 +55,10 @@ public class UsageCalculator {
             List<OrganizationUsage> pendingUsages =
                     OrganizationUsageDao.instance.findAll(filterQ);
 
+            if(pendingUsages.isEmpty()) {
+                loggerMaker.infoAndAddToDb("No pending items for org: " + o.getId(), LoggerMaker.LogDb.BILLING);
+                return;
+            }
             loggerMaker.infoAndAddToDb("Found "+pendingUsages.size()+" items for org: " + o.getId(), LoggerMaker.LogDb.BILLING);
 
             pendingUsages.sort(
