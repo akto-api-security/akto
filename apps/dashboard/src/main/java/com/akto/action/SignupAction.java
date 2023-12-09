@@ -3,6 +3,8 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.notifications.email.WelcomeEmail;
@@ -71,6 +73,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SignupAction.class);
+
     public String getCode() {
         return code;
     }
@@ -456,11 +461,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String registerViaOkta() throws IOException{
         OktaLogin oktaLoginInstance = OktaLogin.getInstance();
         if(oktaLoginInstance == null){
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
 
         Config.OktaConfig oktaConfig = OktaLogin.getInstance().getOktaConfig();
         if (oktaConfig == null) {
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
 
@@ -489,7 +496,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             createUserAndRedirect(email, username, oktaSignupInfo, 1000000);
             code = "";
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
@@ -508,15 +515,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             Auth auth = new Auth(settings, servletRequest, servletResponse);
             auth.login( AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/dashboard/onboarding");
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while getting response of azure sso \n" + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
-            e.printStackTrace();
         }
 
         
         return SUCCESS.toUpperCase();
     }
 
-    public String registerViaAzure(){
+    public String registerViaAzure() throws Exception{
         if(AzureLogin.getInstance() == null){
             return ERROR.toUpperCase();
         }
@@ -536,6 +543,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = null;
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + errors.toString(), LogDb.DASHBOARD);
                 return ERROR.toUpperCase();
             } else {
                 Map<String, List<String>> attributes = auth.getAttributes();
@@ -550,8 +558,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             SignupInfo.AzureSignupInfo signUpInfo = new SignupInfo.AzureSignupInfo(username, useremail);
             createUserAndRedirect(useremail, username, signUpInfo, 1000000);
         } catch (Exception e1) {
-            // TODO Auto-generated catch block
-            e1.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/login");
         }
 
         return SUCCESS.toUpperCase();

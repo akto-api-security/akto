@@ -59,13 +59,7 @@ public class AzureLogin {
         return settings;
     }
 
-    private AzureLogin(){}
-
-    public String getQueryString(Map<String,String> paramMap){
-        return paramMap.entrySet().stream()
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .collect(Collectors.joining("&"));
-    }  
+    private AzureLogin(){} 
     
     public AzureConfig getAzureConfig() {
         return azureConfig;
