@@ -10,6 +10,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -38,8 +39,8 @@ public class OktaSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (ConfigsDao.instance.findOne("_id", "OKTA-ankush") != null) {
-            addActionError("An Okta SSO Integration already exists");
+        if (SsoUtils.isAnySsoActive()) {
+            addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
 
@@ -91,6 +92,10 @@ public class OktaSsoAction extends UserAction {
         }
 
         Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
+        if (SsoUtils.isAnySsoActive() && oktaConfig == null) {
+            addActionError("A different SSO Integration already exists.");
+            return ERROR.toUpperCase();
+        }
 
         if (oktaConfig != null) {
             this.clientId = oktaConfig.getClientId();

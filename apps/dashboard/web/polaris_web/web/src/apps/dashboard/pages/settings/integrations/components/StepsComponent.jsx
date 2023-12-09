@@ -1,7 +1,7 @@
 import { Button, HorizontalStack, LegacyCard, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 
-function StepsComponent({integrationSteps, onClickFunc}) {
+function StepsComponent({integrationSteps, onClickFunc, buttonActive}) {
     return (
         <LegacyCard.Section title="Follow steps">
             <VerticalStack gap={3}>
@@ -17,7 +17,7 @@ function StepsComponent({integrationSteps, onClickFunc}) {
                     )
                 })}
                 <HorizontalStack align="end">
-                    <Button primary size="medium" onClick={onClickFunc} disabled={window.DASHBOARD_MODE !== "ON_PREM"}>Next</Button>
+                    <Button primary size="medium" onClick={onClickFunc} disabled={!buttonActive}>Next</Button>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>
