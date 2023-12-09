@@ -1,16 +1,11 @@
 package com.akto.open_api.parser.parameter_parser;
 
 import java.util.List;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 
-import io.swagger.oas.inflector.examples.ExampleBuilder;
-import io.swagger.oas.inflector.examples.models.Example;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 
 public class PathParamParser {
-
-    private static final LoggerMaker loggerMaker = new LoggerMaker(PathParamParser.class, LogDb.DASHBOARD);
 
     public static String replacePathParameter(String path, List<List<Parameter>> parameterLists) {
         for (List<Parameter> parameters : parameterLists) {
@@ -30,22 +25,31 @@ public class PathParamParser {
             String replacement = parameterNameInUrl;
 
             /*
-             * TODO: If it is a template endpoint, parse it such that it can be captured as
-             * a template url in runtime, in some cases.
+             * If the URL is a template URL,
+             * then the examples should not be used
+             * for the URL to be treated as a template URL.
              */
 
-            String existingExample = CommonParser.getExistingExample(parameter);
-            if (existingExample != null) {
-                replacement = existingExample;
-            } else if (parameter.getStyle().equals(Parameter.StyleEnum.SIMPLE) &&
-                    parameter.getExplode().equals(false) &&
-                    parameter.getSchema() != null) {
-                Example example = ExampleBuilder.fromSchema(parameter.getSchema(), null);
-                replacement = example.asString();
-            } else {
-                loggerMaker.infoAndAddToDb("unable to handle path parameter " + parameterName + " with style "
-                        + parameter.getStyle() + " and explode " + parameter.getExplode());
+            if (parameter.getSchema() != null) {
+                Schema<?> schema = parameter.getSchema();
+                String type = schema.getType();
+                String format = schema.getFormat();
+
+                if ("integer".equalsIgnoreCase(type)) {
+                    replacement = "INTEGER";
+                } else if ("string".equalsIgnoreCase(type)) {
+                    if ("uuid".equalsIgnoreCase(format)) {
+                        replacement = "UUID";
+                    } else {
+                        replacement = "STRING";
+                    }
+                }
             }
+
+            if (replacement.equals(parameterNameInUrl)) {
+                replacement = "STRING";
+            }
+
             path = path.replace(parameterNameInUrl, replacement);
         }
         return path;

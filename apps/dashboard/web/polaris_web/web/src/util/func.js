@@ -12,9 +12,10 @@ import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
+import PersistStore from '../apps/main/PersistStore';
 import { current } from 'immer';
 import { tokens } from "@shopify/polaris-tokens" 
-import PersistStore from '../apps/main/PersistStore';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -1321,6 +1322,13 @@ mapCollectionIdToHostName(apiCollections){
       first = false
     })
     return url;
+  },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
   }
 
 }

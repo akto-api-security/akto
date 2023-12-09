@@ -96,182 +96,264 @@ public class Parser {
             if (pathItem == null)
                 continue;
 
-            List<Server> serversFromPath = pathItem.getServers();
-            List<Parameter> parametersFromPath = pathItem.getParameters();
+            try {
 
-            for (PathItem.HttpMethod operationType : pathItem.readOperationsMap().keySet()) {
-                PathItem.HttpMethod method = operationType;
-                Operation operation = pathItem.readOperationsMap().get(method);
+                List<Server> serversFromPath = pathItem.getServers();
+                List<Parameter> parametersFromPath = pathItem.getParameters();
 
-                List<Parameter> parametersFromOperation = operation.getParameters();
-                List<Server> serversFromOperation = pathItem.readOperationsMap().get(method).getServers();
+                for (PathItem.HttpMethod operationType : pathItem.readOperationsMap().keySet()) {
+                    PathItem.HttpMethod method = operationType;
+                    Operation operation = pathItem.readOperationsMap().get(method);
 
-                /*
-                 * DO NOT CHANGE THE ORDER for passing parameter arrays.
-                 * PATH parameters take precedence over ROOT parameters.
-                 * OPERATION parameters take precedence over PATH parameters.
-                 */
-                path = PathParamParser.replacePathParameter(originalPath, Arrays.asList(
-                        parametersFromOperation, parametersFromPath));
+                    List<Parameter> parametersFromOperation = operation.getParameters();
+                    List<Server> serversFromOperation = pathItem.readOperationsMap().get(method).getServers();
 
-                path = QueryParamParser.addQueryParameters(path, Arrays.asList(
-                        parametersFromPath, parametersFromOperation));
+                    /*
+                     * DO NOT CHANGE THE ORDER for passing parameter arrays.
+                     * PATH parameters take precedence over ROOT parameters.
+                     * OPERATION parameters take precedence over PATH parameters.
+                     */
+                    path = PathParamParser.replacePathParameter(originalPath, Arrays.asList(
+                            parametersFromOperation, parametersFromPath));
 
-                path = ServerParser.addServer(path, Arrays.asList(
-                        serversFromOperation, serversFromPath, servers));
+                    path = QueryParamParser.addQueryParameters(path, Arrays.asList(
+                            parametersFromPath, parametersFromOperation));
 
-                Map<String, String> requestHeaders = HeaderParser.buildHeaders(
-                        Arrays.asList(parametersFromPath, parametersFromOperation));
+                    path = ServerParser.addServer(path, Arrays.asList(
+                            serversFromOperation, serversFromPath, servers));
 
-                Map<String, String> cookieHeaders = CookieParser.getCookieHeader(
-                        Arrays.asList(parametersFromPath, parametersFromOperation));
+                    Map<String, String> requestHeaders = HeaderParser.buildHeaders(
+                            Arrays.asList(parametersFromPath, parametersFromOperation));
 
-                requestHeaders.putAll(cookieHeaders);
+                    Map<String, String> cookieHeaders = CookieParser.getCookieHeader(
+                            Arrays.asList(parametersFromPath, parametersFromOperation));
 
-                String requestString = "";
-                try {
-                    RequestBody requestBody = operation.getRequestBody();
-                    if (requestBody != null) {
-                        requestBody = new RequestBody();
-                        Content content = requestBody.getContent();
-                        if (content != null) {
-                            Pair<String, String> example = ContentParser.getExampleFromContent(content);
-                            if (!(example.getFirst().isEmpty())) {
-                                requestHeaders.put("Content-Type", example.getFirst());
+                    requestHeaders.putAll(cookieHeaders);
+
+                    String requestString = "";
+                    try {
+                        RequestBody requestBody = operation.getRequestBody();
+                        if (requestBody != null) {
+                            requestBody = new RequestBody();
+                            Content content = requestBody.getContent();
+                            if (content != null) {
+                                Pair<String, String> example = ContentParser.getExampleFromContent(content);
+                                if (!(example.getFirst().isEmpty())) {
+                                    requestHeaders.put("Content-Type", example.getFirst());
+                                }
+                                requestString = example.getSecond();
                             }
-                            requestString = example.getSecond();
                         }
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb(
+                                "unable to handle request body for " + path + " " + method + " " + e.toString());
                     }
-                } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb(
-                            "unable to handle request body for " + path + " " + method + " " + e.toString());
-                }
 
-                List<SecurityRequirement> operationSecurity = operation.getSecurity();
+                    List<SecurityRequirement> operationSecurity = operation.getSecurity();
 
-                // adding security schemes for API.
-                try {
-                    if (operationSecurity == null) {
-                        operationSecurity = rootSecurity;
-                    }
-                    if (!operationSecurity.isEmpty()) {
-                        // adding first security scheme.
-                        SecurityRequirement securityRequirement = operationSecurity.get(0);
-                        for (String securitySchemeName : securityRequirement.keySet()) {
-                            Pair<String, Pair<String, String>> securityScheme = parsedSecuritySchemes
-                                    .get(securitySchemeName);
-                            if (securityScheme != null) {
-                                String apiKeyIn = securityScheme.getFirst();
-                                String apiKeyName = securityScheme.getSecond().getFirst();
-                                String apiKeyValue = securityScheme.getSecond().getSecond();
-                                if (apiKeyIn.equals("header")) {
-                                    requestHeaders.put(apiKeyName, apiKeyValue);
-                                } else if (apiKeyIn.equals("query")) {
-                                    if (path.contains("?")) {
-                                        path = path + "&" + apiKeyName + "=" + apiKeyValue;
-                                    } else {
-                                        path = path + "?" + apiKeyName + "=" + apiKeyValue;
+                    // adding security schemes for API.
+                    try {
+                        if (operationSecurity == null) {
+                            operationSecurity = rootSecurity;
+                        }
+                        if (!operationSecurity.isEmpty()) {
+                            // adding first security scheme.
+                            SecurityRequirement securityRequirement = operationSecurity.get(0);
+                            for (String securitySchemeName : securityRequirement.keySet()) {
+                                Pair<String, Pair<String, String>> securityScheme = parsedSecuritySchemes
+                                        .get(securitySchemeName);
+                                if (securityScheme != null) {
+                                    String apiKeyIn = securityScheme.getFirst();
+                                    String apiKeyName = securityScheme.getSecond().getFirst();
+                                    String apiKeyValue = securityScheme.getSecond().getSecond();
+                                    if (apiKeyIn.equals("header")) {
+                                        requestHeaders.put(apiKeyName, apiKeyValue);
+                                    } else if (apiKeyIn.equals("query")) {
+                                        if (path.contains("?")) {
+                                            path = path + "&" + apiKeyName + "=" + apiKeyValue;
+                                        } else {
+                                            path = path + "?" + apiKeyName + "=" + apiKeyValue;
+                                        }
+                                    } else if (apiKeyIn.equals(CookieParser.COOKIE)) {
+                                        if (requestHeaders.containsKey(CookieParser.COOKIE)) {
+                                            requestHeaders.put(CookieParser.COOKIE,
+                                                    requestHeaders.get(CookieParser.COOKIE) + "; " + apiKeyName + "="
+                                                            + apiKeyValue);
+                                        } else {
+                                            requestHeaders.put(CookieParser.COOKIE, apiKeyName + "=" + apiKeyValue);
+                                        }
                                     }
-                                } else if (apiKeyIn.equals("cookie")) {
-                                    requestHeaders.put("Cookie", apiKeyName + "=" + apiKeyValue);
                                 }
                             }
                         }
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
                     }
-                } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
-                }
 
-                String requestHeadersString = "";
-                try {
-                    requestHeadersString = mapper.writeValueAsString(requestHeaders);
-                } catch (JsonProcessingException e) {
-                    loggerMaker.infoAndAddToDb(
-                            "unable to parse request headers for " + path + " " + method + " " + e.getMessage());
-                }
+                    String requestHeadersString = "";
+                    if (requestHeaders != null && !requestHeaders.isEmpty()) {
+                        try {
+                            requestHeadersString = mapper.writeValueAsString(requestHeaders);
+                        } catch (JsonProcessingException e) {
+                            loggerMaker.infoAndAddToDb(
+                                    "unable to parse request headers for " + path + " " + method + " "
+                                            + e.getMessage());
+                        }
+                    }
 
-                String responseString = "";
-                String responseHeadersString = "";
-                Map<String, String> messageObject = new HashMap<>();
+                    Map<String, String> messageObject = new HashMap<>();
 
-                try {
-                    ApiResponses responses = operation.getResponses();
+                    List<Map<String, String>> responseObjectList = new ArrayList<>();
 
-                    if (responses != null) {
-                        for (String responseCode : responses.keySet()) {
+                    try {
+                        ApiResponses responses = operation.getResponses();
 
-                            if(responseCode.equals(ApiResponses.DEFAULT)) continue;
+                        if (responses != null) {
+                            for (String responseCode : responses.keySet()) {
 
-                            int statusCode = Integer.parseInt(responseCode);
-                            if (HttpResponseParams.validHttpResponseCode(statusCode)) {
+                                if (responseCode.equals(ApiResponses.DEFAULT))
+                                    continue;
 
-                                ApiResponse response = responses.get(responseCode);
+                                int statusCode = Integer.parseInt(responseCode);
+                                if (HttpResponseParams.validHttpResponseCode(statusCode)) {
 
-                                messageObject.put("statusCode", responseCode);
-                                Status status = Status.fromStatusCode(statusCode);
-                                if (status != null) {
-                                    messageObject.put("status", status.getReasonPhrase());
-                                }
+                                    String responseString = "";
+                                    String responseHeadersString = "";
+                                    Map<String, String> responseObject = new HashMap<>();
 
-                                Content content = response.getContent();
+                                    ApiResponse response = responses.get(responseCode);
 
-                                Map<String, Header> headers = response.getHeaders();
-                                Map<String, String> responseHeaders = new HashMap<>();
-                                if (headers != null) {
-                                    responseHeaders = HeaderParser.buildResponseHeaders(headers);
-                                }
-
-                                if (content != null) {
-                                    Pair<String, String> example = ContentParser.getExampleFromContent(content);
-                                    if (!(example.getFirst().isEmpty())) {
-                                        responseHeaders.put("Content-Type", example.getFirst());
+                                    responseObject.put(mKeys.statusCode, responseCode);
+                                    Status status = Status.fromStatusCode(statusCode);
+                                    if (status != null) {
+                                        responseObject.put(mKeys.status, status.getReasonPhrase());
                                     }
-                                    responseString = example.getSecond();
-                                }
 
-                                try {
-                                    responseHeadersString = mapper.writeValueAsString(responseHeaders);
-                                } catch (Exception e) {
-                                    loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
-                                            + method + " " + e.toString());
-                                }
+                                    Content content = response.getContent();
 
-                                // save the first valid response and break.
-                                break;
+                                    Map<String, Header> headers = response.getHeaders();
+                                    Map<String, String> responseHeaders = new HashMap<>();
+                                    if (headers != null) {
+                                        responseHeaders = HeaderParser.buildResponseHeaders(headers);
+                                    }
+
+                                    if (content != null) {
+                                        Pair<String, String> example = ContentParser.getExampleFromContent(content);
+                                        if (!(example.getFirst().isEmpty())) {
+                                            responseHeaders.put("Content-Type", example.getFirst());
+                                        }
+                                        responseString = example.getSecond();
+                                    }
+
+                                    try {
+                                        responseHeadersString = mapper.writeValueAsString(responseHeaders);
+                                    } catch (Exception e) {
+                                        loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
+                                                + method + " " + e.toString());
+                                    }
+
+                                    responseObject.put(mKeys.responsePayload, responseString);
+                                    responseObject.put(mKeys.responseHeaders, responseHeadersString);
+                                    responseObjectList.add(responseObject);
+                                }
                             }
                         }
+
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb(
+                                "unable to handle response body for " + path + " " + method + " " + e.toString());
                     }
 
-                } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb(
-                            "unable to handle response body for " + path + " " + method + " " + e.toString());
+                    messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
+                    messageObject.put(mKeys.path, path);
+                    messageObject.put(mKeys.method, method.toString().toUpperCase());
+                    messageObject.put(mKeys.requestHeaders, requestHeadersString);
+                    messageObject.put(mKeys.requestPayload, requestString);
+                    messageObject.put(mKeys.ip, "null");
+                    messageObject.put(mKeys.time, Context.now() + "");
+                    messageObject.put(mKeys.type, "HTTP");
+                    messageObject.put(mKeys.source, "OTHER");
+
+                    if (responseObjectList.isEmpty()) {
+                        responseObjectList.add(emptyResponseObject);
+                    }
+
+                    for (Map<String, String> responseObject : responseObjectList) {
+                        messageObject.putAll(emptyResponseObject);
+                        messageObject.putAll(responseObject);
+
+                        /*
+                         * if no data is present, no entry is made,
+                         * so to avoid that, we add dummy data
+                         */
+
+                        fillDummyIfEmptyMessage(messageObject);
+                        try {
+                            String s = mapper.writeValueAsString(messageObject);
+                            messages.add(s);
+                        } catch (JsonProcessingException e) {
+                            loggerMaker.infoAndAddToDb("unable to parse message object for " + path + " " + method + " "
+                                    + e.getMessage());
+                        }
+                    }
                 }
 
-                messageObject.put("akto_account_id", Context.accountId.get().toString());
-                messageObject.put("path", path);
-                messageObject.put("method", method.toString().toUpperCase());
-                messageObject.put("requestHeaders", requestHeadersString);
-                messageObject.put("requestPayload", requestString);
-                messageObject.put("ip", "null");
-                messageObject.put("time", Context.now() + "");
-                messageObject.put("type", "HTTP");
-                messageObject.put("source", "OTHER");
-
-                messageObject.put("responsePayload", responseString);
-                messageObject.put("responseHeaders", responseHeadersString);
-                messageObject.putIfAbsent("status", "OK");
-                messageObject.putIfAbsent("statusCode", "200");
-
-                try {
-                    String s = mapper.writeValueAsString(messageObject);
-                    messages.add(s);
-                } catch (JsonProcessingException e) {
-                    loggerMaker.infoAndAddToDb("unable to parse message object for " + path + " " + method + " "
-                            + e.getMessage());
-                }
+            } catch (Exception e) {
+                loggerMaker.infoAndAddToDb("unable to parse path item for " + path + " " + e.toString());
             }
         }
+
         return messages;
+    }
+
+    // message keys for akto format.
+    private interface mKeys {
+        String akto_account_id = "akto_account_id";
+        String path = "path";
+        String method = "method";
+        String requestHeaders = "requestHeaders";
+        String requestPayload = "requestPayload";
+        String responseHeaders = "responseHeaders";
+        String responsePayload = "responsePayload";
+        String status = "status";
+        String statusCode = "statusCode";
+        String ip = "ip";
+        String time = "time";
+        String type = "type";
+        String source = "source";
+    }
+
+    private final static Map<String, String> emptyResponseObject = new HashMap<String, String>() {
+        {
+            put(mKeys.responsePayload, "");
+            put(mKeys.responseHeaders, "");
+            put(mKeys.status, "OK");
+            put(mKeys.statusCode, "200");
+        }
+    };
+
+    private final static Map<String, String> AKTO_HEADER = new HashMap<String, String>() {
+        {
+            put("AKTO", "0");
+        }
+    };
+
+    private static void fillDummyIfEmptyMessage(Map<String, String> messageObject) {
+
+        if (messageObject.get(mKeys.requestHeaders).isEmpty()
+                && messageObject.get(mKeys.requestPayload).isEmpty()
+                && messageObject.get(mKeys.responseHeaders).isEmpty()
+                && messageObject.get(mKeys.responsePayload).isEmpty()
+                // ignoring messages with query parameters.
+                && !messageObject.get(mKeys.path).contains("?")) {
+
+            try {
+                messageObject.put(mKeys.requestHeaders,
+                        mapper.writeValueAsString(AKTO_HEADER));
+            } catch (JsonProcessingException e) {
+            }
+        }
+
     }
 
 }
