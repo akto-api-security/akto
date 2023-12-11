@@ -105,8 +105,6 @@ function TestRunResultPage(props) {
   let {testingRunResult, runIssues, testSubCategoryMap} = props;
 
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
-  console.log("selected run res")
-  console.log(selectedTestRunResult)
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
@@ -182,7 +180,6 @@ function TestRunResultPage(props) {
 }
   async function createJiraTicket(issueDetails){
 
-    console.log(issueDetails)
     if (Object.keys(issueDetails).length == 0) {
       return
     }
@@ -204,8 +201,6 @@ function TestRunResultPage(props) {
       await fetchData();
       setToast(true,false,"Jira Ticket Created, scroll down to view")
     })
-
-    console.log("jira ticket " + jiraTicketKey)
 
     if (selectedTestRunResult == null || selectedTestRunResult.testResults == null || selectedTestRunResult.testResults.length == 0) {
       return
@@ -236,9 +231,7 @@ function TestRunResultPage(props) {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
       let jiraIssueCopy = runIssues.jiraIssueUrl || "";
-      console.log("runIssues", runIssues)
       const moreInfoSections = transform.getInfoSectionsHeaders()
-      console.log("jiraIssueCopy" + jiraIssueCopy)
       setJiraIssueUrl(jiraIssueCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       // setJiraIssueUrl(jiraIssueUrl)
