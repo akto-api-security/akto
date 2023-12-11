@@ -36,13 +36,6 @@ public class RuntimeLogsDao extends AccountsContextDao<Log> {
                 db.createCollection(getCollName());
             }
         }
-        
-        MongoCursor<Document> cursor = db.getCollection(getCollName()).listIndexes().cursor();
-        List<Document> indices = new ArrayList<>();
-
-        while (cursor.hasNext()) {
-            indices.add(cursor.next());
-        }
 
         String[] fieldNames = {Log.TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
