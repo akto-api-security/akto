@@ -9,16 +9,30 @@ const SettingsLeftNav = () => {
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
     
+    const aboutArr = window.IS_SAAS === 'true' ? [] : [{
+        label: 'About',
+        icon: StoreDetailsFilledMinor,
+        selected: page === "about",
+        onClick: () => navigate("/dashboard/settings/about")
+    }]
+    const logsArr = window.IS_SAAS === 'true' ? [] : [{
+        label: 'Logs',
+        icon: ListFilledMajor,
+        selected: page === "logs",
+        onClick: () => navigate("/dashboard/settings/logs")
+    }]
+    const metricsArr = window.IS_SAAS === 'true' ? [] : [{
+        label: 'Metrics',
+        icon: ReportFilledMinor,
+        selected: page === "metrics",
+        onClick: () => navigate("/dashboard/settings/metrics")
+    }]
+
     return (
         <Navigation>
             <Navigation.Section
                 items={[
-                    {
-                        label: 'About',
-                        icon: StoreDetailsFilledMinor,
-                        selected: page === "about",
-                        onClick: () => navigate("/dashboard/settings/about")
-                    },
+                    ...aboutArr,
                     {
                         label: 'Users',
                         icon: IdentityCardFilledMajor,
@@ -43,18 +57,9 @@ const SettingsLeftNav = () => {
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
-                    {
-                        label: 'Logs',
-                        icon: ListFilledMajor,
-                        selected: page === "logs",
-                        onClick: () => navigate("/dashboard/settings/logs")
-                    },
-                    {
-                        label: 'Metrics',
-                        icon: ReportFilledMinor,
-                        selected: page === "metrics",
-                        onClick: () => navigate("/dashboard/settings/metrics")
-                    },
+                    
+                    ...logsArr,
+                    ...metricsArr,
                     {
                         label: 'Auth types',
                         icon: LockFilledMajor,

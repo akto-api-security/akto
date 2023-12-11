@@ -53,6 +53,8 @@ import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 
+// if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
+
 const router = createBrowserRouter([
   {
     path: "/dashboard",
