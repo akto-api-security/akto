@@ -38,10 +38,6 @@ function Jira() {
     useEffect(() => {
         fetchJiraInteg()
     }, []);
-    
-    const seeWork = () => {
-        window.open("https://docs.akto.io/traffic-connections/postman")
-    }
 
     async function testJiraIntegration(){
         setToast(true,false,"Testing Jira Integration")
