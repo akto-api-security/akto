@@ -785,6 +785,9 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
+        String webhookBody = webhook.getBody();
+        if (webhookBody.contains("$")) return; // use custom body
+
         StringBuilder body = new StringBuilder();
         body.append("{");
 
@@ -1193,6 +1196,16 @@ public class InitializerListener implements ServletContextListener {
         subdomain += "/signup-google";
     }
 
+    public static boolean isKubernetes() {
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        return isKubernetes != null && isKubernetes.equalsIgnoreCase("true");
+    }
+
+    public static boolean isNotKubernetes() {
+        return !isKubernetes();
+    }
+
+    
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         setSubdomain();

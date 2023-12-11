@@ -170,6 +170,11 @@ public class Main {
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
+            kafkaBrokerUrl = "127.0.0.1:29092";
+        }
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;

@@ -10,6 +10,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -417,7 +418,12 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
-        pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
+
+        Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
+        if (InitializerListener.isNotKubernetes()) {
+            doyProj = Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}));
+        }
+        pipeline.add(Aggregates.project(doyProj));
         pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();

@@ -29,6 +29,15 @@ const settingRequests = {
             }
         })
     },
+    makeAdmin(email) {
+        return request({
+            url: '/api/makeAdmin',
+            method: 'post',
+            data: {
+                email: email
+            }
+        })
+    },
 
     
     fetchApiTokens() {
@@ -153,11 +162,11 @@ const settingRequests = {
             }
         })
     },
-    fetchCustomWebhooks() {
+    fetchCustomWebhooks(customWebhookId) {
         return request({
             url: '/api/fetchCustomWebhooks',
             method: 'post',
-            data: {}
+            data: {customWebhookId}
         })
     },
     changeStatus(id, activeStatus) {
@@ -235,11 +244,97 @@ const settingRequests = {
         })
     },
 
+    fetchOktaSso() {
+        return request({
+            url: '/api/fetchOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
     addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
         return request({
             url: '/api/addIntegration',
             method: 'post',
             data: {userEmail, apiToken, baseUrl, projId, issueType}
+        })
+    },
+
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+        return request({
+            url: '/api/addOktaSso',
+            method: 'post',
+            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+        })
+    },
+
+    deleteOktaSso() {
+        return request({
+            url: '/api/deleteOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAzureSso() {
+        return request({
+            url: '/api/fetchAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+        return request({
+            url: '/api/addAzureSso',
+            method: 'post',
+            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+        })
+    },
+
+    deleteAzureSso() {
+        return request({
+            url: '/api/deleteAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    toggleRedactFeature(redactPayload) {
+        return request({
+            url: '/api/toggleRedactFeature',
+            method: 'post',
+            data: {
+                redactPayload
+            }
+        })
+    },
+
+    toggleNewMergingEnabled(newMergingEnabled) {
+        return request({
+            url: '/api/toggleNewMergingEnabled',
+            method: 'post',
+            data: {
+                newMergingEnabled
+            }
+        });
+    },
+
+    updateSetupType(setupType) {
+        return request({
+            url: '/api/updateSetupType',
+            method: 'post',
+            data: {
+                setupType
+            }
+        })
+    },
+
+    updateTrafficAlertThresholdSeconds(trafficAlertThresholdSeconds) {
+        return request({
+            url: '/api/updateTrafficAlertThresholdSeconds',
+            method: 'post',
+            data: {trafficAlertThresholdSeconds}
         })
     },
 }

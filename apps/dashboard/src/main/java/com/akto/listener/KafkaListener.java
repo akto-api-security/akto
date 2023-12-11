@@ -16,6 +16,11 @@ public class KafkaListener implements ServletContextListener {
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         String brokerIP = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        
+        if (InitializerListener.isKubernetes()) {
+            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.DASHBOARD);
+            return;
+        }
         if (brokerIP != null) {
             try {
                 kafka = new Kafka(brokerIP,  1000, BATCH_SIZE_CONFIG);

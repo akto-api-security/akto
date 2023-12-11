@@ -45,7 +45,7 @@ function GithubSso() {
         }
     }
 
-    const cardContent = "Enable Login via GitHub on  your Akto dashboard"
+    const cardContent = "Enable Login via GitHub on your Akto dashboard"
 
     const listComponent = (
         

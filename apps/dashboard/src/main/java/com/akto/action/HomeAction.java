@@ -2,8 +2,10 @@ package com.akto.action;
 
 import com.akto.listener.InitializerListener;
 import com.akto.utils.Auth0;
+import com.akto.utils.AzureLogin;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubLogin;
+import com.akto.utils.OktaLogin;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
 import com.mongodb.BasicDBObject;
@@ -45,6 +47,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
         if (GithubLogin.getClientId() != null) {
             servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
+        }
+        if(OktaLogin.getAuthorisationUrl() != null){
+            servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
+        }
+        if(AzureLogin.getSamlSettings() != null){
+            servletRequest.setAttribute("azureRequestUrl", new String(Base64.getEncoder().encode((AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/signup-azure-request").getBytes())));
         }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "akto-release-version");

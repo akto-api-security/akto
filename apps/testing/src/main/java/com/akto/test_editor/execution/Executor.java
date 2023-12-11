@@ -37,6 +37,7 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.utils.RedactSampleData;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,10 +47,13 @@ import java.util.Map;
 import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
+import org.apache.commons.lang3.StringUtils;
 
 public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+
+    public final String _HOST = "host";
 
     public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
@@ -90,6 +94,31 @@ public class Executor {
                     break;
                 }
                 try {
+
+                    // change host header in case of override URL ( if not already changed by test template )
+                    try {
+                        List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+                        List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+
+                        if (originalHostHeaders.get(0) != null
+                            && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
+                            && testingRunConfig != null
+                            && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+
+                            String url = ApiExecutor.prepareUrl(testReq.getRequest(), testingRunConfig);
+                            URI uri = new URI(url);
+                            String host = uri.getHost();
+                            if (uri.getPort() != -1) {
+                                host += ":" + uri.getPort();
+                            }
+                            testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
+                        }
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to update host header for overridden test URL",
+                                LogDb.TESTING);
+                    }
+                        
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     requestSent = true;

@@ -52,6 +52,10 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
+import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+
+// if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
 const router = createBrowserRouter([
   {
@@ -185,6 +189,14 @@ const router = createBrowserRouter([
           {
             path: "integrations/github_sso",
             element: <GithubSso />
+          },
+          {
+            path: "integrations/okta_sso",
+            element: <OktaIntegration />
+          },
+          {
+            path: "integrations/azure_sso",
+            element: <AzureSso />
           },
           {
             path: "integrations/slack",

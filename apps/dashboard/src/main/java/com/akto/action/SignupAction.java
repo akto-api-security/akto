@@ -6,8 +6,10 @@ import com.akto.listener.InitializerListener;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.notifications.email.WelcomeEmail;
+import com.akto.utils.AzureLogin;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
+import com.akto.utils.OktaLogin;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
@@ -15,6 +17,7 @@ import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -23,6 +26,9 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.onelogin.saml2.Auth;
+import com.onelogin.saml2.settings.Saml2Settings;
+import com.onelogin.saml2.settings.SettingsBuilder;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -34,6 +40,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -42,7 +50,10 @@ import org.json.JSONObject;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
@@ -442,6 +453,109 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
+    public String registerViaOkta() throws IOException{
+        OktaLogin oktaLoginInstance = OktaLogin.getInstance();
+        if(oktaLoginInstance == null){
+            return ERROR.toUpperCase();
+        }
+
+        Config.OktaConfig oktaConfig = OktaLogin.getInstance().getOktaConfig();
+        if (oktaConfig == null) {
+            return ERROR.toUpperCase();
+        }
+
+        String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+        String clientId = oktaConfig.getClientId();
+        String clientSecret = oktaConfig.getClientSecret();
+        String redirectUri = oktaConfig.getRedirectUri();
+
+        List<NameValuePair> params = new ArrayList<>();
+        params.add(new BasicNameValuePair("grant_type", "authorization_code"));
+        params.add(new BasicNameValuePair("code", this.code));
+        params.add(new BasicNameValuePair("client_id", clientId));
+        params.add(new BasicNameValuePair("client_secret", clientSecret));
+        params.add(new BasicNameValuePair("redirect_uri", redirectUri));
+
+        try {
+            Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
+            String accessToken = tokenData.get("access_token").toString();
+            Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
+            String email = userInfo.get("email").toString();
+            String username = userInfo.get("preferred_username").toString();
+
+            SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
+            
+            shouldLogin = "true";
+            createUserAndRedirect(email, username, oktaSignupInfo, 1000000);
+            code = "";
+        } catch (Exception e) {
+            e.printStackTrace();
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String sendRequestToAzure () throws IOException{
+        if(AzureLogin.getInstance() == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = AzureLogin.getSamlSettings();
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+        try {
+            Auth auth = new Auth(settings, servletRequest, servletResponse);
+            auth.login( AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+        } catch (Exception e) {
+            servletResponse.sendRedirect("/login");
+            e.printStackTrace();
+        }
+
+        
+        return SUCCESS.toUpperCase();
+    }
+
+    public String registerViaAzure(){
+        if(AzureLogin.getInstance() == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = AzureLogin.getSamlSettings();
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+
+        Auth auth;
+        try {
+            auth = new Auth(settings, servletRequest, servletResponse);
+            auth.processResponse();
+            if (!auth.isAuthenticated()) {
+                servletResponse.sendRedirect("/login");
+            }
+            String useremail = null;
+            String username = null;
+            List<String> errors = auth.getErrors();
+            if (!errors.isEmpty()) {
+                return ERROR.toUpperCase();
+            } else {
+                Map<String, List<String>> attributes = auth.getAttributes();
+                if (attributes.isEmpty()) {
+                    return ERROR.toUpperCase();
+                }
+                String nameId = auth.getNameId();
+                useremail = nameId;
+                username = nameId;
+            }
+            shouldLogin = "true";
+            SignupInfo.AzureSignupInfo signUpInfo = new SignupInfo.AzureSignupInfo(username, useremail);
+            createUserAndRedirect(useremail, username, signUpInfo, 1000000);
+        } catch (Exception e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
     public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
     public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
     public static final String INVALID_CHAR = "Invalid character";

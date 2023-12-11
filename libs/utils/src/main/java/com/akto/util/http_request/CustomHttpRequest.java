@@ -20,6 +20,8 @@ public class CustomHttpRequest {
     private static final HttpClient httpclient = HttpClients.createDefault();
     private static final ObjectMapper mapper = new ObjectMapper();
 
+    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
+
     public static Map<String,Object> getRequest(String url, String authHeader) throws HttpResponseException {
         HttpGet httpGet = new HttpGet(url);
 
@@ -36,6 +38,19 @@ public class CustomHttpRequest {
             httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
+        }
+
+        return s(httpPost);
+
+    }
+
+    public static Map<String,Object> postRequestEncodedType(String url, List<NameValuePair> params) throws HttpResponseException {
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Content-Type", FORM_URL_ENCODED_CONTENT_TYPE);
+        try {
+            httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+
         }
 
         return s(httpPost);

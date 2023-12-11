@@ -33,6 +33,17 @@ export default {
             return resp
         })
     },
+    makeAdmin (email) {
+        return request({
+            url: '/api/makeAdmin',
+            method: 'post',
+            data: {
+                email: email
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
     health() {
         return request({
             url: '/api/health',
