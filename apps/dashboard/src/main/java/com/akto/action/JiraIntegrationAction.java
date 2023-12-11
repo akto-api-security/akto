@@ -234,9 +234,7 @@ public class JiraIntegrationAction extends UserAction {
             String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
 
             origCurl = ExportSampleDataAction.getCurl(origReq);
-            System.out.println(origCurl);
             testCurl = ExportSampleDataAction.getCurl(testReq);
-            System.out.println(testCurl);
             HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(origReq);
             BasicDBObject respObj = BasicDBObject.parse(testReq);
             BasicDBObject respPayloaObj = BasicDBObject.parse(respObj.getString("response"));
@@ -273,12 +271,6 @@ public class JiraIntegrationAction extends UserAction {
                 HttpEntity responseEntity = response.getEntity();
                 int statusCode = response.getStatusLine().getStatusCode();
 
-                // Handle the response as needed
-                if (statusCode == 200) {
-                    System.out.println(responseEntity);
-                } else {
-                    System.out.println(responseEntity);
-                }
             }
 
             httpClient.close();

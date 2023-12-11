@@ -341,7 +341,6 @@ function IssuesPage(){
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
                     rowClickable={true}
-                    // nextUrlState={getNextUrlState}
                     getStatus={func.getTestResultStatus}
                 />
             ]}
