@@ -15,6 +15,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
+    public static final String ID = "_id.";
+
     public void createIndicesIfAbsent() {
 
         boolean exists = false;
@@ -28,32 +30,17 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
 
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiCollectionId"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        String[] fieldNames = {"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 2) {
-            String[] fieldNames = {"_id.url"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.URL};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 3) {
-            String[] fieldNames = {"_id.apiCollectionId", "_id.url"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
-    }
+        fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, "_id." + ApiInfo.ApiInfoKey.URL};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+}
 
     @Override
     public String getCollName() {

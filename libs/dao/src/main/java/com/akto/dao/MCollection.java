@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -12,6 +13,7 @@ import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +40,16 @@ public abstract class MCollection<T> {
     public MongoCollection<T> getMCollection() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
         return mongoDatabase.getCollection(getCollName(), getClassT());
+    }
+
+    public static boolean checkConnection() {
+        try {
+            clients[0].listDatabaseNames().first();
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public<V> List<T> findAll(String key, V value) {
@@ -263,5 +275,28 @@ public abstract class MCollection<T> {
 
         return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
     }
+
+    public ObjectId findNthDocumentIdFromEnd(int n) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        MongoCursor<Document> cursor = mongoDatabase.getCollection(getCollName(), Document.class).find(new BasicDBObject())
+                .sort(Sorts.descending(ID))
+                .skip(n)
+                .limit(1)
+                .cursor();
+
+        return cursor.hasNext() ? cursor.next().getObjectId(ID) : null;
+    }
+
+    public void trimCollection(int maxDocuments) {
+        long count = this.getMCollection().estimatedDocumentCount();
+        if (count <= maxDocuments) return;
+        long deleteCount =  maxDocuments / 2;
+        ObjectId objectId = findNthDocumentIdFromEnd((int) deleteCount);
+        if (objectId == null) return;
+
+        DeleteResult deleteResult = this.getMCollection().deleteMany(lt(ID, objectId));
+        System.out.println("Trimmed : " + deleteResult.getDeletedCount());
+    }
+
 
 }
