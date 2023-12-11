@@ -1,5 +1,6 @@
 import settingRequests from './api';
 import func from '@/util/func';
+import { parseString } from "xml2js"
 
 const settingFunctions = {
     getTokenList: async function (type){
@@ -117,6 +118,36 @@ const settingFunctions = {
         trafficData = resp.trafficMetricsMap
       })
       return trafficData
+    },
+
+    getSetupOptions: function(){
+      return setupOptions;
+    },
+
+    getParsedXml: function(xmlText){
+      let entityID = ""
+      let loginUrl= ""
+      let x509Certificate = ""
+
+      parseString(xmlText, (err, result) => {
+        if (err) {
+          console.log(err)
+          return {};
+        } else {
+          const entityDescriptor = result.EntityDescriptor;
+          if (entityDescriptor) {
+            entityID = entityDescriptor.$.entityID;
+            loginUrl = entityDescriptor.IDPSSODescriptor[0].SingleSignOnService[0].$.Location;
+            x509Certificate = entityDescriptor.IDPSSODescriptor[0].KeyDescriptor[0].KeyInfo[0].X509Data[0].X509Certificate[0];
+          }
+        }
+      });
+
+      return {
+        entityId: entityID, 
+        loginUrl: loginUrl,
+        certificate:x509Certificate
+      }
     }
 }
 
