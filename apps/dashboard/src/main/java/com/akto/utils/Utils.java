@@ -130,7 +130,7 @@ public class Utils {
                         statusCode =  res.getStatusCode()+"";
                         status =  "";
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
+                        loggerMaker.errorAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
                         return null;
                     }
                 } else {
