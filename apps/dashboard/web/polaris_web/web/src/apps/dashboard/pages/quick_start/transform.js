@@ -141,7 +141,7 @@ const openApiObj = {
     icon: '/public/openApi.svg',
     label: 'OpenAPI',
     text: 'Upload Open API/Swagger specification file to Akto to create an API inventory.',
-    docsUrl: '#',
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/openapi',
     component: <OpenApiSource/>,
     key: "OPENAPI"
 }

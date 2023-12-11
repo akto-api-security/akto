@@ -46,7 +46,7 @@ function OpenApiSource() {
     }
 
     const goToDocs = () => {
-        window.open("#")
+        window.open("https://docs.akto.io/traffic-connections/traffic-data-sources/openapi", '_blank')
     }
 
     return (
