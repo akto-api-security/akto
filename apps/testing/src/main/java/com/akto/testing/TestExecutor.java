@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
@@ -39,6 +40,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
@@ -123,7 +125,19 @@ public class TestExecutor {
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
+        String testRoleId = testingRun.getTestingRunConfig().getTestRoleId();
+        if(StringUtils.isNotBlank(testRoleId)){
+            TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testRoleId)));
+            if(testRole != null && testRole.getDefaultAuthMechanism() != null) {
+                loggerMaker.infoAndAddToDb("Default auth mechanism exists, using it", LogDb.TESTING);
+                authMechanism = testRole.getDefaultAuthMechanism();
+            } else {
+                String reason = testRole == null ? "Test role has been deleted" : "Default auth mechanism missing";
+                loggerMaker.infoAndAddToDb(reason + ", using user config", LogDb.TESTING);
+            }
+        }
+
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
@@ -623,6 +637,8 @@ public class TestExecutor {
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
+        // TestingUtil -> authMechanism
+        // TestingConfig -> auth
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes);
         List<TestResult> testResults = yamlTestTemplate.run();
