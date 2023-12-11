@@ -27,6 +27,7 @@ import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
 import OpenApiSpec from "../OpenApiSpec"
 import PersistStore from "../../../../main/PersistStore"
+import TooltipText from "../../../components/shared/TooltipText"
 
 const headers = [
     {
@@ -378,7 +379,9 @@ function ApiEndpoints() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg' truncate>{pageTitle}</Text>
+                <Box maxWidth="35vw">
+                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
+                </Box>
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={
