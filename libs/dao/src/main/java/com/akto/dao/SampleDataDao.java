@@ -43,22 +43,13 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
 
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-            counter++;
-        }
+        String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 2) {
-            instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
-        }
+        fieldNames = new String[]{"_id.apiCollectionId"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
 
     }
 

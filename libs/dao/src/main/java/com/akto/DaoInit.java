@@ -1,5 +1,13 @@
 package com.akto;
 
+import com.akto.dao.*;
+import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
@@ -31,6 +39,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
+import com.akto.util.DbMode;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -242,6 +251,7 @@ public class DaoInit {
     }
 
     public static void init(ConnectionString connectionString) {
+        DbMode.refreshDbType(connectionString.getConnectionString());
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
@@ -251,6 +261,22 @@ public class DaoInit {
                 .build();
 
         clients[0] = MongoClients.create(clientSettings);
+    }
+
+    public static void createIndices() {
+        SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        TrafficMetricsDao.instance.createIndicesIfAbsent();
+        TestRolesDao.instance.createIndicesIfAbsent();
+
+        ApiInfoDao.instance.createIndicesIfAbsent();
+        RuntimeLogsDao.instance.createIndicesIfAbsent();
+        LogsDao.instance.createIndicesIfAbsent();
+        DashboardLogsDao.instance.createIndicesIfAbsent();
+        LoadersDao.instance.createIndicesIfAbsent();
+        TestingRunResultDao.instance.createIndicesIfAbsent();
+        TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        TestingRunDao.instance.createIndicesIfAbsent();
+        TestingRunIssuesDao.instance.createIndicesIfAbsent();
     }
 
 }
