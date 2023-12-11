@@ -133,7 +133,7 @@ public class CustomAuthTypeAction extends UserAction{
             }, 5 , TimeUnit.SECONDS);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("ERROR: Reset custom auth types - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR: Reset custom auth types - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }

@@ -100,7 +100,7 @@ public class HarAction extends UserAction {
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
             return SUCCESS.toUpperCase();
         }

@@ -293,7 +293,7 @@ public class PostmanAction extends UserAction {
             try {
                 collectionDetails = main.fetchCollection(collectionId);
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
                 continue;
             }
 
@@ -324,7 +324,7 @@ public class PostmanAction extends UserAction {
             try {
                 msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
                 LoadersDao.instance.updateIncrementalCount(loaderId, countMap.get(collectionId));
                 continue;
             }
@@ -337,7 +337,7 @@ public class PostmanAction extends UserAction {
                 try {
                     Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
                 } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb("Error while pushing data to kafka: " + e.getMessage(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error while pushing data to kafka: " + e.getMessage(), LogDb.DASHBOARD);
                     return;
                 }
                 loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
@@ -356,7 +356,7 @@ public class PostmanAction extends UserAction {
         try {
             collectionDetailsObj = mapper.readTree(postmanCollectionFile);
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Error while parsing the file");
             return ERROR.toLowerCase();
         }
@@ -399,7 +399,7 @@ public class PostmanAction extends UserAction {
         try {
             msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("Error generating messages: " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Error generating messages: " + e.getMessage(), LogDb.DASHBOARD);
             LoadersDao.instance.updateIncrementalCount(loaderId, count);
             return ;
         }
@@ -444,7 +444,7 @@ public class PostmanAction extends UserAction {
                     loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s", apiName, collectionName), LogDb.DASHBOARD);
                     msgs.add(s);
                 } catch (JsonProcessingException e){
-                    loggerMaker.infoAndAddToDb("ERROR: " + e.toString(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("ERROR while JSON parsing: " + e.toString(), LogDb.DASHBOARD);
                 }
             }
         }

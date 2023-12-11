@@ -160,7 +160,7 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
-                loggerMaker.infoAndAddToDb("ERROR in converting testingRunHexId to objectId: " + e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("ERROR in converting testingRunHexId to objectId: " + this.testingRunHexId + " " + e.toString(), LogDb.DASHBOARD);
             }
         }
         if(localTestingRun==null){
@@ -236,7 +236,7 @@ public class StartTestAction extends UserAction {
                     }
                 }
                 if (testSubCategories.isEmpty()) {
-                    loggerMaker.infoAndAddToDb("ERROR: Test not found for " + selectedTest, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("ERROR: Test not found for " + selectedTest, LoggerMaker.LogDb.DASHBOARD);
                 } else {
                     loggerMaker.infoAndAddToDb(String.format("Category: %s, tests: %s", selectedTest, testSubCategories), LoggerMaker.LogDb.DASHBOARD);
                     tests.addAll(testSubCategories);
@@ -246,7 +246,7 @@ public class StartTestAction extends UserAction {
                 this.selectedTests = tests;
                 loggerMaker.infoAndAddToDb("Tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             } else {
-                loggerMaker.infoAndAddToDb("ERROR: No tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("ERROR: No tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             }
         }
     }
