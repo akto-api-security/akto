@@ -3,10 +3,12 @@ package com.akto.action;
 
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.JiraIntegration;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.listener.InitializerListener;
@@ -89,6 +91,16 @@ public class ProfileAction extends UserAction {
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
+
+        boolean jiraIntegrated = false;
+        try {
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration != null) {
+                jiraIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -99,7 +111,8 @@ public class ProfileAction extends UserAction {
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
-                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name())
+                .append("jiraIntegrated", jiraIntegrated);
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");

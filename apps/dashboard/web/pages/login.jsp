@@ -64,6 +64,7 @@
                     window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}');
                     window.OKTA_AUTH_URL = atob('${requestScope.oktaAuthUrl}');
                     window.AZURE_REQUEST_URL = atob('${requestScope.azureRequestUrl}');
+                    window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
 
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
