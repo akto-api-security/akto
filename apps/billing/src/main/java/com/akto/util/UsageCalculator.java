@@ -29,14 +29,6 @@ public class UsageCalculator {
 
     private UsageCalculator() {}
 
-    private static int epochToDateInt(int epoch) {
-        Date dateFromEpoch = new Date( epoch * 1000L );
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(dateFromEpoch);
-        return cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH);
-
-    }
-
     boolean statusDataSinks = false;
 
     boolean statusAggregateUsage = false;
@@ -217,7 +209,7 @@ public class UsageCalculator {
                 }
             }
 
-            int date = epochToDateInt(usageLowerBound);
+            int date = DateUtils.getDateYYYYMMDD(usageLowerBound);
 
             OrganizationUsage usage = OrganizationUsageDao.instance.findOne(ORG_ID, organizationId, DATE, date);
 

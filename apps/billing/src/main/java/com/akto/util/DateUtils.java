@@ -11,4 +11,10 @@ public class DateUtils {
 
         return dateTime.getHour();
     }
+
+    public static int getDateYYYYMMDD(int epoch){
+        LocalDateTime dateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(epoch), ZoneId.systemDefault());
+
+        return dateTime.getYear() * 10000 + dateTime.getMonthValue() * 100 + dateTime.getDayOfMonth();
+    }
 }
