@@ -31,7 +31,6 @@ import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.test_editor.Repository;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -1069,7 +1068,7 @@ public class InitializerListener implements ServletContextListener {
                         baos.write(buffer, 0, bytesRead);
                     }
 
-                    processTemplateFilesZip(baos.toByteArray(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), new Repository());
+                    processTemplateFilesZip(baos.toByteArray(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 }
             } catch (Exception ex) {
                 loggerMaker.errorAndAddToDb(String.format("Error while loading templates files from directory. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
@@ -1359,7 +1358,7 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.infoAndAddToDb(
                                         String.format("Updating akto test templates for account: %d", accountId),
                                         LogDb.DASHBOARD);
-                                processTemplateFilesZip(repoZip, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), new Repository());
+                                processTemplateFilesZip(repoZip, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(
                                         String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -1375,7 +1374,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public static void processTemplateFilesZip(byte[] zipFile, String author, String source, Repository repository) {
+    public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
                     ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
@@ -1434,7 +1433,7 @@ public class InitializerListener implements ServletContextListener {
                             } catch (Exception e) {
                             }
 
-                            if (author == _AKTO) {
+                            if (_AKTO.equals(author)) {
                                 YamlTemplateDao.instance.updateOne(
                                         Filters.eq(Constants.ID, id),
                                         Updates.combine(updates));
@@ -1443,7 +1442,7 @@ public class InitializerListener implements ServletContextListener {
                                         Updates.setOnInsert(YamlTemplate.SOURCE, source)
                                 );
                                 updates.add(
-                                        Updates.setOnInsert(YamlTemplate.REPOSITORY, repository)
+                                        Updates.setOnInsert(YamlTemplate.REPOSITORY_URL, repositoryUrl)
                                 );
 
                                 try {

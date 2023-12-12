@@ -1,25 +1,25 @@
 import request from "@/util/request"
 
 const testLibraryRequests = {
-    addTestLibrary(data) {
+    addTestLibrary(repositoryUrl) {
         return request({
             url: '/api/addTestLibrary',
             method: 'post',
-            data: data
+            data: {repositoryUrl: repositoryUrl}
         })
     },
-    removeTestLibrary(data) {
+    removeTestLibrary(repositoryUrl) {
         return request({
             url: '/api/removeTestLibrary',
             method: 'post',
-            data: data
+            data: {repositoryUrl: repositoryUrl}
         })
     },
-    syncCustomLibrary(data) {
+    syncCustomLibrary(repositoryUrl) {
         return request({
             url: '/api/syncCustomLibrary',
             method: 'post',
-            data: data
+            data: {repositoryUrl: repositoryUrl}
         })
     },
     fetchCustomTestsCount() {

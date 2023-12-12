@@ -1068,6 +1068,12 @@ getSizeOfFile(bytes) {
       event.preventDefault();
       funcToCall();
     }
+  },
+  addPlurality(count){
+    if(count == null || count==undefined){
+      return ""
+    }
+    return count === 1 ? "" : "s" 
   }
 }
 

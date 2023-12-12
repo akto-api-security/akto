@@ -2,12 +2,13 @@ package com.akto.dto.test_editor;
 
 public class TestLibrary {
 
-    Repository repository;
+    String repositoryUrl;
+    public static final String REPOSITORY_URL = "repositoryUrl";
     String author;
     int timestamp;
 
-    public TestLibrary(Repository repository, String author, int timestamp) {
-        this.repository = repository;
+    public TestLibrary(String repositoryUrl, String author, int timestamp) {
+        this.repositoryUrl = repositoryUrl;
         this.author = author;
         this.timestamp = timestamp;
     }
@@ -31,12 +32,12 @@ public class TestLibrary {
         this.timestamp = timestamp;
     }
 
-    public Repository getRepository() {
-        return repository;
+    public String getRepositoryUrl() {
+        return repositoryUrl;
     }
 
-    public void setRepository(Repository repository) {
-        this.repository = repository;
+    public void setRepositoryUrl(String repositoryUrl) {
+        this.repositoryUrl = repositoryUrl;
     }
 
 }

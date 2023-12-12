@@ -17,7 +17,6 @@ import com.akto.dto.User;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.test_editor.Repository;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AuthMechanism;
@@ -77,8 +76,7 @@ public class SaveTestEditorAction extends UserAction {
     private TestingRunIssues testingRunIssues;
     private Map<String, BasicDBObject> subCategoryMap;
     private boolean inactive;
-    private String repository;
-    private String branch;
+    private String repositoryUrl;
     private HashMap<String, Integer> testCountMap;
 
     public String fetchTestingRunResultFromTestingRun() {
@@ -299,30 +297,30 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private void updateTemplates(int accountId, String author, Repository repoObj){
+    private void updateTemplates(int accountId, String author, String repositoryUrl) {
     executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
                 try {
                     GithubSync githubSync = new GithubSync();
-                    byte[] repoZip = githubSync.syncRepo(repository, branch);
-                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s:%s for account: %d", repository, branch, accountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repoObj);
+                    byte[] repoZip = githubSync.syncRepo(repositoryUrl);
+                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s:%s for account %d, Error: %s", repository, branch, accountId, e.getMessage()), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);
     }
 
-    private boolean checkRepoValues(){
-        return repository == null || branch == null || repository.isEmpty() || branch.isEmpty();
+    private boolean checkEmptyRepoString() {
+        return repositoryUrl == null && !repositoryUrl.isEmpty() ;
     }
 
     public String syncCustomLibrary(){
 
-        if (checkRepoValues()) {
-            addActionError("Repository or branch cannot be empty");
+        if (checkEmptyRepoString()) {
+            addActionError("Repository url cannot be empty");
             return ERROR.toUpperCase();
         }
 
@@ -333,8 +331,7 @@ public class SaveTestEditorAction extends UserAction {
 
         if(testLibraries != null){
             testLibrary = testLibraries.stream()
-                    .filter(testLibrary1 -> testLibrary1.getRepository().getName().equals(repository) &&
-                            testLibrary1.getRepository().getBranch().equals(branch))
+                    .filter(testLibrary1 -> testLibrary1.getRepositoryUrl().equals(repositoryUrl))
                     .findFirst().orElse(null);
         }
 
@@ -345,9 +342,8 @@ public class SaveTestEditorAction extends UserAction {
 
         int accountId = Context.accountId.get();
         String author = testLibrary.getAuthor();
-        Repository repoObj = testLibrary.getRepository();
 
-        updateTemplates(accountId, author, repoObj);
+        updateTemplates(accountId, author, repositoryUrl);
 
         return SUCCESS.toUpperCase();
     }
@@ -355,17 +351,18 @@ public class SaveTestEditorAction extends UserAction {
 
     public String addTestLibrary(){
 
-        if (checkRepoValues()) {
-            addActionError("Repository or branch cannot be empty");
+        if (checkEmptyRepoString()) {
+            addActionError("Repository url cannot be empty");
             return ERROR.toUpperCase();
         }
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
-        if (accountSettings.getTestLibraries() != null &&
-                accountSettings.getTestLibraries().stream()
-                        .anyMatch(testLibrary -> testLibrary.getRepository().getName().equals(repository) &&
-                                testLibrary.getRepository().getBranch().equals(branch))) {
+        List<TestLibrary> testLibraries = accountSettings.getTestLibraries();
+
+        if (testLibraries != null &&
+                testLibraries.stream()
+                        .anyMatch(testLibrary -> testLibrary.getRepositoryUrl().equals(repositoryUrl))) {
             addActionError("Test library already exists");
             return ERROR.toUpperCase();
         }
@@ -373,32 +370,28 @@ public class SaveTestEditorAction extends UserAction {
         int accountId = Context.accountId.get();
         String author = getSUser().getLogin();
 
-        Repository repoObj = new Repository(repository, branch);
-        TestLibrary testLibrary = new TestLibrary(repoObj, author, Context.now());
+        TestLibrary testLibrary = new TestLibrary(repositoryUrl, author, Context.now());
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), 
                 Updates.addToSet(AccountSettings.TEST_LIBRARIES, testLibrary));
 
-        updateTemplates(accountId, author, repoObj);
+        updateTemplates(accountId, author, repositoryUrl);
 
         return SUCCESS.toUpperCase();
     }
 
     public String removeTestLibrary(){
 
-        if (checkRepoValues()) {
-            addActionError("Repository or branch cannot be empty");
+        if (checkEmptyRepoString()) {
+            addActionError("Repository url cannot be empty");
             return ERROR.toUpperCase();
         }
 
         String author = getSUser().getLogin();
-
-        Repository repoObj = new Repository(repository, branch);
         
         BasicDBObject repoPullObj = new BasicDBObject();
-        repoPullObj.put("repository.name", repository);
-        repoPullObj.put("repository.branch", branch);
+        repoPullObj.put(TestLibrary.REPOSITORY_URL, repositoryUrl);
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), 
@@ -408,7 +401,7 @@ public class SaveTestEditorAction extends UserAction {
                 Filters.and(
                     Filters.eq(YamlTemplate.AUTHOR, author),
                     Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM),
-                    Filters.eq(YamlTemplate.REPOSITORY, repoObj)));
+                    Filters.eq(YamlTemplate.REPOSITORY_URL, repositoryUrl)));
 
         return SUCCESS.toUpperCase();
     }
@@ -416,15 +409,15 @@ public class SaveTestEditorAction extends UserAction {
     public String fetchCustomTestsCount(){
 
         List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
-            Filters.exists(YamlTemplate.REPOSITORY),
-            Projections.include(YamlTemplate.REPOSITORY));
+            Filters.exists(YamlTemplate.REPOSITORY_URL),
+            Projections.include(YamlTemplate.REPOSITORY_URL));
         
         if(testCountMap == null){
             testCountMap = new HashMap<>();
         }
 
         for(YamlTemplate template : templates){
-            String repo = template.getRepository().toString();
+            String repo = template.getRepositoryUrl();
             if(testCountMap.containsKey(repo)){
                 testCountMap.put(repo, testCountMap.get(repo) + 1);
             }else{
@@ -533,20 +526,12 @@ public class SaveTestEditorAction extends UserAction {
         this.inactive = inactive;
     }
 
-    public String getRepository() {
-        return repository;
+    public String getRepositoryUrl() {
+        return repositoryUrl;
     }
 
-    public void setRepository(String repository) {
-        this.repository = repository;
-    }
-
-    public String getBranch() {
-        return branch;
-    }
-
-    public void setBranch(String branch) {
-        this.branch = branch;
+    public void setRepositoryUrl(String repositoryUrl) {
+        this.repositoryUrl = repositoryUrl;
     }
 
     public HashMap<String, Integer> getTestCountMap() {
