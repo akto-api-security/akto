@@ -80,16 +80,18 @@ function TestLibrary() {
     }
 
     function getStyledForGithubOrDefault(repositoryUrl, type){
-        let arr = repositoryUrl.split("/");
-        if(arr.length < 9) return repositoryUrl;
 
-        if(arr[2] == "github.com"){
-            let tmp = arr[8].split(".")
-            if(tmp.length < 2) return repositoryUrl;
-            if(type == "LINK")
-                return `https://github.com/${arr[3]}/${arr[4]}/tree/${tmp[0]}`
-            else if(type == "NAME")
-                return `${arr[3]}/${arr[4]}:${tmp[0]}`
+        const regex = /https:\/\/github\.com\/([^\/]+\/[^\/]+)\/archive\/refs\/heads\/(.+)\.zip/;
+        const match = repositoryUrl.match(regex);
+
+        if (match && match.length === 3) {
+            const repositoryURL = match[1];
+            const branchName = match[2];
+
+            if (type == "LINK")
+                return `https://github.com/${repositoryURL}/tree/${branchName}`;
+            else if (type == "NAME")
+                return `${repositoryURL}:${branchName}`
         }
         return repositoryUrl;
     }
