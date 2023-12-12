@@ -145,7 +145,7 @@ function OktaIntegration() {
 
     return (
         <>
-            <IntegrationsLayout title="Okta SSO" cardContent={cardContent} component={oktaSSOComponent} />
+            <IntegrationsLayout title="Okta SSO" cardContent={cardContent} component={oktaSSOComponent} docsUrl="https://docs.akto.io/sso/okta-oidc"/>
             <DeleteModal showDeleteModal={showDeleteModal} setShowDeleteModal={setShowDeleteModal} SsoType={"Okta"} onAction={handleDelete} />
         </>
     )

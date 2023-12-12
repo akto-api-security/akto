@@ -128,7 +128,7 @@ function GithubSso() {
     )
     return (
         <>
-        <IntegrationsLayout title="GitHub SSO" cardContent={cardContent} component={card} docsUrl="" />
+        <IntegrationsLayout title="GitHub SSO" cardContent={cardContent} component={card} docsUrl="https://docs.akto.io/sso/github-oidc" />
         {modal}
         </>
     )

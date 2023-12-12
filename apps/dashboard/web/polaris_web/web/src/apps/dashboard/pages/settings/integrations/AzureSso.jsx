@@ -159,7 +159,7 @@ function AzureSso() {
     
     return (
         <>
-            <IntegrationsLayout title="Azure AD SSO SAML" cardContent={cardContent} component={azureSSOComponent} docsUrl="" />
+            <IntegrationsLayout title="Azure AD SSO SAML" cardContent={cardContent} component={azureSSOComponent} docsUrl="https://docs.akto.io/sso/azuread-saml" />
             <DeleteModal setShowDeleteModal={setShowDeleteModal} showDeleteModal={showDeleteModal} SsoType={"Azure"} onAction={handleDelete} />
         </>
     )
