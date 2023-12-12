@@ -389,16 +389,18 @@ public abstract class SignupInfo {
         private String refreshToken;
         private int refreshTokenExpiry;
         private String username;
+        private String email;
 
         public GithubSignupInfo() {
 
         }
 
-        public GithubSignupInfo(String accessToken, String refreshToken, int refreshTokenExpiry, String username) {
+        public GithubSignupInfo(String accessToken, String refreshToken, int refreshTokenExpiry, String username, String email) {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
             this.refreshTokenExpiry = refreshTokenExpiry;
             this.username = username;
+            this.email = email;
             this.configType = Config.ConfigType.GITHUB;
             this.key = this.configType.name();
         }
@@ -433,6 +435,14 @@ public abstract class SignupInfo {
 
         public void setUsername(String username) {
             this.username = username;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
         }
     }
 }

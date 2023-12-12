@@ -48,7 +48,7 @@
  -->
               <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
             </div>
-            <div v-if="githubClientId">
+            <div v-if="githubUrl">
               <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px" @click="goToGithub">
                 <div>
                   <v-icon>$githubIcon</v-icon>
@@ -98,12 +98,12 @@ export default {
       formModel: null,
       isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
       isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
-      githubClientId: window.GITHUB_CLIENT_ID
+      githubUrl: window.GITHUB_AUTH_URL
     }
   },
   methods: {
     goToGithub() {
-      window.location.href = ("https://github.com/login/oauth/authorize?client_id=" + this.githubClientId);
+      window.location.href = this.githubUrl
     },
     login() {
       this.loadingLogin = true
