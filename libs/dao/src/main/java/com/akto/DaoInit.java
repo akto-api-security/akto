@@ -280,6 +280,7 @@ public class DaoInit {
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
         TestingRunDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
+        ApiCollectionsDao.instance.createIndicesIfAbsent();
     }
 
 }
