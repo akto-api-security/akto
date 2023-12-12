@@ -7,8 +7,7 @@ import func from "@/util/func";
 function TestLibrary() {
 
     const aktoTestLibrary = {
-        repository:
-            { name: "akto-api-security/tests-library", branch: "master" },
+        repositoryUrl: "https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip",
         author: "AKTO", timestamp: 0
     }
 
@@ -22,19 +21,16 @@ function TestLibrary() {
         }
 
         let res2 = await api.fetchCustomTestsCount();
-        console.log(res2)
 
         if (res2.testCountMap != null) {
-            for(let v in res2.testCountMap){
-                let repo = { name: v.split(" ")[0], branch: v.split(" ")[1] }
+            for(let repositoryUrl in res2.testCountMap){
                 for(let i in tmp){
-                    if(tmp[i].repository.name === repo.name && tmp[i].repository.branch === repo.branch){
-                        tmp[i].count = res2.testCountMap[v]
+                    if(tmp[i].repositoryUrl === repositoryUrl) {
+                        tmp[i].count = res2.testCountMap[repositoryUrl]
                     }
                 }
             }
         }
-        console.log(tmp);
         setData([aktoTestLibrary, ...tmp])
 
     }
@@ -43,21 +39,17 @@ function TestLibrary() {
         fetchData();
     }, [])
 
-    async function handleRemoveTestLibrary(repository) {
-        await api.removeTestLibrary({
-            repository: repository.name,
-            branch: repository.branch
-        })
+    async function handleRemoveTestLibrary(repositoryUrl) {
+        await api.removeTestLibrary(repositoryUrl)
         func.setToast(true, false, "Test library removed successfully")
         fetchData();
     }
 
-    async function handleSyncTestLibrary(repository) {
-        await api.syncCustomLibrary({
-            repository: repository.name,
-            branch: repository.branch
-        })
-        func.setToast(true, false, "Test library will be synced in the background. It may take a few minutes to sync the library.")
+    const commonMessage = "It may take a few minutes to sync the library, please refresh the page after sometime to see the changes."
+
+    async function handleSyncTestLibrary(repositoryUrl) {
+        await api.syncCustomLibrary(repositoryUrl)
+        func.setToast(true, false, "Test library will be synced in the background. " + commonMessage)
         fetchData();
     }
 
@@ -68,29 +60,38 @@ function TestLibrary() {
     }
 
     async function addTestLibrary() {
-        await api.addTestLibrary({ repository: repositoryName, branch: repositoryBranch })
-        func.setToast(true, false, "Test library added successfully. It may take a few minutes to sync the library.")
+        await api.addTestLibrary(repositoryUrl)
+        func.setToast(true, false, "Test library added successfully. " + commonMessage)
         fetchData()
         setAddTestLibraryModalActive(false)
-        setRepositoryName('')
-        setRepositoryBranch('')
+        setRepositoryUrl('')
     }
 
-    const [repositoryName, setRepositoryName] = useState('');
-    const handleRepositoryNameChange = useCallback(
-        (newValue) => setRepositoryName(newValue),
-        []);
-
-    const [repositoryBranch, setRepositoryBranch] = useState('');
-    const handleRepositoryBranchChange = useCallback(
-        (newValue) => setRepositoryBranch(newValue),
+    const [repositoryUrl, setRepositoryUrl] = useState('');
+    const handleRepositoryUrlChange = useCallback(
+        (newValue) => setRepositoryUrl(newValue),
         []);
 
     function getInfo({author, timestamp, count}){
         if(count == null || count == undefined) 
             return `Added by ${author} ${func.prettifyEpoch(timestamp)}`
 
-        return `${count} test${count == 1 ? "" : "s" } added by ${author} ${func.prettifyEpoch(timestamp)}`
+        return `${count} test${func.addPlurality(count)} added by ${author} ${func.prettifyEpoch(timestamp)}`
+    }
+
+    function getStyledForGithubOrDefault(repositoryUrl, type){
+        let arr = repositoryUrl.split("/");
+        if(arr.length < 9) return repositoryUrl;
+
+        if(arr[2] == "github.com"){
+            let tmp = arr[8].split(".")
+            if(tmp.length < 2) return repositoryUrl;
+            if(type == "LINK")
+                return `https://github.com/${arr[3]}/${arr[4]}/tree/${tmp[0]}`
+            else if(type == "NAME")
+                return `${arr[3]}/${arr[4]}:${tmp[0]}`
+        }
+        return repositoryUrl;
     }
 
     return (
@@ -117,28 +118,28 @@ function TestLibrary() {
                     resourceName={{ singular: 'test library', plural: 'test libraries' }}
                     items={data}
                     renderItem={(item) => {
-                        const { repository, author, timestamp, count } = item;
+                        const { repositoryUrl, author, timestamp, count } = item;
 
                         const shortcutActions = author !== "AKTO" ?
                             [
                                 {
                                     content: 'Sync',
-                                    onAction: () => { handleSyncTestLibrary(repository) },
+                                    onAction: () => { handleSyncTestLibrary(repositoryUrl) },
                                 },
                                 {
                                     content: 'Remove test library',
-                                    onAction: () => { handleRemoveTestLibrary(repository) },
+                                    onAction: () => { handleRemoveTestLibrary(repositoryUrl) },
                                 }
                             ] : []
 
                         return (<ResourceItem
-                            id={repository.name + repository.branch}
+                            id={repositoryUrl}
                             shortcutActions={shortcutActions}
                             persistActions
-                            onClick={() => { window.open(`https://github.com/${repository.name}/tree/${repository.branch}`, "_blank") }}
+                            onClick={() => { window.open(getStyledForGithubOrDefault(repositoryUrl, "LINK"), "_blank") }}
                         >
                             <Text variant="bodyMd" fontWeight="bold" as="h3">
-                                {`${repository.name}:${repository.branch}`}
+                                {`${getStyledForGithubOrDefault(repositoryUrl, "NAME")}`}
                             </Text>
                             <Text variant="bodyMd">
                                 {author !== "AKTO" ?
@@ -165,21 +166,12 @@ function TestLibrary() {
                             <HorizontalStack gap={2}>
                                 <div style={{ flexGrow: 1 }}>
                                     <TextField
-                                        id={"repo-name"}
-                                        label="Repository"
-                                        placeholder="akto-api-security/tests-library"
-                                        value={repositoryName}
-                                        onChange={handleRepositoryNameChange}
-                                        autoComplete="off"
-                                    />
-                                </div>
-                                <div style={{ flexGrow: 1 }}>
-                                    <TextField
-                                        id={"repo-branch"}
-                                        label="Branch"
-                                        placeholder="master"
-                                        value={repositoryBranch}
-                                        onChange={handleRepositoryBranchChange}
+                                        id={"repo-url"}
+                                        label="Repository url"
+                                        placeholder="https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip"
+                                        value={repositoryUrl}
+                                        helpText = "The repository url must be a zip file ( < 10 MiB ) containing test library YAML files. Make sure the zip file is reachable from your akto dashboard."
+                                        onChange={handleRepositoryUrlChange}
                                         autoComplete="off"
                                     />
                                 </div>
