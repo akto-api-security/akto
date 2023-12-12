@@ -20,6 +20,8 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         fieldNames = new String[]{TestingRun.END_TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
+        fieldNames = new String[]{"testingEndpoints.apiCollectionId", "endTimestamp"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
     }
 
     @Override
