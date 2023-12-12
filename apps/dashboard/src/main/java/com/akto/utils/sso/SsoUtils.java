@@ -5,9 +5,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ConfigsDao;
+import com.akto.utils.AzureLogin;
+import com.akto.utils.CustomHttpsWrapper;
 import com.mongodb.client.model.Filters;
 
 public class SsoUtils {
@@ -24,4 +28,20 @@ public class SsoUtils {
         return ConfigsDao.instance.count(filter) > 0;
     }
 
+    public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest){
+        String requestUri = servletRequest.getRequestURL().toString();
+        String savedRequestUri = AzureLogin.getInstance().getAzureConfig().getAcsUrl();
+
+        if(requestUri.equals(savedRequestUri)){
+            return servletRequest;
+        }
+        String tempRequestUri = requestUri.substring(7);
+        String tempSavedRequestUri = savedRequestUri.substring(8);
+        
+        if(tempRequestUri.equals(tempSavedRequestUri)){
+            return new CustomHttpsWrapper(servletRequest);
+        }else{
+            return servletRequest;
+        }
+    }
 }

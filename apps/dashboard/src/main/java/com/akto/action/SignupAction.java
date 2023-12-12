@@ -11,6 +11,7 @@ import com.akto.utils.AzureLogin;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
+import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
@@ -525,16 +526,19 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         Auth auth;
         try {
-            auth = new Auth(settings, servletRequest, servletResponse);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest);
+            auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
             if (!auth.isAuthenticated()) {
+                loggerMaker.errorAndAddToDb("Error reason: " + auth.getLastErrorReason(), LogDb.DASHBOARD);
                 servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
             }
             String useremail = null;
             String username = null;
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
-                loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + errors.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
                 return ERROR.toUpperCase();
             } else {
                 Map<String, List<String>> attributes = auth.getAttributes();
