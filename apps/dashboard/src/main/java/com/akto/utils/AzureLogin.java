@@ -2,7 +2,6 @@ package com.akto.utils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
