@@ -25,9 +25,7 @@ public class ApiToken {
         SLACK(Collections.emptyList()),
         CICD(Arrays.asList("/api/startTest", "/api/retrieveAllCollectionTests", "/api/fetchTestingRunResultSummaries", 
         "/api/fetchTestingRunResults","/api/fetchWorkflowTestingRun","/api/fetchWorkflowTestingSchedule",
-        "/api/stopAllTests","/api/fetchTestRunResultDetails","/api/fetchIssueFromTestRunResultDetails",
-                "/api/publishGithubComments", "/api/updateGithubStatus"));
-        //Adding publishGithubComments and updateGithubStatus
+        "/api/stopAllTests","/api/fetchTestRunResultDetails","/api/fetchIssueFromTestRunResultDetails"));
         private final List<String> accessList;
 
         Utility(List<String> accessList) {
