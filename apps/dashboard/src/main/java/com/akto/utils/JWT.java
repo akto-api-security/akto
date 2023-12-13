@@ -1,17 +1,21 @@
 package com.akto.utils;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.lang.RuntimeEnvironment;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwts;
 
 import java.io.*;
-import java.security.*;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Map;
 
 public class JWT {
@@ -25,7 +29,7 @@ public class JWT {
             kpg = KeyPairGenerator.getInstance("RSA");
             kpg.initialize(2048);
             kp = kpg.generateKeyPair();
-            RuntimeEnvironment.enableBouncyCastleIfPossible();
+
         } catch (NoSuchAlgorithmException e) {
             ;
         } 
@@ -69,38 +73,6 @@ public class JWT {
                 .parseClaimsJws(jwsString);
     }
 
-    static PrivateKey get(byte[] secrets) throws Exception {
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(secrets);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(spec);
-    }
-
-    public static String createJWT(String githubAppId,String secret, long ttlMillis) throws Exception {
-        //The JWT signature algorithm we will be using to sign the token
-        SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.RS256;
-
-        long nowMillis = System.currentTimeMillis();
-        Date now = new Date(nowMillis);
-
-        //We will sign our JWT with our private key
-        Key signingKey = get(Base64.getDecoder().decode(secret));
-
-        //Let's set the JWT Claims
-        JwtBuilder builder = Jwts.builder()
-                .setIssuedAt(now)
-                .setIssuer(githubAppId)
-                .signWith(signingKey, signatureAlgorithm);
-
-        //if it has been specified, let's add the expiration
-        if (ttlMillis > 0) {
-            long expMillis = nowMillis + ttlMillis;
-            Date exp = new Date(expMillis);
-            builder.setExpiration(exp);
-        }
-
-        //Builds the JWT and serializes it to a compact, URL-safe string
-        return builder.compact();
-    }
 
     private static PrivateKey getPrivateKey(String privateKeyPath) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey);

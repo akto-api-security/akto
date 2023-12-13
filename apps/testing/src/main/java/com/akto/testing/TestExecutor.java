@@ -22,6 +22,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.AuthMechanismStore;
@@ -277,12 +278,13 @@ public class TestExecutor {
 
         } while (fetchMore);
 
-        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)));
+        GithubUtils.publishGithubComments(testingRunResultSummary);
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
     }
