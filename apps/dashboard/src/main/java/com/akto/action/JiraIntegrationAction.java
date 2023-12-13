@@ -148,7 +148,7 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject fields = new BasicDBObject();
 
         // issue title
-        fields.put("summary", "Akto Content - " + issueTitle);
+        fields.put("summary", "Akto Report - " + issueTitle);
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         Bson filters = Filters.and(
             Filters.eq("_id.apiInfoKey.apiCollectionId", testingIssueId.getApiInfoKey().getApiCollectionId()),
