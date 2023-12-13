@@ -27,6 +27,7 @@ import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.utils.RedactSampleData;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunConfig;
@@ -47,7 +48,10 @@ import java.util.Map;
 import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
+
+import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 
 public class Executor {
 
@@ -70,9 +74,28 @@ public class Executor {
         OriginalHttpResponse testResponse;
         RawApi sampleRawApi = rawApi.copy();
         ExecutorSingleRequest singleReq = null;
-        if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
+        if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().isEmpty()) {
             result.add(invalidExecutionResult);
             return result;
+        }
+        if (StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            if (role != null) {
+                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                    if (role.getDefaultAuthMechanism() != null) {
+                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        overrideAuth(sampleRawApi, role.getDefaultAuthMechanism());
+                    } else {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                }
+            } else {
+                String reason = "Test role has been deleted";
+                loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+            }
         }
 
         boolean requestSent = false;
@@ -143,6 +166,26 @@ public class Executor {
         }
 
         return result;
+    }
+
+    private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+        if (authParams == null || authParams.isEmpty()) {
+            return;
+        }
+        AuthParam authParam = authParams.get(0);
+        String authHeader = authParam.getKey();
+        String authVal = authParam.getValue();
+        Map<String, List<String>> headersMap= rawApi.fetchReqHeaders();
+        for (Map.Entry<String, List<String>> headerKeyVal : headersMap.entrySet()) {
+            if (headerKeyVal.getKey().equalsIgnoreCase(authHeader)) {
+                headerKeyVal.setValue(Collections.singletonList(authVal));
+                rawApi.modifyReqHeaders(headersMap);
+                loggerMaker.infoAndAddToDb("overriding auth header " + authHeader, LogDb.TESTING);
+                return;
+            }
+        }
+        loggerMaker.infoAndAddToDb("auth header not found " + authHeader, LogDb.TESTING);
     }
 
     public TestResult validate(ExecutionResult attempt, RawApi rawApi, Map<String, Object> varMap, String logId, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {

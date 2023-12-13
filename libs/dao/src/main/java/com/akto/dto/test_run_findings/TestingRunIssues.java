@@ -18,15 +18,17 @@ public class TestingRunIssues {
     private ObjectId latestTestingRunSummaryId;
     public static final String IGNORE_REASON = "ignoreReason";
     private String ignoreReason;
+    private String jiraIssueUrl;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
-                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId) {
+                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, String jiraIssueUrl) {
         this.creationTime = creationTime;
         this.lastSeen = lastSeen;
         this.id = id;
         this.severity = severity;
         this.testRunIssueStatus = status;
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
+        this.jiraIssueUrl = jiraIssueUrl;
     }
 
     public TestingRunIssues() {
@@ -87,4 +89,13 @@ public class TestingRunIssues {
     public void setIgnoreReason(String ignoreReason) {
         this.ignoreReason = ignoreReason;
     }
+
+    public String getJiraIssueUrl() {
+        return jiraIssueUrl;
+    }
+
+    public void setJiraIssueUrl(String jiraIssueUrl) {
+        this.jiraIssueUrl = jiraIssueUrl;
+    }
+
 }

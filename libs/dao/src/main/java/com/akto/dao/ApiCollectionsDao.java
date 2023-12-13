@@ -7,11 +7,8 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -33,6 +30,25 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     @Override
     public Class<ApiCollection> getClassT() {
         return ApiCollection.class;
+    }
+
+    public void createIndicesIfAbsent() {
+        boolean exists = false;
+        String dbName = Context.accountId.get()+"";
+        MongoDatabase db = clients[0].getDatabase(dbName);
+        for (String col: db.listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            db.createCollection(getCollName());
+        }
+
+        String[] fieldNames = {"startTs"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
     }
 
     public ApiCollection getMeta(int apiCollectionId) {
