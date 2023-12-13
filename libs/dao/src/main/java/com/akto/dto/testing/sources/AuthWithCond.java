@@ -12,8 +12,10 @@ public class AuthWithCond {
     }
 
     public AuthWithCond(AuthMechanism authMechanism, Map<String, String> headerKVPairs) {
-        headerKVPairs.remove("");
-        headerKVPairs.remove(null);
+        if (headerKVPairs != null) {
+            headerKVPairs.remove("");
+            headerKVPairs.remove(null);
+        }
         this.authMechanism = authMechanism;
         this.headerKVPairs = headerKVPairs;
     }
