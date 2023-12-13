@@ -80,11 +80,20 @@ public class Executor {
         }
         if (StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
-            if (role != null && role.getDefaultAuthMechanism() != null) {
-                loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                overrideAuth(sampleRawApi, role.getDefaultAuthMechanism());
+            if (role != null) {
+                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                    if (role.getDefaultAuthMechanism() != null) {
+                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        overrideAuth(sampleRawApi, role.getDefaultAuthMechanism());
+                    } else {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                }
             } else {
-                String reason = role == null ? "Test role has been deleted" : "Default auth mechanism absent";
+                String reason = "Test role has been deleted";
                 loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }

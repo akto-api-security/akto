@@ -126,18 +126,6 @@ public class TestExecutor {
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
-        String testRoleId = testingRun.getTestingRunConfig().getTestRoleId();
-        if(StringUtils.isNotBlank(testRoleId)){
-            TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testRoleId)));
-            if(testRole != null && testRole.getDefaultAuthMechanism() != null) {
-                loggerMaker.infoAndAddToDb("Default auth mechanism exists, using it", LogDb.TESTING);
-                authMechanism = testRole.getDefaultAuthMechanism();
-            } else {
-                String reason = testRole == null ? "Test role has been deleted" : "Default auth mechanism missing";
-                loggerMaker.infoAndAddToDb(reason + ", using user config", LogDb.TESTING);
-            }
-        }
-
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
