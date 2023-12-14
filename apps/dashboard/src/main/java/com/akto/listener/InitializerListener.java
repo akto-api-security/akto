@@ -1362,7 +1362,7 @@ public class InitializerListener implements ServletContextListener {
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
-
+            setDashboardMode();
             insertPiiSources();
 
 //            setUpPiiCleanerScheduler();
@@ -1390,6 +1390,22 @@ public class InitializerListener implements ServletContextListener {
     public void readAndSaveBurpPluginVersion() {
         // todo get latest version from github
         burpPluginVersion = 5;
+    }
+
+    public static void setDashboardMode() {
+        String dashboardMode = DashboardMode.getActualDashboardMode().toString();
+
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+
+        SetupDao.instance.getMCollection().updateOne(
+                Filters.empty(),
+                Updates.combine(
+                        Updates.set("dashboardMode", dashboardMode)
+                ),
+                updateOptions
+        );
+
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
