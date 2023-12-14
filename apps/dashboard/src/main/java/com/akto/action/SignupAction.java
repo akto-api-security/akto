@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.notifications.email.WelcomeEmail;
@@ -156,7 +157,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     code = "";
-                    createUserAndRedirect(userEmail, userName, info, 0);
+                    createUserAndRedirect(userEmail, userName, info, 0, "slack");
                 } else {
                     code = usersIdentityResponse.getError();
                 }
@@ -253,7 +254,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
-                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId());
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), "auth0");
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -266,7 +267,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
         }
-        createUserAndRedirect(email, name, auth0SignupInfo, 0);
+        createUserAndRedirect(email, name, auth0SignupInfo, 0, "auth0");
         code = "";
         System.out.println("Executed registerViaAuth0");
         return SUCCESS.toUpperCase();
@@ -317,7 +318,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             SignupInfo.GoogleSignupInfo signupInfo = new SignupInfo.GoogleSignupInfo(aktoGoogleConfig.getId(), accessToken, refreshToken, tokenResponse.getExpiresInSeconds());
             shouldLogin = "true";
-            createUserAndRedirect(userEmail, username, signupInfo, 0);
+            createUserAndRedirect(userEmail, username, signupInfo, 0, "google");
             code = "";
         } catch (IOException e) {
             code = "Please login again";
@@ -400,7 +401,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         try {
             shouldLogin = "true";
-            createUserAndRedirect(email, email, signupInfo, invitedToAccountId);
+            createUserAndRedirect(email, email, signupInfo, invitedToAccountId, "email");
         } catch (IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -432,7 +433,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userData.get("login").toString() + "@" + company;
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
             shouldLogin = "true";
-            createUserAndRedirect(username, username, ghSignupInfo, 1000000);
+            createUserAndRedirect(username, username, ghSignupInfo, 1000000, "github");
             code = "";
             System.out.println("Executed registerViaGithub");
 
@@ -516,7 +517,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 //    }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount) throws IOException {
+                                       int invitationToAccount, String method) throws IOException {
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
@@ -555,6 +556,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletRequest.getSession().setAttribute("accountId", accountId);
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletResponse.sendRedirect("/dashboard/onboarding");
+
+            String dashboardMode = System.getenv("DASHBOARD_MODE");
+            String distinct_id = userEmail + "_" + dashboardMode;
+            JSONObject props = new JSONObject();
+            props.put("Email ID", userEmail);
+            props.put("Email Verified", false);
+            props.put("Source", "dashboard");
+            props.put("Dashboard Mode", dashboardMode);
+            props.put("Invited", invitationToAccount != 0);
+            props.put("method", method);
+            AktoMixpanel aktoMixpanel = new AktoMixpanel();
+            aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
         }
     }
 
