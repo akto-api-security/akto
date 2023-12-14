@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.SetupDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -11,6 +12,9 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.Setup;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
@@ -25,6 +29,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -287,8 +292,16 @@ public class Main {
         {
             testType = "SCHEDULED DAILY";
         }
+        if (testingRunResultSummary.getMetadata() != null) {
+            testType = "CI_CD";
+        }
+
+        Setup setup = SetupDao.instance.findOne(new BasicDBObject());
 
         String dashboardMode = "saas";
+        if (setup != null) {
+            dashboardMode = setup.getDashboardMode();
+        }
 
         String userEmail = testingRun.getUserEmail();
         String distinct_id = userEmail + "_" + dashboardMode.toUpperCase();
@@ -303,6 +316,38 @@ public class Main {
         props.put("Test type", testType);
         props.put("Total APIs tested", totalApis);
 
+        if (testingRun.getTestIdConfig() > 1) {
+            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            if (testingRunConfig != null && testingRunConfig.getTestSubCategoryList() != null) {
+                props.put("Total Tests", testingRunConfig.getTestSubCategoryList().size());
+                props.put("Tests Ran", testingRunConfig.getTestSubCategoryList());
+            }
+        }
+
+        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(Filters.eq("testRunId", testingRun.getId()), Projections.include("vulnerable", "testResults"));
+        int vulnerableCount = 0;
+        Map<String, Integer> severityCount = new HashMap<>();
+        for (TestingRunResult result: testingRunResults) {
+            if (result.isVulnerable()) {
+                vulnerableCount++;
+                List<TestResult> testResults = result.getTestResults();
+                if (testResults != null && testResults.size() > 0) {
+                    String key = testResults.get(0).getConfidence().toString();
+                    if (!severityCount.containsKey(key)) {
+                        severityCount.put(key, 0);
+                    }
+                    int val = severityCount.get(key);
+                    severityCount.put(key, val+1);
+                }
+            }
+        }
+
+        props.put("Vulnerabilities Found", vulnerableCount);
+        Iterator<Map.Entry<String, Integer>> iterator = severityCount.entrySet().iterator();
+        while(iterator.hasNext()) {
+            Map.Entry<String, Integer> entry = iterator.next();
+            props.put(entry.getKey() + " Vulnerabilities", entry.getValue());
+        }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
