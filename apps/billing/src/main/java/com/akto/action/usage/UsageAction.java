@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import javax.servlet.http.HttpServletRequest;
 
 import com.akto.util.UsageCalculator;
+import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
@@ -34,6 +35,33 @@ public class UsageAction implements ServletRequestAware {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
     private int usageLowerBound;
     private int usageUpperBound;
+
+    private String organizationId;
+
+    public String aggregateAccountWiseUsage() {
+
+        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
+            @Override
+            public void accept(Organization organization) {
+
+                UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
+            }
+        }, "aggregateAccountWiseUsage");
+
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String sendDataToSinks() {
+        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
+            @Override
+            public void accept(Organization organization) {
+                UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
+            }
+        }, "aggregateAccountWiseUsage");
+
+        return SUCCESS.toUpperCase();
+    }
 
     public String ingestUsage() {
         try {
@@ -84,6 +112,25 @@ public class UsageAction implements ServletRequestAware {
         return SUCCESS.toUpperCase();
     }
 
+    public String flushUsageDataForOrg(){
+        Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organizationId));
+        if(organization == null){
+            loggerMaker.errorAndAddToDb(String.format("Organization %s does not exist", organizationId), LogDb.BILLING);
+            return Action.ERROR.toUpperCase();
+        }
+        if(usageLowerBound == 0 || usageUpperBound == 0){
+            loggerMaker.infoAndAddToDb("Usage bounds not provided. Using default bounds", LogDb.BILLING);
+            int now = Context.now();
+            usageLowerBound = now - (now % UsageUtils.USAGE_UPPER_BOUND_DL) - UsageUtils.USAGE_UPPER_BOUND_DL;
+            usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
+        }
+        loggerMaker.infoAndAddToDb(String.format("Aggregating usage for organization %s between %d and %d", organizationId, usageLowerBound, usageUpperBound), LogDb.BILLING);
+        UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
+        loggerMaker.infoAndAddToDb(String.format("Sending usage data to sinks for organization %s", organizationId), LogDb.BILLING);
+        UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
+        return SUCCESS.toUpperCase();
+    }
+
     public void setUsageMetric(UsageMetric usageMetric) {
         this.usageMetric = usageMetric;
     }
@@ -107,5 +154,13 @@ public class UsageAction implements ServletRequestAware {
 
     public void setUsageUpperBound(int usageUpperBound) {
         this.usageUpperBound = usageUpperBound;
+    }
+
+    public String getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(String organizationId) {
+        this.organizationId = organizationId;
     }
 }
