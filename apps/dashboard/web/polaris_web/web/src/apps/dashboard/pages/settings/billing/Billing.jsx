@@ -47,17 +47,20 @@ function Billing() {
         }
     })
 
-
-
-
-    async function syncUsage() {
-        await billingApi.syncUsage()
+    async function refreshUsageData(){
+        await billingApi.refreshUsageData({organizationId: window.STIGG_CUSTOMER_ID})
     }
 
+
     const usageTitle = (
-        <Box paddingBlockEnd="4">
-            <Text variant="headingMd">Your plan</Text>
-        </Box>
+        <div>
+            <Box paddingBlockEnd="4">
+                <Text variant="headingMd">Your plan</Text>
+            </Box>
+            <Button onClick={() => refreshUsageData()}>
+                Sync usage data
+            </Button>
+        </div>
     )
 
     const usageInfo = (

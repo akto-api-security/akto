@@ -78,6 +78,39 @@ public class UsageMetricUtils {
         }
     }
 
+    public static void flushUsagePipelineForOrg(String organizationId) throws Exception{
+        Gson gson = new Gson();
+        Map<String, String> wrapper = new HashMap<>();
+        wrapper.put("organizationId", organizationId);
+        String json = gson.toJson(wrapper);
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json, JSON);
+
+        Request request = new Request.Builder()
+                .url(UsageUtils.getUsageServiceUrl() + "/api/flushUsageDataForOrg")
+                .post(body)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response response = null;
+
+        try {
+            response = client.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+        } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("Failed to sync usage metric with Akto. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            throw e;
+        } finally {
+            if (response != null) {
+                response.close(); // Manually close the response body
+            }
+        }
+
+    }
+
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
         try {
             String organizationId = usageMetric.getOrganizationId();
