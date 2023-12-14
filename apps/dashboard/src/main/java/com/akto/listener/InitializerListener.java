@@ -1568,7 +1568,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setDashboardMode() {
-        String dashboardMode = System.getenv("DASHBOARD_MODE");
+        String dashboardMode = DashboardMode.getActualDashboardMode().toString();
 
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
@@ -1580,7 +1580,7 @@ public class InitializerListener implements ServletContextListener {
                 ),
                 updateOptions
         );
-        
+
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
