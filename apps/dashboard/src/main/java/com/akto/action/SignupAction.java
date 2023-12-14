@@ -6,6 +6,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
+import com.akto.utils.DashboardMode;
 import com.akto.notifications.email.WelcomeEmail;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
@@ -157,7 +158,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     code = "";
-                    createUserAndRedirect(userEmail, userName, info, 0, "slack");
+                    createUserAndRedirect(userEmail, userName, info, 0, Config.ConfigType.SLACK.toString());
                 } else {
                     code = usersIdentityResponse.getError();
                 }
@@ -254,7 +255,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
-                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), "auth0");
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -267,7 +268,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
         }
-        createUserAndRedirect(email, name, auth0SignupInfo, 0, "auth0");
+        createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString());
         code = "";
         System.out.println("Executed registerViaAuth0");
         return SUCCESS.toUpperCase();
@@ -318,7 +319,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             SignupInfo.GoogleSignupInfo signupInfo = new SignupInfo.GoogleSignupInfo(aktoGoogleConfig.getId(), accessToken, refreshToken, tokenResponse.getExpiresInSeconds());
             shouldLogin = "true";
-            createUserAndRedirect(userEmail, username, signupInfo, 0, "google");
+            createUserAndRedirect(userEmail, username, signupInfo, 0, Config.ConfigType.GOOGLE.toString());
             code = "";
         } catch (IOException e) {
             code = "Please login again";
@@ -433,7 +434,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userData.get("login").toString() + "@" + company;
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
             shouldLogin = "true";
-            createUserAndRedirect(username, username, ghSignupInfo, 1000000, "github");
+            createUserAndRedirect(username, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
             code = "";
             System.out.println("Executed registerViaGithub");
 
@@ -557,7 +558,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletResponse.sendRedirect("/dashboard/onboarding");
 
-            String dashboardMode = System.getenv("DASHBOARD_MODE");
+            String dashboardMode = DashboardMode.getActualDashboardMode().toString();
             String distinct_id = userEmail + "_" + dashboardMode;
             JSONObject props = new JSONObject();
             props.put("Email ID", userEmail);

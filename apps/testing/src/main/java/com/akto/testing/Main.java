@@ -9,10 +9,13 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.Setup;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
@@ -288,25 +291,24 @@ public class Main {
             }
         }
 
-        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(Filters.eq("testRunId", testingRun.getId()), Projections.include("vulnerable", "testResults"));
-        int vulnerableCount = 0;
+        Bson filters = Filters.and(
+            Filters.eq("latestTestingRunSummaryId", summaryId),
+            Filters.eq("testRunIssueStatus", "OPEN")
+        );
+        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(filters);
+
         Map<String, Integer> severityCount = new HashMap<>();
-        for (TestingRunResult result: testingRunResults) {
-            if (result.isVulnerable()) {
-                vulnerableCount++;
-                List<TestResult> testResults = result.getTestResults();
-                if (testResults != null && testResults.size() > 0) {
-                    String key = testResults.get(0).getConfidence().toString();
-                    if (!severityCount.containsKey(key)) {
-                        severityCount.put(key, 0);
-                    }
-                    int val = severityCount.get(key);
-                    severityCount.put(key, val+1);
-                }
+        for (TestingRunIssues testingRunIssues: testingRunIssuesList) {
+            String key = testingRunIssues.getSeverity().toString();
+            if (!severityCount.containsKey(key)) {
+                severityCount.put(key, 0);
             }
+            int val = severityCount.get(key);
+            severityCount.put(key, val+1);
         }
 
-        props.put("Vulnerabilities Found", vulnerableCount);
+        props.put("Vulnerabilities Found", testingRunIssuesList.size());
+
         Iterator<Map.Entry<String, Integer>> iterator = severityCount.entrySet().iterator();
         while(iterator.hasNext()) {
             Map.Entry<String, Integer> entry = iterator.next();
