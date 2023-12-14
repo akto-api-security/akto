@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.SetupDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -116,16 +117,11 @@ public class Main {
 
         boolean connectedToMongo = false;
         do {
+            connectedToMongo = MCollection.checkConnection();
             try {
-                AccountsDao.instance.getStats();
-                connectedToMongo = true;
-            } catch (Exception ignored) {
-            } finally {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         } while (!connectedToMongo);
 

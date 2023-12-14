@@ -35,17 +35,9 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
+        String[] fieldNames = {TestRoles.NAME};
+        instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
 
-        if (counter == 1) {//Only _id as index available
-            String[] fieldNames = {TestRoles.NAME};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
-        }
     }
 
     public TestRoles createTestRole (String roleName, ObjectId endpointLogicalGroupId, String userName) {
