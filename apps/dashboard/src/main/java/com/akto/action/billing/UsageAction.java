@@ -73,16 +73,6 @@ public class UsageAction extends UserAction {
             UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
         }
 
-        usageMetrics = UsageMetricsDao.instance.findAll(
-                Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false),
-                Filters.eq(UsageMetric.ORGANIZATION_ID, organization.getId())
-        );
-
-        if (usageMetrics.isEmpty()){
-            loggerMaker.errorAndAddToDb("Failed to sync usage metrics", LoggerMaker.LogDb.BILLING);
-            return ERROR.toUpperCase();
-        }
-
         try{
             loggerMaker.infoAndAddToDb("Flushing usage pipeline", LoggerMaker.LogDb.BILLING);
             UsageMetricUtils.flushUsagePipelineForOrg(organization.getId());
