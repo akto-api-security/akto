@@ -11,9 +11,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.lang.RuntimeEnvironment;
 import org.kohsuke.github.*;
 
-import java.security.Key;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
+import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.Date;
