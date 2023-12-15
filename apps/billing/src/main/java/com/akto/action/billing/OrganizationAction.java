@@ -10,6 +10,8 @@ import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.bson.conversions.Bson;
 
+import static com.opensymphony.xwork2.Action.SUCCESS;
+
 public class OrganizationAction {
 
     private Organization organization;
@@ -42,11 +44,28 @@ public class OrganizationAction {
             return Action.ERROR.toUpperCase();
         }
 
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
+    }
+
+    private String orgId;
+    public String fetchOrgDetails() {
+        this.organization = OrganizationsDao.instance.findOne(Organization.ID, orgId);
+        return SUCCESS.toUpperCase();
     }
 
     public void setOrganization(Organization organization) {
         this.organization = organization;
     }
 
+    public Organization getOrganization() {
+        return organization;
+    }
+
+    public String getOrgId() {
+        return orgId;
+    }
+
+    public void setOrgId(String orgId) {
+        this.orgId = orgId;
+    }
 }

@@ -79,6 +79,12 @@ const SettingsLeftNav = () => {
                         selected: page === "billing",
                         onClick: () => navigate("/dashboard/settings/billing")
                     },
+                    {
+                        label: 'Self hosted',
+                        icon: PlanMajor,
+                        selected: page === "self-hosted",
+                        onClick: () => navigate("/dashboard/settings/self-hosted")
+                    },
                 ]}
             />
         </Navigation>

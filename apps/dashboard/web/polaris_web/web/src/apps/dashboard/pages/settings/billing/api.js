@@ -15,6 +15,14 @@ const billingApi = {
             method: 'post',
             data: {billingPeriod, customerId, planId, successUrl, cancelUrl}
         })
+    },
+
+    getCustomerStiggDetails({customerId}) {
+        return request({
+            url: '/api/getCustomerStiggDetails',
+            method: 'post',
+            data: {customerId}
+        })
     }
 }
 
