@@ -7,6 +7,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.util.UsageUtils;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -70,6 +71,11 @@ public class UsageAction extends UserAction {
 
     String customerToken;
     public String getCustomerStiggDetails() {
+        if (!DashboardMode.isSaasDeployment()) {
+            addActionError("Invalid API");
+            return ERROR.toUpperCase();
+        }
+
         if (StringUtils.isEmpty(customerId)) {
             addActionError("Empty org id found");
             return ERROR.toUpperCase();
