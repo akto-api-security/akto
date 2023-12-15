@@ -102,21 +102,18 @@ public class PostmanAction extends UserAction {
         OpenAPI openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true, host);
         String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
-        List<SensitiveSampleData> SensitiveSampleData = SensitiveSampleDataDao.instance.findAll(
-            Filters.eq("_id.apiCollectionId", apiCollectionId)
-        );
-        SampleDataToSTI sensitiveSampleDataToSTI = new SampleDataToSTI();
-        sensitiveSampleDataToSTI.setSensitiveSampleDataToSTI(SensitiveSampleData);
-        Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> sensitiveStiList = sensitiveSampleDataToSTI.getSingleTypeInfoMap();
-        openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(), sensitiveStiList, true, host);
-        String openAPIStringSensitive = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
         Main main = new Main(postmanCredential.getApiKey());
         Map<String, String> openApiSchemaMap = new HashMap<>();
         openApiSchemaMap.put("All", openAPIStringAll);
-        openApiSchemaMap.put("Sensitive", openAPIStringSensitive);
 
-        main.createApiWithSchema(postmanCredential.getWorkspaceId(),apiName, openApiSchemaMap);
+        try {
+            main.createApiWithSchema(postmanCredential.getWorkspaceId(), apiName, openAPIStringAll);
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb("Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error while creating api in postman");
+            return ERROR.toUpperCase();
+        }
 
         return SUCCESS.toUpperCase();
     }
