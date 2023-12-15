@@ -1,17 +1,18 @@
 package com.akto.stigg;
 
-import com.akto.DaoInit;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Config;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 public class StiggReporterClient {
 
@@ -77,15 +78,37 @@ public class StiggReporterClient {
 
     }
 
-    public boolean isOverage(String customerId) {
-        BasicDBList l = fetchEntitlements(customerId);
-        if (l.size() == 0) return false;
+    public boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
+        return featureWiseAllowed.entrySet().stream()
+                .anyMatch(e -> e.getValue().getIsGranted()
+                        && e.getValue().getOverageFirstDetected() != -1);
+    }
 
-        boolean result = false;
+    public HashMap<String, FeatureAccess> getFeatureWiseAllowed(String customerId) {
+        BasicDBList l = fetchEntitlements(customerId);
+        if (l.size() == 0) return new HashMap<>();
+
+        HashMap<String, FeatureAccess> result = new HashMap<>();
+
+        int now = Context.now();
 
         for(Object o: l) {
             try {
                 BasicDBObject bO = (BasicDBObject) o;
+
+                boolean isGranted = bO.getBoolean("isGranted", false);
+
+                BasicDBObject featureObject = (BasicDBObject) bO.get("feature");
+
+                String featureLabel = "";
+                if (featureObject != null) {
+                    BasicDBObject metaData = (BasicDBObject) featureObject.get("additionalMetaData");
+                    if (metaData != null) {
+                        featureLabel = metaData.getString("key", "");
+                    }
+                    result.put(featureLabel, new FeatureAccess(isGranted, -1));
+                }
+
                 Object usageLimitObj = bO.get("usageLimit");
 
                 if (usageLimitObj == null) {
@@ -96,7 +119,7 @@ public class StiggReporterClient {
                     int usageLimit = Integer.parseInt(usageLimitObj.toString());
                     int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
                     if (usage > usageLimit) {
-                        return true;
+                        result.put(featureLabel, new FeatureAccess(true, now));
                     }
 
                 }
@@ -120,6 +143,12 @@ public class StiggReporterClient {
                 "    customerId\\n" +
                 "    entitlementUpdatedAt\\n" +
                 "    usageLimit\\n" +
+                "    isGranted\\n" +
+                "    feature { "    +
+                "    id " +
+                "    refId " +
+                "    additionalMetaData " +
+                "  }" +
             "}}";
 
         BasicDBObject obj = BasicDBObject.parse(executeGraphQL(queryQ, inputVariables));
