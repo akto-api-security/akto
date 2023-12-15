@@ -4,6 +4,7 @@ import com.akto.ApiRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.*;
@@ -55,6 +56,7 @@ public class Main {
     public Map<String,String> getVersion(String apiId, Set<String> versionNameList) {
         String url = BASE_URL + "apis/"+apiId+"/versions";
         JsonNode node = ApiRequest.getRequest(generateHeadersWithAuth(), url);
+        System.out.println("response: " + node.toPrettyString());
         Iterator<JsonNode> versionNodes = node.get("versions").elements();
         Map<String, String> versionNameIdMap = new HashMap<>();
         for (String name: versionNameList) {
@@ -62,6 +64,7 @@ public class Main {
         }
         while (versionNodes.hasNext()) {
             JsonNode n = versionNodes.next();
+            System.out.println(n.toPrettyString());
             String versionName = n.get("name").textValue();
             for (String v: versionNameList) {
                 if (versionName.equals(v)) {
@@ -120,7 +123,60 @@ public class Main {
 
     }
 
-    public void createApiWithSchema(String workspaceId, String apiName, Map<String, String> openApiSchemaMap) {
+    public String addSchemaV10(String apiId, String openApiSchema){
+        String url = BASE_URL + "apis/" + apiId + "?include=schemas";
+
+        JsonNode getNode = ApiRequest.getRequest(generateHeadersWithAuthForV10(),url);
+
+        Set<String> schemaIds = new HashSet<>();
+        if(getNode.has("schemas")) {
+            Iterator<JsonNode> schemas = getNode.get("schemas").elements();
+            while (schemas.hasNext()) {
+                schemaIds.add(schemas.next().get("id").textValue());
+            }
+        }
+        if(schemaIds.isEmpty()){
+            return createSchema(apiId, openApiSchema);
+        }
+        for (String schemaId: schemaIds) {
+            String url2 = BASE_URL + "apis/"+apiId+"/schemas/" + schemaId;
+            JsonNode response = ApiRequest.getRequest(generateHeadersWithAuthForV10(), url2);
+            System.out.println("Schema response: " + response.toPrettyString());
+            JsonNode data = response.get("files").get("data");
+            while (data.elements().hasNext()){
+                JsonNode file = data.elements().next();
+                if(file.get("name").textValue().equals("index.json")){
+                    String url1 = BASE_URL + "apis/"+apiId+"/schemas/" + schemaId + "/files/index.json";
+                    JSONObject obj = new JSONObject();
+                    obj.put("content", openApiSchema);
+                    JsonNode node = ApiRequest.putRequest(generateHeadersWithAuthForV10(), url1, obj.toString());
+                    System.out.println("Update response: " + node.toPrettyString());
+                    return node.get("id").textValue();
+                }
+            }
+        }
+        return createSchema(apiId, openApiSchema);
+    }
+
+    private String createSchema(String apiId, String openApiSchema) {
+        String url1 = BASE_URL + "apis/"+ apiId +"/schemas";
+        JSONObject fileObj = new JSONObject();
+        fileObj.put("content", openApiSchema);
+        fileObj.put("path", "index.json");
+        JSONArray files = new JSONArray();
+        files.put(0, fileObj);
+
+        JSONObject child = new JSONObject();
+        child.put("files", files);
+        child.put("type", "openapi:3");
+
+        String json = child.toString();
+        JsonNode node = ApiRequest.postRequest(generateHeadersWithAuthForV10(), url1,json);
+        System.out.println("Create response: " + node.toPrettyString());
+        return node.get("id").textValue();
+    }
+
+    public void createApiWithSchema(String workspaceId, String apiName, String openApiSchema) {
         // Get akto_<collectionName> API
         String url = BASE_URL +  "apis?name=" + apiName + "&" + "workspace=" + workspaceId; // TODO: created by me
         JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
@@ -134,18 +190,7 @@ public class Main {
             // Create New API
             apiId = createApi(workspaceId,apiName);
         }
-
-        // get versions (if not present create them)
-        Map<String, String> apiVersionNameMap = getVersion(apiId,openApiSchemaMap.keySet());
-
-
-        for (String name: apiVersionNameMap.keySet()) {
-            // Finally, replace schema for all versions
-            addSchema(apiId, apiVersionNameMap.get(name), openApiSchemaMap.get(name));
-        }
-
-
-
+        addSchemaV10(apiId, openApiSchema);
     }
 
 
@@ -176,6 +221,13 @@ public class Main {
     public Map<String,String> generateHeadersWithAuth() {
         Map<String,String> headersMap = new HashMap<>();
         headersMap.put("X-API-Key",apiKey);
+        return headersMap;
+    }
+
+    public Map<String,String> generateHeadersWithAuthForV10() {
+        Map<String,String> headersMap = new HashMap<>();
+        headersMap.put("X-API-Key",apiKey);
+        headersMap.put("Accept", "application/vnd.api.v10+json");
         return headersMap;
     }
 
