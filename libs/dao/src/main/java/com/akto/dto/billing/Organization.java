@@ -44,14 +44,18 @@ public class Organization {
     public Set<Integer> accounts;
     public static final String ACCOUNTS = "accounts";
 
+
+    public static final String ON_PREM = "onPrem";
+    private boolean onPrem;
     public Organization() { }
 
-    public Organization(String id, String name, String adminEmail, Set<Integer> accounts) {
+    public Organization(String id, String name, String adminEmail, Set<Integer> accounts, boolean onPrem) {
         this.id = id;
         this.name = name;
         this.adminEmail = adminEmail;
         this.accounts = accounts;
         this.syncedWithAkto = false;
+        this.onPrem = onPrem;
     }
 
     public String getId() {
@@ -92,5 +96,13 @@ public class Organization {
 
     public void setAccounts(Set<Integer> accounts) {
         this.accounts = accounts;
+    }
+
+    public boolean isOnPrem() {
+        return onPrem;
+    }
+
+    public void setOnPrem(boolean onPrem) {
+        this.onPrem = onPrem;
     }
 }

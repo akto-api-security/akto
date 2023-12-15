@@ -1,11 +1,7 @@
 package com.akto.utils.billing;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -13,14 +9,11 @@ import com.akto.dto.RBAC;
 import com.akto.dto.billing.Organization;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
+import okhttp3.*;
 
 public class OrganizationUtils {
     
@@ -40,6 +33,40 @@ public class OrganizationUtils {
         }
         
         return accounts;
+    }
+
+    public static BasicDBObject fetchOrgDetails(String orgId) {
+
+        String orgIdUUID = UUID.fromString(orgId).toString();
+
+        Request request = new Request.Builder()
+                .url(UsageUtils.getUsageServiceUrl() + "/api/fetchOrgDetails?orgId="+orgIdUUID)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response response = null;
+
+        try {
+            response = client.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+
+            ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                return null;
+            }
+
+            return BasicDBObject.parse(responseBody.string());
+
+        } catch (IOException e) {
+            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            return null;
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
     }
 
     public static Boolean syncOrganizationWithAkto(Organization organization) {
