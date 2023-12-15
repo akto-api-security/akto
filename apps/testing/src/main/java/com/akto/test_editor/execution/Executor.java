@@ -78,7 +78,7 @@ public class Executor {
             result.add(invalidExecutionResult);
             return result;
         }
-        if (StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
             if (role != null) {
                 EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
