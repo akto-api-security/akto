@@ -9,6 +9,7 @@ import func from "@/util/func"
 import api from '../api'
 import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
+import FeatureWrapper from '../../../components/FeatureWrapper'
 
 const statusItems = [
   {
@@ -273,6 +274,7 @@ function DataTypes() {
   let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard, requestCard]
 
   return (
+    <FeatureWrapper featureLabel="CUSTOM_DATA_TYPES" skipCheck={!(isNew || (location?.state?.regexObj))}>
     <DetailsPage
     pageTitle={pageTitle}
     backUrl="/dashboard/observe/sensitive"
@@ -281,6 +283,7 @@ function DataTypes() {
     isDisabled={compareFunc}
     components={components}
     />
+    </FeatureWrapper>
   )
 }
 

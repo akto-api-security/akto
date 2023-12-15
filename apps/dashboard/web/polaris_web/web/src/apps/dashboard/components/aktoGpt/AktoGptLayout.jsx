@@ -10,6 +10,7 @@ import api from './api'
 import ResponseComponent from './ResponseComponent'
 import { useNavigate } from 'react-router-dom'
 import {ClipboardMinor} from '@shopify/polaris-icons';
+import FeatureWrapper from '../FeatureWrapper'
 
 function AktoGptLayout({prompts,closeModal, runCustomTests}) {
 
@@ -104,6 +105,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     }
 
     return (
+        <FeatureWrapper featureLabel="AKTO_GPT_AI">
         <div style={{display:"flex"}}>
             <div className='left-nav-gpt'>
                 <Box padding="3">
@@ -176,6 +178,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 </div>
             </div>
         </div>
+        </FeatureWrapper>
     )
 }
 

@@ -28,6 +28,7 @@ import settingsRequests from "../../settings/api"
 import OpenApiSpec from "../OpenApiSpec"
 import PersistStore from "../../../../main/PersistStore"
 import TooltipText from "../../../components/shared/TooltipText"
+import FeatureWrapper from "../../../components/FeatureWrapper"
 
 const headers = [
     {
@@ -427,17 +428,20 @@ function ApiEndpoints() {
 
                     {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
                     
+                    <FeatureWrapper featureLabel="TEST_RUNS">
                     <RunTest
                         apiCollectionId={apiCollectionId}
                         endpoints={filteredEndpoints}
                         filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
                         disabled={tabs[selected].component !== undefined}
                     />
+                    </FeatureWrapper>
                 </HorizontalStack>
             }
             components={
                 loading ? [<SpinnerCentered key="loading" />] :
                     [
+                        <FeatureWrapper featureLabel="ACTIVE_ENDPOINTS">
                         <div className="apiEndpointsTable" key="table">
                             <GithubSimpleTable
                                 key="table"
@@ -460,7 +464,8 @@ function ApiEndpoints() {
                                     <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
                                 </Modal.Section>
                             </Modal>
-                        </div>,
+                        </div>
+                        </FeatureWrapper>,
                         <ApiDetails
                             key="details"
                             showDetails={showDetails}

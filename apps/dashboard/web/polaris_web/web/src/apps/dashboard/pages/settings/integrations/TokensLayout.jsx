@@ -4,6 +4,7 @@ import settingFunctions from '../module';
 import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
+import FeatureWrapper from "../../../components/FeatureWrapper"
 
 function TokensLayout(props) {
   const [tokenList , setTokenList] = useState([])
@@ -56,7 +57,21 @@ function TokensLayout(props) {
       </LegacyCard.Section>
   )
   
+  function getFeatureLabel() {
+    switch (props.type) {
+      case func.testingResultType().CICD:
+        return "CI_CD_INTEGRATION"
+      case func.testingResultType().EXTERNAL_API:
+        return "AKTO_EXTERNAL_API"
+      case func.testingResultType().BURP:
+        return "BASIC_CONNECTORS"
+      default:
+        return ""
+    }
+  }
+
   const BurpSuiteCard = (
+    <FeatureWrapper featureLabel={getFeatureLabel()}>
     <LegacyCard title="Tokens" 
         secondaryFooterActions={tokenList.length > 0 ? [{content: 'See how it works', onAction: seeWork}] : []}
         primaryFooterAction={tokenList.length > 0 ? {content: 'Generate token', onAction: generateNewToken} : null}
@@ -72,6 +87,7 @@ function TokensLayout(props) {
           : emptyComponent}
       
     </LegacyCard>
+    </FeatureWrapper>
   )
   return (
     <IntegrationsLayout title= {props.title} cardContent={props.cardContent} component={BurpSuiteCard} docsUrl={props.docsUrl}/> 

@@ -8,6 +8,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TestingStore from "../testingStore";
 import Automated from "./Automated";
 import Store from "../../../store";
+import FeatureWrapper from "../../../components/FeatureWrapper";
 
 function UserConfig() {
 
@@ -88,7 +89,9 @@ function UserConfig() {
                             transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
                             expandOnPrint
                         >
+                            <FeatureWrapper featureLabel="AUTOMATED_AUTH_TOKEN">
                             <Automated /> 
+                            </FeatureWrapper>
                         </Collapsible>
                     </LegacyStack>
                 </LegacyCard.Section>

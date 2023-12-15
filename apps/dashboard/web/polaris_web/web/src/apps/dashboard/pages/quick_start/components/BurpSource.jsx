@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
 import func from "@/util/func"
+import FeatureWrapper from '../../../components/FeatureWrapper'
  
 function BurpSource() {
     const navigate = useNavigate()
@@ -121,6 +122,7 @@ function BurpSource() {
                 Use burp plugin to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
+            <FeatureWrapper featureLabel="BASIC_CONNECTORS">
             <VerticalStack gap="1">
                 {steps.map((element,index) => (
                     <VerticalStack gap="1" key={index}>
@@ -139,7 +141,7 @@ function BurpSource() {
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
             </VerticalStack>
-
+            </FeatureWrapper>
         </div>
     )
 }

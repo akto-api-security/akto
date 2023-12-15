@@ -10,6 +10,7 @@ import {
   } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
+import FeatureWrapper from "../../../components/FeatureWrapper"
 
 const headers = [
     {
@@ -153,6 +154,7 @@ function ApiCollections() {
                     }}
                 >
                     <Modal.Section>
+                        <FeatureWrapper featureLabel="API_COLLECTIONS">
                     <div onKeyDown={(e) => func.handleKeyPress(e, createNewCollection)}>
                     <TextField
                         id={"new-collection-input"}
@@ -168,7 +170,7 @@ function ApiCollections() {
                         autoFocus
                     />
                     </div>
-
+                    </FeatureWrapper>
                     </Modal.Section>
                 </Modal>)
                 ,               

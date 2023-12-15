@@ -13,6 +13,7 @@ import values from "@/util/values";
 import ObserveStore from "../observeStore";
 import ApiDetails from "./ApiDetails";
 import PersistStore from "../../../../main/PersistStore";
+import FeatureWrapper from "../../../components/FeatureWrapper";
 
 
 function ApiChanges() {
@@ -130,6 +131,7 @@ function ApiChanges() {
     }
 
     const tabs = (
+        <FeatureWrapper featureLabel="ACTIVE_ENDPOINTS">
         <Card padding={"0"} key="tabs">
             <LayoutWithTabs
                 key="tabs"
@@ -137,6 +139,7 @@ function ApiChanges() {
                 currTab={() => { }}
             />
         </Card>
+        </FeatureWrapper>
     )
 
     const apiChanges = (

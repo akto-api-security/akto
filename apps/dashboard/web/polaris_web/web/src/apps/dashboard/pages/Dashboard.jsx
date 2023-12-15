@@ -58,7 +58,7 @@ function Dashboard() {
     }
 
     const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
+        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={10000} />
     ) : null;
 
     return (

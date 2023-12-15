@@ -7,6 +7,7 @@ import PersistStore from '../../../../main/PersistStore';
 import './Headers.css'
 import api from '../../../../signup/api';
 import func from '@/util/func';
+import FeatureWrapper from '../../FeatureWrapper';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -210,7 +211,7 @@ export default function Header() {
                 }}
             >
                 <Modal.Section>
-
+<FeatureWrapper featureLabel="ACTIVE_ACCOUNTS">
                     <TextField
                         id="create-account-name"
                         label="Name"
@@ -222,7 +223,7 @@ export default function Header() {
                        
                         autoFocus
                     />
-
+</FeatureWrapper>
 
                 </Modal.Section>
             </Modal>

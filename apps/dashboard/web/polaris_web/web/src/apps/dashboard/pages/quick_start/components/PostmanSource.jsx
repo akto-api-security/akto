@@ -7,6 +7,7 @@ import FileUpload from '../../../components/shared/FileUpload';
 import {CancelMajor} from "@shopify/polaris-icons"
 import api from '../api';
 import Store from '../../../store';
+import FeatureWrapper from '../../../components/FeatureWrapper';
 
 function PostmanSource() {
 
@@ -168,6 +169,7 @@ function PostmanSource() {
                 Use postman to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
+            <FeatureWrapper featureLabel="BASIC_CONNECTORS">
             <VerticalStack gap="1">
                 <RadioButton id="api" label="Import using postman API key" checked={type === "api"} onChange={()=>handleChange("api")}/>
                 <RadioButton id="collection" label="Import using postman collection file" checked={type === "collection"} onChange={()=>handleChange("collection")}/>
@@ -192,6 +194,7 @@ function PostmanSource() {
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
             </VerticalStack>
+            </FeatureWrapper>
         </div>
     )
 }
