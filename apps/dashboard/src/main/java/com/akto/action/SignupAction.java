@@ -539,7 +539,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         Set<Integer> organizationAccountsSet = new HashSet<Integer>();
                         organizationAccountsSet.add(accountId);
 
-                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet);
+                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
                         OrganizationsDao.instance.insertOne(organization);
                         System.out.println(String.format("Created organization %s for new user %s", organizationUUID, userEmail));
                         

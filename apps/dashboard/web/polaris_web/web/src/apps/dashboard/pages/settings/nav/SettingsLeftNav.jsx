@@ -28,6 +28,13 @@ const SettingsLeftNav = () => {
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
     }]
+    const selfHostedArr = window.IS_SAAS === 'true' ? [] : [{
+        label: 'Self hosted',
+        icon: PlanMajor,
+        selected: page === "self-hosted",
+        onClick: () => navigate("/dashboard/settings/self-hosted")
+    }]
+
 
     return (
         <Navigation>
@@ -79,6 +86,7 @@ const SettingsLeftNav = () => {
                         selected: page === "billing",
                         onClick: () => navigate("/dashboard/settings/billing")
                     },
+                    ...selfHostedArr
                 ]}
             />
         </Navigation>

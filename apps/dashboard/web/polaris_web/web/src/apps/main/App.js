@@ -40,6 +40,7 @@ import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import Billing from "../dashboard/pages/settings/billing/Billing";
+import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
@@ -224,6 +225,10 @@ const router = createBrowserRouter([
           {
             path: "billing",
             element: <Billing/>
+          },
+          {
+            path: "self-hosted",
+            element: <SelfHosted/>
           }
         ]
       },
