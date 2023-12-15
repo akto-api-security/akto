@@ -21,14 +21,18 @@ public class Organization {
     HashMap<String, FeatureAccess> featureWiseAllowed;
     public static final String FEATURE_WISE_ALLOWED = "featureWiseAllowed";
 
+
+    public static final String ON_PREM = "onPrem";
+    private boolean onPrem;
     public Organization() { }
 
-    public Organization(String id, String name, String adminEmail, Set<Integer> accounts) {
+    public Organization(String id, String name, String adminEmail, Set<Integer> accounts, boolean onPrem) {
         this.id = id;
         this.name = name;
         this.adminEmail = adminEmail;
         this.accounts = accounts;
         this.syncedWithAkto = false;
+        this.onPrem = onPrem;
     }
 
     public String getId() {
@@ -77,5 +81,13 @@ public class Organization {
 
     public void setFeatureWiseAllowed(HashMap<String, FeatureAccess> featureWiseAllowed) {
         this.featureWiseAllowed = featureWiseAllowed;
+    }
+
+    public boolean isOnPrem() {
+        return onPrem;
+    }
+
+    public void setOnPrem(boolean onPrem) {
+        this.onPrem = onPrem;
     }
 }
