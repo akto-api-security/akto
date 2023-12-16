@@ -9,6 +9,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
@@ -30,6 +31,11 @@ public class UsageInterceptor extends AbstractInterceptor {
     public String intercept(ActionInvocation invocation) throws Exception {
 
         try {
+
+            if (!DashboardMode.isSaasDeployment()) {
+                return invocation.invoke();
+            }
+
             Map<String, Object> session = invocation.getInvocationContext().getSession();
             int sessionAccId = (Integer) session.get(UserDetailsFilter.ACCOUNT_ID);
 
