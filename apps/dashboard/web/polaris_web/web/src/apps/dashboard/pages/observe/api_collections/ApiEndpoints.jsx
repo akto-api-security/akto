@@ -352,16 +352,11 @@ function ApiEndpoints() {
                         }
                         fetchData()
                     }).catch(err => {
-                        if(err.response.status === 403){
-                            err?.response = {}
-                            let message = err?.response?.data?.actionErrors?.[0];
-                            if(message!=undefined){
-                                func.setToast(true, true, message)
-                            }
-                        } else if (err.message.includes(404)) {
+                        if (err.message.includes(404)) {
                             func.setToast(true, true, "Please limit the file size to less than 50 MB")
                         } else {
-                            func.setToast(true, true, "Something went wrong while processing the file")
+                            let message = err?.response?.data?.actionErrors?.[0] || "Something went wrong while processing the file"
+                            func.setToast(true, true, message)
                         }
                     })
 
