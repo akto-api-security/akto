@@ -1,5 +1,6 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor} from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
+import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor} from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 
 const SettingsLeftNav = () => {
@@ -27,6 +28,13 @@ const SettingsLeftNav = () => {
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
     }]
+    const selfHostedArr = window.IS_SAAS === 'true' ? [{
+        label: 'Self hosted',
+        icon: PlanMajor,
+        selected: page === "self-hosted",
+        onClick: () => navigate("/dashboard/settings/self-hosted")
+    }] : []
+
 
     return (
         <Navigation>
@@ -72,6 +80,13 @@ const SettingsLeftNav = () => {
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
                     },
+                    {
+                        label: 'Billing',
+                        icon: PlanMajor,
+                        selected: page === "billing",
+                        onClick: () => navigate("/dashboard/settings/billing")
+                    },
+                    ...selfHostedArr
                 ]}
             />
         </Navigation>
