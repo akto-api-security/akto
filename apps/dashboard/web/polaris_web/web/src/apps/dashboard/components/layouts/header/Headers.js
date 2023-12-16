@@ -44,8 +44,15 @@ export default function Header() {
 
     const handleLogOut = async () => {
         storeAccessToken(null)
-        await api.logout()
-        navigate("/login")
+        api.logout().then(res => {
+            if(res.logoutUrl){
+                window.location.href = res.logoutUrl
+            } else {
+                navigate("/login")
+            }
+        }).catch(err => {
+            navigate("/");
+        })
     }
 
     const handleSwitchUI = async () => {
@@ -121,7 +128,7 @@ export default function Header() {
                 },
                 {
                     items: [
-                        (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM") ? {} :
+                        (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
                         { id: "create_account", content: <ContentWithIcon icon={CustomerPlusMajor} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
                         // { id: "manage", content: 'Manage account' },
                         { id: "log-out", content: <ContentWithIcon icon={LogOutMinor} text={"Logout"} /> , onAction: handleLogOut }

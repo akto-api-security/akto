@@ -4,12 +4,16 @@ package com.akto.action;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
+import com.akto.stigg.StiggReporterClient;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
@@ -17,6 +21,9 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import io.micrometer.core.instrument.util.StringUtils;
+import org.apache.commons.codec.digest.HmacAlgorithms;
+import org.apache.commons.codec.digest.HmacUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -27,6 +34,8 @@ import java.util.List;
 import static com.mongodb.client.model.Filters.in;
 
 public class ProfileAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ProfileAction.class);
 
     private int accountId;
 
@@ -87,6 +96,7 @@ public class ProfileAction extends UserAction {
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -97,6 +107,34 @@ public class ProfileAction extends UserAction {
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+
+        if (DashboardMode.isSaasDeployment()) {            
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.in(Organization.ACCOUNTS, sessionAccId)
+            ); 
+            String organizationId = organization.getId();
+
+            boolean isOverage = false;
+            try {
+                isOverage = StiggReporterClient.instance.isOverage(organizationId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+            }
+
+            userDetails.append("organizationId", organizationId);
+            userDetails.append("organizationName", organization.getName());
+            userDetails.append("stiggIsOverage", isOverage);
+
+
+
+            if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
+                String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
+                userDetails.append("stiggCustomerId", organizationId);
+                userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + organizationId + ":" + stiggSignature);
+                userDetails.append("stiggClientKey", StiggReporterClient.instance.getStiggConfig().getClientKey());
+            }
+        }
+
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");

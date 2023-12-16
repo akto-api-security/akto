@@ -13,6 +13,8 @@ public class YamlTemplate {
     public static final String SOURCE = "source";
     private int updatedAt;
     public static final String UPDATED_AT = "updatedAt";
+    private int hash;
+    public static final String HASH = "hash";
     private String content;
     public static final String CONTENT = "content";
     private Info info;
@@ -27,9 +29,15 @@ public class YamlTemplate {
         this.updatedAt = updatedAt;
         this.content = content;
         this.info = info;
+        this.hash = content.hashCode();
     }
 
     public YamlTemplate() {
+    }
+
+    public void setContent(String content) {
+        this.hash = content.hashCode();
+        this.content = content;
     }
 
     public String getId() {
@@ -68,10 +76,6 @@ public class YamlTemplate {
         return content;
     }
 
-    public void setContent(String content) {
-        this.content = content;
-    }
-
     public Info getInfo() {
         return info;
     }
@@ -97,5 +101,17 @@ public class YamlTemplate {
 
     public void setSource(GlobalEnums.YamlTemplateSource source) {
         this.source = source;
+    }
+
+    public int getHash() {
+        return hash;
+    }
+
+    public void setHash(int hash) {
+        this.hash = hash;
+    }
+
+    public boolean isInactive() {
+        return inactive;
     }
 }
