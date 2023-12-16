@@ -1,0 +1,18 @@
+.stigg-subscription-usage-layout {
+    border: 0px !important;
+    padding: 12px 0px !important;
+}
+
+.stigg-payment-details-section-layout {
+    border: 0px !important;
+    padding: 12px 0px !important;
+}
+
+.stigg-customer-portal-subscriptions-overview {
+    border: 0px !important;
+    padding: 12px 24px !important;
+}
+
+.stigg-watermark {
+    display: none;
+}

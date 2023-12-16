@@ -90,6 +90,8 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
     }
 
 }
