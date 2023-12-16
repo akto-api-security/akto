@@ -6,6 +6,7 @@ import com.akto.dto.Config;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import okhttp3.*;
@@ -107,6 +108,12 @@ public class StiggReporterClient {
                         featureLabel = metaData.getString("key", "");
                     }
                     result.put(featureLabel, new FeatureAccess(isGranted, -1));
+                } else {
+                    loggerMaker.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LogDb.DASHBOARD);
+                }
+
+                if(featureLabel.isEmpty() && featureObject != null){
+                    loggerMaker.errorAndAddToDb("unable to find feature label for this feature " + featureObject.toString(), LogDb.DASHBOARD);
                 }
 
                 Object usageLimitObj = bO.get("usageLimit");
