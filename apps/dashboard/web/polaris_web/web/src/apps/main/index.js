@@ -7,10 +7,12 @@ import en from "@shopify/polaris/locales/en.json";
 import "@shopify/polaris/build/esm/styles.css";
 const container = document.getElementById("root");
 const root = createRoot(container);
-
+import { StiggProvider } from '@stigg/react-sdk';
 
 root.render(
-  <AppProvider i18n={en}>
-    <App />
-  </AppProvider>
+    <StiggProvider apiKey={window.STIGG_CLIENT_KEY}>
+      <AppProvider i18n={en}>
+        <App />
+      </AppProvider>
+    </StiggProvider>
 );

@@ -42,6 +42,44 @@ public class SendgridEmail {
         return sendgridConfig;
     }
 
+    public Mail buildBillingEmail (
+            String adminName,
+            String adminEmail,
+            int apis,
+            int testRuns,
+            int customTemplates,
+            int accounts
+    ) {
+        Mail mail = new Mail();
+
+        Email fromEmail = new Email();
+        fromEmail.setName("Ankita");
+        fromEmail.setEmail("ankita.gupta@akto.io");
+        mail.setFrom(fromEmail);
+
+        Personalization personalization = new Personalization();
+        Email to = new Email();
+        to.setName(adminName);
+        to.setEmail(adminEmail);
+        personalization.addTo(to);
+        //personalization.setSubject("Welcome to Akto");
+        mail.addPersonalization(personalization);
+
+        Content content = new Content();
+        content.setType("text/html");
+        content.setValue("Hello");
+        mail.addContent(content);
+
+        mail.setTemplateId("d-64cefe02855e48fa9b4dd0a618e38569");
+
+
+        personalization.addDynamicTemplateData("apis",apis +"");
+        personalization.addDynamicTemplateData("testRuns",testRuns + "");
+        personalization.addDynamicTemplateData("customTemplates",customTemplates +"");
+        personalization.addDynamicTemplateData("accounts",accounts +"");
+        return mail;
+    }
+
     public Mail buildInvitationEmail (
             String inviteeName,
             String inviteeEmail,
@@ -92,6 +130,7 @@ public class SendgridEmail {
     public void send(final Mail mail) throws IOException {
         String secretKey = this.getSendgridConfig().getSendgridSecretKey();
         if (secretKey == null || secretKey.isEmpty()) {
+            System.out.println("No sendgrid config found. Skipping sending email");
             return;
         }
         final SendGrid sg = new SendGrid(this.getSendgridConfig().getSendgridSecretKey());
