@@ -56,7 +56,6 @@ public class Main {
     public Map<String,String> getVersion(String apiId, Set<String> versionNameList) {
         String url = BASE_URL + "apis/"+apiId+"/versions";
         JsonNode node = ApiRequest.getRequest(generateHeadersWithAuth(), url);
-        System.out.println("response: " + node.toPrettyString());
         Iterator<JsonNode> versionNodes = node.get("versions").elements();
         Map<String, String> versionNameIdMap = new HashMap<>();
         for (String name: versionNameList) {
@@ -64,7 +63,6 @@ public class Main {
         }
         while (versionNodes.hasNext()) {
             JsonNode n = versionNodes.next();
-            System.out.println(n.toPrettyString());
             String versionName = n.get("name").textValue();
             for (String v: versionNameList) {
                 if (versionName.equals(v)) {
@@ -141,7 +139,6 @@ public class Main {
         for (String schemaId: schemaIds) {
             String url2 = BASE_URL + "apis/"+apiId+"/schemas/" + schemaId;
             JsonNode response = ApiRequest.getRequest(generateHeadersWithAuthForV10(), url2);
-            System.out.println("Schema response: " + response.toPrettyString());
             JsonNode data = response.get("files").get("data");
             while (data.elements().hasNext()){
                 JsonNode file = data.elements().next();
@@ -150,7 +147,6 @@ public class Main {
                     JSONObject obj = new JSONObject();
                     obj.put("content", openApiSchema);
                     JsonNode node = ApiRequest.putRequest(generateHeadersWithAuthForV10(), url1, obj.toString());
-                    System.out.println("Update response: " + node.toPrettyString());
                     return node.get("id").textValue();
                 }
             }
@@ -172,7 +168,6 @@ public class Main {
 
         String json = child.toString();
         JsonNode node = ApiRequest.postRequest(generateHeadersWithAuthForV10(), url1,json);
-        System.out.println("Create response: " + node.toPrettyString());
         return node.get("id").textValue();
     }
 
