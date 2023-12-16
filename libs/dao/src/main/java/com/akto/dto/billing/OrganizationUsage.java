@@ -13,6 +13,9 @@ public class OrganizationUsage {
 
     public static final String DATE = "date";
     private int date;
+
+    public static final String HOURLY_USAGE = "hourlyUsage";
+    private Map<String, Map<String, Integer>> hourlyUsage;
     public static final String CREATION_EPOCH = "creationEpoch";
     private int creationEpoch;
     public static final String ORG_METRIC_MAP = "orgMetricMap";
@@ -24,12 +27,13 @@ public class OrganizationUsage {
 
     public OrganizationUsage() { }
 
-    public OrganizationUsage(String orgId, int date, int creationEpoch, Map<String, Integer> orgMetricMap, Map<String, Integer> sinks) {
+    public OrganizationUsage(String orgId, int date, int creationEpoch, Map<String, Integer> orgMetricMap, Map<String, Integer> sinks, Map<String, Map<String, Integer>> hourlyUsage) {
         this.orgId = orgId;
         this.date = date;
         this.creationEpoch = creationEpoch;
         this.orgMetricMap = orgMetricMap;
         this.sinks = sinks;
+        this.hourlyUsage = hourlyUsage;
     }
 
     public String getOrgId() {
@@ -70,6 +74,14 @@ public class OrganizationUsage {
 
     public void setSinks(Map<String, Integer> sinks) {
         this.sinks = sinks;
+    }
+
+    public Map<String, Map<String, Integer>> getHourlyUsage() {
+        return hourlyUsage;
+    }
+
+    public void setHourlyUsage(Map<String, Map<String, Integer>> hourlyUsage) {
+        this.hourlyUsage = hourlyUsage;
     }
 
     @Override
