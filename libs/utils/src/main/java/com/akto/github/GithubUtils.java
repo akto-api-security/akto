@@ -204,11 +204,6 @@ public class GithubUtils {
         messageStringBuilder.append(GITHUB_COMMENT);
         messageStringBuilder.replace(messageStringBuilder.indexOf("@@TEST_NAME@@")
                 ,messageStringBuilder.indexOf("@@TEST_NAME@@") + "@@TEST_NAME@@".length(), testingRun.getName());
-        String endpointURL = "/dashboard/testing" + testingRun.getHexId();
-        while (messageStringBuilder.indexOf("@@TEST_URL@@") != -1) {
-            messageStringBuilder.replace(messageStringBuilder.indexOf("@@TEST_URL@@")
-                    ,messageStringBuilder.indexOf("@@TEST_URL@@") + "@@TEST_URL@@".length(), endpointURL);
-        }
         Set<String> affectedEndpoints = new HashSet<>();
         Map<String, Integer> testSuperTypeCount = new HashMap<>();
 
@@ -291,9 +286,9 @@ public class GithubUtils {
 
     private static final String GITHUB_COMMENT = "### **Test on @@TEST_NAME@@ summary:**\n" +
             "**Issues:**\n" +
-            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/high.png 'High') [@@HIGH_COUNT@@ High](@@TEST_URL@@)  \n" +
-            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/medium.png 'High') [@@MEDIUM_COUNT@@ Medium](@@TEST_URL@@)  \n" +
-            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/low.png 'High') [@@LOW_COUNT@@ Low](@@TEST_URL@@)  \n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/high.png 'High') @@HIGH_COUNT@@ High  \n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/medium.png 'High') @@MEDIUM_COUNT@@ Medium  \n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/low.png 'High') @@LOW_COUNT@@ Low \n" +
             "\n" +
             "**Vulnerability Type**\n" +
             "\n" +
@@ -304,5 +299,5 @@ public class GithubUtils {
             "@@ENDPOINTS_AFFECTED@@" +
             "\n" +
             "\n" +
-            "[See full details on Akto](@@TEST_URL@@)  ";
+            "See full details on Akto";
 }
