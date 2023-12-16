@@ -1,5 +1,5 @@
 import { Box, Button, ButtonGroup, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
 import func from "@/util/func"
@@ -10,6 +10,7 @@ function BurpSource() {
     const [aktoIp, setAktoIp] = useState("");
     const [aktoToken, setAktoToken] = useState("");
     const [burpCollectionURL, setBurpCollectionURL] = useState("")
+    const ref = useRef(null)
 
     const getGithubLink = async() => {
         await api.fetchBurpPluginDownloadLink().then((resp) => {
@@ -54,8 +55,7 @@ function BurpSource() {
     }
 
     const copyText = (text,messageText) => {
-        navigator.clipboard.writeText(text)
-        func.setToast(true, false, `${messageText} is copied to clipboard.`)
+        func.copyToClipboard(text, ref, `${messageText} is copied to clipboard.`)
     }
 
     const steps = [
@@ -74,6 +74,7 @@ function BurpSource() {
             component: (
                 <Box paddingInlineStart={2}>
                     <VerticalStack gap={1}>
+                        <div ref={ref}/>
                         <HorizontalStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
                             <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
