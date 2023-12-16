@@ -1,24 +1,30 @@
 package com.akto.github;
 
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.log.LoggerMaker;
+import com.akto.util.enums.GlobalEnums;
+import com.mongodb.client.model.Filters;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.lang.RuntimeEnvironment;
 import org.kohsuke.github.*;
 
-import java.security.*;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.akto.dao.AccountSettingsDao.generateFilter;
+import static com.akto.dao.MCollection.ID;
 
 public class GithubUtils {
 
@@ -117,11 +123,7 @@ public class GithubUtils {
             boolean isCompleted = testingRunResultSummary.getState() == TestingRun.State.COMPLETED;
             StringBuilder messageStringBuilder = new StringBuilder();
             if (isCompleted) {
-                Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
-                messageStringBuilder.append("Akto vulnerability report\n");
-                for (String severity : countIssues.keySet()) {
-                    messageStringBuilder.append(severity).append(" - ").append(countIssues.get(severity)).append("\n");
-                }
+                buildCommentForCompletedTest(testingRunResultSummary, messageStringBuilder);
             } else {
                 messageStringBuilder.append("Akto CI/CD test is currently in ").append(testingRunResultSummary.getState().name()).append(" state");
             }
@@ -188,4 +190,119 @@ public class GithubUtils {
             loggerMaker.errorAndAddToDb("Error while publishing github comment", LoggerMaker.LogDb.TESTING);
         }
     }
+
+    private static Map<String, String> getShortNameVsDisplayNameMap () {
+        Map<String, String> namesMap = new HashMap<>();
+        for (GlobalEnums.TestCategory category :  GlobalEnums.TestCategory.values()) {
+            namesMap.put(category.getName(), category.getDisplayName());
+        }
+        return namesMap;
+    }
+
+    private static void buildCommentForCompletedTest(TestingRunResultSummary testingRunResultSummary, StringBuilder messageStringBuilder) {
+        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(ID, testingRunResultSummary.getTestingRunId()));
+        messageStringBuilder.append(GITHUB_COMMENT);
+        messageStringBuilder.replace(messageStringBuilder.indexOf("@@TEST_NAME@@")
+                ,messageStringBuilder.indexOf("@@TEST_NAME@@") + "@@TEST_NAME@@".length(), testingRun.getName());
+        String endpointURL = "/dashboard/testing" + testingRun.getHexId();
+        while (messageStringBuilder.indexOf("@@TEST_URL@@") != -1) {
+            messageStringBuilder.replace(messageStringBuilder.indexOf("@@TEST_URL@@")
+                    ,messageStringBuilder.indexOf("@@TEST_URL@@") + "@@TEST_URL@@".length(), endpointURL);
+        }
+        Set<String> affectedEndpoints = new HashSet<>();
+        Map<String, Integer> testSuperTypeCount = new HashMap<>();
+
+        boolean fetchMore = true;
+        int skip = 0;
+        int limit = 1000;
+        while (fetchMore) {
+            List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(Filters.and(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()),
+                    Filters.eq(TestingRunResult.VULNERABLE, true)), skip, limit, null);
+
+            if (testingRunResultList.isEmpty() || testingRunResultList.size() < 1000) {
+                fetchMore = false;
+            } else {
+                skip = skip + limit;
+            }
+
+            for (TestingRunResult testingRunResult : testingRunResultList) {
+                String superType = testingRunResult.getTestSuperType();
+                testSuperTypeCount.merge(superType, 1, Integer::sum);
+                ApiInfo.ApiInfoKey infoKey = testingRunResult.getApiInfoKey();
+                String url = infoKey.method.name() + " " + infoKey.getUrl();
+                affectedEndpoints.add(url);
+            }
+        }
+
+        StringBuilder stringBuilder = new StringBuilder();
+
+        int count = 3;
+        for (Iterator<String> it = affectedEndpoints.stream().iterator(); it.hasNext() && count > 0; ) {
+            String endpoint = it.next();
+            stringBuilder.append("**{/}** ").append(endpoint).append("\n");
+            count--;
+        }
+        if (affectedEndpoints.size() > 3) {
+            stringBuilder.append(" +").append(affectedEndpoints.size() - 3).append(" more").append("\n");
+        }
+
+        messageStringBuilder.replace(messageStringBuilder.indexOf("@@ENDPOINTS_AFFECTED@@")
+                ,messageStringBuilder.indexOf("@@ENDPOINTS_AFFECTED@@") + "@@ENDPOINTS_AFFECTED@@".length(), stringBuilder.toString());
+
+        Map<String, String> categoryNameMap = getShortNameVsDisplayNameMap();
+        count = 3;
+        stringBuilder = new StringBuilder();
+        for (String superCategory : testSuperTypeCount.keySet()) {
+            if (count <= 0) {
+                break;
+            }
+            if (testSuperTypeCount.get(superCategory) > 0) {
+                stringBuilder.append(categoryNameMap.get(superCategory)).append(" - _").append(testSuperTypeCount.get(superCategory)).append(" issues_").append("\n");
+                count--;
+            }
+        }
+        if (count <= 0 && stringBuilder.length() != 0) {
+            stringBuilder.append(" +").append(testSuperTypeCount.keySet().size() - 3).append(" more").append("\n");
+        }
+
+        messageStringBuilder.replace(messageStringBuilder.indexOf("@@ISSUES_FOUND@@")
+                ,messageStringBuilder.indexOf("@@ISSUES_FOUND@@") + "@@ISSUES_FOUND@@".length(), stringBuilder.toString());
+
+        Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
+        for (String severity : countIssues.keySet()) {
+            switch (severity) {
+                case "HIGH":
+                    messageStringBuilder.replace(messageStringBuilder.indexOf("@@HIGH_COUNT@@")
+                            ,messageStringBuilder.indexOf("@@HIGH_COUNT@@") + "@@HIGH_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
+                    break;
+                case "MEDIUM":
+                    messageStringBuilder.replace(messageStringBuilder.indexOf("@@MEDIUM_COUNT@@")
+                            ,messageStringBuilder.indexOf("@@MEDIUM_COUNT@@") + "@@MEDIUM_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
+                    break;
+                case "LOW":
+                    messageStringBuilder.replace(messageStringBuilder.indexOf("@@LOW_COUNT@@")
+                            ,messageStringBuilder.indexOf("@@LOW_COUNT@@") + "@@LOW_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
+                    break;
+            }
+        }
+
+
+    }
+
+    private static final String GITHUB_COMMENT = "### **Test on @@TEST_NAME@@ summary:**\n" +
+            "**Issues:**\n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/high.png 'High') [@@HIGH_COUNT@@ High](@@TEST_URL@@)  \n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/medium.png 'High') [@@MEDIUM_COUNT@@ Medium](@@TEST_URL@@)  \n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/low.png 'High') [@@LOW_COUNT@@ Low](@@TEST_URL@@)  \n" +
+            "\n" +
+            "**Vulnerability Type**\n" +
+            "\n" +
+            "@@ISSUES_FOUND@@" +
+            "\n" +
+            "**Endpoints Affected**\n" +
+            "\n" +
+            "@@ENDPOINTS_AFFECTED@@" +
+            "\n" +
+            "\n" +
+            "[See full details on Akto](@@TEST_URL@@)  ";
 }
