@@ -47,7 +47,7 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
         }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
-            servletRequest.setAttribute("AktoVersionGlobal", "akto-release-version");
+            servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {
             servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
         }
