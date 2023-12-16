@@ -42,49 +42,63 @@ const PlanDetails = ({customerId}) => {
 
 
 
-    return (<>{customerToken &&
-        <Box>
-            <CustomerPortalProvider>
-                <CustomerUsageData />
-                <PaymentDetailsSection />
-                <SubscriptionsOverview />
-                <AddonsList/>
-                <Promotions/>
-                <InvoicesSection/>
-            </CustomerPortalProvider>
+    return (<>{customerToken && <>
+            <LegacyCard title="Usage for your plan">
+                <Divider />
+                <LegacyCard.Section><Box>
+                    <CustomerPortalProvider>
+                        <CustomerUsageData />
+                        <PaymentDetailsSection />
+                        <SubscriptionsOverview />
+                        <AddonsList/>
+                        <Promotions/>
+                        <InvoicesSection/>
+                    </CustomerPortalProvider>
+                </Box></LegacyCard.Section>
+                <LegacyCard.Section subdued>
+                    For any help, please reach out to support@akto.io
+                </LegacyCard.Section>
+            </LegacyCard>
 
-            <Paywall
-                productId="product-akto"
-                onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
-                    switch (intentionType) {
+            <LegacyCard title="Available plans">
+                <Divider />
+                <LegacyCard.Section><Box>
+                    <Paywall
+                        productId="product-akto"
+                        onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
+                            switch (intentionType) {
 
-                        case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
-                          window.location.href = "https://calendly.com/ankita-akto/akto-demo?month=2023-11"
-                          break;
-                        case SubscribeIntentionType.CHANGE_UNIT_QUANTITY:
-                        case SubscribeIntentionType.UPGRADE_PLAN:
-                        case SubscribeIntentionType.DOWNGRADE_PLAN:
-                            const checkoutResult = await api.provisionSubscription({
-                              billingPeriod: selectedBillingPeriod,
-                              customerId: customer.id,
-                              planId: plan.id,
-                              successUrl: window.location.href+"?orgId="+orgId,
-                              cancelUrl: window.location.href+"?orgId="+orgId
-                            });
+                                case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
+                                  window.location.href = "https://calendly.com/ankita-akto/akto-demo?month=2023-11"
+                                  break;
+                                case SubscribeIntentionType.CHANGE_UNIT_QUANTITY:
+                                case SubscribeIntentionType.UPGRADE_PLAN:
+                                case SubscribeIntentionType.DOWNGRADE_PLAN:
+                                    const checkoutResult = await api.provisionSubscription({
+                                      billingPeriod: selectedBillingPeriod,
+                                      customerId: customer.id,
+                                      planId: plan.id,
+                                      successUrl: window.location.href+"?orgId="+orgId,
+                                      cancelUrl: window.location.href+"?orgId="+orgId
+                                    });
 
-                            console.log("checkoutResult", checkoutResult);
-                            if (checkoutResult.data.provisionSubscription.status === 'PAYMENT_REQUIRED') {
-                              window.location.href = checkoutResult.data.provisionSubscription.checkoutUrl;
-                            } else {
-                                refreshData()
-                                console.log("some error happened!")
+                                    console.log("checkoutResult", checkoutResult);
+                                    if (checkoutResult.data.provisionSubscription.status === 'PAYMENT_REQUIRED') {
+                                      window.location.href = checkoutResult.data.provisionSubscription.checkoutUrl;
+                                    } else {
+                                        refreshData()
+                                        console.log("some error happened!")
+                                    }
+                                  break;
                             }
-                          break;
-                    }
-                }}
-            />
-
-        </Box>
+                        }}
+                    />
+                </Box></LegacyCard.Section>
+                <LegacyCard.Section subdued>
+                    For any help, please reach out to support@akto.io
+                </LegacyCard.Section>
+            </LegacyCard>
+            </>
     }
     {isLoading && <div>Checking org...</div>}
     {!isLoading && !customerToken && <div>Invalid org id</div>}
@@ -125,20 +139,32 @@ const SelfHosted = () => {
         }
     })
 
-    return (<>
+    return (<Page
+            title="Self hosted plans"
+            divider
+        >
         {
             !checkValidOrgId(customerId) &&
-            <TextField
-                label="Organization ID"
-                value={customerId}
-                placeholder="416b746f-6973-746f-6f61-7765736f6d65"
-                onChange={(customerId) => setCustomerId(customerId)}
-                autoComplete="off"
-            />
+            <LegacyCard title="Available plans">
+                <Divider />
+                <LegacyCard.Section><Box>
+
+                    <TextField
+                        label="Organization ID"
+                        value={customerId}
+                        placeholder="416b746f-6973-746f-6f61-7765736f6d65"
+                        onChange={(customerId) => setCustomerId(customerId)}
+                        autoComplete="off"
+                    />
+                </Box></LegacyCard.Section>
+                <LegacyCard.Section subdued>
+                    For any help, please reach out to support@akto.io
+                </LegacyCard.Section>
+            </LegacyCard>
 
         }
         {checkValidOrgId(customerId) && <StiggProvider apiKey={window.STIGG_CLIENT_KEY}><PlanDetails customerId={customerId}/></StiggProvider>}
-        </>
+        </Page>
     )
 
 }
