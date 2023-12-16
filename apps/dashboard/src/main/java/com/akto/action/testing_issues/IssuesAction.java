@@ -240,7 +240,7 @@ public class IssuesAction extends UserAction {
 
         this.categories = GlobalEnums.TestCategory.values();
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
-        // this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+        this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
