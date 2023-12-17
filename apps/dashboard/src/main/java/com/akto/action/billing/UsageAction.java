@@ -1,12 +1,10 @@
 package com.akto.action.billing;
 
 import com.akto.action.UserAction;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.stigg.StiggReporterClient;
-import com.akto.util.UsageUtils;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.mongodb.BasicDBList;
@@ -17,10 +15,8 @@ import org.apache.commons.codec.digest.HmacUtils;
 
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -54,17 +50,6 @@ public class UsageAction extends UserAction {
         String ret = StiggReporterClient.instance.provisionSubscription(customerId, planId, billingPeriod, successUrl, cancelUrl);
 
         checkoutResult = BasicDBObject.parse(ret);
-
-        return SUCCESS.toUpperCase();
-    }
-
-    public String calcUsage() {
-        InitializerListener.calcUsage();
-
-        return SUCCESS.toUpperCase();
-    }
-    public String syncWithAkto() {
-        InitializerListener.syncWithAkto();
 
         return SUCCESS.toUpperCase();
     }
