@@ -5,18 +5,83 @@ import java.util.*;
 
 import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.log.LoggerMaker;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 import okhttp3.*;
+import org.apache.commons.lang3.StringUtils;
 
 public class OrganizationUtils {
-    
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
+    public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
+        return featureWiseAllowed.entrySet().stream()
+                .anyMatch(e -> e.getValue().getIsGranted()
+                        && e.getValue().getOverageFirstDetected() != -1);
+    }
+
+    public static HashMap<String, FeatureAccess> getFeatureWiseAllowed(BasicDBList l) {
+        if (l == null || l.size() == 0) return new HashMap<>();
+
+        HashMap<String, FeatureAccess> result = new HashMap<>();
+
+        int now = Context.now();
+
+        for(Object o: l) {
+            try {
+                BasicDBObject bO = (BasicDBObject) o;
+
+                boolean isGranted = bO.getBoolean("isGranted", false);
+
+                BasicDBObject featureObject = (BasicDBObject) bO.get("feature");
+
+                String featureLabel = "";
+                if (featureObject != null) {
+                    BasicDBObject metaData = (BasicDBObject) featureObject.get("additionalMetaData");
+                    if (metaData != null) {
+                        featureLabel = metaData.getString("key", "");
+                    }
+                    result.put(featureLabel, new FeatureAccess(isGranted, -1));
+                } else {
+                    loggerMaker.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LoggerMaker.LogDb.DASHBOARD);
+                }
+
+                if(featureLabel.isEmpty() && featureObject != null){
+                    loggerMaker.errorAndAddToDb("unable to find feature label for this feature " + featureObject.toString(), LoggerMaker.LogDb.DASHBOARD);
+                }
+
+                Object usageLimitObj = bO.get("usageLimit");
+
+                if (usageLimitObj == null) {
+                    continue;
+                }
+
+                if (StringUtils.isNumeric(usageLimitObj.toString())) {
+                    int usageLimit = Integer.parseInt(usageLimitObj.toString());
+                    int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
+                    if (usage > usageLimit) {
+                        result.put(featureLabel, new FeatureAccess(isGranted, now));
+                    }
+
+                }
+            } catch (Exception e) {
+                loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
+                continue;
+            }
+        }
+
+        return result;
+    }
+
     public static Set<Integer> findAccountsBelongingToOrganization(int adminUserId) {
         Set<Integer> accounts = new HashSet<Integer>();
 
@@ -35,12 +100,14 @@ public class OrganizationUtils {
         return accounts;
     }
 
-    public static BasicDBObject fetchOrgDetails(String orgId) {
+    private static BasicDBObject fetchFromBillingService(String apiName, BasicDBObject reqBody) {
+        String json = reqBody.toJson();
 
-        String orgIdUUID = UUID.fromString(orgId).toString();
-
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json, JSON);
         Request request = new Request.Builder()
-                .url(UsageUtils.getUsageServiceUrl() + "/api/fetchOrgDetails?orgId="+orgIdUUID)
+                .url(UsageUtils.getUsageServiceUrl() + "/api/"+apiName)
+                .post(body)
                 .build();
 
         OkHttpClient client = new OkHttpClient();
@@ -67,6 +134,31 @@ public class OrganizationUtils {
                 response.close();
             }
         }
+    }
+
+    public static BasicDBObject fetchOrgDetails(String orgId) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        return fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
+    }
+
+    public static String fetchClientKey(String orgId, String adminEmail) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
+        BasicDBObject respBody = fetchFromBillingService("fetchClientKey", reqBody);
+        if (respBody == null) return "";
+
+        return respBody.getOrDefault("clientKey", "").toString();
+
+    }
+
+    public static String fetchSignature(String orgId, String adminEmail) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
+        BasicDBObject respBody = fetchFromBillingService("fetchSignature", reqBody);
+
+        if (respBody == null) return "";
+
+        return respBody.getOrDefault("signature", "").toString();
     }
 
     public static Boolean syncOrganizationWithAkto(Organization organization) {
@@ -125,5 +217,16 @@ public class OrganizationUtils {
         }
 
         return domainParts[0];
+    }
+
+    public static BasicDBList fetchEntitlements(String orgId, String adminEmail) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
+        BasicDBObject ret = fetchFromBillingService("fetchEntitlements", reqBody);
+
+        if (ret == null) {
+            return null;
+        }
+        return (BasicDBList) (ret.get("entitlements"));
     }
 }

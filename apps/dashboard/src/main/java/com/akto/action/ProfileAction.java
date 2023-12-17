@@ -15,10 +15,10 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
-import com.akto.stigg.StiggReporterClient;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -129,7 +129,8 @@ public class ProfileAction extends UserAction {
             boolean isOverage = false;
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
             try {
-                featureWiseAllowed = StiggReporterClient.instance.getFeatureWiseAllowed(organizationId);
+                BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId, organization.getAdminEmail());
+                featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
 
                 for(Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                     String label = entry.getKey();
@@ -149,7 +150,7 @@ public class ProfileAction extends UserAction {
                         Filters.eq(Constants.ID, organizationId),
                         Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed));
                 
-                isOverage = StiggReporterClient.instance.isOverage(featureWiseAllowed);
+                isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
             }
@@ -165,12 +166,10 @@ public class ProfileAction extends UserAction {
             }
             userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
 
-            if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
-                String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
-                userDetails.append("stiggCustomerId", organizationId);
-                userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + organizationId + ":" + stiggSignature);
-                userDetails.append("stiggClientKey", StiggReporterClient.instance.getStiggConfig().getClientKey());
-            }
+            userDetails.append("stiggCustomerId", organizationId);
+            userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
+            userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
+
         }
 
         if (versions.length > 2) {

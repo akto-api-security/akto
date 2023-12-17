@@ -79,65 +79,7 @@ public class StiggReporterClient {
 
     }
 
-    public boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
-        return featureWiseAllowed.entrySet().stream()
-                .anyMatch(e -> e.getValue().getIsGranted()
-                        && e.getValue().getOverageFirstDetected() != -1);
-    }
 
-    public HashMap<String, FeatureAccess> getFeatureWiseAllowed(String customerId) {
-        BasicDBList l = fetchEntitlements(customerId);
-        if (l.size() == 0) return new HashMap<>();
-
-        HashMap<String, FeatureAccess> result = new HashMap<>();
-
-        int now = Context.now();
-
-        for(Object o: l) {
-            try {
-                BasicDBObject bO = (BasicDBObject) o;
-
-                boolean isGranted = bO.getBoolean("isGranted", false);
-
-                BasicDBObject featureObject = (BasicDBObject) bO.get("feature");
-
-                String featureLabel = "";
-                if (featureObject != null) {
-                    BasicDBObject metaData = (BasicDBObject) featureObject.get("additionalMetaData");
-                    if (metaData != null) {
-                        featureLabel = metaData.getString("key", "");
-                    }
-                    result.put(featureLabel, new FeatureAccess(isGranted, -1));
-                } else {
-                    loggerMaker.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LogDb.DASHBOARD);
-                }
-
-                if(featureLabel.isEmpty() && featureObject != null){
-                    loggerMaker.errorAndAddToDb("unable to find feature label for this feature " + featureObject.toString(), LogDb.DASHBOARD);
-                }
-
-                Object usageLimitObj = bO.get("usageLimit");
-
-                if (usageLimitObj == null) {
-                    continue;
-                }
-
-                if (StringUtils.isNumeric(usageLimitObj.toString())) {
-                    int usageLimit = Integer.parseInt(usageLimitObj.toString());
-                    int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
-                    if (usage > usageLimit) {
-                        result.put(featureLabel, new FeatureAccess(isGranted, now));
-                    }
-
-                }
-            } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
-                continue;
-            }
-        }
-
-        return result;
-    }
 
     public BasicDBList fetchEntitlements(String customerId) {
         BasicDBObject varsObj = new BasicDBObject("input", new BasicDBObject("customerId", customerId));
