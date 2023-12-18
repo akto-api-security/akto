@@ -140,6 +140,16 @@ public class OrganizationUtils {
         String orgIdUUID = UUID.fromString(orgId).toString();
         return fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
     }
+    public static BasicDBObject provisionSubscription(String customerId, String planId, String billingPeriod, String successUrl, String cancelUrl) {
+        String orgIdUUID = UUID.fromString(customerId).toString();
+        BasicDBObject req =
+            new BasicDBObject("orgId", orgIdUUID)
+            .append("planId", planId)
+            .append("billingPeriod", billingPeriod)
+            .append("successUrl", successUrl)
+            .append("cancelUrl", cancelUrl);
+        return fetchFromBillingService("provisionSubscription", req);
+    }
 
     public static String fetchClientKey(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
