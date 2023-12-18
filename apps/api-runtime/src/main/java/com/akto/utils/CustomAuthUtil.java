@@ -37,12 +37,13 @@ public class CustomAuthUtil {
         );
     }
 
+    private static Set<ApiInfo.AuthType> customTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.CUSTOM));
+    private static Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
+
     private static Set<Set<ApiInfo.AuthType>> addCustomAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
 
         // remove unauthenticated and add custom auth type
-
-        authTypes.remove(Collections.singleton(ApiInfo.AuthType.UNAUTHENTICATED));
-        Set<ApiInfo.AuthType> customTypes = Collections.singleton(ApiInfo.AuthType.CUSTOM);
+        authTypes.remove(unauthenticatedTypes);
         
         if(!authTypes.contains(customTypes)){
             authTypes.add(customTypes);
@@ -54,7 +55,7 @@ public class CustomAuthUtil {
     private static Set<Set<ApiInfo.AuthType>> addUnauthenticatedIfNoAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
 
         if(authTypes.isEmpty()){
-            authTypes.add(Collections.singleton(ApiInfo.AuthType.UNAUTHENTICATED));
+            authTypes.add(unauthenticatedTypes);
         }
 
         return authTypes;

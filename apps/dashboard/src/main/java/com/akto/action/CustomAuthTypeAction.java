@@ -122,11 +122,11 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String resetAllCustomAuthTypes() {
         try {
-            CustomAuthUtil.resetAllCustomAuthTypes();
             int accountId = Context.accountId.get();
-            SingleTypeInfo.fetchCustomAuthTypes(accountId);
             executorService.schedule( new Runnable() {
                 public void run() {
+                    CustomAuthUtil.resetAllCustomAuthTypes();
+                    SingleTypeInfo.fetchCustomAuthTypes(accountId);
                     Context.accountId.set(accountId);
                     CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
                 }
