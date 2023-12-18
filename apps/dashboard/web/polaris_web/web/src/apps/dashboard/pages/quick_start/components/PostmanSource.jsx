@@ -7,6 +7,8 @@ import FileUpload from '../../../components/shared/FileUpload';
 import {CancelMajor} from "@shopify/polaris-icons"
 import api from '../api';
 import Store from '../../../store';
+import InformationBannerComponent from "./shared/InformationBannerComponent";
+
 
 function PostmanSource() {
 
@@ -172,6 +174,10 @@ function PostmanSource() {
                 <RadioButton id="api" label="Import using postman API key" checked={type === "api"} onChange={()=>handleChange("api")}/>
                 <RadioButton id="collection" label="Import using postman collection file" checked={type === "collection"} onChange={()=>handleChange("collection")}/>
             </VerticalStack>
+            <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/postman#pre-requisites-for-akto-postman-connection"
+                    content="Please ensure the pre-requisites " 
+            />
+
             <VerticalStack gap="1">
                 {steps.map((element,index) => (
                     <HorizontalStack gap="1" wrap={false} key={element.text}>
@@ -191,6 +197,10 @@ function PostmanSource() {
                     <Button onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
+                <Button plain onClick={(event) => { 
+                            event.stopPropagation(); 
+                            window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
+                        }}>postman trouble-shooting guide</Button>
             </VerticalStack>
         </div>
     )
