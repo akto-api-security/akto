@@ -48,28 +48,6 @@
             </result>
         </action>
 
-        <action name="api/aggregateAccountWiseUsage" class="com.akto.action.usage.UsageAction" method="aggregateAccountWiseUsage">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/sendDataToSinks" class="com.akto.action.usage.UsageAction" method="sendDataToSinks">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/fetchClientKey" class="com.akto.action.selfhosted.InfoAction" method="fetchClientKey">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -96,19 +74,6 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/provisionSubscription" class="com.akto.action.billing.OrganizationAction" method="provisionSubscription">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="root">checkoutResult</param>
-            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

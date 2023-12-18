@@ -1,7 +1,5 @@
 package com.akto.action.internal;
 
-import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.stigg.StiggReporterClient;
@@ -11,9 +9,6 @@ import static com.opensymphony.xwork2.Action.ERROR;
 import static com.opensymphony.xwork2.Action.SUCCESS;
 
 public class SubscriptionAction {
-
-    private Organization organization;
-
     private static final LoggerMaker loggerMaker = new LoggerMaker(SubscriptionAction.class);
     String planId;
     String billingPeriod;
@@ -34,22 +29,6 @@ public class SubscriptionAction {
     }
 
     private String orgId;
-    public String fetchOrgDetails() {
-        this.organization = OrganizationsDao.instance.findOne(Organization.ID, orgId);
-        return SUCCESS.toUpperCase();
-    }
-
-    public void setOrganization(Organization organization) {
-        this.organization = organization;
-    }
-
-    public Organization getOrganization() {
-        return organization;
-    }
-
-    public String getOrgId() {
-        return orgId;
-    }
 
     public void setOrgId(String orgId) {
         this.orgId = orgId;
