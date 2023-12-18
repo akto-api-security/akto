@@ -486,7 +486,7 @@ export default {
           var result = await this.$store.dispatch('inventory/exportToPostman')
           window._AKTO.$emit('SHOW_SNACKBAR', {
             show: true,
-            text: "Exported to Postman!",
+            text: "We have initiated export to Postman, checkout API section on your Postman app in sometime.",
             color: 'green'
           })
         },
