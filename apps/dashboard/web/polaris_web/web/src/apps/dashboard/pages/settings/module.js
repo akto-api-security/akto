@@ -99,7 +99,7 @@ const settingFunctions = {
           //   text: 'Akto'
           // },
           {
-            title: "Organization ID"
+            title: "Organization ID",
             text: respOrgStr
           },
           {
