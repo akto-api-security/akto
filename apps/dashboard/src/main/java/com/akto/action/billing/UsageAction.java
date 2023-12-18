@@ -47,9 +47,12 @@ public class UsageAction extends UserAction {
 
     BasicDBObject checkoutResult = new BasicDBObject();
     public String provisionSubscription() {
-        String ret = StiggReporterClient.instance.provisionSubscription(customerId, planId, billingPeriod, successUrl, cancelUrl);
+        if (!DashboardMode.isSaasDeployment()) {
+            addActionError("Invalid API");
+            return ERROR.toUpperCase();
+        }
 
-        checkoutResult = BasicDBObject.parse(ret);
+        checkoutResult = OrganizationUtils.provisionSubscription(customerId, planId, billingPeriod, successUrl, cancelUrl);
 
         return SUCCESS.toUpperCase();
     }
@@ -68,13 +71,6 @@ public class UsageAction extends UserAction {
 
         if (!patternToSubType.get(SingleTypeInfo.UUID).matcher(customerId).matches()) {
             addActionError("Org id is not of the form uuid");
-            return ERROR.toUpperCase();
-        }
-
-        try {
-            BasicDBList entitlements = StiggReporterClient.instance.fetchEntitlements(customerId);
-        } catch (Exception e) {
-            addActionError("No such organization found. Please contact support@akto.io.");
             return ERROR.toUpperCase();
         }
 
@@ -107,14 +103,17 @@ public class UsageAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
-            String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(customerId);
-            this.customerToken = "HMAC-SHA256 " + customerId + ":" + stiggSignature;
-
-            return SUCCESS.toUpperCase();
-        } else {
+        try {
+            BasicDBList entitlements = OrganizationUtils.fetchEntitlements(customerId, orgUser);
+        } catch (Exception e) {
+            addActionError("No such organization found. Please contact support@akto.io.");
             return ERROR.toUpperCase();
         }
+
+
+        this.customerToken = OrganizationUtils.fetchSignature(customerId, orgUser);
+
+        return SUCCESS.toUpperCase();
     }
 
     @Override
@@ -149,4 +148,6 @@ public class UsageAction extends UserAction {
     public String getCustomerToken() {
         return customerToken;
     }
+
+
 }
