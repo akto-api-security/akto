@@ -136,6 +136,42 @@ public class OrganizationUtils {
         }
     }
 
+    private static BasicDBObject fetchFromInternalService(String apiName, BasicDBObject reqBody) {
+        String json = reqBody.toJson();
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json, JSON);
+        Request request = new Request.Builder()
+                .url(UsageUtils.getInternalServiceUrl() + "/api/"+apiName)
+                .post(body)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response response = null;
+
+        try {
+            response = client.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+
+            ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                return null;
+            }
+
+            return BasicDBObject.parse(responseBody.string());
+
+        } catch (IOException e) {
+            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            return null;
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
+    }
+
     public static BasicDBObject fetchOrgDetails(String orgId) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         return fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
@@ -148,7 +184,7 @@ public class OrganizationUtils {
             .append("billingPeriod", billingPeriod)
             .append("successUrl", successUrl)
             .append("cancelUrl", cancelUrl);
-        return fetchFromBillingService("provisionSubscription", req);
+        return fetchFromInternalService("provisionSubscription", req);
     }
 
     public static String fetchClientKey(String orgId, String adminEmail) {
