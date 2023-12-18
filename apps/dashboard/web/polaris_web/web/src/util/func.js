@@ -1068,6 +1068,19 @@ getSizeOfFile(bytes) {
       event.preventDefault();
       funcToCall();
     }
+  },
+  convertQueryParamsToUrl(queryParams) {
+    let url = ""
+    let first = true;
+    let joiner = "?"
+    Object.keys(queryParams).forEach((key) => {
+      if (!first) {
+        joiner = "&"
+      }
+      url = url + joiner + key + '=' + encodeURI(queryParams[key])
+      first = false
+    })
+    return url;
   }
 }
 
