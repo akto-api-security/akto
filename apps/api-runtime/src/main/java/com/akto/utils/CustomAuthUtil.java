@@ -164,8 +164,5 @@ public class CustomAuthUtil {
         ApiInfoDao.instance.updateMany(new BasicDBObject(),
                 Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$in",
                         new String[] { ApiInfo.AuthType.CUSTOM.name(), ApiInfo.AuthType.UNAUTHENTICATED.name() })));
-
-        ApiInfoDao.instance.updateMany(new BasicDBObject(),
-                Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", ApiInfo.AuthType.UNAUTHENTICATED.name()));
     }
 }
