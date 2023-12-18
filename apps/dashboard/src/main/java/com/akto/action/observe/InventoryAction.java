@@ -69,9 +69,15 @@ public class InventoryAction extends UserAction {
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
-        Bson filterQWithTs = Filters.and(Filters.gte("timestamp", startTimestamp), Filters.lte("timestamp", endTimestamp), hostFilterQ);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                hostFilterQ
+        );
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             loggerMaker.debugInfoAddToDb(sti.getUrl() + " discovered_ts: " + sti.getTimestamp() + " inserted_ts: " + sti.getId().getTimestamp(), LogDb.DASHBOARD);
@@ -84,7 +90,6 @@ public class InventoryAction extends UserAction {
             endpoints.add(endpoint);
         }
         
-        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
 
         if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
             List<Bson> pipeline = new ArrayList<>();

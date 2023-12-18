@@ -67,7 +67,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames =  new String[]{"responseCode", "subType", "timestamp",};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
     }
 
     public static Bson filterForSTIUsingURL(int apiCollectionId, String url, URLMethods.Method method) {
@@ -77,7 +78,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Filters.eq("method", method.name())
         );
     }
-
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
         List<Bson> filters = new ArrayList<>();

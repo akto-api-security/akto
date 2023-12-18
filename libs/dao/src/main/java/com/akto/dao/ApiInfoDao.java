@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -9,6 +10,8 @@ import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
@@ -37,11 +40,14 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
+        
         fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, "_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-}
-
+    }
+    
     @Override
     public String getCollName() {
         return "api_info";

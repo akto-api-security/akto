@@ -17,6 +17,9 @@ import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -40,7 +43,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.notifications.email.WeeklyEmail;
+import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
@@ -50,6 +53,8 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.EmailAccountName;
+import com.akto.util.Constants;
 import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
@@ -74,6 +79,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,8 +95,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -345,6 +349,57 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+    public void setUpAktoMixpanelEndpointsScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            raiseMixpanelEvent();
+
+                        } catch (Exception e) {
+                        }
+                    }
+                }, "akto-mixpanel-endpoints-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static void raiseMixpanelEvent() {
+
+        int now = Context.now();
+        List<BasicDBObject> totalEndpoints = new InventoryAction().fetchRecentEndpoints(0, now);
+        List<BasicDBObject> newEndpoints  = new InventoryAction().fetchRecentEndpoints(now - 604800, now);
+
+        DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
+
+        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN);
+
+        if (record == null) {
+            return;
+        }
+
+        BasicDBObject mentionedUser = UsersDao.instance.getUserInfo(record.getUserId());
+        String userEmail = (String) mentionedUser.get("name");
+
+        String distinct_id = userEmail + "_" + dashboardMode;
+
+        EmailAccountName emailAccountName = new EmailAccountName(userEmail);
+        String accountName = emailAccountName.getAccountName();
+
+        JSONObject props = new JSONObject();
+        props.put("Email ID", userEmail);
+        props.put("Dashboard Mode", dashboardMode);
+        props.put("Account Name", accountName);
+        props.put("Total Endpoints", totalEndpoints.size());
+        props.put("New Endpoints", newEndpoints.size());
+
+        AktoMixpanel aktoMixpanel = new AktoMixpanel();
+        aktoMixpanel.sendEvent(distinct_id, "Endpoints Populated", props);
+
+    }
+    
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1184,6 +1239,52 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAktoDefaultNewUI() == 0){
+
+            UsersDao.instance.updateMany(Filters.empty(), Updates.set(User.AKTO_UI_MODE, AktoUIMode.VERSION_2));
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DEFAULT_NEW_UI, Context.now())
+            );
+        }
+    }
+
+    public void fillCollectionIdArray() {
+        Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
+
+            put(CollectionType.ApiCollectionId,
+                Arrays.asList("$apiCollectionId"));
+            put(CollectionType.Id_ApiCollectionId,
+                Arrays.asList("$_id.apiCollectionId"));
+            put(CollectionType.Id_ApiInfoKey_ApiCollectionId,
+                Arrays.asList("$_id.apiInfoKey.apiCollectionId"));
+        }};
+
+        Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
+
+        Bson filter = Filters.exists(SingleTypeInfo._COLLECTION_IDS, false);
+
+        for(Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()){
+
+            List<Bson> update = Arrays.asList(
+                            Updates.set(SingleTypeInfo._COLLECTION_IDS, 
+                            matchKeyMap.get(collections.getKey())));
+
+            if(collections.getKey().equals(CollectionType.ApiCollectionId)){
+                ApiCollectionUsers.updateCollectionsInBatches(collections.getValue(), filter, update);
+            } else {
+                ApiCollectionUsers.updateCollections(collections.getValue(), filter, update);
+            }
+        }
+    }
+
+    private static void checkMongoConnection() throws Exception {
+        AccountsDao.instance.getStats();
+        connectedToMongo = true;
+    }
+
     public static void setSubdomain(){
         if (System.getenv("AKTO_SUBDOMAIN") != null) {
             subdomain = System.getenv("AKTO_SUBDOMAIN");
@@ -1244,6 +1345,7 @@ public class InitializerListener implements ServletContextListener {
                 setUpWebhookScheduler();
                 setUpPiiAndTestSourcesScheduler();
                 setUpTestEditorTemplatesScheduler();
+                setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 updateGlobalAktoVersion();
                 trimCappedCollections();
@@ -1318,6 +1420,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);
@@ -1512,14 +1615,28 @@ public class InitializerListener implements ServletContextListener {
                             int updatedAt = Context.now();
                             String author = "AKTO";
 
-                            YamlTemplateDao.instance.updateOne(
-                                    Filters.eq("_id", id),
-                                    Updates.combine(
+                            List<Bson> updates = new ArrayList<>(
+                                    Arrays.asList(
                                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
                                             Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
+                            
+                            try {
+                                Object inactiveObject = TestConfigYamlParser.getFieldIfExists(templateContent,
+                                        YamlTemplate.INACTIVE);
+                                if (inactiveObject != null && inactiveObject instanceof Boolean) {
+                                    boolean inactive = (boolean) inactiveObject;
+                                    updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
+                                }
+                            } catch (Exception e) {
+                            }
+
+                            YamlTemplateDao.instance.updateOne(
+                                    Filters.eq(Constants.ID, id),
+                                    Updates.combine(updates));
+
                         }
                     }
 

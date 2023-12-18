@@ -27,6 +27,7 @@ import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
 import OpenApiSpec from "../OpenApiSpec"
 import PersistStore from "../../../../main/PersistStore"
+import TooltipText from "../../../components/shared/TooltipText"
 
 const headers = [
     {
@@ -302,7 +303,7 @@ function ApiEndpoints() {
     async function exportPostman() {
         const result = await api.exportToPostman(apiCollectionId)
         if (result)
-            func.setToast(true, false, "Postman collection downloaded successfully")
+            func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
 
     function disambiguateLabel(key, value) {
@@ -378,7 +379,9 @@ function ApiEndpoints() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg' truncate>{pageTitle}</Text>
+                <Box maxWidth="35vw">
+                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
+                </Box>
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={

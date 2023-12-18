@@ -1,6 +1,7 @@
 package com.akto.runtime.merge;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,9 +27,11 @@ import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Util;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 public class MergeOnHostOnly {
@@ -54,7 +57,10 @@ public class MergeOnHostOnly {
 
         List<ApiInfo> apiInfos =  ApiInfoDao.instance.findAll("_id.apiCollectionId", oldId);
         if(apiInfos!=null && apiInfos.size()>0){
-            apiInfos.forEach((apiInfo)->apiInfo.getId().setApiCollectionId(newId));
+            apiInfos.forEach((apiInfo)->{
+                apiInfo.getId().setApiCollectionId(newId);
+                apiInfo.setCollectionIds(Util.replaceElementInList(apiInfo.getCollectionIds(), newId, oldId));
+            });
             try{
                 ApiInfoDao.instance.getMCollection().insertMany(apiInfos,options);
             } catch(Exception e){
@@ -66,7 +72,10 @@ public class MergeOnHostOnly {
 
         List<SampleData> sampleDatas =  SampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
         if(sampleDatas!=null && sampleDatas.size()>0){
-            sampleDatas.forEach((sampleData)->sampleData.getId().setApiCollectionId(newId));
+            sampleDatas.forEach((sampleData) -> {
+                sampleData.getId().setApiCollectionId(newId);
+                sampleData.setCollectionIds(Util.replaceElementInList(sampleData.getCollectionIds(), newId, oldId));
+            });
             try{
                 SampleDataDao.instance.getMCollection().insertMany(sampleDatas,options);
             } catch(Exception e){
@@ -79,7 +88,10 @@ public class MergeOnHostOnly {
 
         List<SensitiveSampleData> sensitiveSampleDatas =  SensitiveSampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
         if(sensitiveSampleDatas!=null && sensitiveSampleDatas.size()>0){
-            sensitiveSampleDatas.forEach((sensitiveSampleData)->sensitiveSampleData.getId().setApiCollectionId(newId));
+            sensitiveSampleDatas.forEach((sensitiveSampleData)->{
+                sensitiveSampleData.getId().setApiCollectionId(newId);
+                sensitiveSampleData.setCollectionIds(Util.replaceElementInList(sensitiveSampleData.getCollectionIds(), newId, oldId));
+            });
             try{
                 SensitiveSampleDataDao.instance.getMCollection().insertMany(sensitiveSampleDatas,options);
             } catch(Exception e){
@@ -92,7 +104,10 @@ public class MergeOnHostOnly {
 
         List<TrafficInfo> trafficInfos =  TrafficInfoDao.instance.findAll("_id.apiCollectionId", oldId);
         if(trafficInfos!=null && trafficInfos.size()>0){
-            trafficInfos.forEach((trafficInfo)->trafficInfo.getId().setApiCollectionId(newId));
+            trafficInfos.forEach((trafficInfo)->{
+                trafficInfo.getId().setApiCollectionId(newId);
+                trafficInfo.setCollectionIds(Util.replaceElementInList(trafficInfo.getCollectionIds(), newId, oldId));
+            });
             try{
                 TrafficInfoDao.instance.getMCollection().insertMany(trafficInfos,options);
             } catch(Exception e){
@@ -112,12 +127,22 @@ public class MergeOnHostOnly {
         loggerMaker.infoAndAddToDb("Deleted filter sample data", LoggerMaker.LogDb.RUNTIME);
     }
 
-    public void updateSTI(int oldId, int newId){
+    public void updateSTI(int oldId, int newId) {
         SingleTypeInfoDao.instance.getMCollection().updateMany(
-            Filters.eq("apiCollectionId",oldId), 
-            Updates.set("apiCollectionId",newId));
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, oldId),
+                        Filters.exists(SingleTypeInfo._COLLECTION_IDS, false)),
+                Updates.set(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(newId)));
 
-        loggerMaker.infoAndAddToDb("Updated STI", LoggerMaker.LogDb.RUNTIME);
+        // the below query fails when collectionIds is not present, thus the above query.
+        SingleTypeInfoDao.instance.getMCollection().updateMany(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, oldId),
+                Updates.combine(
+                        Updates.set(SingleTypeInfo._API_COLLECTION_ID, newId),
+                        Updates.set("collectionIds.$[element]", newId)),
+                new UpdateOptions().arrayFilters(
+                        Arrays.asList(
+                                Filters.in("element", oldId))));
     }
 
     public void deleteFromAllCollections(int apiCollectionId, List<String> urls ) {

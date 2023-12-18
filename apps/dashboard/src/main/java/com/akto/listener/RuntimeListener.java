@@ -322,7 +322,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
     }
 
-    private static String convertStreamToString(InputStream in) throws Exception {
+    public static String convertStreamToString(InputStream in) throws Exception {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();

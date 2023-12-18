@@ -70,6 +70,29 @@ public class TestingRunConfig {
     public void setOverriddenTestAppUrl(String overriddenTestAppUrl) {
         this.overriddenTestAppUrl = overriddenTestAppUrl;
     }
+
+    public void rebaseOn(TestingRunConfig that) {
+        if (that == null) return;
+
+        if (this == that) return;
+
+        if (this.collectionWiseApiInfoKey == null) {
+            this.collectionWiseApiInfoKey = that.collectionWiseApiInfoKey;
+        }
+
+        if (this.testSubCategoryList == null) {
+            this.testSubCategoryList = that.testSubCategoryList;
+        }
+
+        if (this.authMechanismId == null) {
+            this.authMechanismId = that.authMechanismId;
+        }
+
+        if (this.overriddenTestAppUrl == null) {
+            this.overriddenTestAppUrl = that.overriddenTestAppUrl;
+        }
+    }
+    
     public String getTestRoleId() {
         return testRoleId;
     }

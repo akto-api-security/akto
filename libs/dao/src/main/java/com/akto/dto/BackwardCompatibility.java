@@ -43,11 +43,15 @@ public class BackwardCompatibility {
     public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
     private int loadTemplateFilesFromDirectory;
 
+    public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
+    private int aktoDefaultNewUI;
+
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging, int enableMergeAsyncOutside,
-                                 int loadTemplateFilesFromDirectory) {
+                                 int loadTemplateFilesFromDirectory, int aktoDefaultNewUI) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -62,6 +66,7 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
         this.enableMergeAsyncOutside = enableMergeAsyncOutside;
         this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
+        this.aktoDefaultNewUI = aktoDefaultNewUI;
     }
 
     public BackwardCompatibility() {
@@ -185,4 +190,12 @@ public class BackwardCompatibility {
     public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
         return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
     } 
+
+    public int getAktoDefaultNewUI() {
+        return aktoDefaultNewUI;
+    }
+
+    public void setAktoDefaultNewUI(int aktoDefaultNewUI) {
+        this.aktoDefaultNewUI = aktoDefaultNewUI;
+    }
 }

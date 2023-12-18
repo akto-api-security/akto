@@ -57,6 +57,8 @@ import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
+// if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
+
 const router = createBrowserRouter([
   {
     path: "/dashboard",
