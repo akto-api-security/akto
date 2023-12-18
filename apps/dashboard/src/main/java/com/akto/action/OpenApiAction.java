@@ -2,22 +2,30 @@ package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.open_api.Main;
+import com.akto.open_api.parser.Parser;
+import com.akto.util.Constants;
 import com.akto.utils.SampleDataToSTI;
+import com.akto.utils.Utils;
 import com.mongodb.client.model.Filters;
+
+import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.parser.core.models.ParseOptions;
+import io.swagger.v3.parser.core.models.SwaggerParseResult;
+
 import org.apache.struts2.interceptor.ServletResponseAware;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -91,8 +99,57 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         return null;
     }
 
+    private static final String OPEN_API = "OpenAPI";
+    public String importDataFromOpenApiSpec(){
+
+        List<String> messages = new ArrayList<>();
+        String title = OPEN_API + " ";
+
+        try {
+            ParseOptions options = new ParseOptions();
+            options.setResolve(true);
+            options.setResolveFully(true);
+            SwaggerParseResult result = new OpenAPIParser().readContents(openAPIString, null, options);
+            OpenAPI openAPI = result.getOpenAPI();
+            if(openAPI.getInfo()!=null && openAPI.getInfo().getTitle()!=null){
+                title += openAPI.getInfo().getTitle();
+            } else {
+                title += Context.now();
+            }
+            messages = Parser.convertOpenApiToAkto(openAPI);
+            
+        } catch (Exception e) {
+            addActionError("ERROR while parsing openAPI file.");
+            return ERROR.toUpperCase();
+        }
+
+        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+
+        if (messages.size() > 0) {
+            apiCollectionId = title.hashCode();
+            if (ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)) == null) {
+                ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(apiCollectionId, title));
+            }
+
+            try {
+                Utils.pushDataToKafka(apiCollectionId, topic, messages, new ArrayList<>(), true);
+            } catch (Exception e) {
+                addActionError("ERROR while creating collection from openAPI file.");
+                return ERROR.toUpperCase();
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public int getApiCollectionId() {
+        return apiCollectionId;
+    }
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+    }
+
+    public void setOpenAPIString(String openAPIString) {
+        this.openAPIString = openAPIString;
     }
 
     public String getOpenAPIString() {

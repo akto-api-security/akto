@@ -1,5 +1,7 @@
 package com.akto.util.http_request;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.*;
 import org.apache.http.client.HttpClient;
@@ -19,6 +21,9 @@ import java.util.Map;
 public class CustomHttpRequest {
     private static final HttpClient httpclient = HttpClients.createDefault();
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomHttpRequest.class);
+
+    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 
     public static Map<String,Object> getRequest(String url, String authHeader) throws HttpResponseException {
         HttpGet httpGet = new HttpGet(url);
@@ -36,6 +41,19 @@ public class CustomHttpRequest {
             httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
+        }
+
+        return s(httpPost);
+
+    }
+
+    public static Map<String,Object> postRequestEncodedType(String url, List<NameValuePair> params) throws HttpResponseException {
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Content-Type", FORM_URL_ENCODED_CONTENT_TYPE);
+        try {
+            httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+
         }
 
         return s(httpPost);
@@ -69,13 +87,13 @@ public class CustomHttpRequest {
                 inputStream = entity.getContent();
                 jsonMap = mapper.readValue(inputStream, Map.class);
             } catch (IOException ioException) {
-                ioException.printStackTrace();
+                loggerMaker.errorAndAddToDb("Exception in parsing entity of sso request \n " + ioException.getMessage(), LogDb.DASHBOARD);
             } finally {
                 if (inputStream != null) {
                     try {
                         inputStream.close();
                     } catch (IOException ioException) {
-                        ioException.printStackTrace();
+                        loggerMaker.errorAndAddToDb("Exception in parsing entity of sso request \n " + ioException.getMessage(), LogDb.DASHBOARD);
                     }
                 }
             }

@@ -48,48 +48,27 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
-        
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
 
-        if (counter == 1) {
-            String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-        }
+        String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 2) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"apiCollectionId"}));
-            counter++;
-        }
+        fieldNames = new String[]{"apiCollectionId"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 3) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"param", "apiCollectionId"}));
-            counter++;
-        }
+        fieldNames = new String[]{"param", "apiCollectionId"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 4) {
-            String[] fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-            counter++;
-        }
+        fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 5) {
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE}));
-            counter++;
-        }
+        fieldNames = new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 6) {
-            String[] fieldNames = {"responseCode", "subType", "timestamp",};
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-        }
+        fieldNames =  new String[]{"responseCode", "subType", "timestamp",};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
-
     }
 
     public static Bson filterForSTIUsingURL(int apiCollectionId, String url, URLMethods.Method method) {

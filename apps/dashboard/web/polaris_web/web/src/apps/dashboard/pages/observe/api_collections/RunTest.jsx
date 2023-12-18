@@ -24,7 +24,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         testRunTimeLabel: "Till complete",
         maxConcurrentRequests: -1,
         testName: "",
-        authMechanismPresent: false
+        authMechanismPresent: false,
+        testRoleLabel: "No test role selected",
+        testRoleId: "",
     }
 
     const navigate = useNavigate()
@@ -35,6 +37,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
     const [active, setActive] = useState(false);
+    const [testRolesArr, setTestRolesArr] = useState([])
 
     const runTestRef = useRef(null);
 
@@ -62,6 +65,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         setLoading(true)
 
         const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true)
+        const testRolesResponse = await testingApi.fetchTestRoles()
+        var testRoles = testRolesResponse.testRoles.map(testRole => {
+            return {
+                "label": testRole.name,
+                "value": testRole.hexId
+            }
+        })
+        testRoles.unshift({"label": "No test role selected", "value": ""})
+        setTestRolesArr(testRoles)
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
@@ -295,7 +307,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -314,9 +326,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         }))
 
         if (filtered) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI")
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId)
         }
 
         setActive(false)
@@ -521,7 +533,30 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                             }))
                                         }} />
                                 </ButtonGroup>
+                                
                             </Box>
+                            <Box>
+                            <ButtonGroup>
+                                    <Text>Select test role:</Text>
+                                    <Dropdown
+                                        menuItems={testRolesArr}
+                                        initial={"No test role selected"}
+                                        selected={(requests) => {
+                                            let testRole
+                                            console.log(requests);
+                                            if (requests === "No test role selected") maxConcurrentRequests = ""
+                                            else testRole = requests
+
+                                            const testRoleOption = getLabel(testRolesArr, requests)
+
+                                            setTestRun(prev => ({
+                                                ...prev,
+                                                testRoleId: testRole,
+                                                testRoleLabel: testRoleOption.label
+                                            }))
+                                        }} />
+                                </ButtonGroup>
+                                </Box>
                         </HorizontalGrid>
                     </Modal.Section>
                 }

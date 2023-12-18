@@ -227,6 +227,79 @@ const settingRequests = {
             data: {}
         })
     },
+
+    testJiraIntegration(userEmail, apiToken, baseUrl, projId) {
+        return request({
+            url: '/api/testIntegration',
+            method: 'post',
+            data: {userEmail, apiToken, baseUrl, projId}
+        })
+    },
+
+    fetchJiraIntegration() {
+        return request({
+            url: '/api/fetchIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchOktaSso() {
+        return request({
+            url: '/api/fetchOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
+        return request({
+            url: '/api/addIntegration',
+            method: 'post',
+            data: {userEmail, apiToken, baseUrl, projId, issueType}
+        })
+    },
+
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+        return request({
+            url: '/api/addOktaSso',
+            method: 'post',
+            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+        })
+    },
+
+    deleteOktaSso() {
+        return request({
+            url: '/api/deleteOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAzureSso() {
+        return request({
+            url: '/api/fetchAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+        return request({
+            url: '/api/addAzureSso',
+            method: 'post',
+            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+        })
+    },
+
+    deleteAzureSso() {
+        return request({
+            url: '/api/deleteAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
     toggleRedactFeature(redactPayload) {
         return request({
             url: '/api/toggleRedactFeature',

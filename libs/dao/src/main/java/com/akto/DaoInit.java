@@ -1,5 +1,13 @@
 package com.akto;
 
+import com.akto.dao.*;
+import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
@@ -24,6 +32,7 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
@@ -31,6 +40,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
+import com.akto.util.DbMode;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -114,6 +124,8 @@ public class DaoInit {
                 .build();
         ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class)
                 .enableDiscriminator(true).build();
+        ClassModel<Setup> setupClassModel = ClassModel.builder(Setup.class)
+                .enableDiscriminator(true).build();
         ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true)
                 .build();
         ClassModel<HardcodedAuthParam> hardcodedAuthParamClassModel = ClassModel.builder(HardcodedAuthParam.class)
@@ -178,6 +190,7 @@ public class DaoInit {
         .enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
+        ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
                 configClassModel,
@@ -201,7 +214,7 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,                
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel).automatic(true).build());
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, jiraintegrationClassModel, setupClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -242,6 +255,7 @@ public class DaoInit {
     }
 
     public static void init(ConnectionString connectionString) {
+        DbMode.refreshDbType(connectionString.getConnectionString());
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
@@ -251,6 +265,25 @@ public class DaoInit {
                 .build();
 
         clients[0] = MongoClients.create(clientSettings);
+    }
+
+    public static void createIndices() {
+        SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        TrafficMetricsDao.instance.createIndicesIfAbsent();
+        TestRolesDao.instance.createIndicesIfAbsent();
+
+        ApiInfoDao.instance.createIndicesIfAbsent();
+        RuntimeLogsDao.instance.createIndicesIfAbsent();
+        LogsDao.instance.createIndicesIfAbsent();
+        DashboardLogsDao.instance.createIndicesIfAbsent();
+        AnalyserLogsDao.instance.createIndicesIfAbsent();
+        SampleDataDao.instance.createIndicesIfAbsent();
+        LoadersDao.instance.createIndicesIfAbsent();
+        TestingRunResultDao.instance.createIndicesIfAbsent();
+        TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        TestingRunDao.instance.createIndicesIfAbsent();
+        TestingRunIssuesDao.instance.createIndicesIfAbsent();
+        ApiCollectionsDao.instance.createIndicesIfAbsent();
     }
 
 }

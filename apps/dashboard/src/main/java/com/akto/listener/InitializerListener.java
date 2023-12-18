@@ -55,6 +55,7 @@ import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
 import com.akto.util.EmailAccountName;
 import com.akto.util.Constants;
+import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -1308,7 +1309,6 @@ public class InitializerListener implements ServletContextListener {
 
         System.out.println("context initialized");
 
-        // String mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         System.out.println("MONGO URI " + mongoURI);
 
@@ -1321,54 +1321,47 @@ public class InitializerListener implements ServletContextListener {
 
         executorService.schedule(new Runnable() {
             public void run() {
-                boolean calledOnce = false;
-                do {
-                    try {
+                DaoInit.init(new ConnectionString(mongoURI));
 
-                        if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI));
-                            calledOnce = true;
-                        }
-                        checkMongoConnection();
-                        AccountTask.instance.executeTask(new Consumer<Account>() {
-                            @Override
-                            public void accept(Account account) {
-                                AccountSettingsDao.instance.getStats();
-                                runInitializerFunctions();
-                            }
-                        }, "context-initializer");
-                        setUpTrafficAlertScheduler();
-                        setUpAktoMixpanelEndpointsScheduler();
-                        SingleTypeInfo.init();
-                        setUpDailyScheduler();
-                        setUpWebhookScheduler();
-                        setUpPiiAndTestSourcesScheduler();
-                        setUpTestEditorTemplatesScheduler();
-                        //fetchGithubZip();
-                        updateGlobalAktoVersion();
-                        if(isSaas){
-                            try {
-                                Auth0.getInstance();
-                                loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
-                            }
-                        }
-                    } catch (Exception e) {
-//                        e.printStackTrace();
-                    } finally {
+                connectedToMongo = false;
+                do {
+                    connectedToMongo = MCollection.checkConnection();
+                    if (!connectedToMongo) {
                         try {
                             Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                        } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
+
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        runInitializerFunctions();
+                    }
+                }, "context-initializer");
+                setUpTrafficAlertScheduler();
+                SingleTypeInfo.init();
+                setUpDailyScheduler();
+                setUpWebhookScheduler();
+                setUpPiiAndTestSourcesScheduler();
+                setUpTestEditorTemplatesScheduler();
+                setUpAktoMixpanelEndpointsScheduler();
+                //fetchGithubZip();
+                updateGlobalAktoVersion();
+                trimCappedCollections();
+                if(isSaas){
+                    try {
+                        Auth0.getInstance();
+                        loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
             }
         }, 0, TimeUnit.SECONDS);
     }
 
-    private void updateGlobalAktoVersion() throws Exception{
+    private void updateGlobalAktoVersion() {
         try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
             if (in != null) {
                 BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
@@ -1378,6 +1371,27 @@ public class InitializerListener implements ServletContextListener {
             } else  {
                 throw new Exception("Input stream null");
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error updating global akto version : " + e.getMessage(), LogDb.DASHBOARD );
+        }
+    }
+
+    public static void trimCappedCollections() {
+        if (DbMode.allowCappedCollections()) return;
+
+        clear(LoadersDao.instance, LoadersDao.maxDocuments);
+        clear(RuntimeLogsDao.instance, RuntimeLogsDao.maxDocuments);
+        clear(LogsDao.instance, LogsDao.maxDocuments);
+        clear(DashboardLogsDao.instance, DashboardLogsDao.maxDocuments);
+        clear(TrafficMetricsDao.instance, TrafficMetricsDao.maxDocuments);
+        clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
+    }
+
+    public static void clear(AccountsContextDao mCollection, int maxDocuments) {
+        try {
+            mCollection.trimCollection(maxDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
 
@@ -1440,19 +1454,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        TrafficMetricsDao.instance.createIndicesIfAbsent();
-        TestRolesDao.instance.createIndicesIfAbsent();
-
-        ApiInfoDao.instance.createIndicesIfAbsent();
-        RuntimeLogsDao.instance.createIndicesIfAbsent();
-        LogsDao.instance.createIndicesIfAbsent();
-        DashboardLogsDao.instance.createIndicesIfAbsent();
-        AnalyserLogsDao.instance.createIndicesIfAbsent();
-        LoadersDao.instance.createIndicesIfAbsent();
-        TestingRunResultDao.instance.createIndicesIfAbsent();
-        TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
-        fillCollectionIdArray();
+        DaoInit.createIndices();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
@@ -1463,6 +1465,7 @@ public class InitializerListener implements ServletContextListener {
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
+            setDashboardMode();
             insertPiiSources();
 
 //            setUpPiiCleanerScheduler();
@@ -1490,6 +1493,22 @@ public class InitializerListener implements ServletContextListener {
     public void readAndSaveBurpPluginVersion() {
         // todo get latest version from github
         burpPluginVersion = 5;
+    }
+
+    public static void setDashboardMode() {
+        String dashboardMode = DashboardMode.getActualDashboardMode().toString();
+
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+
+        SetupDao.instance.getMCollection().updateOne(
+                Filters.empty(),
+                Updates.combine(
+                        Updates.set("dashboardMode", dashboardMode)
+                ),
+                updateOptions
+        );
+
     }
 
     public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {

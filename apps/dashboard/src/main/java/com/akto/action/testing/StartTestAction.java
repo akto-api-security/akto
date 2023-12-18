@@ -64,6 +64,8 @@ public class StartTestAction extends UserAction {
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
+    private String testRoleId;
+
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
                 Projections.excludeId(),
@@ -134,7 +136,7 @@ public class StartTestAction extends UserAction {
         }
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
-            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -190,7 +192,7 @@ public class StartTestAction extends UserAction {
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff ;
-                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl);
+                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -836,5 +838,13 @@ public class StartTestAction extends UserAction {
         public boolean isCallFromAktoGpt(){
             return AKTO_GPT.equals(this);
         }
+    }
+
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }

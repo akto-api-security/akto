@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -62,8 +63,8 @@ public class GithubSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (ConfigsDao.instance.findOne("_id", "GITHUB-ankush") != null) {
-            addActionError("A Github SSO Integration already exists");
+        if (SsoUtils.isAnySsoActive()) {
+            addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
 
@@ -85,6 +86,10 @@ public class GithubSsoAction extends UserAction {
         }
 
         Config.GithubConfig githubConfig = (Config.GithubConfig) ConfigsDao.instance.findOne("_id", "GITHUB-ankush");
+        if (SsoUtils.isAnySsoActive() && githubConfig == null) {
+            addActionError("A different SSO Integration already exists.");
+            return ERROR.toUpperCase();
+        }
 
         if (githubConfig != null) {
             this.githubClientId = githubConfig.getClientId();
