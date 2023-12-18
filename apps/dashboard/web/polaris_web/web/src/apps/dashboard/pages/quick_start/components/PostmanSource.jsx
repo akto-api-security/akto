@@ -197,10 +197,12 @@ function PostmanSource() {
                     <Button onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
-                <Button plain onClick={(event) => { 
-                            event.stopPropagation(); 
-                            window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
-                        }}>postman trouble-shooting guide</Button>
+                <ButtonGroup>
+                    <Button plain onClick={(event) => { 
+                                event.stopPropagation(); 
+                                window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
+                            }}>postman trouble-shooting guide</Button>
+                </ButtonGroup>
             </VerticalStack>
         </div>
     )
