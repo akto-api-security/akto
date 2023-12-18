@@ -29,6 +29,7 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -76,47 +77,59 @@ public class PostmanAction extends UserAction {
         this.workspace_id = workspace_id;
     }
 
+    private ExecutorService executor = Executors.newSingleThreadExecutor();
+
 
     private int apiCollectionId;
-    public String createPostmanApi() throws Exception {
+    public String createPostmanApi() throws Exception { // TODO: remove exception
         PostmanCredential postmanCredential = fetchPostmanCredential();
         if (postmanCredential == null) {
             addActionError("Please add postman credentials in settings");
             return ERROR.toUpperCase();
         }
+        int accountId = Context.accountId.get();
 
+        Runnable r = () -> {
+            loggerMaker.infoAndAddToDb("Starting thread to create postman api", LogDb.DASHBOARD);
+            Context.accountId.set(accountId);
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+            if (apiCollection == null) {
+                return;
+            }
+            String apiName = "AKTO " + apiCollection.getDisplayName();
 
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
-        if (apiCollection == null) {
-            return ERROR.toUpperCase();
-        }
-        String apiName = "AKTO " + apiCollection.getDisplayName();
-
-        List<SampleData> sampleData = SampleDataDao.instance.findAll(
-                Filters.eq("_id.apiCollectionId", apiCollectionId)
+            List<SampleData> sampleData = SampleDataDao.instance.findAll(
+                    Filters.eq("_id.apiCollectionId", apiCollectionId)
             );
-        String host =  apiCollection.getHostName();
-        SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();    
-        sampleDataToSTI.setSampleDataToSTI(sampleData);
-        Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-        OpenAPI openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true, host);
-        String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
+            String host =  apiCollection.getHostName();
+            SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
+            sampleDataToSTI.setSampleDataToSTI(sampleData);
+            Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
+            OpenAPI openAPI = null;
+            try {
+                openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true, host);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while creating open api: " + e.getMessage(), LogDb.DASHBOARD);
+                return;
+            }
+            String openAPIStringAll = null;
+            try {
+                openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while converting open api to json: " + e.getMessage(), LogDb.DASHBOARD);
+                return;
+            }
 
-        List<SensitiveSampleData> SensitiveSampleData = SensitiveSampleDataDao.instance.findAll(
-            Filters.eq("_id.apiCollectionId", apiCollectionId)
-        );
-        SampleDataToSTI sensitiveSampleDataToSTI = new SampleDataToSTI();
-        sensitiveSampleDataToSTI.setSensitiveSampleDataToSTI(SensitiveSampleData);
-        Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> sensitiveStiList = sensitiveSampleDataToSTI.getSingleTypeInfoMap();
-        openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(), sensitiveStiList, true, host);
-        String openAPIStringSensitive = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
+            Main main = new Main(postmanCredential.getApiKey());
+            try {
+                main.createApiWithSchema(postmanCredential.getWorkspaceId(), apiName, openAPIStringAll);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb("Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+            loggerMaker.infoAndAddToDb("Successfully created api in postman", LogDb.DASHBOARD);
+        };
 
-        Main main = new Main(postmanCredential.getApiKey());
-        Map<String, String> openApiSchemaMap = new HashMap<>();
-        openApiSchemaMap.put("All", openAPIStringAll);
-        openApiSchemaMap.put("Sensitive", openAPIStringSensitive);
-
-        main.createApiWithSchema(postmanCredential.getWorkspaceId(),apiName, openApiSchemaMap);
+        executorService.submit(r);
 
         return SUCCESS.toUpperCase();
     }
