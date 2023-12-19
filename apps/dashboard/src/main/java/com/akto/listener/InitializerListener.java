@@ -1491,7 +1491,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
-        setOrganizationsInBilling(backwardCompatibility);
+        if (DashboardMode.isMetered()) {
+            setOrganizationsInBilling(backwardCompatibility);
+        }
         setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
@@ -1504,7 +1506,9 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
-        initializeOrganizationAccountBelongsTo(backwardCompatibility);
+        if (DashboardMode.isMetered()) {
+            initializeOrganizationAccountBelongsTo(backwardCompatibility);
+        }
     }
 
     public void runInitializerFunctions() {
