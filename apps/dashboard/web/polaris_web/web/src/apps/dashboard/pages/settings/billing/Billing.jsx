@@ -86,6 +86,10 @@ function Billing() {
                     productId="product-akto-saa-s"
                     onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
                         console.log(plan, customer, intentionType);
+                        if (window.IS_SAAS !== 'true') {
+                            window.location.href = "https://app.akto.io/dashboard/settings/self-hosted"
+                            return;
+                        }
                         switch (intentionType) {
 
                             case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
@@ -131,7 +135,7 @@ function Billing() {
             </LegacyCard.Section>
         </LegacyCard>
 
-        <LegacyCard title={planTitle}>
+        {window.IS_SAAS === 'true'  && <LegacyCard title={planTitle}>
             <Divider />
             <LegacyCard.Section  >
                 {planInfo}
@@ -139,7 +143,7 @@ function Billing() {
             <LegacyCard.Section subdued>
                 For any help, please reach out to support@akto.io
             </LegacyCard.Section>
-        </LegacyCard>
+        </LegacyCard>}
     </Page>
   )
 }

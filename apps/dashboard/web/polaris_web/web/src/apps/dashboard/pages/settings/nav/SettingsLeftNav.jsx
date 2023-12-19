@@ -35,6 +35,12 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/self-hosted")
     }] : []
 
+    const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
+        label: 'Billing',
+        icon: PlanMajor,
+        selected: page === "billing",
+        onClick: () => navigate("/dashboard/settings/billing")
+     }] : [];
 
     return (
         <Navigation>
@@ -80,12 +86,7 @@ const SettingsLeftNav = () => {
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
                     },
-                    {
-                        label: 'Billing',
-                        icon: PlanMajor,
-                        selected: page === "billing",
-                        onClick: () => navigate("/dashboard/settings/billing")
-                    },
+                    ...billingArr,
                     ...selfHostedArr
                 ]}
             />
