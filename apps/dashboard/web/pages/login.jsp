@@ -70,6 +70,7 @@
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
+                    window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'

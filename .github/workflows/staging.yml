@@ -107,6 +107,8 @@ jobs:
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
           cd ../billing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
+          cd ../internal
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
 
       - name: Configure AWS Credentials for ECR
         if: ${{ github.event.inputs.Environment == 'prod' }}

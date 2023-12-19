@@ -383,7 +383,8 @@ public abstract class Config {
         private String clientKey;
         private String serverKey;
         private String signingKey;
-        private String freePlanId;
+        private String saasFreePlanId;
+        private String onPremFreePlanId;
 
         private String activeEndpointsLabel;
 
@@ -423,12 +424,20 @@ public abstract class Config {
             this.signingKey = signingKey;
         }
 
-        public String getFreePlanId() {
-            return freePlanId;
+        public String getSaasFreePlanId() {
+            return saasFreePlanId;
         }
 
-        public void setFreePlanId(String freePlanId) {
-            this.freePlanId = freePlanId;
+        public void setSaasFreePlanId(String saasFreePlanId) {
+            this.saasFreePlanId = saasFreePlanId;
+        }
+
+        public String getOnPremFreePlanId() {
+            return onPremFreePlanId;
+        }
+
+        public void setOnPremFreePlanId(String onPremFreePlanId) {
+            this.onPremFreePlanId = onPremFreePlanId;
         }
 
         public String getActiveEndpointsLabel() {
