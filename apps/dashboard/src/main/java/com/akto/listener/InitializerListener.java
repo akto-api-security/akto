@@ -1343,7 +1343,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
 
-                        if (DashboardMode.isSaasDeployment()) {
+                        if (DashboardMode.isMetered()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
                         }

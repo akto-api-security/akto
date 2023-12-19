@@ -36,4 +36,8 @@ public enum DashboardMode {
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();
         return dashboardMode.equals(LOCAL_DEPLOY) && "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     }
+
+    public static boolean isMetered() {
+        return isSaasDeployment() || isOnPremDeployment();
+    }
 }

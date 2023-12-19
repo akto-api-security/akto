@@ -115,7 +115,7 @@ public class ProfileAction extends UserAction {
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
 
         // only external API calls have non-null "utility"
-        if (DashboardMode.isSaasDeployment() && utility == null) {
+        if (DashboardMode.isMetered() &&  utility == null) {
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, sessionAccId)
             ); 
