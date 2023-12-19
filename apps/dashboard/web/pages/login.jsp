@@ -70,6 +70,7 @@
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
+                    window.DATA_INGESTION_PAUSED='${requestScope.dataIngestionPaused}'
                     window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
@@ -106,7 +107,8 @@
                             email: window.USER_NAME,
                             user_hash: '${userHash}',
                             created_at: new Date().getTime(),
-                            show_overage: window.STIGG_IS_OVERAGE==='true'
+                            show_overage: window.STIGG_IS_OVERAGE==='true',
+                            data_ingestion_paused: window.DATA_INGESTION_PAUSED==='true'
                         };
                     }
    // mixpanel.track('Login');
