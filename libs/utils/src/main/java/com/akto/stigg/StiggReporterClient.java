@@ -183,7 +183,7 @@ public class StiggReporterClient {
 
         loggerMaker.infoAndAddToDb("Provisioning customer organization: " + organization.getId() + " " + out, LoggerMaker.LogDb.BILLING);
 
-        return provisionSubscription(organization.getId(), stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
+        return provisionSubscription(organization.getId(), organization.isOnPrem() ? "plan-akto-free-plan" : stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
     }
 
     public Config.StiggConfig getStiggConfig() {
