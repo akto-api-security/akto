@@ -135,7 +135,7 @@ function Billing() {
             </LegacyCard.Section>
         </LegacyCard>
 
-        <LegacyCard title={planTitle}>
+        {window.IS_SAAS === 'true'  && <LegacyCard title={planTitle}>
             <Divider />
             <LegacyCard.Section  >
                 {planInfo}
@@ -143,7 +143,7 @@ function Billing() {
             <LegacyCard.Section subdued>
                 For any help, please reach out to support@akto.io
             </LegacyCard.Section>
-        </LegacyCard>
+        </LegacyCard>}
     </Page>
   )
 }
