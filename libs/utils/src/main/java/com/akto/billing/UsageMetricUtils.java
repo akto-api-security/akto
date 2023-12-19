@@ -10,7 +10,9 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
@@ -118,6 +120,35 @@ public class UsageMetricUtils {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
+    }
+
+    public static boolean checkActiveEndpointOverage(int accountId) {
+
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, accountId));
+
+        // stop ingestion if organization is not found
+        if (organization == null) {
+            return true;
+        }
+
+        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+
+        // stop ingestion if featureMap is not found
+        if(featureWiseAllowed == null) {
+            return true;
+        }
+        
+        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.name(), null);
+
+        // stop ingestion if active endpoints feature is not found
+        if(featureAccess == null) {
+            return true;
+        }
+
+        // stop ingestion if feature is overage
+        return featureAccess.checkOverageAfterGrace(organization.getGracePeriod());
+
     }
 
 }

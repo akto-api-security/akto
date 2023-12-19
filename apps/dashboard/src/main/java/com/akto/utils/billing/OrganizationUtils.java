@@ -275,4 +275,17 @@ public class OrganizationUtils {
         }
         return (BasicDBList) (ret.get("entitlements"));
     }
+
+    public static int fetchOrgGracePeriod(String orgId, String adminEmail) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
+        BasicDBObject ret = fetchFromBillingService("fetchOrgMetaData", reqBody);
+        int gracePeriod = ret.getInt("GRACE_PERIOD_END_EPOCH", 0);
+
+        if (ret == null || gracePeriod <= 0) {
+            return 0;
+        }
+
+        return gracePeriod;
+    }
 }

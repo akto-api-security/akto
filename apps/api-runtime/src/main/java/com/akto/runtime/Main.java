@@ -11,6 +11,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
@@ -222,6 +223,12 @@ public class Main {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
 
+                // Since 1_000_000 is the default account id
+                if (UsageMetricUtils.checkActiveEndpointOverage(1_000_000)) {
+                    logger.info("Active endpoint overage detected for account: 1_000_000 . Stopping ingestion.");
+                    continue;
+                }
+
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
                     HttpResponseParams httpResponseParams;
@@ -275,6 +282,12 @@ public class Main {
                     }
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        continue;
+                    }
+
+                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
+                        logger.info("Active endpoint overage detected for account " + accountIdInt
+                                + ". Stopping ingestion.");
                         continue;
                     }
 

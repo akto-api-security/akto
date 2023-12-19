@@ -1,6 +1,7 @@
 package com.akto.action;
 
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
@@ -128,6 +129,7 @@ public class ProfileAction extends UserAction {
 
             boolean isOverage = false;
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
+            int gracePeriod = organization.getGracePeriod();
             try {
                 BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId, organization.getAdminEmail());
                 featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
@@ -146,9 +148,13 @@ public class ProfileAction extends UserAction {
                     }
                 }
 
+                gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+
                 OrganizationsDao.instance.updateOne(
                         Filters.eq(Constants.ID, organizationId),
-                        Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed));
+                        Updates.combine(
+                                Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
+                                Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
                 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
@@ -162,8 +168,12 @@ public class ProfileAction extends UserAction {
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 stiggFeatureWiseAllowed.append(entry.getKey(), new BasicDBObject()
                         .append(FeatureAccess.IS_GRANTED, entry.getValue().getIsGranted())
-                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace()));
+                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace(gracePeriod)));
             }
+
+            boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
+            userDetails.append("dataIngestionPaused", dataIngestionPaused);
+
             userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
 
             userDetails.append("stiggCustomerId", organizationId);
