@@ -89,7 +89,7 @@ const settingFunctions = {
         resp = JSON.parse(JSON.stringify(response.accountSettings))
         let respOrgStr = "-"
         if (response.organization) {
-            respOrg = JSON.parse(JSON.stringify(response.organization))
+            let respOrg = JSON.parse(JSON.stringify(response.organization))
             respOrgStr = respOrg._id + "(" + respOrg.adminEmail + ")"
         }
 
