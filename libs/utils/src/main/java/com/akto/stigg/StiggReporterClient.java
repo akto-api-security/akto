@@ -36,7 +36,7 @@ public class StiggReporterClient {
                         loggerMaker.errorAndAddToDb("Error while fetching stigg config: " + e.getMessage(), LoggerMaker.LogDb.BILLING);
                     }
 
-                    if (stiggConfig != null && stiggConfig.getFreePlanId() == null) {
+                    if (stiggConfig != null && stiggConfig.getSaasFreePlanId() == null  && stiggConfig.getOnPremFreePlanId() == null) {
                         loggerMaker.errorAndAddToDb("No free planId found in stigg config", LoggerMaker.LogDb.BILLING);
                     }
                 }
@@ -176,14 +176,14 @@ public class StiggReporterClient {
             new BasicDBObject("customerId", organization.getId())
             .append("name", organization.getName())
             .append("email", organization.getAdminEmail())
-            .append("subscriptionParams", new BasicDBObject("planId", stiggConfig.getFreePlanId()))
+            .append("subscriptionParams", new BasicDBObject("planId", organization.isOnPrem() ? stiggConfig.getOnPremFreePlanId(): stiggConfig.getSaasFreePlanId()))
         ).toString();
 
         String out = executeGraphQL(mutationQ, inputVariables);
 
         loggerMaker.infoAndAddToDb("Provisioning customer organization: " + organization.getId() + " " + out, LoggerMaker.LogDb.BILLING);
 
-        return provisionSubscription(organization.getId(), organization.isOnPrem() ? "plan-akto-free-plan" : stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
+        return provisionSubscription(organization.getId(), organization.isOnPrem() ? stiggConfig.getOnPremFreePlanId() : stiggConfig.getSaasFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
     }
 
     public Config.StiggConfig getStiggConfig() {
