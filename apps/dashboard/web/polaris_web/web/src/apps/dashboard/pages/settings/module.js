@@ -87,7 +87,7 @@ const settingFunctions = {
       let resp = {}
       await settingRequests.fetchAdminSettings().then((response)=>{
         resp = JSON.parse(JSON.stringify(response.accountSettings))
-        respOrgStr = "-"
+        let respOrgStr = "-"
         if (response.organization) {
             respOrg = JSON.parse(JSON.stringify(response.organization))
             respOrgStr = respOrg._id + "(" + respOrg.adminEmail + ")"
