@@ -48,26 +48,35 @@ public class UsageInterceptor extends AbstractInterceptor {
 
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
 
-            FeatureAccess featureAccess = featureWiseAllowed.get(featureLabel);
+            String[] features = featureLabel.split(" ");
+            for (String feature : features) {
+                feature = feature.trim();
 
-            if (UsageInterceptorUtil.checkContextSpecificFeatureAccess(invocation, featureLabel)) {
-
-                /*
-                 * if the feature doesn't exist in the entitlements map,
-                 * then the user is unauthorized to access the feature
-                 */
-                if (featureAccess == null ||
-                        !featureAccess.getIsGranted()) {
-                    ((ActionSupport) invocation.getAction())
-                            .addActionError("This feature is not available in your plan.");
-                    return UNAUTHORIZED;
-                }
-                if (featureAccess.checkOverageAfterGrace()) {
-                    ((ActionSupport) invocation.getAction())
-                            .addActionError("You have exceeded the limit of this feature.");
-                    return UNAUTHORIZED;
+                if(feature.isEmpty()) {
+                    continue;
                 }
 
+                FeatureAccess featureAccess = featureWiseAllowed.get(feature);
+
+                if (UsageInterceptorUtil.checkContextSpecificFeatureAccess(invocation, feature)) {
+
+                    /*
+                     * if the feature doesn't exist in the entitlements map,
+                     * then the user is unauthorized to access the feature
+                     */
+                    if (featureAccess == null ||
+                            !featureAccess.getIsGranted()) {
+                        ((ActionSupport) invocation.getAction())
+                                .addActionError("This feature is not available in your plan.");
+                        return UNAUTHORIZED;
+                    }
+                    if (featureAccess.checkOverageAfterGrace()) {
+                        ((ActionSupport) invocation.getAction())
+                                .addActionError("You have exceeded the limit of this feature.");
+                        return UNAUTHORIZED;
+                    }
+
+                }
             }
 
         } catch (Exception e) {
