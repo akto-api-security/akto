@@ -3,11 +3,18 @@ package com.akto.log;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.Config;
 import com.akto.dto.Log;
+import com.akto.notifications.slack.DailyUpdate;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -15,11 +22,35 @@ import java.util.concurrent.TimeUnit;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.slack.api.Slack;
 
 public class LoggerMaker  {
 
     public final Logger logger;
     private final Class<?> aClass;
+
+    private static String slackWebhookUrl;
+
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    static {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Config config = ConfigsDao.instance.findOne("_id", Config.SlackAlertConfig.CONFIG_ID);
+                    if (config == null) {
+                        return;
+                    }
+
+                    Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
+                    slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
+                } catch (Exception e) {
+                    System.out.println("error in getting config: " + e.getMessage());
+                }
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+    }
 
     private static int logCount = 0;
     private static int logCountResetTimestamp = Context.now();
@@ -28,15 +59,15 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
     }
 
     private static AccountSettings accountSettings = null;
 
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
 
     static {
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        scheduler2.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
                 String cliTestIds = System.getenv("TEST_IDS");
@@ -71,12 +102,33 @@ public class LoggerMaker  {
         this.db = db;
     }
 
+    private void sendToSlack(String err) {
+        if (slackWebhookUrl != null) {
+            try {
+                Slack slack = Slack.getInstance();
+                BasicDBList sectionsList = new BasicDBList();
+                BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text", err + "\n");
+                BasicDBObject section = new BasicDBObject("type", "section").append("text", textObj);
+                sectionsList.add(section);
+                BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
+                slack.send(slackWebhookUrl, ret.toJson());
+
+            } catch (IOException e) {
+                logger.error("Can't send to Slack: " + e.getMessage(), e);
+            }
+        }
+    }
+
     public void errorAndAddToDb(String err, LogDb db) {
         logger.error(err);
         try{
             insert(err, "error", db);
         } catch (Exception e){
 
+        }
+
+        if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
+            sendToSlack(err);
         }
     }
 
@@ -131,6 +183,10 @@ public class LoggerMaker  {
                     break;
                 case ANALYSER:
                     AnalyserLogsDao.instance.insertOne(log);
+                    break;
+                case BILLING:
+                    BillingLogsDao.instance.insertOne(log);
+                    break;
                 default:
                     break;
             }
@@ -162,6 +218,10 @@ public class LoggerMaker  {
                 break;
             case ANALYSER:
                 logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case BILLING:
+                logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
             default:
                 break;
         }

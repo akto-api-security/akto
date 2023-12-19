@@ -303,7 +303,7 @@ function ApiEndpoints() {
     async function exportPostman() {
         const result = await api.exportToPostman(apiCollectionId)
         if (result)
-            func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
+        func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
 
     function disambiguateLabel(key, value) {
