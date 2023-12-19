@@ -24,6 +24,10 @@ public class Organization {
 
     public static final String ON_PREM = "onPrem";
     private boolean onPrem;
+
+    public static final String GRACE_PERIOD = "gracePeriod";
+    private int gracePeriod;
+
     public Organization() { }
 
     public Organization(String id, String name, String adminEmail, Set<Integer> accounts, boolean onPrem) {
@@ -89,5 +93,13 @@ public class Organization {
 
     public void setOnPrem(boolean onPrem) {
         this.onPrem = onPrem;
+    }
+
+    public int getGracePeriod() {
+        return gracePeriod;
+    }
+
+    public void setGracePeriod(int gracePeriod) {
+        this.gracePeriod = gracePeriod;
     }
 }

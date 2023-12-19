@@ -47,6 +47,7 @@ public class UsageInterceptor extends AbstractInterceptor {
             }
 
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+            int gracePeriod = organization.getGracePeriod();
 
             String[] features = featureLabel.split(" ");
             for (String feature : features) {
@@ -70,7 +71,7 @@ public class UsageInterceptor extends AbstractInterceptor {
                                 .addActionError("This feature is not available in your plan.");
                         return UNAUTHORIZED;
                     }
-                    if (featureAccess.checkOverageAfterGrace()) {
+                    if (featureAccess.checkOverageAfterGrace(gracePeriod)) {
                         ((ActionSupport) invocation.getAction())
                                 .addActionError("You have exceeded the limit of this feature.");
                         return UNAUTHORIZED;
