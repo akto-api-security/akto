@@ -2708,6 +2708,9 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
         <action name="api/provisionSubscription" class="com.akto.action.billing.UsageAction" method="provisionSubscription">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
