@@ -90,7 +90,7 @@ const settingFunctions = {
         let respOrgStr = "-"
         if (response.organization) {
             let respOrg = JSON.parse(JSON.stringify(response.organization))
-            respOrgStr = respOrg._id + "(" + respOrg.adminEmail + ")"
+            respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
         }
 
         arr = [
