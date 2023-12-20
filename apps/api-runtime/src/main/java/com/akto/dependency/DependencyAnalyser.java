@@ -46,6 +46,9 @@ public class DependencyAnalyser {
         URLStatic urlStatic = URLAggregator.getBaseURL(requestParams.getURL(), method);
         String url = urlStatic.getUrl();
 
+        if (url.endsWith(".js") || url.endsWith(".png") || url.endsWith(".css") || url.endsWith(".jpeg") ||
+                url.endsWith(".svg") || url.endsWith(".webp") || url.endsWith(".woff2")) return;
+
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
 
         // different URL variables and corresponding examples. Use accordingly
@@ -110,7 +113,8 @@ public class DependencyAnalyser {
     public boolean filterValues(Object val) {
         if (val == null) return false;
         if (val instanceof Boolean) return false;
-        if (val instanceof String) return val.toString().length() > 4 && val.toString().length() < 32;
+        if (val instanceof String) return val.toString().length() > 4 && val.toString().length() < 64;
+        if (val instanceof Integer) return ((int) val) > 50;
         return true;
     }
 
