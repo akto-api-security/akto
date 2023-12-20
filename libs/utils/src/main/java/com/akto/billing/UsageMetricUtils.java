@@ -127,16 +127,16 @@ public class UsageMetricUtils {
         Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId));
 
-        // stop ingestion if organization is not found
+        // allow ingestion if organization is not found
         if (organization == null) {
-            return true;
+            return false;
         }
 
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
 
-        // stop ingestion if featureMap is not found
-        if(featureWiseAllowed == null) {
-            return true;
+        // allow ingestion if featureMap is not found
+        if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+            return false;
         }
         
         FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.name(), null);
