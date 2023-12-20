@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
@@ -85,26 +86,11 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
                 new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
     }
 
-    private boolean hasTestRunSuccessfullyOnApi(List<TestingRunResult> testingRunResults){
-        for(TestingRunResult result : testingRunResults){
-            List<TestResult> testResults = result.getTestResults() ;
-            for(TestResult singleTestResult : testResults){
-                List<String> errors = singleTestResult.getErrors();
-                if(errors.size() == 0 && singleTestResult.getMessage().length() > 0){
-                    return true ;
-                }
-            }
-        }
-        return false;
-    }
-
-    public void updateLastTestedField(List<TestingRunResult> testingRunResults, ApiInfo.ApiInfoKey apiInfoKey){
-        if(hasTestRunSuccessfullyOnApi(testingRunResults)){
-            instance.getMCollection().updateOne(
-                getFilter(apiInfoKey), 
-                Updates.set("lastTested", Context.now())
-            );
-        }
+    public void updateLastTestedField(ApiInfoKey apiInfoKey){
+        instance.getMCollection().updateOne(
+            getFilter(apiInfoKey), 
+            Updates.set(ApiInfo.LAST_TESTED, Context.now())
+        );
     }
 
     public Map<Integer,Integer> getCoverageCount(){

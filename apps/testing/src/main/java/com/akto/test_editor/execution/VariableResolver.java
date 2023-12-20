@@ -220,20 +220,56 @@ public class VariableResolver {
 
         String expression = key.toString();
 
-        expression = expression.substring(2, expression.length());
-        expression = expression.substring(0, expression.length() - 1);
+        Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+        Matcher matcher = pattern.matcher(expression);
+        while (matcher.find()) {
+            try {
+                String match = matcher.group(0);
+                match = match.substring(2, match.length());
+                match = match.substring(0, match.length() - 1);
 
-        Boolean isWordListVar = varMap.containsKey("wordList_" + expression);
-        return isWordListVar;
+                Boolean isWordListVar = varMap.containsKey("wordList_" + match);
+                if (isWordListVar) return true;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        return false;
     }
 
     public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
         String expression = key.toString();
 
-        expression = expression.substring(2, expression.length());
-        expression = expression.substring(0, expression.length() - 1);
+        List<String> wordList = new ArrayList<>();
+        String wordListKey = null;
 
-        return (List<String>) varMap.get("wordList_" + expression);
+        Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+        Matcher matcher = pattern.matcher(expression);
+        while (matcher.find()) {
+            try {
+                String match = matcher.group(0);
+                String originalKey = match;
+                match = match.substring(2, match.length());
+                match = match.substring(0, match.length() - 1);
+
+                Boolean isWordListVar = varMap.containsKey("wordList_" + match);
+                if (isWordListVar) {
+                    wordList = (List<String>) varMap.get("wordList_" + match);
+                    wordListKey = originalKey;
+                    break;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        List<String> result = new ArrayList<>();
+        for (String word: wordList) {
+            result.add(expression.replace(wordListKey, word));
+        }
+
+        return result;
     }
 
     // public Object resolveExpression(Map<String, Object> varMap, String expression) {

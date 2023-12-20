@@ -39,6 +39,8 @@ import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
+import Billing from "../dashboard/pages/settings/billing/Billing";
+import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
@@ -52,6 +54,7 @@ import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
+import { useStiggContext } from '@stigg/react-sdk';
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -223,6 +226,14 @@ const router = createBrowserRouter([
           {
             path: "tags/details",
             element: <TagDetails/>
+          },
+          {
+            path: "billing",
+            element: <Billing/>
+          },
+          {
+            path: "self-hosted",
+            element: <SelfHosted/>
           }
         ]
       },
@@ -259,6 +270,12 @@ function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
   setAllRoutes(searchData)
+  const { stigg } = useStiggContext();
+  useEffect(() => {
+    stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
+    
+  })
+
 
   useEffect(() => {
     const script = document.createElement('script')
