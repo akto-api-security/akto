@@ -54,6 +54,9 @@ public class RateLimitFilter implements Filter {
         if (path.startsWith("/tools/")) {
             refill = Refill.intervally(1000, Duration.ofHours(1));
             limit = Bandwidth.classic(1000, refill);
+        } else if (path.equals("/api/getCustomerStiggDetails")) {
+            refill = Refill.intervally(100, Duration.ofHours(1));
+            limit = Bandwidth.classic(100, refill);
         } else {
             refill = Refill.intervally(10, Duration.ofHours(1));
             limit = Bandwidth.classic(10, refill);
