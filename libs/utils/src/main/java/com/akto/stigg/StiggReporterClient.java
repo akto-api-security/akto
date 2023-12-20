@@ -123,8 +123,13 @@ public class StiggReporterClient {
         loggerMaker.infoAndAddToDb("OrgInfo for customerId: " + customerId + " " + obj.toJson(), LoggerMaker.LogDb.BILLING);
 
         BasicDBObject data = (BasicDBObject) obj.getOrDefault("data", new BasicDBObject());
-        BasicDBObject customer = (BasicDBObject)data.getOrDefault("getCustomerByRefId", new BasicDBObject());
-        return (BasicDBObject) customer.getOrDefault("additionalMetaData", new BasicDBObject());
+        BasicDBObject customer = (BasicDBObject) data.getOrDefault("getCustomerByRefId", new BasicDBObject());
+        BasicDBObject additionalMetaData = (BasicDBObject) customer.getOrDefault("additionalMetaData",
+                new BasicDBObject());
+        if (additionalMetaData == null) {
+            additionalMetaData = new BasicDBObject();
+        }
+        return additionalMetaData;    
     }
 
     public String reportUsage(int value, String customerId, String featureId) throws IOException {
