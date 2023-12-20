@@ -14,6 +14,7 @@ public class User {
     private String login;
     public static final String LOGIN = "login";
     private int id;
+    public static final String ID = "_id";
     private List<String> refreshTokens;
     public static final String LAST_LOGIN_TS = "lastLoginTs";
     private int lastLoginTs;

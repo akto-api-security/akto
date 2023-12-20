@@ -38,8 +38,12 @@ public abstract class MCollection<T> {
     }
 
     public MongoCollection<T> getMCollection() {
-        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
-        return mongoDatabase.getCollection(getCollName(), getClassT());
+        return getMCollection(getDBName(), getCollName(), getClassT());
+    }
+
+    public static <T> MongoCollection<T> getMCollection(String dbName, String collectionName, Class<T> classT) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(dbName);
+        return mongoDatabase.getCollection(collectionName, classT);
     }
 
     public static boolean checkConnection() {

@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
@@ -251,6 +252,12 @@ public class Main {
                     throw e;
                 }
 
+                // Since 1_000_000 is the default account id
+                if (UsageMetricUtils.checkActiveEndpointOverage(1_000_000)) {
+                    logger.info("Active endpoint overage detected for account: 1_000_000 . Stopping ingestion.");
+                    continue;
+                }
+                
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -307,6 +314,12 @@ public class Main {
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
                         loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                        continue;
+                    }
+
+                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
+                        logger.info("Active endpoint overage detected for account " + accountIdInt
+                                + ". Stopping ingestion.");
                         continue;
                     }
 

@@ -303,7 +303,7 @@ function ApiEndpoints() {
     async function exportPostman() {
         const result = await api.exportToPostman(apiCollectionId)
         if (result)
-            func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
+        func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
 
     function disambiguateLabel(key, value) {
@@ -355,7 +355,8 @@ function ApiEndpoints() {
                         if (err.message.includes(404)) {
                             func.setToast(true, true, "Please limit the file size to less than 50 MB")
                         } else {
-                            func.setToast(true, true, "Something went wrong while processing the file")
+                            let message = err?.response?.data?.actionErrors?.[0] || "Something went wrong while processing the file"
+                            func.setToast(true, true, message)
                         }
                     })
 

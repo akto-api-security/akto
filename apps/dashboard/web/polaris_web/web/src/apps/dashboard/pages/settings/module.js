@@ -88,13 +88,23 @@ const settingFunctions = {
       let resp = {}
       await settingRequests.fetchAdminSettings().then((response)=>{
         resp = JSON.parse(JSON.stringify(response.accountSettings))
+        let respOrgStr = "-"
+        if (response.organization) {
+            let respOrg = JSON.parse(JSON.stringify(response.organization))
+            respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
+        }
+
         arr = [
           // {
           //   title: 'Organisation',
           //   text: 'Akto'
           // },
           {
-            title: 'Organisation ID',
+            title: "Organization ID",
+            text: respOrgStr
+          },
+          {
+            title: 'Account ID',
             text: resp.id,
           },{
             title: 'Dashboard Version',

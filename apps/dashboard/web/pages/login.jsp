@@ -65,10 +65,20 @@
                     window.OKTA_AUTH_URL = atob('${requestScope.oktaAuthUrl}');
                     window.AZURE_REQUEST_URL = atob('${requestScope.azureRequestUrl}');
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
+                    window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
+                    window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
+                    window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
 
+                    window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
+                    window.DATA_INGESTION_PAUSED='${requestScope.dataIngestionPaused}'
+                    window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'
+                    }
+
+                    if(!window.STIGG_CLIENT_KEY){
+                        window.STIGG_CLIENT_KEY='invalid-key'
                     }
 
                     // Enabling the debug mode flag is useful during implementation,
@@ -96,7 +106,9 @@
                             app_id: "xjvl0z2h",
                             email: window.USER_NAME,
                             user_hash: '${userHash}',
-                            created_at: new Date().getTime()
+                            created_at: new Date().getTime(),
+                            show_overage: window.STIGG_IS_OVERAGE==='true',
+                            data_ingestion_paused: window.DATA_INGESTION_PAUSED==='true'
                         };
                     }
    // mixpanel.track('Login');

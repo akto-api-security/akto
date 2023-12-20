@@ -1,35 +1,51 @@
 package com.akto.action;
 
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.JiraIntegration;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Intercom;
+import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+import io.micrometer.core.instrument.util.StringUtils;
+import org.apache.commons.codec.digest.HmacAlgorithms;
+import org.apache.commons.codec.digest.HmacUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.mongodb.client.model.Filters.in;
 
 public class ProfileAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ProfileAction.class);
 
     private int accountId;
 
@@ -39,7 +55,7 @@ public class ProfileAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void executeMeta1(User user, HttpServletRequest request, HttpServletResponse response) {
+    public static void executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
         BasicDBObject userDetails = new BasicDBObject();
         BasicDBObject accounts = new BasicDBObject();
         Integer sessionAccId = Context.accountId.get();
@@ -112,7 +128,55 @@ public class ProfileAction extends UserAction {
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
-                .append("jiraIntegrated", jiraIntegrated);
+                .append("jiraIntegrated", jiraIntegrated)
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+
+        // only external API calls have non-null "utility"
+        if (DashboardMode.isMetered() &&  utility == null) {
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.in(Organization.ACCOUNTS, sessionAccId)
+            ); 
+            String organizationId = organization.getId();
+
+            HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
+            if(initialFeatureWiseAllowed == null) {
+                initialFeatureWiseAllowed = new HashMap<>();
+            }
+
+            boolean isOverage = false;
+            HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
+            int gracePeriod = organization.getGracePeriod();
+            try {
+
+                featureWiseAllowed = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
+                gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+
+                isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+            }
+
+            userDetails.append("organizationId", organizationId);
+            userDetails.append("organizationName", organization.getName());
+            userDetails.append("stiggIsOverage", isOverage);
+            BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
+            for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
+                stiggFeatureWiseAllowed.append(entry.getKey(), new BasicDBObject()
+                        .append(FeatureAccess.IS_GRANTED, entry.getValue().getIsGranted())
+                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace(gracePeriod)));
+            }
+
+            boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
+            userDetails.append("dataIngestionPaused", dataIngestionPaused);
+
+            userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
+
+            userDetails.append("stiggCustomerId", organizationId);
+            userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
+            userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
+
+        }
+
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");

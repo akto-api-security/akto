@@ -29,7 +29,7 @@ const Users = () => {
         getTeamData();
     }, [])
 
-    const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
+    const isLocalDeploy = window.IS_SAAS !== "true" && window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
     const currentUser = users.find(user => user.login === username)
 
     let isAdmin = false
