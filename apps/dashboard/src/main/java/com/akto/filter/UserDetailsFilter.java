@@ -66,6 +66,8 @@ public class UserDetailsFilter implements Filter {
         filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
 
+    public static final String ACCOUNT_ID = "accountId";
+
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
@@ -251,9 +253,9 @@ public class UserDetailsFilter implements Filter {
                     redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                     return ;
                 }
-                session.setAttribute("accountId", accountId);
+                session.setAttribute(ACCOUNT_ID, accountId);
             }
-            Object accountIdObj = session.getAttribute("accountId");
+            Object accountIdObj = session.getAttribute(ACCOUNT_ID);
             String accountIdStr = accountIdObj == null ? null : accountIdObj+"";
 
             if (StringUtils.isEmpty(accountIdStr)) {
@@ -275,13 +277,13 @@ public class UserDetailsFilter implements Filter {
                         accountId = Integer.parseInt(accountIdStr);
 
                         Context.accountId.set(accountId);
-                        session.setAttribute("accountId", accountId);
+                        session.setAttribute(ACCOUNT_ID, accountId);
 
                     }
                 }
             }
             if (accessTokenFromRequest == null) {
-                ProfileAction.executeMeta1(user, httpServletRequest, httpServletResponse);
+                ProfileAction.executeMeta1(utility, user, httpServletRequest, httpServletResponse);
             }
         } else {
             redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
