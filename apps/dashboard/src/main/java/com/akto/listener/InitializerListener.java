@@ -20,6 +20,7 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
@@ -1278,8 +1279,10 @@ public class InitializerListener implements ServletContextListener {
             int accountId = Context.accountId.get();
 
             Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
-            boolean alreadyExists = OrganizationsDao.instance.findOne(filterQ) != null;
+            Organization organization = OrganizationsDao.instance.findOne(filterQ);
+            boolean alreadyExists = organization != null;
             if (alreadyExists) {
+                fetchAndSaveFeatureWiseAllowed(organization);
                 loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
                 return;
             }
@@ -1308,6 +1311,8 @@ public class InitializerListener implements ServletContextListener {
             } else {
                 loggerMaker.infoAndAddToDb("Found a new org for acc: " + accountId + " org="+org.getId(), LogDb.DASHBOARD);
             }
+
+            fetchAndSaveFeatureWiseAllowed(org);
 
             Bson updates = Updates.addToSet(Organization.ACCOUNTS, accountId);
             OrganizationsDao.instance.updateOne(Organization.ID, org.getId(), updates);
@@ -1595,6 +1600,52 @@ public class InitializerListener implements ServletContextListener {
     }
 
     static boolean executedOnce = false;
+
+    public static HashMap<String, FeatureAccess> fetchAndSaveFeatureWiseAllowed(Organization organization) {
+
+        HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
+        
+        try {
+            int gracePeriod = organization.getGracePeriod();
+            String organizationId = organization.getId();
+
+            HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
+            if (initialFeatureWiseAllowed == null) {
+                initialFeatureWiseAllowed = new HashMap<>();
+            }
+
+            BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId,
+                    organization.getAdminEmail());
+            featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
+
+            for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
+                String label = entry.getKey();
+                FeatureAccess value = entry.getValue();
+                if (initialFeatureWiseAllowed.containsKey(label)) {
+                    FeatureAccess initialValue = initialFeatureWiseAllowed.get(label);
+                    if (initialValue.getOverageFirstDetected() != -1 &&
+                            value.getOverageFirstDetected() != -1 &&
+                            initialValue.getOverageFirstDetected() < value.getOverageFirstDetected()) {
+                        value.setOverageFirstDetected(initialValue.getOverageFirstDetected());
+                    }
+                    featureWiseAllowed.put(label, value);
+                }
+            }
+
+            gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+
+            OrganizationsDao.instance.updateOne(
+                    Filters.eq(Constants.ID, organizationId),
+                    Updates.combine(
+                            Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
+                            Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
+                    LogDb.DASHBOARD);
+        }
+        
+        return featureWiseAllowed;
+    }
 
     private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {
         backwardCompatibility.setOrgsInBilling(0);

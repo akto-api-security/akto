@@ -147,31 +147,10 @@ public class ProfileAction extends UserAction {
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
             int gracePeriod = organization.getGracePeriod();
             try {
-                BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId, organization.getAdminEmail());
-                featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
 
-                for(Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
-                    String label = entry.getKey();
-                    FeatureAccess value = entry.getValue();
-                    if(initialFeatureWiseAllowed.containsKey(label)) {
-                        FeatureAccess initialValue = initialFeatureWiseAllowed.get(label);
-                        if (initialValue.getOverageFirstDetected() != -1 &&
-                                value.getOverageFirstDetected() != -1 &&
-                                initialValue.getOverageFirstDetected() < value.getOverageFirstDetected()) {
-                            value.setOverageFirstDetected(initialValue.getOverageFirstDetected());
-                        }
-                        featureWiseAllowed.put(label, value);
-                    }
-                }
-
+                featureWiseAllowed = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
                 gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
 
-                OrganizationsDao.instance.updateOne(
-                        Filters.eq(Constants.ID, organizationId),
-                        Updates.combine(
-                                Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
-                                Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
-                
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
