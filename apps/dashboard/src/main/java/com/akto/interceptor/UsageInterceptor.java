@@ -32,7 +32,7 @@ public class UsageInterceptor extends AbstractInterceptor {
 
         try {
 
-            if (!DashboardMode.isMetered()) {
+            if (!DashboardMode.isSaasDeployment()) {
                 return invocation.invoke();
             }
 
