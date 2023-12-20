@@ -13,7 +13,8 @@ const err = async (error) => {
   const { status, data } = error.response
   const { errors } = data
   const { actionErrors } = data
-  let message = "OOPS! Something went wrong"
+  const standardMessage = "OOPS! Something went wrong"
+  let message = standardMessage
   if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
     message = actionErrors[0]
   }
@@ -70,6 +71,16 @@ const err = async (error) => {
       break
 
     case 403:
+
+      if (message.localeCompare(standardMessage) != 0) {
+        window._AKTO.$emit('SHOW_SNACKBAR', {
+          show: true,
+          text: message,
+          color: 'red'
+        })
+        break;
+      }
+
       const originalRequest = error.config;
       if (originalRequest._retry) {
         await window._AKTO.$emit('SHOW_SNACKBAR', {

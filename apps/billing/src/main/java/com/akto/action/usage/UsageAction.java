@@ -35,31 +35,6 @@ public class UsageAction implements ServletRequestAware {
     private int usageLowerBound;
     private int usageUpperBound;
 
-    public String aggregateAccountWiseUsage() {
-
-        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-            @Override
-            public void accept(Organization organization) {
-
-                UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
-            }
-        }, "aggregateAccountWiseUsage");
-
-
-        return SUCCESS.toUpperCase();
-    }
-
-    public String sendDataToSinks() {
-        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-            @Override
-            public void accept(Organization organization) {
-                UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
-            }
-        }, "aggregateAccountWiseUsage");
-
-        return SUCCESS.toUpperCase();
-    }
-
     public String ingestUsage() {
         try {
             String organizationId = usageMetric.getOrganizationId();
