@@ -1516,17 +1516,17 @@ public class InitializerListener implements ServletContextListener {
                     setupUsageScheduler();
                     setupUsageSyncScheduler();
                 }
+                updateGlobalAktoVersion();
+                trimCappedCollections();
+                setUpPiiAndTestSourcesScheduler();
                 setUpTrafficAlertScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 SingleTypeInfo.init();
                 setUpDailyScheduler();
                 setUpWebhookScheduler();
-                setUpPiiAndTestSourcesScheduler();
                 setUpTestEditorTemplatesScheduler();
-                setUpAktoMixpanelEndpointsScheduler();
+                // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
-                updateGlobalAktoVersion();
-                trimCappedCollections();
                 if(isSaas){
                     try {
                         Auth0.getInstance();
