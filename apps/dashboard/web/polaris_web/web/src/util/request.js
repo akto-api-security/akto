@@ -43,6 +43,11 @@ const err = async (error) => {
 
       if (message.localeCompare(standardMessage) != 0) {
         func.setToast(true, true, message);
+        if (window?.mixpanel?.track && error?.config?.url) {
+          window.mixpanel.track("Unauthorized_API_blocked", {
+            "api": error.config.url
+          })
+        }
         break;
       }
 
