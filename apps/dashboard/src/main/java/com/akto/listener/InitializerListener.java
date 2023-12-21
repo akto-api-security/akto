@@ -1512,7 +1512,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "context-initializer");
 
-                if (DashboardMode.isSaasDeployment()) {
+                if (DashboardMode.isMetered()) {
                     setupUsageScheduler();
                     setupUsageSyncScheduler();
                 }
