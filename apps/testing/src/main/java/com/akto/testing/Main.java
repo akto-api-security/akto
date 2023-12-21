@@ -216,7 +216,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
         
-        int testingStartTime = Context.now();
+        Map<Integer, Integer> logSentMap = new HashMap<>();
 
         while (true) {
             AccountTask.instance.executeTask(account -> {
@@ -225,8 +225,9 @@ public class Main {
 
                 int accountId = account.getId();
                 if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int interval = start - testingStartTime;
-                    if ((interval) % LoggerMaker.LOG_SAVE_INTERVAL == 0) {
+                    int lastSent = logSentMap.getOrDefault(accountId, 0);
+                    if ( start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                        logSentMap.put(accountId, start);
                         loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
                                 + " . Skipping test run : " + start, LogDb.TESTING);
                     }

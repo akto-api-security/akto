@@ -241,7 +241,7 @@ public class Main {
 
         long lastSyncOffset = 0;
 
-        int ingestionStartTime = Context.now();
+        Map<Integer, Integer> logSentMap = new HashMap<>();
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
@@ -315,8 +315,9 @@ public class Main {
 
                     if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
                         int now = Context.now();
-                        int ingestionInterval = now - ingestionStartTime;
-                        if ((ingestionInterval) % LoggerMaker.LOG_SAVE_INTERVAL == 0) {
+                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
+                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                            logSentMap.put(accountIdInt, now);
                             loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
                                     + ". Ingestion stopped " + now, LogDb.RUNTIME);
                         }
