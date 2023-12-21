@@ -71,7 +71,7 @@ public class UsageInterceptor extends AbstractInterceptor {
             }
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in UsageInterceptor " + e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error in UsageInterceptor " + e.toString(), LogDb.DASHBOARD);
         }
 
         return invocation.invoke();

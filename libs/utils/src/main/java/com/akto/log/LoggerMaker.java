@@ -94,6 +94,21 @@ public class LoggerMaker  {
         }
     }
 
+    public void errorAndAddToDb(Exception e, String err, LogDb db) {
+        StackTraceElement stackTraceElement = e.getStackTrace()[0];
+        err = String.format("Err msg:%s\nFile:%s\nLine:%d", err, stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+
+        logger.error(err);
+        try{
+            insert(err, "error", db);
+        } catch (Exception ex){
+
+        }
+        if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
+            sendToSlack(err);
+        }
+    }
+
     public void infoAndAddToDb(String info, LogDb db) {
         logger.info(info);
         try{
