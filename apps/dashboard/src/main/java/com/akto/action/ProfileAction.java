@@ -10,17 +10,21 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
+import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
-import com.akto.stigg.StiggReporterClient;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import io.micrometer.core.instrument.util.StringUtils;
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
@@ -29,7 +33,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.mongodb.client.model.Filters.in;
 
@@ -45,7 +51,7 @@ public class ProfileAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void executeMeta1(User user, HttpServletRequest request, HttpServletResponse response) {
+    public static void executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
         BasicDBObject userDetails = new BasicDBObject();
         BasicDBObject accounts = new BasicDBObject();
         Integer sessionAccId = Context.accountId.get();
@@ -108,15 +114,43 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name());
 
-        if (DashboardMode.isSaasDeployment()) {            
+        // only external API calls have non-null "utility"
+        if (DashboardMode.isMetered() &&  utility == null) {
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, sessionAccId)
             ); 
             String organizationId = organization.getId();
 
+            HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
+            if(initialFeatureWiseAllowed == null) {
+                initialFeatureWiseAllowed = new HashMap<>();
+            }
+
             boolean isOverage = false;
+            HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
             try {
-                isOverage = StiggReporterClient.instance.isOverage(organizationId);
+                BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId, organization.getAdminEmail());
+                featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
+
+                for(Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
+                    String label = entry.getKey();
+                    FeatureAccess value = entry.getValue();
+                    if(initialFeatureWiseAllowed.containsKey(label)) {
+                        FeatureAccess initialValue = initialFeatureWiseAllowed.get(label);
+                        if (initialValue.getOverageFirstDetected() != -1 &&
+                                value.getOverageFirstDetected() != -1 &&
+                                initialValue.getOverageFirstDetected() < value.getOverageFirstDetected()) {
+                            value.setOverageFirstDetected(initialValue.getOverageFirstDetected());
+                        }
+                        featureWiseAllowed.put(label, value);
+                    }
+                }
+
+                OrganizationsDao.instance.updateOne(
+                        Filters.eq(Constants.ID, organizationId),
+                        Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed));
+                
+                isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
             }
@@ -124,15 +158,18 @@ public class ProfileAction extends UserAction {
             userDetails.append("organizationId", organizationId);
             userDetails.append("organizationName", organization.getName());
             userDetails.append("stiggIsOverage", isOverage);
-
-
-
-            if (StringUtils.isNotEmpty(InitializerListener.STIGG_SIGNING_KEY)) {
-                String stiggSignature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256, InitializerListener.STIGG_SIGNING_KEY).hmacHex(organizationId);
-                userDetails.append("stiggCustomerId", organizationId);
-                userDetails.append("stiggCustomerToken", "HMAC-SHA256 " + organizationId + ":" + stiggSignature);
-                userDetails.append("stiggClientKey", StiggReporterClient.instance.getStiggConfig().getClientKey());
+            BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
+            for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
+                stiggFeatureWiseAllowed.append(entry.getKey(), new BasicDBObject()
+                        .append(FeatureAccess.IS_GRANTED, entry.getValue().getIsGranted())
+                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace()));
             }
+            userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
+
+            userDetails.append("stiggCustomerId", organizationId);
+            userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
+            userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
+
         }
 
         if (versions.length > 2) {
