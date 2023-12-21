@@ -69,6 +69,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+
+        // needed for usage metric calculation
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo.LAST_SEEN }, true);
+        
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._TIMESTAMP }, true);
     }
 
     public static Bson filterForSTIUsingURL(int apiCollectionId, String url, URLMethods.Method method) {
