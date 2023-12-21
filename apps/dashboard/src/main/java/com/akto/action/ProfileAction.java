@@ -152,7 +152,10 @@ public class ProfileAction extends UserAction {
             }
 
             boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
-            userDetails.append("dataIngestionPaused", dataIngestionPaused);
+            boolean testRunsPaused = UsageMetricUtils.checkTestRunsOverage(sessionAccId);
+            userDetails.append("usagePaused", new BasicDBObject()
+                    .append("dataIngestion", dataIngestionPaused)
+                    .append("testRuns", testRunsPaused));
 
             userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
 
