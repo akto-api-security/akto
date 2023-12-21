@@ -241,6 +241,8 @@ public class Main {
 
         long lastSyncOffset = 0;
 
+        int ingestionStartTime = Context.now();
+
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
@@ -250,12 +252,6 @@ public class Main {
                     main.consumer.commitSync();
                 } catch (Exception e) {
                     throw e;
-                }
-
-                // Since 1_000_000 is the default account id
-                if (UsageMetricUtils.checkActiveEndpointOverage(1_000_000)) {
-                    logger.info("Active endpoint overage detected for account: 1_000_000 . Stopping ingestion.");
-                    continue;
                 }
                 
                 // TODO: what happens if exception
@@ -318,8 +314,12 @@ public class Main {
                     }
 
                     if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
-                        logger.info("Active endpoint overage detected for account " + accountIdInt
-                                + ". Stopping ingestion.");
+                        int now = Context.now();
+                        int ingestionInterval = now - ingestionStartTime;
+                        if ((ingestionInterval) % LoggerMaker.LOG_SAVE_INTERVAL == 0) {
+                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
+                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
+                        }
                         continue;
                     }
 

@@ -26,6 +26,8 @@ import com.slack.api.Slack;
 
 public class LoggerMaker  {
 
+    public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
+
     public final Logger logger;
     private final Class<?> aClass;
 

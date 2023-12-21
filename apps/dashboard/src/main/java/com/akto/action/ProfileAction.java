@@ -148,8 +148,9 @@ public class ProfileAction extends UserAction {
             int gracePeriod = organization.getGracePeriod();
             try {
 
-                featureWiseAllowed = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
-                gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+                organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
+                gracePeriod = organization.getGracePeriod();
+                featureWiseAllowed = organization.getFeatureWiseAllowed();
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
