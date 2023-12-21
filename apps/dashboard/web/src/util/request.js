@@ -79,7 +79,7 @@ const err = async (error) => {
           color: 'red'
         })
         if (window?.mixpanel?.track && error?.config?.url) {
-          window.mixpanel.track("Unauthorized_API_blocked", {
+          window.mixpanel.track("UNAUTHORIZED_API_BLOCKED", {
             "api": error.config.url
           })
         }
