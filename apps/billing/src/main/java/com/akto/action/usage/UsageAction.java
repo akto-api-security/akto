@@ -70,14 +70,14 @@ public class UsageAction implements ServletRequestAware {
 
                     loggerMaker.infoAndAddToDb(String.format("Updated ACTIVE_ACCOUNTS for organization %s", organizationId), LogDb.BILLING);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while updating ACTIVE_ACCOUNTS for organization %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
+                    loggerMaker.errorAndAddToDb(e, String.format("Error while updating ACTIVE_ACCOUNTS for organization %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
                     return Action.ERROR.toUpperCase();
                 }
             }
 
             UsageMetricsDao.instance.insertOne(usageMetric);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while ingesting usage metric. Error: %s", e.getMessage()), LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e, String.format("Error while ingesting usage metric. Error: %s", e.getMessage()), LogDb.BILLING);
             return Action.ERROR.toUpperCase();
         }
     

@@ -109,14 +109,14 @@ public class PostmanAction extends UserAction {
             try {
                 openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true, host);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while creating open api: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Error while creating open api: " + e.getMessage(), LogDb.DASHBOARD);
                 return;
             }
             String openAPIStringAll = null;
             try {
                 openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while converting open api to json: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Error while converting open api to json: " + e.getMessage(), LogDb.DASHBOARD);
                 return;
             }
 
@@ -124,7 +124,7 @@ public class PostmanAction extends UserAction {
             try {
                 main.createApiWithSchema(postmanCredential.getWorkspaceId(), apiName, openAPIStringAll);
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb("Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
             }
             loggerMaker.infoAndAddToDb("Successfully created api in postman", LogDb.DASHBOARD);
         };
@@ -258,7 +258,7 @@ public class PostmanAction extends UserAction {
             String result = addOrUpdateApiKey();
             if ( result == null || !result.equals(SUCCESS.toUpperCase())) throw new Exception("Returned Error");
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while adding/updating postman key+ " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error while adding/updating postman key+ " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Error while adding/updating postman key.");
             return ERROR.toUpperCase();
         }
@@ -306,7 +306,7 @@ public class PostmanAction extends UserAction {
             try {
                 collectionDetails = main.fetchCollection(collectionId);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
                 continue;
             }
 
@@ -337,7 +337,7 @@ public class PostmanAction extends UserAction {
             try {
                 msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
                 LoadersDao.instance.updateIncrementalCount(loaderId, countMap.get(collectionId));
                 continue;
             }
@@ -350,7 +350,7 @@ public class PostmanAction extends UserAction {
                 try {
                     Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while pushing data to kafka: " + e.getMessage(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e,"Error while pushing data to kafka: " + e.getMessage(), LogDb.DASHBOARD);
                     return;
                 }
                 loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
@@ -369,7 +369,7 @@ public class PostmanAction extends UserAction {
         try {
             collectionDetailsObj = mapper.readTree(postmanCollectionFile);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Error while parsing the file");
             return ERROR.toLowerCase();
         }
@@ -412,7 +412,7 @@ public class PostmanAction extends UserAction {
         try {
             msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error generating messages: " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error generating messages: " + e.getMessage(), LogDb.DASHBOARD);
             LoadersDao.instance.updateIncrementalCount(loaderId, count);
             return ;
         }
@@ -421,7 +421,7 @@ public class PostmanAction extends UserAction {
         try {
             Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error pushing data to kafka", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error pushing data to kafka", LogDb.DASHBOARD);
             return;
         }
         LoadersDao.instance.updateIncrementalCount(loaderId, count);
@@ -457,7 +457,7 @@ public class PostmanAction extends UserAction {
                     loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s", apiName, collectionName), LogDb.DASHBOARD);
                     msgs.add(s);
                 } catch (JsonProcessingException e){
-                    loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
                 }
             }
         }

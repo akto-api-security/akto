@@ -160,7 +160,7 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
             }
         }
         if(localTestingRun==null){
@@ -170,7 +170,7 @@ public class StartTestAction extends UserAction {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
             }
 
             if (localTestingRun == null) {
@@ -545,7 +545,7 @@ public class StartTestAction extends UserAction {
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 return SUCCESS.toUpperCase();
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
             }
         }
 
