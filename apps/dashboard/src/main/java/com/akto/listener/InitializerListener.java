@@ -1340,12 +1340,12 @@ public class InitializerListener implements ServletContextListener {
                                 runInitializerFunctions();
                             }
                         }, "context-initializer");
+                        setUpPiiAndTestSourcesScheduler();
                         setUpTrafficAlertScheduler();
 //                        setUpAktoMixpanelEndpointsScheduler();
                         SingleTypeInfo.init();
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
-                        setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
 
                         if (DashboardMode.isMetered()) {
@@ -1417,7 +1417,7 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
-    public static HashMap<String, FeatureAccess> fetchAndSaveFeatureWiseAllowed(Organization organization) {
+    public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
         
@@ -1450,6 +1450,9 @@ public class InitializerListener implements ServletContextListener {
 
             gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
 
+            organization.setGracePeriod(gracePeriod);
+            organization.setFeatureWiseAllowed(featureWiseAllowed);
+
             OrganizationsDao.instance.updateOne(
                     Filters.eq(Constants.ID, organizationId),
                     Updates.combine(
@@ -1460,7 +1463,7 @@ public class InitializerListener implements ServletContextListener {
                     LogDb.DASHBOARD);
         }
         
-        return featureWiseAllowed;
+        return organization;
     }
 
     private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import org.json.JSONObject;
 
 import com.akto.dao.billing.OrganizationsDao;
@@ -122,33 +123,45 @@ public class UsageMetricUtils {
         }
     }
 
-    public static boolean checkActiveEndpointOverage(int accountId) {
+    public static boolean checkMeteredOverage(int accountId, String featureLabel) {
 
-        Organization organization = OrganizationsDao.instance.findOne(
-                Filters.in(Organization.ACCOUNTS, accountId));
+        try {
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.in(Organization.ACCOUNTS, accountId));
 
-        // stop ingestion if organization is not found
-        if (organization == null) {
-            return true;
+            if (organization == null) {
+                throw new Exception("Organization not found");
+            }
+
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+
+            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+                throw new Exception("feature map not found or empty for organization " + organization.getId());
+            }
+
+            FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(featureLabel, null);
+
+            int gracePeriod = organization.getGracePeriod();
+
+            // stop access if feature is not found or overage
+            return featureAccess == null || !featureAccess.getIsGranted()
+                    || featureAccess.checkOverageAfterGrace(gracePeriod);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to check metered overage. Error - " + e.getMessage(),
+                    LogDb.DASHBOARD);
         }
 
-        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+        // allow access by default and in case of errors.
+        return false;
+    }
 
-        // stop ingestion if featureMap is not found
-        if(featureWiseAllowed == null) {
-            return true;
-        }
-        
-        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.name(), null);
+    public static boolean checkActiveEndpointOverage(int accountId){
+        return checkMeteredOverage(accountId, MetricTypes.ACTIVE_ENDPOINTS.name());
+    }
 
-        // stop ingestion if active endpoints feature is not found
-        if(featureAccess == null) {
-            return true;
-        }
-
-        // stop ingestion if feature is overage
-        return featureAccess.checkOverageAfterGrace(organization.getGracePeriod());
-
+    public static boolean checkTestRunsOverage(int accountId){
+        return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS.name());
     }
 
 }

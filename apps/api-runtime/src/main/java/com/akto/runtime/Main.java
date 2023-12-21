@@ -217,17 +217,13 @@ public class Main {
 
         long lastSyncOffset = 0;
 
+        int ingestionStartTime = Context.now();
+
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
-
-                // Since 1_000_000 is the default account id
-                if (UsageMetricUtils.checkActiveEndpointOverage(1_000_000)) {
-                    logger.info("Active endpoint overage detected for account: 1_000_000 . Stopping ingestion.");
-                    continue;
-                }
 
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -286,8 +282,12 @@ public class Main {
                     }
 
                     if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
-                        logger.info("Active endpoint overage detected for account " + accountIdInt
-                                + ". Stopping ingestion.");
+                        int now = Context.now();
+                        int ingestionInterval = now - ingestionStartTime;
+                        if ((ingestionInterval) % LoggerMaker.LOG_SAVE_INTERVAL == 0) {
+                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
+                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
+                        }
                         continue;
                     }
 
