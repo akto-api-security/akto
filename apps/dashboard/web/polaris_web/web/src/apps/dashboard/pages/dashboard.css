@@ -67,3 +67,7 @@
 .reduce-size .Polaris-Avatar--sizeExtraSmall{
     --pc-avatar-extra-small-size: 1.25rem;
 }
+
+.beamer_defaultBeamerSelector {
+    display: none !important;
+}
