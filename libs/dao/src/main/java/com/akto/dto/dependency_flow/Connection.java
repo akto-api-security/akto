@@ -1,12 +1,15 @@
-package com.akto.util.dependency_flow;
+package com.akto.dto.dependency_flow;
 
 
 import java.util.List;
 import java.util.Objects;
 
 public class Connection {
-    String param;
-    List<Edge> edges;
+    private String param;
+    private List<Edge> edges;
+
+    public Connection() {
+    }
 
     public Connection(String param, List<Edge> edges) {
         this.param = param;
@@ -26,4 +29,19 @@ public class Connection {
         return Objects.hash(param);
     }
 
+    public String getParam() {
+        return param;
+    }
+
+    public void setParam(String param) {
+        this.param = param;
+    }
+
+    public List<Edge> getEdges() {
+        return edges;
+    }
+
+    public void setEdges(List<Edge> edges) {
+        this.edges = edges;
+    }
 }
