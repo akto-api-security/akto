@@ -1,6 +1,7 @@
 package com.akto.action;
 
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
@@ -128,28 +129,13 @@ public class ProfileAction extends UserAction {
 
             boolean isOverage = false;
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
+            int gracePeriod = organization.getGracePeriod();
             try {
-                BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId, organization.getAdminEmail());
-                featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
 
-                for(Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
-                    String label = entry.getKey();
-                    FeatureAccess value = entry.getValue();
-                    if(initialFeatureWiseAllowed.containsKey(label)) {
-                        FeatureAccess initialValue = initialFeatureWiseAllowed.get(label);
-                        if (initialValue.getOverageFirstDetected() != -1 &&
-                                value.getOverageFirstDetected() != -1 &&
-                                initialValue.getOverageFirstDetected() < value.getOverageFirstDetected()) {
-                            value.setOverageFirstDetected(initialValue.getOverageFirstDetected());
-                        }
-                        featureWiseAllowed.put(label, value);
-                    }
-                }
+                organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
+                gracePeriod = organization.getGracePeriod();
+                featureWiseAllowed = organization.getFeatureWiseAllowed();
 
-                OrganizationsDao.instance.updateOne(
-                        Filters.eq(Constants.ID, organizationId),
-                        Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed));
-                
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
@@ -162,8 +148,15 @@ public class ProfileAction extends UserAction {
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 stiggFeatureWiseAllowed.append(entry.getKey(), new BasicDBObject()
                         .append(FeatureAccess.IS_GRANTED, entry.getValue().getIsGranted())
-                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace()));
+                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace(gracePeriod)));
             }
+
+            boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
+            boolean testRunsPaused = UsageMetricUtils.checkTestRunsOverage(sessionAccId);
+            userDetails.append("usagePaused", new BasicDBObject()
+                    .append("dataIngestion", dataIngestionPaused)
+                    .append("testRuns", testRunsPaused));
+
             userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
 
             userDetails.append("stiggCustomerId", organizationId);
