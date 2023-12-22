@@ -4,7 +4,7 @@ package com.akto.listener;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 
 
 import javax.servlet.ServletContextListener;
