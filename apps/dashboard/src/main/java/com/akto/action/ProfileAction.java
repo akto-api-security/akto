@@ -148,8 +148,9 @@ public class ProfileAction extends UserAction {
             int gracePeriod = organization.getGracePeriod();
             try {
 
-                featureWiseAllowed = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
-                gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+                organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
+                gracePeriod = organization.getGracePeriod();
+                featureWiseAllowed = organization.getFeatureWiseAllowed();
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
@@ -167,7 +168,10 @@ public class ProfileAction extends UserAction {
             }
 
             boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
-            userDetails.append("dataIngestionPaused", dataIngestionPaused);
+            boolean testRunsPaused = UsageMetricUtils.checkTestRunsOverage(sessionAccId);
+            userDetails.append("usagePaused", new BasicDBObject()
+                    .append("dataIngestion", dataIngestionPaused)
+                    .append("testRuns", testRunsPaused));
 
             userDetails.append("stiggFeatureWiseAllowed", stiggFeatureWiseAllowed);
 

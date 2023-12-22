@@ -32,7 +32,7 @@ public class UsageInterceptor extends AbstractInterceptor {
 
         try {
 
-            if (!DashboardMode.isSaasDeployment()) {
+            if (!DashboardMode.isMetered()) {
                 return invocation.invoke();
             }
 
@@ -47,6 +47,11 @@ public class UsageInterceptor extends AbstractInterceptor {
             }
 
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+
+            if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+                throw new Exception("feature map not found or empty for organization " + organization.getId());
+            }
+
             int gracePeriod = organization.getGracePeriod();
 
             String[] features = featureLabel.split(" ");
@@ -81,7 +86,9 @@ public class UsageInterceptor extends AbstractInterceptor {
             }
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in UsageInterceptor " + e.toString(), LogDb.DASHBOARD);
+            String api = invocation.getProxy().getActionName();
+            String error = "Error in UsageInterceptor for api: " + api + " ERROR: " + e.getMessage();
+            loggerMaker.errorAndAddToDb(error, LogDb.DASHBOARD);
         }
 
         return invocation.invoke();
