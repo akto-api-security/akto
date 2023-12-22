@@ -138,7 +138,7 @@ public class ProfileAction extends UserAction {
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
             }
 
             userDetails.append("organizationId", organizationId);

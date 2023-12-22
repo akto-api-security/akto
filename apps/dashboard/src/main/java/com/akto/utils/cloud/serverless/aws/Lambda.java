@@ -79,7 +79,7 @@ public class Lambda implements ServerlessFunction {
             awsLambda.updateFunctionConfiguration(req);
             loggerMaker.infoAndAddToDb("Succeefully updated function configuration for function: " + functionName, LogDb.DASHBOARD);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
         }
     }
 
@@ -105,7 +105,7 @@ public class Lambda implements ServerlessFunction {
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
             loggerMaker.infoAndAddToDb(String.format("Function: %s, response: %s", functionName, resp), LogDb.DASHBOARD);
         } catch (AWSLambdaException e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while invoking Lambda, %s : %s", functionName, e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Error while invoking Lambda, %s : %s", functionName, e.toString()), LogDb.DASHBOARD);
         }
 
 
