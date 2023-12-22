@@ -190,17 +190,6 @@ public class Main {
 
                 int start = Context.now();
 
-                int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if ( start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Skipping test run : " + start, LogDb.TESTING);
-                    }
-                    return;
-                }
-
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
                 TestingRun testingRun;
                 ObjectId summaryId = null;
@@ -212,6 +201,25 @@ public class Main {
                 }
 
                 if (testingRun == null) {
+                    return;
+                }
+
+                int accountId = account.getId();
+                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
+                    int lastSent = logSentMap.getOrDefault(accountId, 0);
+                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                        logSentMap.put(accountId, start);
+                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                + " . Failing test run : " + start, LogDb.TESTING);
+                    }
+                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq(Constants.ID, testingRun.getId()),
+                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
+                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq(Constants.ID, summaryId),
+                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
                     return;
                 }
 
