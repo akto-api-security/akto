@@ -19,6 +19,7 @@ function getOrderPriority(state){
         case "RUNNING": return 1;
         case "SCHEDULED": return 2;
         case "STOPPED": return 4;
+        case "FAILED":
         case "FAIL": return 5;
         default: return 3;
     }
@@ -73,6 +74,7 @@ function getAlternateTestsInfo(state){
         case "RUNNING": return "Tests are still running";
         case "SCHEDULED": return "Tests have been scheduled";
         case "STOPPED": return "Tests have been stopped";
+        case "FAILED":
         case "FAIL": return "Test execution has failed during run";
         default: return "Information unavailable";
     }
