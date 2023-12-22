@@ -160,17 +160,17 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "ERROR in converting testingRunHexId to objectId: " + this.testingRunHexId + " " + e.toString(), LogDb.DASHBOARD);
             }
         }
         if(localTestingRun==null){
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
-                if (triggeredBy.length() > 0) {
+                if (triggeredBy!=null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "Unable to create test run - " + e.toString(), LogDb.DASHBOARD);
             }
 
             if (localTestingRun == null) {
@@ -545,7 +545,7 @@ public class StartTestAction extends UserAction {
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 return SUCCESS.toUpperCase();
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "ERROR: Stop test failed - " + e.toString(), LogDb.DASHBOARD);
             }
         }
 
