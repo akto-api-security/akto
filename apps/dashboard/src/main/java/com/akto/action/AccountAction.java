@@ -10,7 +10,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;

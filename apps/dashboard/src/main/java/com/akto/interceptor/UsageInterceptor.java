@@ -9,7 +9,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;

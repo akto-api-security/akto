@@ -7,7 +7,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
