@@ -8,7 +8,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.billing.OrganizationUtils;
