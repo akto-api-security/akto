@@ -20,7 +20,7 @@ public class KafkaListener implements ServletContextListener {
             try {
                 kafka = new Kafka(brokerIP,  1000, BATCH_SIZE_CONFIG);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("ERROR while setting up KafkaListener", LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "ERROR while setting up KafkaListener", LogDb.DASHBOARD);
             }
         }
 
