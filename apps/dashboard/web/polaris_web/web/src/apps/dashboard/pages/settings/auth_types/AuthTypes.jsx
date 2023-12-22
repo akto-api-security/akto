@@ -7,7 +7,8 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import func from "@/util/func";
 import {
     CustomersMinor,
-    ClockMinor
+    ClockMinor,
+    CircleTickMajor
   } from '@shopify/polaris-icons';
 
 function AuthTypes() {
@@ -28,7 +29,13 @@ function AuthTypes() {
             value: "createdBy",
             itemOrder: 3,
             icon:CustomersMinor
-        }
+        },
+        {
+            text: "",
+            value: "isActive",
+            itemOrder: 3,
+            icon:CircleTickMajor
+        },
     ]
 
     const resourceName = {
@@ -77,6 +84,7 @@ function AuthTypes() {
                     authType.id = authType.name
                     authType.updatedTimestamp = func.prettifyEpoch(authType.timestamp);
                     authType.createdBy = usersMap[authType.creatorId]
+                    authType.isActive = authType.active ? "Active" : "Inactive"
                     return authType;
                 }));
                 setLoading(false);
@@ -122,7 +130,7 @@ function AuthTypes() {
                 ]}
             >
                 <Modal.Section>
-                    Are you sure you want to reset all custom auth types in your API inventory?
+                    Please mark the auth types you wish to reset as inactive, before resetting. Are you sure you want to reset all custom auth types in your API inventory?
                 </Modal.Section>
             </Modal>
         </Box>
