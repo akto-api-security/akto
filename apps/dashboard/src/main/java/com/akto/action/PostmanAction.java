@@ -14,7 +14,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.postman.Main;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;

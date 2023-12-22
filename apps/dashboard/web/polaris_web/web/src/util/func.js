@@ -194,6 +194,7 @@ prettifyEpoch(epoch) {
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMajor;
       case "COMPLETED": return CircleTickMajor;
+      case "FAILED" :
       case "FAIL": return CircleAlertMajor;
       default: return ClockMinor;
     }
@@ -202,6 +203,7 @@ prettifyEpoch(epoch) {
     switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
+      case "FAILED":
       case "FAIL":
       case "STOPPED": return "critical";
       case "COMPLETED": return "success";

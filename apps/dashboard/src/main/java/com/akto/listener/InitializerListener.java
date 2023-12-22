@@ -60,7 +60,7 @@ import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
@@ -1491,7 +1491,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
-        setOrganizationsInBilling(backwardCompatibility);
+        if (DashboardMode.isMetered()) {
+            setOrganizationsInBilling(backwardCompatibility);
+        }
         setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
@@ -1504,7 +1506,9 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
-        initializeOrganizationAccountBelongsTo(backwardCompatibility);
+        if (DashboardMode.isMetered()) {
+            initializeOrganizationAccountBelongsTo(backwardCompatibility);
+        }
     }
 
     public void runInitializerFunctions() {

@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import com.akto.util.Constants;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.akto.utils.cloud.stack.dto.StackState;
