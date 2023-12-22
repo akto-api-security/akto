@@ -4,6 +4,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.Organization;
 import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import org.apache.commons.codec.digest.HmacAlgorithms;
@@ -60,6 +61,27 @@ public class InfoAction extends ActionSupport {
         entitlements = StiggReporterClient.instance.fetchEntitlements(orgId);
 
         return SUCCESS.toUpperCase();
+    }
+
+    BasicDBObject additionalMetaData;
+    public String fetchOrgMetaData() {
+        Organization organization = OrganizationsDao.instance.findOne(Organization.ID, orgId, Organization.ADMIN_EMAIL, adminEmail);
+
+        if (organization == null) {
+            addActionError("Organization not found to fetch Signature: " + orgId + " " + adminEmail);
+            return ERROR.toUpperCase();
+        }
+        additionalMetaData = StiggReporterClient.instance.fetchOrgMetaData(orgId);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public BasicDBObject getAdditionalMetaData() {
+        return additionalMetaData;
+    }
+
+    public void setAdditionalMetaData(BasicDBObject additionalMetaData) {
+        this.additionalMetaData = additionalMetaData;
     }
 
     public void setOrgId(String orgId) {
