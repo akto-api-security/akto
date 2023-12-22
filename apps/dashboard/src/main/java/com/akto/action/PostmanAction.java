@@ -368,6 +368,7 @@ public class PostmanAction extends UserAction {
         JsonNode collectionDetailsObj;
         try {
             collectionDetailsObj = mapper.readTree(postmanCollectionFile);
+            loggerMaker.errorAndAddToDb("Postman file:" + postmanCollectionFile, LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Error while parsing the file");
