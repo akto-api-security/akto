@@ -6,6 +6,7 @@ import ReactFlow, {
 import ApiDependencyNode from "./ApiDependencyNode";
 import api from "../api";
 import ApiDependencyEdge from "./ApiDependencyEdge";
+import func from "../../../../../util/func";
 
 
 
@@ -59,111 +60,126 @@ const midPoint = 210
 function formatRawNodeData(nodes, currentApiCollectionId, currentEndpoint, currentMethod) {
     let result = {}
     let finalNodes = []
-    result["nodes"] = finalNodes
     let finalEdges = []
-    result["edges"] = finalEdges
+    let currentNodeId = calculateNodeId(currentApiCollectionId, currentEndpoint, currentMethod)
 
     let nodesLength = nodes.length;
     if (nodesLength == 0) return finalNodes;
 
-    let currentNodeId = calculateNodeId(currentApiCollectionId, currentEndpoint, currentMethod)
-
-
-    // add current node
-    finalNodes.push({
-        "id": currentNodeId,
-        "type": 'apiDependencyNode',
-        "data": { "apiCollectionId": currentApiCollectionId, "endpoint": currentEndpoint, "method": currentMethod },
-        "position": { x: midPoint, y: 200 },
+    let maxDepth = 0
+    nodes.forEach((x) => {
+        maxDepth = Math.max(maxDepth, findMaxDepth(x))
     })
 
-    let parentNodes = new Map()
-    let childrenNodes = new Map()
-
-    for (let index = 0; index < nodesLength; index++) {
-        let node = nodes[index]["node"]
-        let nodeInfo = nodes[index]["nodeInfo"]
-
-        if (isParent(node, currentApiCollectionId, currentEndpoint, currentMethod)) {
-            let id = calculateNodeId(node["apiCollectionIdResp"], node["urlResp"], node["methodResp"])
-            parentNodes.set(id, {
-                "id": id,
-                "type": 'apiDependencyNode',
-                "data": { "apiCollectionId": node["apiCollectionIdResp"], "endpoint": node["urlResp"], "method": node["methodResp"], "type": "input", "dependents": nodeInfo["dependents"] },
-                "position": { x: 0, y: 0 }
-            })
-
-            let edgeId = node["hexId"];
-            let source = id;
-            let target = currentNodeId;
-
-            let paramInfos = node["paramInfos"]
-            let parameters = []
-            paramInfos.forEach(paramInfo => {
-                parameters.push(paramInfo["responseParam"] + " \u2192 " + paramInfo["requestParam"])
-            })
-
-
-            finalEdges.push({
-                id: edgeId, source: source, target: target, animated: false, type: 'apiDependencyEdge', data: { "parameters": parameters }
-            })
-
-        } else {
-            let id = calculateNodeId(node["apiCollectionIdReq"], node["urlReq"], node["methodReq"])
-            childrenNodes.set(id, {
-                "id": id,
-                "type": 'apiDependencyNode',
-                "data": { "apiCollectionId": node["apiCollectionIdReq"], "endpoint": node["urlReq"], "method": node["methodReq"], "type": "output", "dependents": nodeInfo["dependents"] },
-                "position": { x: 0, y: 380 }
-            })
-
-            let edgeId = node["hexId"];
-            let source = currentNodeId;
-            let target = id;
-
-            let paramInfos = node["paramInfos"]
-            let parameters = []
-            paramInfos.forEach(paramInfo => {
-                parameters.push(paramInfo["responseParam"] + " \u2192 " + paramInfo["requestParam"])
-            })
-
-            finalEdges.push({
-                id: edgeId, source: source, target: target, animated: false, type: 'apiDependencyEdge', data: { "parameters": parameters }
-            })
-        }
-
+    for (let i = 0; i < maxDepth + 1; i++) {
+        finalNodes.push([])
     }
 
-    fillFinalNodes(parentNodes, finalNodes)
-    fillFinalNodes(childrenNodes, finalNodes)
+    let nodesAdded = new Set()
+
+    for (let index = 0; index < nodesLength; index++) {
+        let node = nodes[index]
+
+        let id = calculateNodeId(node["apiCollectionId"], node["url"], node["method"])
+
+        if (!nodesAdded.has(id)) {
+            let isCurrentNode = id === currentNodeId
+            let depth = findMaxDepth(node)
+            finalNodes[depth].push({
+                "id": id,
+                "type": 'apiDependencyNode',
+                "data": { "apiCollectionId": node["apiCollectionId"], "endpoint": node["url"], "method": node["method"], "isCurrentNode": isCurrentNode, "isFirstNode": false },
+                "position": { x: 0, y: depth * 200 }
+            })
+            nodesAdded.add(id)
+        }
+
+        let connections = node["connections"]
+        let edgesMap = new Map()
+        Object.values(connections).forEach(connection => {
+            let edge = connection["edges"][0] // todo: null check
+
+            let source = calculateNodeId(edge["apiCollectionId"], edge["url"], edge["method"]);
+            let edgeId = source + "-" + id;
+
+            let parameters = prepareParams(edge["param"], connection["param"])
+
+            if (edge["depth"] === 1) {
+                let parentId = calculateNodeId(edge["apiCollectionId"], edge["url"], edge["method"])
+                if (!nodesAdded.has(parentId)) {
+                    finalNodes[0].push({
+                        "id": parentId,
+                        "type": 'apiDependencyNode',
+                        "data": { "apiCollectionId": edge["apiCollectionId"], "endpoint": edge["url"], "method": edge["method"], "isCurrentNode": false, "isFirstNode": true },
+                        "position": { x: 100, y: 0 }
+                    })
+                    nodesAdded.add(parentId)
+                }
+            }
+
+            debugger
+            let edgeFromMap = edgesMap.get(edgeId)
+            if (edgeFromMap) {
+                edgeFromMap["data"]["parameters"].push(parameters)
+            } else {
+                edgesMap.set(edgeId, {id: edgeId, source: source, target: id, animated: false, type: 'apiDependencyEdge', data: { "parameters": [parameters] }})
+            }
+        })
+
+        for (let [key, value] of edgesMap) {
+            finalEdges.push(value)
+        }
+    }
+
+    result["nodes"] = []
+    finalNodes.forEach((x) => {
+        fillFinalNodes(x, result["nodes"])
+    })
+
+    result["edges"] = finalEdges
 
     return result;
-
 }
 
 function fillFinalNodes(nodes, finalNodes) {
-    let n = nodes.size
+    let nodesLength = nodes.length
 
     let pattern = [];
-    let start = midPoint - 150 * (n - 1);
-    for (let i = 0; i < n; i++) {
+    let start = midPoint - 150 * (nodesLength - 1);
+    for (let i = 0; i < nodesLength; i++) {
         pattern.push(start + 300 * i);
     }
 
     let idx = 0
-    for (const [id, node] of nodes) {
-        node["position"]["x"] = pattern[idx]
-        finalNodes.push(node)
+    for (const n of nodes) {
+        n["position"]["x"] = pattern[idx];
+        finalNodes.push(n)
         idx += 1
     }
+}
+
+function prepareParams(responseParam, requestParam) {
+    let finalResponseParam = func.findLastParamField(responseParam)
+    let finalRequestParam = func.findLastParamField(requestParam)
+
+    return finalResponseParam + " \u2192 " + finalRequestParam
 }
 
 function calculateNodeId(apiCollectionId, endpoint, method) {
     return apiCollectionId + "#" + endpoint + "#" + method
 }
 
-function isParent(node, currentApiCollectionId, currentEndpoint, currentMethod) {
-    return calculateNodeId(node["apiCollectionIdReq"], node["urlReq"], node["methodReq"]) === calculateNodeId(currentApiCollectionId, currentEndpoint, currentMethod)
+function findMaxDepth(node) {
+    let connections = node["connections"]
+    let maxDepth = 0
+    Object.values(connections).forEach(x => {
+        let edges = x["edges"]
+        if (edges.length > 0) {
+            maxDepth = Math.max(maxDepth, edges[0].depth)
+        }
+    })
+
+    return maxDepth
 }
 
 export default ApiDependency

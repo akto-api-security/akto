@@ -1068,7 +1068,18 @@ getSizeOfFile(bytes) {
       event.preventDefault();
       funcToCall();
     }
+  },
+
+  convertParamToDotNotation(str) {
+    return str.replace(/[#\$]+/g, '.');;
+  },
+
+  findLastParamField(str) {
+    let paramDot = func.convertParamToDotNotation(str)
+    let parmArr = paramDot.split(".")
+    return parmArr.length > 0 ? parmArr[parmArr.length-1] : paramDot
   }
+
 }
 
 export default func
