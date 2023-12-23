@@ -1,22 +1,39 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.OtpTestDataDao;
 import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.test_editor.ExecutionResult;
+import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.test_editor.ExecutorSingleRequest;
+import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
 import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
+import com.akto.testing.workflow_node_executor.NodeExecutor;
+import com.akto.testing.workflow_node_executor.NodeExecutorFactory;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
@@ -181,7 +198,8 @@ public class ApiWorkflowExecutor {
         String message;
 
         OtpTestData otpTestData = fetchOtpTestData(node, 4);
-        String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
+        DefaultNodeDetails defaultNodeDetails = (DefaultNodeDetails) node.getWorkflowNodeDetails().getNodeDetails();
+        String uuid = defaultNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
             message = "otp data not received for uuid " + uuid;
@@ -192,7 +210,7 @@ public class ApiWorkflowExecutor {
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         try {
-            String otp = extractOtpCode(otpTestData.getOtpText(), node.getWorkflowNodeDetails().getOtpRegex());
+            String otp = extractOtpCode(otpTestData.getOtpText(), defaultNodeDetails.getOtpRegex());
             if (otp == null) {
                 data.put("error", "unable to extract otp for provided regex");
                 testErrors.add("unable to extract otp for provided regex");
@@ -216,9 +234,10 @@ public class ApiWorkflowExecutor {
 
     private OtpTestData fetchOtpTestData(Node node, int retries) {
         OtpTestData otpTestData = null;
+        DefaultNodeDetails defaultNodeDetails = (DefaultNodeDetails) node.getWorkflowNodeDetails().getNodeDetails();
         for (int i=0; i<retries; i++) {
             try {
-                int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(), 60);
+                int waitInSeconds = Math.min(defaultNodeDetails.getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
                     loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
                     Thread.sleep(waitInSeconds*1000);
@@ -227,7 +246,7 @@ public class ApiWorkflowExecutor {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
+            String uuid = defaultNodeDetails.getOtpRefUuid();
             int curTime = Context.now() - 5 * 60;
             Bson filters = Filters.and(
                 Filters.eq("uuid", uuid),
@@ -329,80 +348,85 @@ public class ApiWorkflowExecutor {
 
 
     public WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
-        loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
-        List<String> testErrors = new ArrayList<>();
-        String nodeId = node.getId();
-        WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-        WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
-        WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
-        boolean followRedirects = !workflowNodeDetails.getOverrideRedirect();
+        
+        NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory();
+        NodeExecutor nodeExecutor = nodeExecutorFactory.getExecutor(node);
+        return nodeExecutor.processNode(node, valuesMap, allowAllStatusCodes);
 
-        OriginalHttpRequest request;
-        try {
-            request = buildHttpRequest(updatedSampleData, valuesMap);
-            if (request == null) throw new Exception();
-        } catch (Exception e) {
-            ;
-            return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
-        }
+        // loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
+        // List<String> testErrors = new ArrayList<>();
+        // String nodeId = node.getId();
+        // WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
+        // WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
+        // WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
+        // boolean followRedirects = !workflowNodeDetails.getOverrideRedirect();
 
-        String url = request.getUrl();
-        valuesMap.put(nodeId + ".request.url", url);
+        // OriginalHttpRequest request;
+        // try {
+        //     request = buildHttpRequest(updatedSampleData, valuesMap);
+        //     if (request == null) throw new Exception();
+        // } catch (Exception e) {
+        //     ;
+        //     return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
+        // }
 
-        populateValuesMap(valuesMap, request.getBody(), nodeId, request.getHeaders(),
-                true, request.getQueryParams());
+        // String url = request.getUrl();
+        // valuesMap.put(nodeId + ".request.url", url);
 
-        OriginalHttpResponse response = null;
-        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? node.getWorkflowNodeDetails().getMaxPollRetries() : 1;
+        // populateValuesMap(valuesMap, request.getBody(), nodeId, request.getHeaders(),
+        //         true, request.getQueryParams());
 
-        try {
-            int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
-            if (waitInSeconds > 0) {
-                loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
-                Thread.sleep(waitInSeconds*1000);
-                loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        // OriginalHttpResponse response = null;
+        // int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? node.getWorkflowNodeDetails().getMaxPollRetries() : 1;
 
-        for (int i = 0; i < maxRetries; i++) {
-            try {
-                if (i > 0) {
-                    int sleep = node.getWorkflowNodeDetails().getPollRetryDuration();
-                    loggerMaker.infoAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......", LogDb.TESTING);
-                    Thread.sleep(sleep);
-                }
+        // try {
+        //     int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
+        //     if (waitInSeconds > 0) {
+        //         loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
+        //         Thread.sleep(waitInSeconds*1000);
+        //         loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
+        //     }
+        // } catch (InterruptedException e) {
+        //     throw new RuntimeException(e);
+        // }
 
-                response = ApiExecutor.sendRequest(request, followRedirects, null);
+        // for (int i = 0; i < maxRetries; i++) {
+        //     try {
+        //         if (i > 0) {
+        //             int sleep = node.getWorkflowNodeDetails().getPollRetryDuration();
+        //             loggerMaker.infoAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......", LogDb.TESTING);
+        //             Thread.sleep(sleep);
+        //         }
 
-                int statusCode = response.getStatusCode();
+        //         response = ApiExecutor.sendRequest(request, followRedirects, null);
 
-                String statusKey =   nodeId + "." + "response" + "." + "status_code";
-                valuesMap.put(statusKey, statusCode);
+        //         int statusCode = response.getStatusCode();
 
-                populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
-                if (!allowAllStatusCodes && (statusCode >= 400)) {
-                    testErrors.add("process node failed with status code " + statusCode);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                testErrors.add("API request failed");
-                ;
-            }
-        }
+        //         String statusKey =   nodeId + "." + "response" + "." + "status_code";
+        //         valuesMap.put(statusKey, statusCode);
 
-        String message = null;
-        try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
-        } catch (Exception e) {
-            ;
-        }
+        //         populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
+        //         if (!allowAllStatusCodes && (statusCode >= 400)) {
+        //             testErrors.add("process node failed with status code " + statusCode);
+        //         }
+        //     } catch (InterruptedException e) {
+        //         Thread.currentThread().interrupt();
+        //     } catch (Exception e) {
+        //         testErrors.add("API request failed");
+        //         ;
+        //     }
+        // }
 
-        boolean vulnerable = validateTest(workflowNodeDetails.getTestValidatorCode(), valuesMap);
-        return new WorkflowTestResult.NodeResult(message,vulnerable, testErrors);
+        // String message = null;
+        // try {
+        //     message = RedactSampleData.convertOriginalReqRespToString(request, response);
+        // } catch (Exception e) {
+        //     ;
+        // }
+
+        // boolean vulnerable = validateTest(workflowNodeDetails.getTestValidatorCode(), valuesMap);
+        // return new WorkflowTestResult.NodeResult(message,vulnerable, testErrors);
 
     }
 

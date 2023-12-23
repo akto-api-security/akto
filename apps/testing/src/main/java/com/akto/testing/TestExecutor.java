@@ -16,6 +16,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
@@ -392,9 +393,12 @@ public class TestExecutor {
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
-            WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
+
+            DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,
-                    nodeType, true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
+                    true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
+
+            WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(nodeType, defaultNodeDetails);
 
             mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
         }
