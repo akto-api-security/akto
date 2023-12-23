@@ -1,17 +1,14 @@
 package com.akto.action;
 
 import com.akto.MongoBasedTest;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dto.DependencyNode;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static junit.framework.TestCase.assertEquals;
 
@@ -39,7 +36,7 @@ public class TestDependencyAction extends MongoBasedTest {
         String execute = dependencyAction.execute();
         assertEquals("SUCCESS", execute);
 
-        List<BasicDBObject> result = dependencyAction.getResult();
+        Collection<Node> result = dependencyAction.getResult();
         assertEquals(5, result.size());
 
 

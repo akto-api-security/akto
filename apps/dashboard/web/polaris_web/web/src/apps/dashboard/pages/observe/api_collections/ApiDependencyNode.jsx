@@ -13,23 +13,17 @@ import { ArrowUpMinor } from "@shopify/polaris-icons"
 
 function ApiDependencyNode({ data }) {
 
-    const { apiCollectionId, endpoint, method, type, dependents } = data
+    const { apiCollectionId, endpoint, method, isCurrentNode, isFirstNode} = data
 
     const methodPlusUrl = method + " " + endpoint
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const apiCollectionName = collectionsMap[apiCollectionId]
 
-    const parentText = dependents && dependents > 1 ? "parents" : "parent"
-    const childText = dependents && dependents > 1 ? "children" : "child"
-
-    const isCurrentNode = type !== "input" && type !== "output"
-
     return (
         <>
-            {type !== "input" ? <Handle type="target" position={Position.Top} /> : null}
+            {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
             <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
                 <VerticalStack gap={2}>
-                    {type === "input" && dependents ? <Text color='subdued' variant='bodySm' alignment="center">{dependents} more {parentText}</Text> : null}
                     <Card padding={0}>
                         <Box padding={3}>
                             <VerticalStack gap={1}>
@@ -48,10 +42,9 @@ function ApiDependencyNode({ data }) {
                             </VerticalStack>
                         </Box>
                     </Card>
-                    {type === "output" && dependents ? <Text color='subdued' variant='bodySm' alignment="center">{dependents} more {childText}</Text> : null}
                 </VerticalStack>
             </div>
-            {type !== "output" ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
+            {!isCurrentNode ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
         </>
     );
 }
