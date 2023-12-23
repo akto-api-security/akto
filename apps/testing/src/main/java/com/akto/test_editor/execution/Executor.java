@@ -1,28 +1,44 @@
 package com.akto.test_editor.execution;
 
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.dto.api_workflow.Graph;
+import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.LoginWorkflowGraphEdge;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.WorkflowUpdatedSampleData;
+import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
+import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.workflow_node_executor.NodeExecutor;
+import com.akto.testing.workflow_node_executor.NodeExecutorFactory;
 import com.akto.utils.RedactSampleData;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.json.JSONObject;
 
 public class Executor {
 
@@ -39,6 +55,9 @@ public class Executor {
             result.add(invalidExecutionResult);
             return result;
         }
+
+        // If type multiple, build workflow edges
+
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
         RawApi sampleRawApi = rawApi.copy();
@@ -51,6 +70,11 @@ public class Executor {
         boolean requestSent = false;
 
         List<String> error_messages = new ArrayList<>();
+
+        String executionType = node.getChildNodes().get(0).getValues().toString();
+        if (executionType.equals("multiple")) {
+            triggerMultiExecution(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+        }
 
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
@@ -69,7 +93,7 @@ public class Executor {
                 if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
                     break;
                 }
-                try {
+            try {
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     requestSent = true;
@@ -97,6 +121,96 @@ public class Executor {
 
         return result;
     }
+
+    public void triggerMultiExecution(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
+        WorkflowTest workflowTest = convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+        
+        Graph graph = new Graph();
+        graph.buildGraph(workflowTest);
+
+        ArrayList<Object> responses = new ArrayList<Object>();
+
+        List<Node> nodes = graph.sort();
+        
+        NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory();
+        for (Node node: nodes) {
+            WorkflowTestResult.NodeResult nodeResult;
+            try {
+                NodeExecutor nodeExecutor = nodeExecutorFactory.getExecutor(node);
+                nodeResult = nodeExecutor.processNode(node, varMap, true);
+            } catch (Exception e) {
+                ;
+                List<String> testErrors = new ArrayList<>();
+                testErrors.add("Something went wrong");
+                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
+            }
+        }
+
+        // convert 
+
+    }
+
+    public WorkflowTest convertToWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism, 
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
+
+        ObjectMapper m = new ObjectMapper();
+        String source, target;
+        List<String> edges = new ArrayList<>();
+        int edgeNumber = 1;
+        LoginWorkflowGraphEdge edgeObj;
+        Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = new HashMap<>();
+
+        for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
+
+            source = (edgeNumber==1)? "1" : "x"+ (edgeNumber - 1);
+            target = "x"+ edgeNumber;
+            edgeNumber += 1;
+
+            String testId = null;
+            try {
+                Map<String,Object> mapValues = m.convertValue(reqNode.getValues(), Map.class);
+                testId = (String) mapValues.get("test_name");
+            } catch (Exception e) {
+                // TODO: handle exception
+            }
+
+            if (testId != null) {
+                edgeObj = new LoginWorkflowGraphEdge(source, target, target);
+                edges.add(edgeObj.toString());
+                JSONObject json = new JSONObject() ;
+                json.put("method", rawApi.getRequest().getMethod());
+                json.put("requestPayload", rawApi.getRequest().getBody());
+                json.put("path", rawApi.getRequest().getUrl());
+                json.put("requestHeaders", rawApi.getRequest().getHeaders().toString());
+                json.put("type", "");
+                
+                // WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), rawApi.getRequest().getQueryParams(),
+                //     rawApi.getRequest().getHeaders().toString(), rawApi.getRequest().getBody(), rawApi.getRequest().getUrl());
+
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, null, null, customAuthTypes, authMechanism, rawApi, apiInfoKey);
+                WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
+                mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
+            } else {
+                // DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, rawApi.getRequest().getUrl(),
+                //     URLMethods.Method.fromString(rawApi.getRequest().getMethod()), null, null, true, 0, 0, 0, null, null);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, varMap, customAuthTypes, authMechanism, rawApi, apiInfoKey);
+                WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
+                mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
+            }
+
+            edgeObj = new LoginWorkflowGraphEdge(source, target, target);
+            edges.add(edgeObj.toString());
+
+        }
+
+        edgeObj = new LoginWorkflowGraphEdge("x"+ (edgeNumber - 1), "3", "x"+ edgeNumber);
+        edges.add(edgeObj.toString());
+
+        return new WorkflowTest(234, apiInfoKey.getApiCollectionId(), "", Context.now(), "", Context.now(),
+                null, edges, mapNodeIdToWorkflowNodeDetails, WorkflowTest.State.DRAFT);
+    }
+    
 
     public TestResult validate(ExecutionResult attempt, RawApi rawApi, Map<String, Object> varMap, String logId, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {
         if (attempt == null || attempt.getResponse() == null) {
@@ -381,6 +495,10 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, "auth value missing");
                 }
                 return Operations.modifyHeader(rawApi, authHeader, authVal);
+            case "type":
+                return new ExecutorSingleOperationResp(true, "");
+            case "test_name":
+                return new ExecutorSingleOperationResp(true, "");
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
 

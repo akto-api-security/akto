@@ -209,12 +209,18 @@ public class TestEditorEnums {
         MODIFY_QUERY_PARAM
     }
 
+    public enum TerminalTestExecutorDataOperands {
+        TYPE,
+        TEST_NAME
+    }
+
     public enum ExecutorOperandTypes {
         Parent,
         Req,
         Terminal,
         NonTerminal,
-        Data
+        Data,
+        TerminalTest
     }
 
     public String getExecutorOperandValue(String key) {
@@ -232,6 +238,12 @@ public class TestEditorEnums {
         }
 
         for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return operand.toString();
             }
@@ -263,6 +275,12 @@ public class TestEditorEnums {
         for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return "nonterminal";
+            }
+        }
+
+        for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "terminaltest";
             }
         }
 
