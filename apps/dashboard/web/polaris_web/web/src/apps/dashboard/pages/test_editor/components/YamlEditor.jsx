@@ -34,6 +34,7 @@ import keywords from "./editor_config/keywords"
 
 const YamlEditor = ({ fetchAllTests }) => {
     const navigate = useNavigate()
+    const ref = useRef(null)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const testsObj = TestEditorStore(state => state.testsObj)
@@ -113,7 +114,7 @@ const YamlEditor = ({ fetchAllTests }) => {
       }, [selectedTest])
 
     const copyTestName = () =>{
-        func.copyToClipboard(editorInstance.getValue())
+        func.copyToClipboard(editorInstance.getValue(), ref)
     }
 
     const setTestInactive = () => {
@@ -144,6 +145,7 @@ const YamlEditor = ({ fetchAllTests }) => {
     return (
         <div>
             <div className="editor-header">
+                <div ref={ref} />
                 <HorizontalStack gap={"1"}>
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>

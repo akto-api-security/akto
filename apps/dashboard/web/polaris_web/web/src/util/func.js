@@ -202,6 +202,7 @@ prettifyEpoch(epoch) {
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMajor;
       case "COMPLETED": return CircleTickMajor;
+      case "FAILED" :
       case "FAIL": return CircleAlertMajor;
       default: return ClockMinor;
     }
@@ -210,6 +211,7 @@ prettifyEpoch(epoch) {
     switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
+      case "FAILED":
       case "FAIL":
       case "STOPPED": return "critical";
       case "COMPLETED": return "success";
@@ -257,17 +259,18 @@ prettifyEpoch(epoch) {
     }
   }
   ,
-  copyToClipboard(text) {
+  copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.opacity = 0;
-      document.body.appendChild(textarea);
+      ref.current.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
+      ref.current.removeChild(textarea);
+      this.setToast(true,false,toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       return;
     }
 
@@ -275,7 +278,7 @@ prettifyEpoch(epoch) {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        this.setToast(true,false,'Text copied to clipboard successfully!');
+        this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
@@ -1041,16 +1044,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
-  allRoutes.forEach((item)=>{
-    if(!(item.path.includes(":") || !(item.path.includes("/dashboard")))){
-      combinedArr.push({content: item.content, url: item.path})
-    }
-  })
 
   let initialStr = "/dashboard/observe/inventory/"
 
   allCollections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id})
+    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
 
   return combinedArr
@@ -1228,6 +1226,19 @@ handleKeyPress (event, funcToCall) {
       })
     })
     return filters;
+  },
+  convertQueryParamsToUrl(queryParams) {
+    let url = ""
+    let first = true;
+    let joiner = "?"
+    Object.keys(queryParams).forEach((key) => {
+      if (!first) {
+        joiner = "&"
+      }
+      url = url + joiner + key + '=' + encodeURI(queryParams[key])
+      first = false
+    })
+    return url;
   }
 }
 

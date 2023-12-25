@@ -129,11 +129,7 @@ public class TestConfigYamlParser {
 
         Map<String, Object> config = mapper.readValue(content, new TypeReference<Map<String, Object>>() {});
 
-        Object object = config.get(field);
-        if (object == null) {
-            return null;
-        }
-        return object;
+        return config.get(field);
     }
 
 }

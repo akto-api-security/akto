@@ -62,10 +62,20 @@
                     window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
                     window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
                     window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
+                    window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
+                    window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
+                    window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
 
+                    window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
+                    window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
+                    window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'
+                    }
+
+                    if(!window.STIGG_CLIENT_KEY){
+                        window.STIGG_CLIENT_KEY='invalid-key'
                     }
 
                     // Enabling the debug mode flag is useful during implementation,
@@ -91,7 +101,10 @@
                         window.intercomSettings = {
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
-                            created_at: new Date().getTime()
+                            created_at: new Date().getTime(),
+                            show_overage: window.STIGG_IS_OVERAGE==='true',
+                            data_ingestion_paused: window.USAGE_PAUSED?.dataIngestion === 'true',
+                            test_runs_paused: window.USAGE_PAUSED?.testRuns === 'true'
                         };
                     }
    // mixpanel.track('Login');

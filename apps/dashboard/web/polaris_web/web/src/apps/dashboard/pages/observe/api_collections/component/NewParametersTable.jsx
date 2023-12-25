@@ -148,7 +148,7 @@ function NewParametersTable(props) {
             case "apiCollectionId": 
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
             default:
-                return value;
+                return func.convertToDisambiguateLabelObj(value,null, 2);
         }
     }
 

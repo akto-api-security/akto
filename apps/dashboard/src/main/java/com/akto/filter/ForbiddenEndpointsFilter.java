@@ -1,7 +1,7 @@
 package com.akto.filter;
 
 import com.akto.listener.InitializerListener;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import io.github.bucket4j.Bucket;
 
 import javax.servlet.*;

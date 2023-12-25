@@ -3,17 +3,25 @@ package com.akto.action.observe;
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBObject;
+import org.json.JSONArray;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static com.akto.listener.RuntimeListener.convertStreamToString;
+import static org.junit.Assert.*;
 
 public class TestInventoryAction extends MongoBasedTest {
 
@@ -62,5 +70,30 @@ public class TestInventoryAction extends MongoBasedTest {
         assertEquals(2, basicDBObject.size());
         assertNotNull(basicDBObject.get("url"));
         assertNotNull(basicDBObject.get("method"));
+    }
+
+    @Test
+    public void testFetchRecentEndpoints() throws Exception {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
+        HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+        info.setHttpCallParser(callParser);
+        info.setPolicy(new AktoPolicyNew(false));
+        int accountId = Context.accountId.get();
+        RuntimeListener.accountHTTPParserMap.put(accountId, info);
+
+
+        String data = convertStreamToString(InitializerListener.class.getResourceAsStream("/SampleApiData.json"));
+        int endpointCount = new JSONArray(data).length();
+
+        assertTrue(endpointCount > 0);
+
+        RuntimeListener.addSampleData();
+
+        InventoryAction inventoryAction = new InventoryAction();
+        List<BasicDBObject> basicDBObjects = inventoryAction.fetchRecentEndpoints(0, Context.now());
+        assertEquals(endpointCount, basicDBObjects.size());
     }
 }

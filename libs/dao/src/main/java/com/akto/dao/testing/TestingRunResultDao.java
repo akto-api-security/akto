@@ -1,6 +1,7 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRunResult;
@@ -87,6 +88,10 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
         createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name("testRunResultSummaryId_-1__id_-1"));
 
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
     }
 
 }
