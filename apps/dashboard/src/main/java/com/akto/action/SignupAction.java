@@ -1,12 +1,16 @@
 package com.akto.action;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
+import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
@@ -525,9 +529,25 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             if (user == null) {
 
-                if (accountId == 0 || invitationToAccount == 0) {
+                if (accountId == 0) {
                     accountId = AccountAction.createAccountRecord("My account");
+
+                    // Create organization for new user
+                    if (DashboardMode.isSaasDeployment()) {
+                        String organizationUUID = UUID.randomUUID().toString();
+
+                        Set<Integer> organizationAccountsSet = new HashSet<Integer>();
+                        organizationAccountsSet.add(accountId);
+
+                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
+                        OrganizationsDao.instance.insertOne(organization);
+                        System.out.println(String.format("Created organization %s for new user %s", organizationUUID, userEmail));
+                        
+                        Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
+                        System.out.println(String.format("Organization %s for new user %s - Akto sync status - %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
+                    }
                 }
+
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
 
             } else if (StringUtils.isEmpty(code)) {

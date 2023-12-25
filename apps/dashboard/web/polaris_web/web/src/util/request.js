@@ -14,7 +14,8 @@ const err = async (error) => {
   const { status, data } = error.response
   const { errors } = data
   const { actionErrors } = data
-  let message = "OOPS! Something went wrong"
+  const standardMessage = "OOPS! Something went wrong"
+  let message = standardMessage
   if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
     message = actionErrors[0]
   }
@@ -39,6 +40,17 @@ const err = async (error) => {
       func.setToast(true, true, "Too many requests!! Please try after 1 hour");
       break
     case 403:
+
+      if (message.localeCompare(standardMessage) != 0) {
+        func.setToast(true, true, message);
+        if (window?.mixpanel?.track && error?.config?.url) {
+          window.mixpanel.track("UNAUTHORIZED_API_BLOCKED", {
+            "api": error.config.url
+          })
+        }
+        break;
+      }
+
       const originalRequest = error.config;
       if (originalRequest._retry) {
         // if done multiple times, then redirect to login.

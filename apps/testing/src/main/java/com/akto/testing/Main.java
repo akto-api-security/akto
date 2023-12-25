@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
@@ -182,6 +183,8 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
+        Map<Integer, Integer> logSentMap = new HashMap<>();
+
         while (true) {
             AccountTask.instance.executeTask(account -> {
 
@@ -198,6 +201,25 @@ public class Main {
                 }
 
                 if (testingRun == null) {
+                    return;
+                }
+
+                int accountId = account.getId();
+                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
+                    int lastSent = logSentMap.getOrDefault(accountId, 0);
+                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                        logSentMap.put(accountId, start);
+                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                + " . Failing test run : " + start, LogDb.TESTING);
+                    }
+                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq(Constants.ID, testingRun.getId()),
+                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
+                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq(Constants.ID, summaryId),
+                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
                     return;
                 }
 
