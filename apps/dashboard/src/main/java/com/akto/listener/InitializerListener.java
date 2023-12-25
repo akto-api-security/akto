@@ -1655,7 +1655,7 @@ public class InitializerListener implements ServletContextListener {
                         String entryName = entry.getName();
 
                         if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
-                            loggerMaker.errorAndAddToDb(
+                            loggerMaker.infoAndAddToDb(
                                     String.format("%s not a YAML template file, skipping", entryName),
                                     LogDb.DASHBOARD);
                             continue;
