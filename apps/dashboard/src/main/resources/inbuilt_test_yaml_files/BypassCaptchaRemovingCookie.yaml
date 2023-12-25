@@ -19,6 +19,9 @@ info:
   references:
   cwe:
     - CWE-307
+  cve:
+    - CVE-2023-0085
+    - CVE-2021-37417
 
 api_selection_filters:
   response_code:

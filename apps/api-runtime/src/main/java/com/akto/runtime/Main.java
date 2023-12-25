@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
@@ -103,11 +104,6 @@ public class Main {
     }
 
 
-    public static void createIndices() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
-        SampleDataDao.instance.createIndicesIfAbsent();
-    }
 
     public static void insertRuntimeFilters() {
         RuntimeFilterDao.instance.initialiseFilters();
@@ -170,6 +166,11 @@ public class Main {
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
+            kafkaBrokerUrl = "127.0.0.1:29092";
+        }
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
@@ -240,6 +241,8 @@ public class Main {
 
         long lastSyncOffset = 0;
 
+        Map<Integer, Integer> logSentMap = new HashMap<>();
+
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
@@ -250,7 +253,7 @@ public class Main {
                 } catch (Exception e) {
                     throw e;
                 }
-
+                
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -307,6 +310,17 @@ public class Main {
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
                         loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                        continue;
+                    }
+
+                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
+                        int now = Context.now();
+                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
+                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                            logSentMap.put(accountIdInt, now);
+                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
+                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
+                        }
                         continue;
                     }
 
@@ -428,26 +442,32 @@ public class Main {
             }
 
             Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
-            if (apiCollectioNameMapper != null && !apiCollectioNameMapper.isEmpty()) {
-                for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
-                    Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
-                    for(String headerName : apiCollectioNameMapper.keySet()) {
-                        List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get(headerName);
-                        if (reqHeaderValues != null && !reqHeaderValues.isEmpty()) {
-                            Map<Pattern, String> apiCollectioNameForGivenHeader = apiCollectioNameMapper.get(headerName);            
-                            for (Map.Entry<Pattern,String> apiCollectioNameOrigXNew: apiCollectioNameForGivenHeader.entrySet()) {
-                                for (int i = 0; i < reqHeaderValues.size(); i++) {
-                                    String reqHeaderValue = reqHeaderValues.get(i);
-                                    Pattern regex = apiCollectioNameOrigXNew.getKey();
-                                    String newValue = apiCollectioNameOrigXNew.getValue();
+            changeTargetCollection(apiCollectioNameMapper, accWiseResponse);
+        }
 
-                                    try {
-                                        if (regex.matcher(reqHeaderValue).matches()) {
-                                            reqHeaders.put("host", Collections.singletonList(newValue));
-                                        }
-                                    } catch (Exception e) {
-                                        // eat it
+        return accWiseResponse;
+    }
+
+    public static void changeTargetCollection(Map<String, Map<Pattern, String>> apiCollectioNameMapper, List<HttpResponseParams> accWiseResponse) {
+        if (apiCollectioNameMapper != null && !apiCollectioNameMapper.isEmpty()) {
+            for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
+                Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
+                for(String headerName : apiCollectioNameMapper.keySet()) {
+                    List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get(headerName);
+                    if (reqHeaderValues != null && !reqHeaderValues.isEmpty()) {
+                        Map<Pattern, String> apiCollectioNameForGivenHeader = apiCollectioNameMapper.get(headerName);
+                        for (Map.Entry<Pattern,String> apiCollectioNameOrigXNew: apiCollectioNameForGivenHeader.entrySet()) {
+                            for (int i = 0; i < reqHeaderValues.size(); i++) {
+                                String reqHeaderValue = reqHeaderValues.get(i);
+                                Pattern regex = apiCollectioNameOrigXNew.getKey();
+                                String newValue = apiCollectioNameOrigXNew.getValue();
+
+                                try {
+                                    if (regex.matcher(reqHeaderValue).matches()) {
+                                        reqHeaders.put("host", Collections.singletonList(newValue));
                                     }
+                                } catch (Exception e) {
+                                    // eat it
                                 }
                             }
                         }
@@ -455,8 +475,6 @@ public class Main {
                 }
             }
         }
-
-        return accWiseResponse;
     }
 
     public static void initializeRuntime(){
@@ -468,7 +486,7 @@ public class Main {
 
     public static void initializeRuntimeHelper() {
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
-        createIndices();
+        DaoInit.createIndices();
         insertRuntimeFilters();
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);

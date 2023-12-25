@@ -20,7 +20,10 @@ info:
     - "https://owasp.org/www-community/attacks/Content_Spoofing"
     - "https://infosecwriteups.com/text-based-injection-content-spoofing-96e9eb1615d8"
   cwe:
-    - CWE-345
+    - CWE-74
+  cve:
+    - CVE-2019-1680
+    - CVE-2022-42889
 
 api_selection_filters:
   url:

@@ -3,23 +3,32 @@ package com.akto.action.observe;
 import com.akto.MongoBasedTest;
 import com.akto.dao.*;
 import com.akto.dto.AccountSettings;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.runtime.APICatalogSync;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
 import org.junit.Test;
 
 import java.util.*;
+import org.json.JSONArray;
+import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static com.akto.listener.RuntimeListener.convertStreamToString;
+import static org.junit.Assert.*;
 
 public class TestInventoryAction extends MongoBasedTest {
 
@@ -81,25 +90,34 @@ public class TestInventoryAction extends MongoBasedTest {
 
         APICatalogSync.mergeAsyncOutside = true;
 
-        ApiCollection.useHost = true;
+        ApiCollection.useHost = false;
 
         // populate db before bug fix
 
         // common headers: {"host" : "akto.io"} and {"resHeader" : "1"}
 
         // {"user": "akto"}
-        String p1 = "{ \"path\": \"/api/books/hi\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"user\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"user_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p1 = "{ \"path\": \"/api/books/hi\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"user\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"user_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
 
         // {"name": "akto"}
-        String p2 = "{ \"path\": \"/api/books/hello\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"name\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"name_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p2 = "{ \"path\": \"/api/books/hello\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"name\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"name_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
 
         // {"company": "akto"}
-        String p3 = "{ \"path\": \"/api/books/650d602277c31aee121e1d9b/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
-        String p4 = "{ \"path\": \"/api/books/64c8f7361d5c23180a4c855c/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"MIRRORING\" }";
+        String p3 = "{ \"path\": \"/api/books/650d602277c31aee121e1d9b/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
+        String p4 = "{ \"path\": \"/api/books/64c8f7361d5c23180a4c855c/\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"{\\\"company\\\": \\\"akto\\\"}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"company_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
 
-        // hashcode of akto.io is -932654193
-        int apiCollectionId = -932654193;
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(apiCollectionId, "akto.io", 0, new HashSet<>(), "akto.io", -932654193));
+        // target collection changed to prod.akto.io from akto.io
+        AccountSettings accountSettings = new AccountSettings();
+        Map<String, CollectionReplaceDetails> apiCollectionNameMapper= new HashMap<>();
+        String regex = "akto.*";
+        String newName = "prod.akto.io";
+        apiCollectionNameMapper.put(regex.hashCode()+"", new CollectionReplaceDetails(regex, newName, "host"));
+        accountSettings.setApiCollectionNameMapper(apiCollectionNameMapper);
+        AccountSettingsDao.instance.insertOne(accountSettings);
+
+        // hashcode of prod.akto.io is -184401928
+        int apiCollectionId = -184401928;
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(apiCollectionId, "akto.io", 0, new HashSet<>(), "akto.io", apiCollectionId));
         String url = "api/books/STRING";
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         singleTypeInfos.add(new SingleTypeInfo(new SingleTypeInfo.ParamId(url, "POST", -1, true, "host", SingleTypeInfo.GENERIC, apiCollectionId, false), new HashSet<>(), new HashSet<>(), 0, 1650287116, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, Long.MAX_VALUE, Long.MIN_VALUE)); // req header
@@ -163,4 +181,30 @@ public class TestInventoryAction extends MongoBasedTest {
         assertNotNull(apiInfoHello);
 
     }
+
+    @Test
+    public void testFetchRecentEndpoints() throws Exception {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
+        HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+        info.setHttpCallParser(callParser);
+        info.setPolicy(new AktoPolicyNew(false));
+        int accountId = Context.accountId.get();
+        RuntimeListener.accountHTTPParserMap.put(accountId, info);
+
+
+        String data = convertStreamToString(InitializerListener.class.getResourceAsStream("/SampleApiData.json"));
+        int endpointCount = new JSONArray(data).length();
+
+        assertTrue(endpointCount > 0);
+
+        RuntimeListener.addSampleData();
+
+        InventoryAction inventoryAction = new InventoryAction();
+        List<BasicDBObject> basicDBObjects = inventoryAction.fetchRecentEndpoints(0, Context.now());
+        assertEquals(endpointCount, basicDBObjects.size());
+    }
+    
 }

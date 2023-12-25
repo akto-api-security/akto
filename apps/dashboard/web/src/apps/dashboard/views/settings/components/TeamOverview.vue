@@ -166,6 +166,14 @@
                         func: item => this.removeUser(item),
                         success: (resp, item) => this.removedSuccess(resp, item),
                         failure: (err, item) => this.removedFailure(err, item)
+                    },
+                    {
+                        isValid: item => item.login != window.USER_NAME && ( item.role.toUpperCase() === "MEMBER" ) ,
+                        icon: item => '$fas_bolt',
+                        text: item => 'Make admin',
+                        func: item => this.makeAdmin(item),
+                        success: (resp, item) => func.showSuccessSnackBar(`${item.login} made admin successfully!`),
+                        failure: (err, item) => func.showErrorSnackBar(`Unable to make ${item.login} admin`)
                     }
                 ],
                 isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
@@ -233,6 +241,9 @@
             },
             removeUser (user) {
                 return this.$store.dispatch('team/removeUser', user)
+            },
+            makeAdmin (user) {
+                return this.$store.dispatch('team/makeAdmin', user)
             },
             removedSuccess (resp, user) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {

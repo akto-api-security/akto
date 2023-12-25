@@ -27,7 +27,9 @@ import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.utils.RedactSampleData;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -36,7 +38,9 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.utils.RedactSampleData;
 
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,25 +49,58 @@ import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
 
+import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
+
 public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+
+    public final String _HOST = "host";
 
     public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
         List<TestResult> result = new ArrayList<>();
         
+        TestResult invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.INVALID_EXECUTION_BLOCK.getMessage()), 0, false, TestResult.Confidence.HIGH, null);
+
         if (node.getChildNodes().size() < 2) {
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
+            result.add(invalidExecutionResult);
             return result;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
         RawApi sampleRawApi = rawApi.copy();
         ExecutorSingleRequest singleReq = null;
-        if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
-            return null;
+        if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().isEmpty()) {
+            result.add(invalidExecutionResult);
+            return result;
         }
+        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            if (role != null) {
+                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                    if (role.getDefaultAuthMechanism() != null) {
+                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        overrideAuth(sampleRawApi, role.getDefaultAuthMechanism());
+                    } else {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                }
+            } else {
+                String reason = "Test role has been deleted";
+                loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+            }
+        }
+
+        boolean requestSent = false;
+
+        List<String> error_messages = new ArrayList<>();
 
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
@@ -74,6 +111,7 @@ public class Executor {
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
             if (testRawApis == null) {
+                error_messages.add(singleReq.getErrMsg());
                 continue;
             }
             boolean vulnerable = false;
@@ -82,8 +120,34 @@ public class Executor {
                     break;
                 }
                 try {
+
+                    // change host header in case of override URL ( if not already changed by test template )
+                    try {
+                        List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+                        List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+
+                        if (originalHostHeaders.get(0) != null
+                            && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
+                            && testingRunConfig != null
+                            && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+
+                            String url = ApiExecutor.prepareUrl(testReq.getRequest(), testingRunConfig);
+                            URI uri = new URI(url);
+                            String host = uri.getHost();
+                            if (uri.getPort() != -1) {
+                                host += ":" + uri.getPort();
+                            }
+                            testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
+                        }
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to update host header for overridden test URL",
+                                LogDb.TESTING);
+                    }
+                        
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
+                    requestSent = true;
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                     TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                     if (res != null) {
@@ -91,12 +155,42 @@ public class Executor {
                     }
                     vulnerable = res.getVulnerable();
                 } catch(Exception e) {
-                    loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
             }
         }
 
+        if(result.isEmpty()){
+            if(requestSent){
+                error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
+            } else {
+                error_messages.add(TestError.NO_API_REQUEST.getMessage());
+            }
+            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
+        }
+
         return result;
+    }
+
+    private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+        if (authParams == null || authParams.isEmpty()) {
+            return;
+        }
+        AuthParam authParam = authParams.get(0);
+        String authHeader = authParam.getKey();
+        String authVal = authParam.getValue();
+        Map<String, List<String>> headersMap= rawApi.fetchReqHeaders();
+        for (Map.Entry<String, List<String>> headerKeyVal : headersMap.entrySet()) {
+            if (headerKeyVal.getKey().equalsIgnoreCase(authHeader)) {
+                headerKeyVal.setValue(Collections.singletonList(authVal));
+                rawApi.modifyReqHeaders(headersMap);
+                loggerMaker.infoAndAddToDb("overriding auth header " + authHeader, LogDb.TESTING);
+                return;
+            }
+        }
+        loggerMaker.infoAndAddToDb("auth header not found " + authHeader, LogDb.TESTING);
     }
 
     public TestResult validate(ExecutionResult attempt, RawApi rawApi, Map<String, Object> varMap, String logId, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {

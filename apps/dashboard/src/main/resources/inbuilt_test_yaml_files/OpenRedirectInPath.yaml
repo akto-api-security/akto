@@ -23,6 +23,8 @@ info:
   cwe:
     - CWE-601
     - CWE-610
+  cve:
+    - CVE-2021-28861
 
 api_selection_filters:
   response_code:

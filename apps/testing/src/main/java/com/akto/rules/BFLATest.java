@@ -17,6 +17,7 @@ import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -36,6 +37,15 @@ public class BFLATest {
 
         int statusCode = testResponse.getStatusCode();
         String originalMessage = rawApi.getOriginalMessage();
+
+        loggerMaker.infoAndAddToDb("Request: " + testRequest, LogDb.TESTING);
+        String testResponseTrimmed = testResponse.getJsonResponseBody();
+        if (testResponseTrimmed == null) {
+            testResponseTrimmed = "";
+        } else {
+            testResponseTrimmed = testResponseTrimmed.substring(0, Math.min(500, testResponseTrimmed.length()));
+        }
+        loggerMaker.infoAndAddToDb("Response: " + testResponse.getStatusCode() + " "+ testResponse.getHeaders() + " " + testResponseTrimmed, LogDb.TESTING);
 
         return new TestPlugin.ApiExecutionDetails(statusCode, 0, testResponse, originalHttpResponse, originalMessage);
     }
@@ -92,7 +102,7 @@ public class BFLATest {
         Bson update = Updates.addEachToSet(AccessMatrixUrlToRole.ROLES, ret);
         UpdateOptions opts = new UpdateOptions().upsert(true);
         AccessMatrixUrlToRolesDao.instance.getMCollection().updateOne(q, update, opts);
-
+        loggerMaker.infoAndAddToDb("updated for " + apiInfoKey.getUrl() + " role: " + StringUtils.join(ret, ","), LogDb.TESTING);
         return ret;        
     }
 }

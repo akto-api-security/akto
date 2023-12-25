@@ -1,12 +1,32 @@
-import { Box, Card, Divider, LegacyCard, Page, Text } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Page, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
+import Dropdown from '../../../components/layouts/Dropdown'
+import settingRequests from '../api'
 
 function About() {
 
+    const trafficAlertDurations= [
+        {label : "1 hour", value: 60*60*1},
+        {label : "4 hours", value: 60*60*4},
+        {label : "12 hours", value: 60*60*12},
+        {label : "1 Day", value: 60*60*24},
+        {label : "4 Days", value: 60*60*24*4},
+    ]
+
     const [objArr, setObjectArr] = useState([])
+    const [setupType,setSetuptype] = useState('')
+    const [redactPayload, setRedactPayload] = useState(false)
+    const [newMerging, setNewMerging] = useState(false)
+    const [trafficThreshold, setTrafficThreshold] = useState(trafficAlertDurations[0].value)
+    const setupOptions = settingFunctions.getSetupOptions()
+
     async function fetchDetails(){
-        const arr = await settingFunctions.fetchAdminInfo()
+        const {arr, resp} = await settingFunctions.fetchAdminInfo()
+        setSetuptype(resp.setupType)
+        setRedactPayload(resp.redactPayload)
+        setNewMerging(resp.urlRegexMatchingEnabled)
+        setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
     }
 
@@ -24,13 +44,54 @@ function About() {
     )
 
     const infoComponent = (
-        objArr.map((item,index)=>(
-            <Box key={item.title} >
-                <Text fontWeight='semi-bold' color='subdued'>{item.title}</Text>
-                <Text fontWeight='bold'>{item.text}</Text>
-            </Box>
-        ))
+        <VerticalStack gap={5}>
+            {objArr.map((item)=>(
+                <Box key={item.title} >
+                    <VerticalStack gap={1}>
+                        <Text fontWeight='semi-bold' color='subdued'>{item.title}</Text>
+                        <Text fontWeight='bold'>{item.text}</Text>
+                    </VerticalStack>
+                </Box>
+            ))}
+        </VerticalStack>
     )
+
+    const handleSelect = async(selected) => {
+        setSetuptype(selected);
+        await settingRequests.updateSetupType(selected)
+    }
+
+    const handleRedactPayload = async(val) => {
+        setRedactPayload(val);
+        await settingRequests.toggleRedactFeature(val);
+    }
+
+    const handleNewMerging = async(val) => {
+        setNewMerging(val);
+        await settingRequests.toggleNewMergingEnabled(val);
+    }
+
+    const handleSelectTraffic = async(val) => {
+        setTrafficThreshold(val) ;
+        await settingRequests.updateTrafficAlertThresholdSeconds(val);
+    }
+
+    function ToggleComponent({text,onToggle,initial}){
+        return(
+            <VerticalStack gap={1}>
+                <Text color="subdued">{text}</Text>
+                <ButtonGroup segmented>
+                    <Button size="slim" onClick={onToggle} pressed={initial === true}>
+                        True
+                    </Button>
+                    <Button size="slim" onClick={onToggle} pressed={initial === false}>
+                        False
+                    </Button>
+                </ButtonGroup>
+            </VerticalStack>
+        )
+    }
+
   return (
     <Page
         title="About"
@@ -38,11 +99,35 @@ function About() {
     >
         <LegacyCard title={titleComponent}>
             <Divider />
-            <LegacyCard.Section  >
-                {infoComponent}
+            <LegacyCard.Section>
+                <VerticalStack gap={5}>
+                    {infoComponent}
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">Setup type</Text>
+                        <Box width='13%'>
+                            <Dropdown 
+                                selected={handleSelect}
+                                menuItems={setupOptions}
+                                initial={setupType}
+                            />
+                        </Box>
+                    </VerticalStack>
+                    <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
+                    <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">Traffic alert threshold</Text>
+                        <Box width='15%'>
+                            <Dropdown 
+                                selected={handleSelectTraffic}
+                                menuItems={trafficAlertDurations}
+                                initial={trafficThreshold}
+                            />
+                        </Box>
+                    </VerticalStack>
+                </VerticalStack>
             </LegacyCard.Section>
             <LegacyCard.Section subdued>
-                View our <a href='#'>terms of service</a> and <a href='#'>privacy policy  </a>
+                View our <a href='https://www.akto.io/terms-and-policies' target="_blank">terms of service</a> and <a href='https://www.akto.io/terms/privacy' target="_blank" >privacy policy  </a>
             </LegacyCard.Section>
         </LegacyCard>
     </Page>

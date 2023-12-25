@@ -23,7 +23,10 @@ info:
     - "https://www.onwebsecurity.com/security/unsafe-http-methods.html"
     - "https://hackerone.com/reports/109054"
   cwe:
-    - CWE-274
+    - CWE-16
+  cve:
+    - CVE-2022-38115
+    - CVE-2018-11039
 
 api_selection_filters:
   response_code:

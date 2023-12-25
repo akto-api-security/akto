@@ -70,3 +70,13 @@
 .update-connections .Polaris-Page--divider{
     padding-top: 20px !important;
 }
+
+.overflow-text{
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+    white-space: nowrap;
+}
+
+.right-card .Polaris-Scrollable{
+    overflow-x: hidden;
+}

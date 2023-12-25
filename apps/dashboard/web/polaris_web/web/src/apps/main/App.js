@@ -21,6 +21,7 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
+import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
@@ -39,6 +40,8 @@ import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
+import Billing from "../dashboard/pages/settings/billing/Billing";
+import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
@@ -50,6 +53,14 @@ import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
+import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
+import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+
+// if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
+import { useStiggContext } from '@stigg/react-sdk';
+
+// if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
 const router = createBrowserRouter([
   {
@@ -169,6 +180,10 @@ const router = createBrowserRouter([
             element: <Postman />,
           },
           {
+            path: "integrations/jira",
+            element: <Jira />,
+          },
+          {
             path: "integrations/akto_apis",
             element: <ApiTokens />,
           },
@@ -179,6 +194,14 @@ const router = createBrowserRouter([
           {
             path: "integrations/github_sso",
             element: <GithubSso />
+          },
+          {
+            path: "integrations/okta_sso",
+            element: <OktaIntegration />
+          },
+          {
+            path: "integrations/azure_sso",
+            element: <AzureSso />
           },
           {
             path: "integrations/slack",
@@ -215,6 +238,14 @@ const router = createBrowserRouter([
           {
             path: "tags/details",
             element: <TagDetails/>
+          },
+          {
+            path: "billing",
+            element: <Billing/>
+          },
+          {
+            path: "self-hosted",
+            element: <SelfHosted/>
           }
         ]
       },
@@ -234,7 +265,8 @@ const router = createBrowserRouter([
         path: "issues/summary/:issuesFilter",
         element: <ExportHtml />
       }
-    ]
+    ],
+    errorElement: <ErrorComponent/>
   },
 {
   path: "/login",
@@ -250,6 +282,12 @@ function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
   setAllRoutes(searchData)
+  const { stigg } = useStiggContext();
+  useEffect(() => {
+    stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
+    
+  })
+
 
   useEffect(() => {
     const script = document.createElement('script')

@@ -52,6 +52,7 @@
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
+                    window.CLOUD_TYPE = '${requestScope.cloudType}';
                     window.IS_SAAS = '${requestScope.isSaas}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
@@ -59,12 +60,25 @@
                     window.ACCOUNT_NAME = '${requestScope.accountName}';
                     window.RELEASE_VERSION = '${requestScope.releaseVersion}';
                     window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
-                    window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
-                    window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
+                    window.AKTO_UI_MODE = '${requestScope.aktoUIMode}' ;
+                    window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}');
+                    window.OKTA_AUTH_URL = atob('${requestScope.oktaAuthUrl}');
+                    window.AZURE_REQUEST_URL = atob('${requestScope.azureRequestUrl}');
+                    window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
+                    window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
+                    window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
+                    window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
 
+                    window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
+                    window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
+                    window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'
+                    }
+
+                    if(!window.STIGG_CLIENT_KEY){
+                        window.STIGG_CLIENT_KEY='invalid-key'
                     }
 
                     // Enabling the debug mode flag is useful during implementation,
@@ -92,7 +106,10 @@
                             app_id: "xjvl0z2h",
                             email: window.USER_NAME,
                             user_hash: '${userHash}',
-                            created_at: new Date().getTime()
+                            created_at: new Date().getTime(),
+                            show_overage: window.STIGG_IS_OVERAGE==='true',
+                            data_ingestion_paused: window.USAGE_PAUSED?.dataIngestion === 'true',
+                            test_runs_paused: window.USAGE_PAUSED?.testRuns === 'true'
                         };
                     }
    // mixpanel.track('Login');

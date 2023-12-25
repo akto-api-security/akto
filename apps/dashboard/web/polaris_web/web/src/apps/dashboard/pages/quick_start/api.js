@@ -67,6 +67,31 @@ const api = {
             method: 'post',
             data: {deploymentMethod}
         })
+    },
+    fetchBurpPluginDownloadLink() {
+        return request({
+            url: '/api/fetchBurpPluginDownloadLink',
+            method: 'post',
+            data: {},
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchBurpCredentials() {
+        return request({
+            url: '/api/fetchBurpCredentials',
+            method: 'post',
+            data: {},
+        }).then((resp) => {
+            return resp
+        })
+    },
+    importDataFromOpenApiSpec(formData) {
+        return request({
+            url: '/api/importDataFromOpenApiSpec',
+            method: 'post',
+            data: formData,
+        })
     }
 }
 

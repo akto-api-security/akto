@@ -32,17 +32,12 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.InsertOneResult;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -68,6 +63,8 @@ public class StartTestAction extends UserAction {
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+
+    private String testRoleId;
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -138,7 +135,8 @@ public class StartTestAction extends UserAction {
                 return null;
         }
         if (this.selectedTests != null) {
-            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId(), this.overriddenTestAppUrl);
+            int id = UUID.randomUUID().hashCode() & 0xfffffff;
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -164,17 +162,17 @@ public class StartTestAction extends UserAction {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
                 localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("ERROR in converting testingRunHexId to objectId: " + this.testingRunHexId + " " + e.toString(), LogDb.DASHBOARD);
             }
         }
         if(localTestingRun==null){
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
-                if (triggeredBy.length() > 0) {
+                if (triggeredBy!=null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Unable to create test run - " + e.toString(), LogDb.DASHBOARD);
             }
 
             if (localTestingRun == null) {
@@ -183,6 +181,7 @@ public class StartTestAction extends UserAction {
                 TestingRunDao.instance.insertOne(localTestingRun);
                 testingRunHexId = localTestingRun.getId().toHexString();
             }
+            this.testIdConfig = 0;
         } else {
             TestingRunDao.instance.updateOne(
                 Filters.eq(Constants.ID,localTestingRun.getId()),
@@ -190,6 +189,14 @@ public class StartTestAction extends UserAction {
                     Updates.set(TestingRun.STATE,TestingRun.State.SCHEDULED),
                     Updates.set(TestingRun.SCHEDULE_TIMESTAMP,scheduleTimestamp)
                 ));
+
+            if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
+                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
+                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
+                this.testIdConfig = testingRunConfig.getId();
+                TestingRunConfigDao.instance.insertOne(testingRunConfig);
+            }
+
         }
 
         Map<String, Object> session = getSession();
@@ -197,12 +204,15 @@ public class StartTestAction extends UserAction {
 
         if(utility!=null && ( Utility.CICD.toString().equals(utility) || Utility.EXTERNAL_API.toString().equals(utility))){
             TestingRunResultSummary summary = new TestingRunResultSummary(scheduleTimestamp, 0, new HashMap<>(),
-            0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0);
+            0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig);
             summary.setState(TestingRun.State.SCHEDULED);
             if(metadata!=null){
+                loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
                 summary.setMetadata(metadata);
             }
-            TestingRunResultSummariesDao.instance.insertOne(summary);
+            InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
+            this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
+
         }
         
         this.startTimestamp = 0;
@@ -384,6 +394,18 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchTestingRunResultSummary() {
+        this.testingRunResultSummaries = new ArrayList<>();
+        this.testingRunResultSummaries.add(TestingRunResultSummariesDao.instance.findOne("_id", new ObjectId(this.testingRunResultSummaryHexId)));
+
+        if (this.testingRunResultSummaries.size() == 0) {
+            addActionError("No test summaries found");
+            return ERROR.toUpperCase();
+        } else {
+            return SUCCESS.toUpperCase();
+        }
+    }
+
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
@@ -525,7 +547,7 @@ public class StartTestAction extends UserAction {
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 return SUCCESS.toUpperCase();
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("ERROR: Stop test failed - " + e.toString(), LogDb.DASHBOARD);
             }
         }
 
@@ -609,6 +631,10 @@ public class StartTestAction extends UserAction {
 
     public List<TestingRunResultSummary> getTestingRunResultSummaries() {
         return this.testingRunResultSummaries;
+    }
+
+    public String getTestingRunResultSummaryHexId() {
+        return this.testingRunResultSummaryHexId;
     }
 
     public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
@@ -812,5 +838,13 @@ public class StartTestAction extends UserAction {
         public boolean isCallFromAktoGpt(){
             return AKTO_GPT.equals(this);
         }
+    }
+
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }

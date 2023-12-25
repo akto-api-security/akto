@@ -349,7 +349,7 @@ export default {
             return "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + this.aktoDashboardRoleName  + "$createPolicy?step=edit";
         },
         fetchLBs() {
-            if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
+            if((window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy') || (window.CLOUD_TYPE && window.CLOUD_TYPE.toLowerCase() === 'gcp')){
                 this.loading = false;
                 this.isLocalDeploy = true;
             } else {

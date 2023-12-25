@@ -17,6 +17,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
 
 import com.akto.util.enums.GlobalEnums;
+import com.akto.utils.GithubSync;
 import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -88,10 +89,10 @@ public class TestInitializerListener extends MongoBasedTest {
         TestingRunIssuesDao.instance.getMCollection().drop();
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "url1", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), null);
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), null);
 
         TestingRunIssuesDao.instance.insertMany(Arrays.asList(testingRunIssues1, testingRunIssues2));
 
@@ -115,7 +116,10 @@ public class TestInitializerListener extends MongoBasedTest {
         long count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertFalse(count > 0);
 
-        InitializerListener.saveTestEditorYaml();
+        GithubSync githubSync = new GithubSync();
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+
+        InitializerListener.processTemplateFilesZip(repoZip);
 
         count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertTrue(count > 0);

@@ -2,7 +2,12 @@ Run dashboard using
 `mvn --projects :dashboard --also-make jetty:run` 
 
 <a href="https://www.akto.io/blog/akto-takes-center-stage-at-black-hat-2023-in-las-vegas" _target="blank">
-  <img src="https://img.shields.io/badge/Black_Hat_Arsenal-USA_2023-blue?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Black_Hat_Arsenal-USA_2023-blue?style=square"/>
+</a>  
+
+
+<a href="https://www.akto.io/blog/akto-presentation-at-defcon-2023-in-las-vegas" _target="blank">
+  <img src="https://img.shields.io/badge/Defcon-USA_2023-blue?style=square"/>
 </a>  
 
 <br/> 

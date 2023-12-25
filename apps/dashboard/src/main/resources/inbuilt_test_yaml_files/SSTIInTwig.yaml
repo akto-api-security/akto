@@ -20,6 +20,10 @@ info:
     - "https://www.cobalt.io/blog/a-pentesters-guide-to-server-side-template-injection-ssti"
   cwe:
     - CWE-1336
+    - CWE-94
+  cve:
+    - CVE-2018-13818
+    - CVE-2023-34448
 
 api_selection_filters:
   or:

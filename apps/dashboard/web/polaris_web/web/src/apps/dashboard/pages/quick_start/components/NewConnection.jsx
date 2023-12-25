@@ -106,7 +106,7 @@ function NewConnection() {
     const trafficScreenLabel = (
         <div className='connector-container'>
             <VerticalStack gap="4">
-                <DropdownSearch optionsList={dropdownList} value={connectors?.label} avatarIcon={connectors?.icon} setSelected={(item)=> setConnector(item)}/>
+                <DropdownSearch optionsList={dropdownList} value={connectors?.label} avatarIcon={connectors?.icon} setSelected={(item)=> setConnector(item)} dropdownSearchKey="value"/>
                 {connectors?.component}
             </VerticalStack>
         </div>

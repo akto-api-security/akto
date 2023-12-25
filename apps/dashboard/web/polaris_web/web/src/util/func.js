@@ -9,7 +9,9 @@ import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
+import PersistStore from '../apps/main/PersistStore';
 import { current } from 'immer';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -247,19 +249,20 @@ prettifyEpoch(epoch) {
       let a = testSubType.superCategory["severity"]["_name"]
       return a
     }
-  }
-  ,
-  copyToClipboard(text) {
+  },
+
+  copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.opacity = 0;
-      document.body.appendChild(textarea);
+      ref.current.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
+      ref.current.removeChild(textarea);
+      this.setToast(true,false,toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       return;
     }
 
@@ -267,7 +270,7 @@ prettifyEpoch(epoch) {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        this.setToast(true,false,'Text copied to clipboard successfully!');
+        this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
@@ -1008,16 +1011,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
-  allRoutes.forEach((item)=>{
-    if(!(item.path.includes(":") || !(item.path.includes("/dashboard")))){
-      combinedArr.push({content: item.content, url: item.path})
-    }
-  })
 
   let initialStr = "/dashboard/observe/inventory/"
 
   allCollections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id})
+    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
 
   return combinedArr
@@ -1067,6 +1065,20 @@ getSizeOfFile(bytes) {
     }
     return duration.trim();
   },
+  handleKeyPress (event, funcToCall) {
+    const enterKeyPressed = event.keyCode === 13;
+    if (enterKeyPressed) {
+      event.preventDefault();
+      funcToCall();
+    }
+  },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  }
 }
 
 export default func

@@ -1,11 +1,15 @@
 package com.akto.action;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.type.CollectionReplaceDetails;
+import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.runtime.Main;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -22,10 +26,12 @@ public class AdminSettingsAction extends UserAction {
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
 
+    private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        organization = OrganizationsDao.instance.findOne(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -272,5 +278,9 @@ public class AdminSettingsAction extends UserAction {
 
     public void setEnableTelemetry(Boolean enableTelemetry) {
         this.enableTelemetry = enableTelemetry;
+    }
+
+    public Organization getOrganization() {
+        return organization;
     }
 }

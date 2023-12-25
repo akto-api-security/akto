@@ -1,13 +1,25 @@
 package com.akto.action;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
+import com.akto.mixpanel.AktoMixpanel;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
+import com.akto.utils.DashboardMode;
 import com.akto.notifications.email.WelcomeEmail;
+import com.akto.utils.AzureLogin;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
+import com.akto.utils.OktaLogin;
+import com.akto.utils.sso.SsoUtils;
+import com.akto.utils.GithubLogin;
+import com.akto.utils.JWT;
+import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
@@ -15,6 +27,7 @@ import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -23,6 +36,9 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.onelogin.saml2.Auth;
+import com.onelogin.saml2.settings.Saml2Settings;
+import com.onelogin.saml2.settings.SettingsBuilder;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -34,6 +50,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -42,7 +60,10 @@ import org.json.JSONObject;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
@@ -60,6 +81,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SignupAction.class);
+
     public String getCode() {
         return code;
     }
@@ -156,7 +180,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     code = "";
-                    createUserAndRedirect(userEmail, userName, info, 0);
+                    createUserAndRedirect(userEmail, userName, info, 0, Config.ConfigType.SLACK.toString());
                 } else {
                     code = usersIdentityResponse.getError();
                 }
@@ -253,7 +277,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
-                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId());
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -266,7 +290,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
         }
-        createUserAndRedirect(email, name, auth0SignupInfo, 0);
+        createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString());
         code = "";
         System.out.println("Executed registerViaAuth0");
         return SUCCESS.toUpperCase();
@@ -317,7 +341,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             SignupInfo.GoogleSignupInfo signupInfo = new SignupInfo.GoogleSignupInfo(aktoGoogleConfig.getId(), accessToken, refreshToken, tokenResponse.getExpiresInSeconds());
             shouldLogin = "true";
-            createUserAndRedirect(userEmail, username, signupInfo, 0);
+            createUserAndRedirect(userEmail, username, signupInfo, 0, Config.ConfigType.GOOGLE.toString());
             code = "";
         } catch (IOException e) {
             code = "Please login again";
@@ -400,7 +424,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         try {
             shouldLogin = "true";
-            createUserAndRedirect(email, email, signupInfo, invitedToAccountId);
+            createUserAndRedirect(email, email, signupInfo, invitedToAccountId, "email");
         } catch (IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -432,7 +456,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userData.get("login").toString() + "@" + company;
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
             shouldLogin = "true";
-            createUserAndRedirect(username, username, ghSignupInfo, 1000000);
+            createUserAndRedirect(username, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
             code = "";
             System.out.println("Executed registerViaGithub");
 
@@ -442,6 +466,115 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
+    public String registerViaOkta() throws IOException{
+        OktaLogin oktaLoginInstance = OktaLogin.getInstance();
+        if(oktaLoginInstance == null){
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+
+        Config.OktaConfig oktaConfig = OktaLogin.getInstance().getOktaConfig();
+        if (oktaConfig == null) {
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+
+        String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+        String clientId = oktaConfig.getClientId();
+        String clientSecret = oktaConfig.getClientSecret();
+        String redirectUri = oktaConfig.getRedirectUri();
+
+        List<NameValuePair> params = new ArrayList<>();
+        params.add(new BasicNameValuePair("grant_type", "authorization_code"));
+        params.add(new BasicNameValuePair("code", this.code));
+        params.add(new BasicNameValuePair("client_id", clientId));
+        params.add(new BasicNameValuePair("client_secret", clientSecret));
+        params.add(new BasicNameValuePair("redirect_uri", redirectUri));
+
+        try {
+            Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
+            String accessToken = tokenData.get("access_token").toString();
+            Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
+            String email = userInfo.get("email").toString();
+            String username = userInfo.get("preferred_username").toString();
+
+            SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
+            
+            shouldLogin = "true";
+            createUserAndRedirect(email, username, oktaSignupInfo, 1000000, Config.ConfigType.OKTA.toString());
+            code = "";
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String sendRequestToAzure () throws IOException{
+        if(AzureLogin.getInstance() == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = AzureLogin.getSamlSettings();
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+        try {
+            Auth auth = new Auth(settings, servletRequest, servletResponse);
+            auth.login( AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while getting response of azure sso \n" + e.getMessage(), LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/login");
+        }
+
+        
+        return SUCCESS.toUpperCase();
+    }
+
+    public String registerViaAzure() throws Exception{
+        if(AzureLogin.getInstance() == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = AzureLogin.getSamlSettings();
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+
+        Auth auth;
+        try {
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest);
+            auth = new Auth(settings, wrappedRequest, servletResponse);
+            auth.processResponse();
+            if (!auth.isAuthenticated()) {
+                loggerMaker.errorAndAddToDb("Error reason: " + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+            String useremail = null;
+            String username = null;
+            List<String> errors = auth.getErrors();
+            if (!errors.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            } else {
+                Map<String, List<String>> attributes = auth.getAttributes();
+                if (attributes.isEmpty()) {
+                    return ERROR.toUpperCase();
+                }
+                String nameId = auth.getNameId();
+                useremail = nameId;
+                username = nameId;
+            }
+            shouldLogin = "true";
+            SignupInfo.AzureSignupInfo signUpInfo = new SignupInfo.AzureSignupInfo(username, useremail);
+            createUserAndRedirect(useremail, username, signUpInfo, 1000000, Config.ConfigType.AZURE.toString());
+        } catch (Exception e1) {
+            loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/login");
+        }
+
+        return SUCCESS.toUpperCase();
+    }
     public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
     public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
     public static final String INVALID_CHAR = "Invalid character";
@@ -516,7 +649,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 //    }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount) throws IOException {
+                                       int invitationToAccount, String method) throws IOException {
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
@@ -534,9 +667,25 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             if (user == null) {
 
-                if (accountId == 0 || invitationToAccount == 0) {
+                if (accountId == 0) {
                     accountId = AccountAction.createAccountRecord("My account");
+
+                    // Create organization for new user
+                    if (DashboardMode.isSaasDeployment()) {
+                        String organizationUUID = UUID.randomUUID().toString();
+
+                        Set<Integer> organizationAccountsSet = new HashSet<Integer>();
+                        organizationAccountsSet.add(accountId);
+
+                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
+                        OrganizationsDao.instance.insertOne(organization);
+                        System.out.println(String.format("Created organization %s for new user %s", organizationUUID, userEmail));
+                        
+                        Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
+                        System.out.println(String.format("Organization %s for new user %s - Akto sync status - %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
+                    }
                 }
+
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
 
             } else if (StringUtils.isEmpty(code)) {
@@ -555,6 +704,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletRequest.getSession().setAttribute("accountId", accountId);
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletResponse.sendRedirect("/dashboard/onboarding");
+
+            String dashboardMode = DashboardMode.getActualDashboardMode().toString();
+            String distinct_id = userEmail + "_" + dashboardMode;
+            JSONObject props = new JSONObject();
+            props.put("Email ID", userEmail);
+            props.put("Email Verified", false);
+            props.put("Source", "dashboard");
+            props.put("Dashboard Mode", dashboardMode);
+            props.put("Invited", invitationToAccount != 0);
+            props.put("method", method);
+            AktoMixpanel aktoMixpanel = new AktoMixpanel();
+            aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
         }
     }
 

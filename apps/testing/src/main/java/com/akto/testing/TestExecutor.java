@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
@@ -17,6 +18,7 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
@@ -28,13 +30,17 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -107,7 +113,7 @@ public class TestExecutor {
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
-        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
+        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -120,7 +126,7 @@ public class TestExecutor {
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
@@ -162,7 +168,7 @@ public class TestExecutor {
 
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
-        List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
+        List<Future<Void>> futureTestingRunResults = new ArrayList<>();
         Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
@@ -197,7 +203,7 @@ public class TestExecutor {
                 loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
             }
             try {
-                 Future<List<TestingRunResult>> future = threadPool.submit(
+                 Future<Void> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
@@ -222,51 +228,62 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
 
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
-        for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
-            if (!future.isDone()) continue;
-            try {
-                if (!future.get().isEmpty()) {
-                    testingRunResults.addAll(future.get());
-                }
-            } catch (InterruptedException | ExecutionException e) {
-                loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
-            }
-        }
+    }
 
-        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
+    public static void updateTestSummary(ObjectId summaryId){
 
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
-        );
+        long testingRunResultsCount = TestingRunResultDao.instance
+                .count(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
 
-        loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
+        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(Constants.ID, summaryId),
+                Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResultsCount));
+
+        loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put("HIGH", 0);
-        totalCountIssues.put("MEDIUM", 0);
-        totalCountIssues.put("LOW", 0);
+        totalCountIssues.put(Severity.HIGH.toString(), 0);
+        totalCountIssues.put(Severity.MEDIUM.toString(), 0);
+        totalCountIssues.put(Severity.LOW.toString(), 0);
 
-        for (TestingRunResult testingRunResult: testingRunResults) {
-            if (testingRunResult.isVulnerable()) {
+        int skip = 0;
+        int limit = 1000;
+        boolean fetchMore = false;
+        do {
+            fetchMore = false;
+            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance
+                    .fetchLatestTestingRunResult(
+                            Filters.and(
+                                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
+                                    Filters.eq(TestingRunResult.VULNERABLE, true)),
+                            limit,
+                            skip,
+                            Projections.include("testResults.confidence"));
+
+            loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
+                    LogDb.TESTING);
+
+            for (TestingRunResult testingRunResult : testingRunResults) {
                 String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
                 int initialCount = totalCountIssues.get(severity);
                 totalCountIssues.put(severity, initialCount + 1);
             }
-        }
 
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.combine(
-                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
-            )
-        );
+            if (testingRunResults.size() == limit) {
+                skip += limit;
+                fetchMore = true;
+            }
+
+        } while (fetchMore);
+
+        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(Constants.ID, summaryId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)));
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
@@ -438,7 +455,7 @@ public class TestExecutor {
         return respMap;
     }
 
-    public List<TestingRunResult> startWithLatch(
+    public Void startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
@@ -447,27 +464,12 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
 
         Context.accountId.set(accountId);
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
         int now = Context.now();
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
                 // todo: commented out older one
 //                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                testingRunResults = startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap);
-                String size = testingRunResults.size()+"";
-                loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
-                if (!testingRunResults.isEmpty()) {
-                    trim(testingRunResults);
-                    TestingRunResultDao.instance.insertMany(testingRunResults);
-                    loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
-                    //Creating issues from testingRunResults
-                   TestingIssuesHandler handler = new TestingIssuesHandler();
-                   boolean triggeredByTestEditor = false;
-                   if (testingRun.getTriggeredBy() != null) {
-                        triggeredByTestEditor = testingRun.getTriggeredBy().equals("test_editor");
-                   }
-                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor); // pass new field here
-                }
+                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
@@ -475,7 +477,7 @@ public class TestExecutor {
         }
 
         latch.countDown();
-        return testingRunResults;
+        return null;
     }
 
     public static void trim(TestingRunResult testingRunResult) {
@@ -510,15 +512,30 @@ public class TestExecutor {
         }
     }
 
-    public List<TestingRunResult> startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
+    public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults) {
+        int resultSize = testingRunResults.size();
+        if (resultSize > 0) {
+            loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
+            trim(testingRunResults);
+            TestingRunResultDao.instance.insertMany(testingRunResults);
+            loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+            TestingIssuesHandler handler = new TestingIssuesHandler();
+            boolean triggeredByTestEditor = false;
+            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+            testingRunResults.clear();
+        }
+    }
+
+    public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
-        List<TestingRunResult> testingRunResults = new ArrayList<>();
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
         for (String testSubCategory: testSubCategories) {
+            List<TestingRunResult> testingRunResults = new ArrayList<>();
+
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null) continue;
             TestingRunResult testingRunResult = null;
@@ -532,9 +549,10 @@ public class TestExecutor {
                 e.printStackTrace();
             }
             if (testingRunResult != null) testingRunResults.add(testingRunResult);
+
+            insertResultsAndMakeIssues(testingRunResults);
         }
 
-        return testingRunResults;
     }
 
     public boolean applyRunOnceCheck(ApiInfoKey apiInfoKey, TestConfig testConfig, ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, String testSubCategory) {
@@ -555,8 +573,19 @@ public class TestExecutor {
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
 
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
-        if (messages == null || messages.size() == 0) return null;
+        if (messages == null || messages.isEmpty()){
+            List<TestResult> testResults = new ArrayList<>();
+            testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
+            return new TestingRunResult(
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
+                false,new ArrayList<>(),100,Context.now(),
+                Context.now(), testRunResultSummaryId
+            );
+        }
 
         String message = messages.get(0);
 
@@ -577,20 +606,20 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
-        String testSuperType = testConfig.getInfo().getCategory().getName();
-        String testSubType = testConfig.getInfo().getSubCategory();
-
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
+        // TestingUtil -> authMechanism
+        // TestingConfig -> auth
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes);
         List<TestResult> testResults = yamlTestTemplate.run();
-        if (testResults == null || testResults.size() == 0) {
-            return null;
+        if (testResults == null || testResults.isEmpty()) {
+            testResults = new ArrayList<>();
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
         }
         int endTime = Context.now();
 

@@ -26,6 +26,9 @@ info:
     - "https://www.cobalt.io/blog/from-ssrf-to-port-scanner"
   cwe:
     - CWE-918
+  cve:
+    - CVE-2023-26492
+    - CVE-2023-45152
 
 api_selection_filters:
   or:

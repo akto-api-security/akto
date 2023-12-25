@@ -19,6 +19,13 @@ export default {
             return resp
         })        
     },
+    deleteTestRole(roleName) {
+        return request({
+            url: '/api/deleteTestRole',
+            method: 'post',
+            data: {roleName}
+        })
+    },
     updateTestRoles (roleName, andConditions, orConditions) {
         return request({
             url: '/api/updateTestRoles',
@@ -44,6 +51,13 @@ export default {
             data: {roleName}
         }).then((resp) => {
             return resp
+        })
+    },
+    deleteAccessMatrix(roleName){
+        return request({
+            url: '/api/deleteAccessMatrix',
+            method: 'post',
+            data: {roleName}
         })
     },
     analyzeApiSamples(apiCollectionIds, headerNames){

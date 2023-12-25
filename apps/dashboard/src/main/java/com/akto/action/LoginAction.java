@@ -119,7 +119,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     claims,
                     "Akto",
                     "refreshToken",
-                    Calendar.DAY_OF_MONTH,
+                    Calendar.MONTH,
                     6
             );
 

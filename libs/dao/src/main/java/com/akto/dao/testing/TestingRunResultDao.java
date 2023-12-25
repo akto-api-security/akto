@@ -1,6 +1,7 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRunResult;
@@ -47,9 +48,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
-                .projection(
-                        Projections.include(
+        Bson projections = Projections.include(
                                 TestingRunResult.TEST_RUN_ID,
                                 TestingRunResult.API_INFO_KEY,
                                 TestingRunResult.TEST_SUPER_TYPE,
@@ -59,9 +58,16 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                                 TestingRunResult.START_TIMESTAMP,
                                 TestingRunResult.END_TIMESTAMP,
                                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
-                        )
-                )
+                        );
+
+        return fetchLatestTestingRunResult(filters, limit, 0, projections);
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
+                .projection(projections)
                 .sort(Sorts.descending("_id"))
+                .skip(skip)
                 .limit(limit)
                 .cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -82,6 +88,10 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
         createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name("testRunResultSummaryId_-1__id_-1"));
 
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
     }
 
 }

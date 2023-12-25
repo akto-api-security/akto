@@ -27,7 +27,11 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
   cwe:
-    - CWE-16
+    - CWE-116
+    - CWE-430
+  cve:
+    - CVE-2023-38199
+    - CVE-2023-26130
 
 api_selection_filters:
   response_code:

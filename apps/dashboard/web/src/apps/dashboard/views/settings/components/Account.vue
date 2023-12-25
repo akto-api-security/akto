@@ -64,26 +64,6 @@
             </div>
         </div>
 
-        <div class="toggle-redact-feature" v-if="localEnableDebugLogs !== null">
-            <div class="entry-text">Enable debug logs</div>
-            <div class="entry-value">
-                <v-switch
-                    color="var(--themeColor)"
-                    v-model="localEnableDebugLogs"
-                />
-            </div>
-        </div>
-
-        <div class="toggle-redact-feature" v-if="!localMergeAsyncOutside">
-            <div class="entry-text">Activate new merging</div>
-            <div class="entry-value">
-                <v-switch
-                    color="var(--themeColor)"
-                    v-model="localMergeAsyncOutside"
-                />
-            </div>
-        </div>
-
         <div class="toggle-redact-feature">
             <div class="entry-text">Enable New Merging</div>
             <div class="entry-value">
@@ -353,19 +333,6 @@ import {mapState} from 'vuex'
               set(v) {
                 this.$store.dispatch('team/updateTrafficAlertThresholdSeconds', v)
               }
-            },
-            localMergeAsyncOutside: {
-                get() {
-                    return this.mergeAsyncOutside
-                },
-                set(v) {
-                    this.$store.dispatch('team/updateMergeAsyncOutside')
-                }
-            },
-            cidr: {
-                get() {
-                    return this.privateCidrList && this.privateCidrList.length > 0 ? func.prettifyArray(this.privateCidrList) : "No values stored"
-                },
             },
             newMerging: {
                 get() {

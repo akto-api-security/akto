@@ -23,7 +23,12 @@ info:
     - "https://portswigger.net/web-security/host-header/exploiting"
     - "https://blog.yeswehack.com/yeswerhackers/http-header-exploitation/"
   cwe:
+    - CWE-200
     - CWE-16
+  cve:
+    - CVE-2022-3215
+    - CVE-2020-5247
+    - CVE-2023-38039
 
 api_selection_filters:
   response_code:

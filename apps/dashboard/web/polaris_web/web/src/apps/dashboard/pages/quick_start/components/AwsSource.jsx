@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import api from '../api'
 import quickStartFunc from '../transform'
 import { Box, Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
@@ -21,8 +21,10 @@ function AwsSource() {
 
     const [policyLines, setPolicyLines] = useState(quickStartFunc.getPolicyLines("AWS"))
     const isLocalDeploy = Store(state => state.isLocalDeploy)
-    // const isLocalDeploy = false
+    const isAws = Store(state => state.isAws)
     const DeploymentMethod = "AWS_TRAFFIC_MIRRORING"
+
+    const ref = useRef(null)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -67,18 +69,20 @@ function AwsSource() {
     }
 
     const checkStackState = () => {
-      let intervalId = null;
-      intervalId = setInterval(async () => {
-        await api.fetchStackCreationStatus({deploymentMethod: DeploymentMethod}).then((resp) => {  
-            handleStackState(resp.stackState, intervalId)
-          }
-        )
-      }, 5000)
+      if(isAws){
+          let intervalId = null;
+          intervalId = setInterval(async () => {
+            await api.fetchStackCreationStatus({deploymentMethod: DeploymentMethod}).then((resp) => {
+                handleStackState(resp.stackState, intervalId)
+              }
+            )
+          }, 5000)
+      }
     }
 
     const fetchLBs = async() => {
       setLoading(true)
-      if(!isLocalDeploy){
+      if(isAws){
         await api.fetchLBs({deploymentMethod: DeploymentMethod}).then((resp)=> {
           if (!resp.dashboardHasNecessaryRole) {
             let policyLinesCopy = policyLines
@@ -105,6 +109,7 @@ function AwsSource() {
 
     useEffect(()=> {
       fetchLBs()
+      checkStackState()
     },[])
 
     const docsUrl = "https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy"
@@ -125,8 +130,7 @@ function AwsSource() {
     }
 
     const copyRequest = () => {
-      navigator.clipboard.writeText(formattedJson)
-      setToast(true, false, "Policy copied to clipboard.")
+      func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
 
     const saveFunc = async() => {
@@ -185,12 +189,13 @@ function AwsSource() {
     }
      
 
-    const displayObj = isLocalDeploy ? localDeployObj : hasRequiredAccess ? selectedLBObj : noAccessObject
+    const displayObj = isLocalDeploy || !isAws ? localDeployObj : hasRequiredAccess ? selectedLBObj : noAccessObject
     
     return (
       <div className='card-items'>
         <Text>{displayObj?.text}</Text>
         {displayObj?.component}
+        <div ref = {ref} />
       </div>
     )
 }

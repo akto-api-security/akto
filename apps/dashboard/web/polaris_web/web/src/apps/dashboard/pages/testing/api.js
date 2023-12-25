@@ -83,6 +83,24 @@ export default {
             }
         })
     },
+    createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+        return request({
+            url: '/api/createJiraIssue',
+            method: 'post',
+            data: {
+                hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId
+            }
+        })
+    },
+    attachFileToIssue(origReq, testReq, issueId) {
+        return request({
+            url: '/api/attachFileToIssue',
+            method: 'post',
+            data: {
+                origReq, testReq, issueId
+            }
+        })
+    },
     async fetchCollectionWiseApiEndpoints (apiCollectionId) {
         const resp = await request({
             url: '/api/fetchCollectionWiseApiEndpoints',
@@ -194,6 +212,20 @@ export default {
                 testingRunResultSummaryHexId,
                 skip
             }
+        })
+    },
+    addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData) {
+        return request({
+            url: '/api/addAuthToRole',
+            method: 'post',
+            data: {roleName, apiCond, authParamData, authAutomationType, reqData}
+        })
+    },
+    deleteAuthFromRole(roleName, index) {
+        return request({
+            url: '/api/deleteAuthFromRole',
+            method: 'post',
+            data: {roleName, index}
         })
     },
 }

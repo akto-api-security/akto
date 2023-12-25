@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Store from '../../../store'
 import BannerComponent from './shared/BannerComponent'
 import { Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
@@ -20,10 +20,12 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const [progressBar, setProgressBar] = useState({show: false, value: 0, max_deployment_time_in_ms: 8 * 60 * 1000})
     const [yaml, setYaml] = useState(quickStartFunc.getYamlLines(deploymentMethod))
 
+    const ref = useRef(null)
+
     const setYamlContent = QuickStartStore(state => state.setYamlContent)
 
     const isLocalDeploy = Store(state => state.isLocalDeploy)
-    // const isLocalDeploy = false
+    const isAws = Store(state => state.isAws)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -68,29 +70,32 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         }
 
     const checkStackState = () => {
-        let intervalId = null;
-        setLoading(true)
-        intervalId = setInterval(async () => {
-            await api.fetchStackCreationStatus({deploymentMethod: deploymentMethod}).then((resp) => {
-                setLoading(false)
-                setStackStatus(resp.stackState.status)
-                handleStackState(resp.stackState, intervalId)
-                if(resp.aktoNLBIp && resp.aktoMongoConn){
-                    let yamlCopy = yaml
-                    for(let i=0; i< yaml.length; i++){
-                        let line = yamlCopy[i];
-                        line = line.replace('<AKTO_NLB_IP>', resp.aktoNLBIp);
-                        line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
-                        yamlCopy[i] = line;
+        if(isAws){
+            let intervalId = null;
+            setLoading(true)
+
+            intervalId = setInterval(async () => {
+                await api.fetchStackCreationStatus({deploymentMethod: deploymentMethod}).then((resp) => {
+                    setLoading(false)
+                    setStackStatus(resp.stackState.status)
+                    handleStackState(resp.stackState, intervalId)
+                    if(resp.aktoNLBIp && resp.aktoMongoConn){
+                        let yamlCopy = yaml
+                        for(let i=0; i< yaml.length; i++){
+                            let line = yamlCopy[i];
+                            line = line.replace('<AKTO_NLB_IP>', resp.aktoNLBIp);
+                            line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
+                            yamlCopy[i] = line;
+                        }
+                        setYaml(yaml)
                     }
-                    setYaml(yaml)
-                }
-            })
-        }, 5000)
+                })
+            }, 5000)
+        }
     }
 
     const fetchLBs = async() => {
-        if(!isLocalDeploy){
+        if(isAws){
             setLoading(true)
             await api.fetchLBs({deploymentMethod: deploymentMethod}).then((resp) => {
                 if (!resp.dashboardHasNecessaryRole) {
@@ -127,9 +132,8 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const steps = quickStartFunc.getDesiredSteps(urlFargate)
     const formattedJson = func.convertPolicyLines(policyLines)
 
-    const copyRequest = () => {
-        navigator.clipboard.writeText(formattedJson)
-        setToast(true, false, "Policy copied to clipboard.")
+    const copyRequest = () => { 
+        func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
     
     const creatFargateStack = async() => {
@@ -184,7 +188,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     }
 
     const displayFunc = () => {
-        if (isLocalDeploy) {
+        if (isLocalDeploy || !isAws) {
             return localDeployObj
         }
         if (hasRequiredAccess) {
@@ -199,6 +203,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         <div className='card-items'>
             {loading ? null : <Text>{displayObj?.text}</Text>}
             {loading ? <SpinnerCentered /> : displayObj?.component}
+            <div ref = {ref}/>
         </div>
     )
 }

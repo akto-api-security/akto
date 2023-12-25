@@ -24,6 +24,8 @@ info:
     - "https://github.com/cujanovic/SSRF-Testing#htaccess---redirect-test-for-various-cases"
   cwe:
     - CWE-918
+  cve:
+    - CVE-2022-4725
 
 api_selection_filters:
   response_code:
