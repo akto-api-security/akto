@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT;
     }
 
     ConfigType configType;
@@ -326,4 +326,152 @@ public abstract class Config {
         }
     }
 
+
+    @BsonDiscriminator
+    public static class StiggConfig extends Config {
+        private String clientKey;
+        private String serverKey;
+        private String signingKey;
+        private String saasFreePlanId;
+        private String onPremFreePlanId;
+
+        private String activeEndpointsLabel;
+
+        private String testRunsLabel;
+
+        private String customTestsLabel;
+
+        private String activeAccountsLabel;
+        public static final String CONFIG_ID = ConfigType.STIGG.name() + CONFIG_SALT;
+
+        public StiggConfig() {
+            this.configType = ConfigType.STIGG;
+            this.id = CONFIG_ID;
+        }
+
+        public String getClientKey() {
+            return clientKey;
+        }
+
+        public void setClientKey(String clientKey) {
+            this.clientKey = clientKey;
+        }
+
+        public String getServerKey() {
+            return serverKey;
+        }
+
+        public void setServerKey(String serverKey) {
+            this.serverKey = serverKey;
+        }
+
+        public String getSigningKey() {
+            return signingKey;
+        }
+
+        public void setSigningKey(String signingKey) {
+            this.signingKey = signingKey;
+        }
+
+        public String getSaasFreePlanId() {
+            return saasFreePlanId;
+        }
+
+        public void setSaasFreePlanId(String saasFreePlanId) {
+            this.saasFreePlanId = saasFreePlanId;
+        }
+
+        public String getOnPremFreePlanId() {
+            return onPremFreePlanId;
+        }
+
+        public void setOnPremFreePlanId(String onPremFreePlanId) {
+            this.onPremFreePlanId = onPremFreePlanId;
+        }
+
+        public String getActiveEndpointsLabel() {
+            return activeEndpointsLabel;
+        }
+
+        public void setActiveEndpointsLabel(String activeEndpointsLabel) {
+            this.activeEndpointsLabel = activeEndpointsLabel;
+        }
+
+        public String getTestRunsLabel() {
+            return testRunsLabel;
+        }
+
+        public void setTestRunsLabel(String testRunsLabel) {
+            this.testRunsLabel = testRunsLabel;
+        }
+
+        public String getCustomTestsLabel() {
+            return customTestsLabel;
+        }
+
+        public void setCustomTestsLabel(String customTestsLabel) {
+            this.customTestsLabel = customTestsLabel;
+        }
+
+        public String getActiveAccountsLabel() {
+            return activeAccountsLabel;
+        }
+
+        public void setActiveAccountsLabel(String activeAccountsLabel) {
+            this.activeAccountsLabel = activeAccountsLabel;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class MixpanelConfig extends Config {
+        private String projectToken;
+
+        public static final String CONFIG_ID = ConfigType.MIXPANEL.name() + CONFIG_SALT;
+
+        public MixpanelConfig() {
+            this.configType = ConfigType.MIXPANEL;
+            this.id = CONFIG_ID;
+        }
+
+        public MixpanelConfig(String projectToken) {
+            this.configType = ConfigType.MIXPANEL;
+            this.id = configType.name();
+            this.projectToken = projectToken;
+        }
+
+        public String getProjectToken() {
+            return projectToken;
+        }
+
+        public void setProjectToken(String projectToken) {
+            this.projectToken = projectToken;
+        }
+    }
+
+
+    @BsonDiscriminator
+    public static class SlackAlertConfig extends Config {
+        private String slackWebhookUrl;
+
+        public static final String CONFIG_ID = ConfigType.SLACK_ALERT.name() + CONFIG_SALT;
+
+        public SlackAlertConfig() {
+            this.configType = ConfigType.SLACK_ALERT;
+            this.id = CONFIG_ID;
+        }
+
+        public SlackAlertConfig(String slackWebhookUrl) {
+            this.configType = ConfigType.SLACK_ALERT;
+            this.id = configType.name();
+            this.slackWebhookUrl = slackWebhookUrl;
+        }
+
+        public String getSlackWebhookUrl() {
+            return slackWebhookUrl;
+        }
+
+        public void setSlackWebhookUrl(String slackWebhookUrl) {
+            this.slackWebhookUrl = slackWebhookUrl;
+        }
+    }
 }

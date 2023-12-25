@@ -128,7 +128,7 @@ export default function Header() {
                 },
                 {
                     items: [
-                        (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM") ? {} :
+                        (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
                         { id: "create_account", content: <ContentWithIcon icon={CustomerPlusMajor} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
                         // { id: "manage", content: 'Manage account' },
                         { id: "log-out", content: <ContentWithIcon icon={LogOutMinor} text={"Logout"} /> , onAction: handleLogOut }
@@ -190,6 +190,17 @@ export default function Header() {
         />
     );
 
+    const secondaryMenuMarkup = (
+        <TopBar.Menu
+            activatorContent={
+                <span id="beamer-btn">
+                    <Icon source={NotificationMajor} />
+                </span>
+            }
+            actions={[]}
+        />
+    );
+
     const topBarMarkup = (
         <div className='topbar'>
             <TopBar
@@ -199,6 +210,7 @@ export default function Header() {
                 searchResultsVisible={isSearchActive}
                 searchResults={searchResultsMarkup}
                 onSearchResultsDismiss={handleSearchResultsDismiss}
+                secondaryMenu={secondaryMenuMarkup}
             />
             <Modal
                 open={showCreateAccount}

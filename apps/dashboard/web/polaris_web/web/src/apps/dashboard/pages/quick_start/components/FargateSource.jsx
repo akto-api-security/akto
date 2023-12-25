@@ -4,14 +4,15 @@ import JsonComponent from './shared/JsonComponent'
 import { HorizontalStack, VerticalStack } from '@shopify/polaris'
 import QuickStartStore from '../quickStartStore'
 import func from '@/util/func'
+import { useRef } from 'react'
 
 function FargateSource({docsUrl,bannerTitle}) {
 
     const yamlContent = QuickStartStore(state => state.yamlContent)
+    const ref = useRef(null)
 
     const copyYaml = () => {
-        navigator.clipboard.writeText(yamlContent)
-        func.setToast(true, false, "Variables Copied to Clipboard !")
+        func.copyToClipboard(yamlContent, ref, "Variables Copied to Clipboard !")
     }
 
     const deploymentMethod = "FARGATE"
@@ -22,6 +23,7 @@ function FargateSource({docsUrl,bannerTitle}) {
 
     const stackCompleteComponent = (
         <VerticalStack gap="2">
+            <div ref = {ref}/>
             <HorizontalStack gap="1">
                 <span>Add traffic sources from our docs. Click</span>
                 <a href='dashboard/observe/inventory'>here</a>

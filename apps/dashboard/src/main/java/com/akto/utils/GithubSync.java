@@ -68,7 +68,7 @@ public class GithubSync {
                 githubFile = new GithubFile(fileName, filePath, fileContents, latestSha);
             }
         } catch (IOException ex) {
-            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s from repo %s", filePath, repo), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(ex, String.format("Error while syncing file %s from repo %s", filePath, repo), LogDb.DASHBOARD);
         }
 
         return githubFile;
@@ -108,7 +108,7 @@ public class GithubSync {
                 }
             }
         } catch (Exception ex) {
-            loggerMaker.errorAndAddToDb(String.format("Error while syncing files from directory %s in Github repo %s %s ", repo, dirPath, ex.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(ex,String.format("Error while syncing files from directory %s in Github repo %s %s ", repo, dirPath, ex.toString()), LogDb.DASHBOARD);
             return null;
         }
         
@@ -152,7 +152,7 @@ public class GithubSync {
                 loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD);
             }
         } catch (Exception ex) {
-            loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(ex, String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD);
         } 
         finally {
             httpGet.releaseConnection();
