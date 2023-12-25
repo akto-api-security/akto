@@ -64,15 +64,14 @@
     background: #F6F6F7 !important;
 }
 
-.Polaris-Tabs {
-    padding: 0 !important;
+.Polaris-TopBar-UserMenu__Details{
+    margin-right: 0px !important;
 }
 
-.Polaris-Tabs__Tab--active {
-    background: #EDEEEF !important;
-    color: #202223 !important;
+.reduce-size .Polaris-Avatar--sizeExtraSmall{
+    --pc-avatar-extra-small-size: 1.25rem;
 }
 
-.Polaris-Tabs .Polaris-Badge--statusSuccess{
-    background: rgba(221, 224, 228, 1) !important;
+.beamer_defaultBeamerSelector {
+    display: none !important;
 }
