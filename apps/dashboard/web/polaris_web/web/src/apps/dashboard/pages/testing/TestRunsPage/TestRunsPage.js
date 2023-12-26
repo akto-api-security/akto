@@ -274,17 +274,17 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
       id: 'oneTime',
     },
     {
-      content: 'Recurring',
-      index: 0,
-      onAction: ()=> {setCurrentTab('scheduled')},
-      id: 'scheduled',
-    },
-    {
       content: 'CI/CD',
       index: 0,
       onAction: ()=> {setCurrentTab('cicd')},
       id: 'cicd',
     },
+    {
+      content: 'Recurring',
+      index: 0,
+      onAction: ()=> {setCurrentTab('scheduled')},
+      id: 'scheduled',
+    }
   ]
 
   const handleSelectedTab = (selectedIndex) => {

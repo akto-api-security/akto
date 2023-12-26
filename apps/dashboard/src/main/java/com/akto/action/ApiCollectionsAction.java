@@ -53,7 +53,7 @@ public class ApiCollectionsAction extends UserAction {
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 int urlsCount = 0;
                 try {
-                    urlsCount = ApiCollectionUsers.getUrlsFromConditions(apiCollection.getConditions()).size();
+                    urlsCount = ApiCollectionUsers.getApisFromConditions(apiCollection.getConditions()).size();
                 } catch (Exception e) {
                     urlsCount = fallbackCount;
                 }
@@ -156,7 +156,7 @@ public class ApiCollectionsAction extends UserAction {
             for (CollectionCondition it : conditions) {
                 switch (it.getType()) {
                     case API_LIST:
-                        Set<ApiInfoKey> tmp = it.returnApis();
+                        Set<ApiInfoKey> tmp = new HashSet<>(it.returnApis());
                         tmp.removeIf((ApiInfoKey key) -> apiCollectionIds.contains(key.getApiCollectionId()));
                         ((ApiListCondition) it).setApiList(tmp);
                         break;
