@@ -10,6 +10,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.billing.OrganizationUtils;
@@ -315,7 +316,7 @@ public class AccountAction extends UserAction {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(repoZip);
+                    InitializerListener.processTemplateFilesZip(repoZip, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
