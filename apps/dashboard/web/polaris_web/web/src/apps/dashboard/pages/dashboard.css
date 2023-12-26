@@ -64,6 +64,19 @@
     background: #F6F6F7 !important;
 }
 
+.Polaris-Tabs {
+    padding: 0 !important;
+}
+
+.Polaris-Tabs__Tab--active {
+    background: #EDEEEF !important;
+    color: #202223 !important;
+}
+
+.Polaris-Tabs .Polaris-Badge--statusSuccess{
+    background: rgba(221, 224, 228, 1) !important;
+}
+
 .Polaris-TopBar-UserMenu__Details{
     margin-right: 0px !important;
 }
