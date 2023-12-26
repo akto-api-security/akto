@@ -13,34 +13,23 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
-public abstract class CollectionCondition {
-    private Type type;
+public abstract class CollectionCondition extends TestingEndpoints {
     private Operator operator;
 
     public CollectionCondition(Type type, Operator operator) {
-        this.type = type;
+        super(type);
         this.operator = operator;
-    }
-
-    public abstract Set<ApiInfo.ApiInfoKey> returnApis();
-    public abstract Map<CollectionType, Bson> returnFiltersMap();
-
-    public enum Type {
-        API_LIST, METHOD, PARAM, TIMESTAMP
     }
 
     public enum Operator {
         AND, OR
-    }
-
-    public Type getType() {
-        return type;
-    }
-
-    public void setType(Type type) {
-        this.type = type;
     }
 
     public Operator getOperator() {
@@ -52,7 +41,7 @@ public abstract class CollectionCondition {
     }
 
     public static CollectionCondition generateCondition(Type type, Operator operator, BasicDBObject data) {
-        CollectionCondition condition = null;
+        CollectionCondition condition = null; 
 
         try {
             switch (type) {
@@ -118,7 +107,8 @@ public abstract class CollectionCondition {
 
     }
 
-    public static Map<CollectionType, Bson> createFiltersMapWithApiList(Set<ApiInfoKey> apiList){
+    private static Map<CollectionType, Bson> createFiltersMapWithApiList(List<ApiInfoKey> apiList){
+        Set<ApiInfoKey> apiSet = new HashSet<>(apiList);
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         filtersMap.put(CollectionType.ApiCollectionId, new BasicDBObject());
         filtersMap.put(CollectionType.Id_ApiCollectionId, new BasicDBObject());
@@ -127,8 +117,8 @@ public abstract class CollectionCondition {
         for(Map.Entry<CollectionType, Bson> filters: filtersMap.entrySet()){
             List<Bson> apiFilters = new ArrayList<>();
             CollectionType type = filters.getKey();
-            if(apiList != null && !apiList.isEmpty()){
-                for (ApiInfoKey api : apiList) {
+            if(apiSet != null && !apiSet.isEmpty()){
+                for (ApiInfoKey api : apiSet) {
                     apiFilters.add(createApiFilters(type, api));
                 }
                 filters.setValue(Filters.or(apiFilters));
@@ -138,5 +128,9 @@ public abstract class CollectionCondition {
         }
         return filtersMap;
     }
+
+    public Map<CollectionType, Bson> returnFiltersMap() {
+        return createFiltersMapWithApiList(returnApis());
+    };
 
 }

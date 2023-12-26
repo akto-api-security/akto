@@ -5,11 +5,11 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -32,16 +32,38 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
 
     public void createIndicesIfAbsent() {
 
-        String dbName = Context.accountId.get() + "";
-        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
 
-        List<Bson> indices = new ArrayList<>(
-            Arrays.asList(
-                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD }),
-                Indexes.ascending(new String[] { ApiInfo.ID_API_COLLECTION_ID }),
-                Indexes.ascending(new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD })));
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
 
-        createIndices(indices);
+        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
+        int counter = 0;
+        while (cursor.hasNext()) {
+            counter++;
+            cursor.next();
+        }
+
+        if (counter == 1) {
+            String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+            counter++;
+        }
+
+        if (counter == 2) {
+            instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
+        }
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD }, true);
+
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,

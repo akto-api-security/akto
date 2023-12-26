@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import com.akto.util.Constants;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.akto.utils.cloud.stack.dto.StackState;
@@ -122,7 +122,7 @@ public class QuickStartAction extends UserAction {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error occurred while fetching LBs %s", e), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Error occurred while fetching LBs %s", e), LogDb.DASHBOARD);
             this.dashboardHasNecessaryRole = false;
         }
         this.awsRegion = System.getenv(Constants.AWS_REGION);
@@ -232,7 +232,7 @@ public class QuickStartAction extends UserAction {
                         );
                         loggerMaker.infoAndAddToDb("Successfully triggered CreateMirrorSession", LogDb.DASHBOARD);
                     } catch(Exception e){
-                        loggerMaker.errorAndAddToDb(String.format("Failed to invoke lambda for the first time : %s", e), LogDb.DASHBOARD);
+                        loggerMaker.errorAndAddToDb(e, String.format("Failed to invoke lambda for the first time : %s", e), LogDb.DASHBOARD);
                     }
                 } else {
                     loggerMaker.infoAndAddToDb("Already invoked", LogDb.DASHBOARD);

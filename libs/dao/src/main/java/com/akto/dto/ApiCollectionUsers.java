@@ -68,23 +68,30 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static Set<ApiInfoKey> getApisFromConditions(List<CollectionCondition> conditions) {
+    public static Set<ApiInfoKey> getApisFromConditions(List<CollectionCondition> conditions){
         Set<ApiInfoKey> apis = new HashSet<>();
-        
-        // all AND conditions should be last
+
+        /*
+         * all AND conditions should be last
+         * so that we add all the OR apis first and then do retainAll for AND apis.
+         */
         conditions.sort((CollectionCondition c1, CollectionCondition c2) -> {
-            if(c1.getOperator().equals(c2.getOperator())){
+            if (c1.getOperator().equals(c2.getOperator())) {
                 return 0;
-            } else if(c1.getOperator().equals(CollectionCondition.Operator.OR)) {
+            } else if (c1.getOperator().equals(CollectionCondition.Operator.OR)) {
                 return -1;
             }
             return 1;
         });
 
+        /*
+         * Add the first condition to the list, so that retainAll works
+         * even if there is only one AND condition
+         */
         if(!conditions.isEmpty()){
             apis.addAll(conditions.get(0).returnApis());
         }
-        
+
         conditions.forEach((condition) -> {
             if(CollectionCondition.Operator.AND.equals(condition.getOperator())){
                 apis.retainAll(condition.returnApis());
@@ -133,7 +140,7 @@ public class ApiCollectionUsers {
         return Filters.and(filters);
     }
 
-    public static void operationForCollectionId(List<CollectionCondition> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
+    private static void operationForCollectionId(List<CollectionCondition> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
             Bson filter = getFilters(conditions, type);
@@ -185,7 +192,7 @@ public class ApiCollectionUsers {
         }, 0, TimeUnit.SECONDS);
     }
 
-    public static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
+    private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
             collection.getMCollection().updateMany(filter, update);
         }

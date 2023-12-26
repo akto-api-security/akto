@@ -10,7 +10,6 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
 
@@ -166,55 +165,44 @@ public class ApiCollection {
         this.conditions = conditions;
     }
 
-    public void addToConditions(CollectionCondition condition) {
-        
-        if(conditions == null){
-            conditions = new ArrayList<>();
+    private void initializeConditionsList(CollectionCondition condition) {
+        if (this.conditions == null) {
+            this.conditions = new ArrayList<>();
         }
+    }
 
-        boolean found = false;
-
+    private void updateConditionList(CollectionCondition condition, boolean isAddOperation) {
         for (CollectionCondition it : conditions) {
             boolean sameType = it.getType() == condition.getType();
             if (sameType) {
                 switch (it.getType()) {
                     case API_LIST:
-                        Set<ApiInfoKey> tmp = it.returnApis();
-                        tmp.addAll(condition.returnApis());
-                        ((ApiListCondition) it).setApiList(tmp);
-                        found = true;
-                        break;
+                        // Only one API_LIST condition should exist
+                        ApiListCondition.updateApiListCondition((ApiListCondition) it, condition.returnApis(), isAddOperation);
+                        return;
                     default:
                         break;
                 }
             }
         }
-        
-        if(!found){
+
+        /*
+         * Since we return if we find a condition of the same type,
+         * we can add the condition if we reach here
+         */
+        if (isAddOperation) {
             conditions.add(condition);
         }
     }
 
-    public void removeFromConditions(CollectionCondition condition) {
-        
-        if(conditions == null){
-            conditions = new ArrayList<>();
-        }
+    public void addToConditions(CollectionCondition condition) {
+        initializeConditionsList(condition);
+        updateConditionList(condition, true);
+    }
 
-        for(CollectionCondition it : conditions){
-            boolean sameType = it.getType() == condition.getType();
-            if (sameType) {
-                switch (it.getType()) {
-                    case API_LIST:
-                        Set<ApiInfoKey> tmp = it.returnApis();
-                        tmp.removeAll(condition.returnApis());
-                        ((ApiListCondition) it).setApiList(tmp);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
+    public void removeFromConditions(CollectionCondition condition) {
+        initializeConditionsList(condition);
+        updateConditionList(condition, false);
     }
 
 }

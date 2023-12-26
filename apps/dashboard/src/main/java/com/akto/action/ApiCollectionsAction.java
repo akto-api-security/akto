@@ -156,7 +156,7 @@ public class ApiCollectionsAction extends UserAction {
             for (CollectionCondition it : conditions) {
                 switch (it.getType()) {
                     case API_LIST:
-                        Set<ApiInfoKey> tmp = it.returnApis();
+                        Set<ApiInfoKey> tmp = new HashSet<>(it.returnApis());
                         tmp.removeIf((ApiInfoKey key) -> apiCollectionIds.contains(key.getApiCollectionId()));
                         ((ApiListCondition) it).setApiList(tmp);
                         break;
