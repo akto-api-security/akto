@@ -196,4 +196,13 @@ export default {
             }
         })
     },
+    deleteTestRuns(testRunIds){
+        return request({
+            url: '/api/deleteTestRuns',
+            method: 'post',
+            data: {
+               testRunIds
+            }
+        })
+    }
 }

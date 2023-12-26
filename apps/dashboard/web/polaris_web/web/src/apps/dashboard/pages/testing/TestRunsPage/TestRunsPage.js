@@ -269,6 +269,18 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   }
 
+  const promotedBulkActions = (selectedTestRuns) => { 
+    return [
+    {
+      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      onAction: async() => {
+        await api.deleteTestRuns(selectedTestRuns);
+        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        window.location.reload();
+      },
+    },
+  ]};
+
 const coreTable = (
 <GithubServerTable
     key={updateTable}
@@ -286,6 +298,8 @@ const coreTable = (
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}
+    promotedBulkActions={promotedBulkActions}
+    selectable={true}
   />   
 )
 
