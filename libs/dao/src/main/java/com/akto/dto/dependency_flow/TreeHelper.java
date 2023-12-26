@@ -10,10 +10,21 @@ import java.util.Objects;
 
 public class TreeHelper {
     public Map<Integer, Node> result = new HashMap<>();
+    public int nodeCount = 0;
+    private final int MAX_NODE_COUNT = 10;
+
+    public TreeHelper() {
+        this.result = new HashMap<>();
+        this.nodeCount = 0;
+    }
+
 
     public void buildTree(String apiCollectionId, String url, String method) {
 
         if (result.containsKey(Objects.hash(apiCollectionId, url, method))) return;
+
+        nodeCount += 1;
+        if (nodeCount > MAX_NODE_COUNT) return;
 
         Node node = DependencyFlowNodesDao.instance.findOne(
                 Filters.and(

@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.dto.DependencyNode;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.dependency_flow.TreeHelper;
 import com.akto.dto.type.URLMethods;
@@ -23,12 +22,6 @@ public class DependencyAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-
-    public static boolean isParentNode(DependencyNode node, int apiCollectionId, String url, String method) {
-        return (apiCollectionId+"#"+url+"#"+method).equals(node.getApiCollectionIdReq()+"#"+ node.getUrlReq()+"#"+node.getMethodReq());
-    }
-
-    
 
     public Collection<Node> getResult() {
         return result;
