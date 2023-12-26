@@ -1,11 +1,11 @@
 package com.akto.dto.CollectionConditions;
 
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
-import org.bson.conversions.Bson;
-
-import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class ApiListCondition extends CollectionCondition{
@@ -34,13 +34,25 @@ public class ApiListCondition extends CollectionCondition{
     }
 
     @Override
-    public Set<ApiInfoKey> returnApis() {
-        return apiList;
+    public List<ApiInfoKey> returnApis() {
+        return new ArrayList<>(apiList);
     }
 
     @Override
-    public Map<CollectionType, Bson> returnFiltersMap(){
-        return CollectionCondition.createFiltersMapWithApiList(returnApis());
+    public boolean containsApi(ApiInfoKey key) {
+        return apiList.contains(key);
+    }
+
+    public static void updateApiListCondition(ApiListCondition apiListCondition, List<ApiInfoKey> list, boolean isAddOperation) {
+        Set<ApiInfoKey> tmp = new HashSet<>(apiListCondition.returnApis());
+
+        if (isAddOperation) {
+            tmp.addAll(list);
+        } else {
+            tmp.removeAll(list);
+        }
+
+        apiListCondition.setApiList(tmp);
     }
 
 }

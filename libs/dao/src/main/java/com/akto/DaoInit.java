@@ -11,7 +11,6 @@ import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
-import com.akto.dto.FilterSampleData;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.Info;
@@ -29,6 +28,10 @@ import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetric;
+import com.akto.dto.usage.UsageMetricInfo;
+import com.akto.dto.usage.UsageSync;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
 import com.akto.util.EnumCodec;
@@ -39,6 +42,7 @@ import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.ParamCondition;
 import com.akto.dto.CollectionConditions.TimestampCondition;
 import com.akto.dto.auth.APIAuth;
+import com.akto.dto.billing.Organization;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -190,6 +194,11 @@ public class DaoInit {
         ClassModel<TimestampCondition> timestampConditionClassModel = ClassModel.builder(TimestampCondition.class)
                 .enableDiscriminator(true).build();
 
+        ClassModel<UsageMetric> UsageMetricClassModel = ClassModel.builder(UsageMetric.class).enableDiscriminator(true).build();
+        ClassModel<UsageMetricInfo> UsageMetricInfoClassModel = ClassModel.builder(UsageMetricInfo.class).enableDiscriminator(true).build();
+        ClassModel<UsageSync> UsageSyncClassModel = ClassModel.builder(UsageSync.class).enableDiscriminator(true).build();
+        ClassModel<Organization> OrganizationClassModel = ClassModel.builder(Organization.class).enableDiscriminator(true).build();
+
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
                 signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -211,9 +220,10 @@ public class DaoInit {
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, 
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,
                 collectionConditionClassModel, apiListConditionClassModel, methodConditionClassModel,
-                paramConditionClassModel, timestampConditionClassModel).automatic(true).build());
+                paramConditionClassModel, timestampConditionClassModel,
+                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -246,9 +256,11 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
                 new EnumCodec<>(AktoGptConfigState.class),
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
-                new EnumCodec<>(TrafficMetricsAlert.FilterType.class),
+                new EnumCodec<>(CollectionCondition.Operator.class),
                 new EnumCodec<>(CollectionCondition.Type.class),
-                new EnumCodec<>(CollectionCondition.Operator.class));
+                new EnumCodec<>(MetricTypes.class),
+                new EnumCodec<>(User.AktoUIMode.class),
+                new EnumCodec<>(TrafficMetricsAlert.FilterType.class));
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

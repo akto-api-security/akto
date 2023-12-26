@@ -58,16 +58,6 @@
             </div>
         </div>
 
-        <div class="toggle-redact-feature" v-if="!localMergeAsyncOutside">
-            <div class="entry-text">Activate new merging</div>
-            <div class="entry-value">
-                <v-switch
-                    color="var(--themeColor)"
-                    v-model="localMergeAsyncOutside"
-                />
-            </div>
-        </div>
-
         <div class="toggle-redact-feature">
             <div class="entry-text">Enable New Merging</div>
             <div class="entry-value">
@@ -168,14 +158,6 @@ import {mapState} from 'vuex'
               set(v) {
                 this.$store.dispatch('team/updateTrafficAlertThresholdSeconds', v)
               }
-            },
-            localMergeAsyncOutside: {
-                get() {
-                    return this.mergeAsyncOutside
-                },
-                set(v) {
-                    this.$store.dispatch('team/updateMergeAsyncOutside')
-                }
             },
             newMerging: {
                 get() {

@@ -1,9 +1,12 @@
 package com.akto.mixpanel;
 
+import com.akto.dao.ConfigsDao;
+import com.akto.dto.Config;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mixpanel.mixpanelapi.ClientDelivery;
 import com.mixpanel.mixpanelapi.MessageBuilder;
 import com.mixpanel.mixpanelapi.MixpanelAPI;
-import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,8 +15,27 @@ import java.io.IOException;
 
 public class AktoMixpanel {
     private static final Logger logger = LoggerFactory.getLogger(AktoMixpanel.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoMixpanel.class);
 
-    private static final String MIXPANEL_PROJECT_TOKEN = System.getenv("MIXPANEL_PROJECT_TOKEN");
+    private Config.MixpanelConfig mixpanelConfig = null;
+    public AktoMixpanel() {
+        if (mixpanelConfig == null) {
+            synchronized (AktoMixpanel.class) {
+                if (mixpanelConfig == null) {
+                    try {
+                        Config config = ConfigsDao.instance.findOne("_id", "MIXPANEL-ankush");
+                        if (config == null) {
+                            logger.error("No mixpanel config found");
+                        } else {
+                            mixpanelConfig = (Config.MixpanelConfig) config;
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error while fetching mixpanel config: " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
 
     private final MixpanelAPI mixpanel = new MixpanelAPI();
 
@@ -21,10 +43,14 @@ public class AktoMixpanel {
 
     public void sendEvent(String distinctId, String eventName, JSONObject props) {
 
-        if (StringUtils.isEmpty(MIXPANEL_PROJECT_TOKEN)) return;
-
+        if (mixpanelConfig == null) {
+            loggerMaker.errorAndAddToDb("Mixpanel config is not initialized", LogDb.DASHBOARD);
+            return;
+        }
         try {
-            MessageBuilder messageBuilder = new MessageBuilder(MIXPANEL_PROJECT_TOKEN);
+            String projectToken = mixpanelConfig.getProjectToken();
+            
+            MessageBuilder messageBuilder = new MessageBuilder(projectToken);
 
             JSONObject event = messageBuilder.event(distinctId, eventName, props);
 

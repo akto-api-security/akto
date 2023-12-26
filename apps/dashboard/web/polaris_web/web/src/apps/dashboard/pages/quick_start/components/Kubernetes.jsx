@@ -1,4 +1,5 @@
 import React from 'react'
+import {useRef} from 'react'
 import CompleteSetup from './CompleteSetup'
 import QuickStartStore from '../quickStartStore'
 import { HorizontalStack, VerticalStack } from '@shopify/polaris'
@@ -8,14 +9,13 @@ import func from '@/util/func'
 function Kubernetes({bannerTitle, docsUrl}) {
 
     const yamlContent = QuickStartStore(state => state.yamlContent)
+    const ref = useRef(null)
     const copyYaml = () => {
-        navigator.clipboard.writeText(yamlContent)
-        func.setToast(true, false, "Variables Copied to Clipboard !")
+        func.copyToClipboard(yamlContent, ref, "Variables Copied to Clipboard !")
     }
 
     const copyText = () => {
-      navigator.clipboard.writeText("kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>")
-      func.setToast(true, false, "Command Copied !!")
+      func.copyToClipboard("kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>", ref, "Command Copied !!")
     }
 
     const deploymentMethod = "KUBERNETES"
@@ -26,6 +26,7 @@ function Kubernetes({bannerTitle, docsUrl}) {
 
     const stackCompleteComponent = (
       <VerticalStack gap="2">
+        <div ref = {ref}/>
         <span>You need to setup a daemonset for your Kubernetes environment:</span>
 
         <VerticalStack gap="1">

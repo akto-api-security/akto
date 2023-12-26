@@ -13,6 +13,7 @@ public class User {
     private String login;
     public static final String LOGIN = "login";
     private int id;
+    public static final String ID = "_id";
     private List<String> refreshTokens;
     public static final String LAST_LOGIN_TS = "lastLoginTs";
     private int lastLoginTs;
@@ -43,7 +44,9 @@ public class User {
     public static User create(String name, String login, SignupInfo info, Map<String, UserAccountEntry> accountEntryMap) {
         Map<String, SignupInfo> infoMap = new HashMap<>();
         infoMap.put(info.getKey(), info);
-        return new User(name, login, accountEntryMap, infoMap);
+        User user =  new User(name, login, accountEntryMap, infoMap);
+        user.setAktoUIMode(AktoUIMode.VERSION_2);
+        return user;
     }
 
     public String findAnyAccountId() {
@@ -128,7 +131,7 @@ public class User {
 
     public AktoUIMode getAktoUIMode() {
         if (aktoUIMode == null) {
-            return AktoUIMode.VERSION_1;
+            return AktoUIMode.VERSION_2;
         }
         return aktoUIMode;
     }
