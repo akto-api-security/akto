@@ -24,7 +24,6 @@ function About() {
 
     async function fetchDetails(){
         const {arr, resp} = await settingFunctions.fetchAdminInfo()
-        console.log('Settings', resp)
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
