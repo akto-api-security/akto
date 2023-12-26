@@ -1735,11 +1735,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
-        try {
-            readAndSaveBurpPluginVersion();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
         if(DashboardMode.isOnPremDeployment()) {
             telemetryExecutorService.scheduleAtFixedRate(() -> {
