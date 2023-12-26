@@ -325,17 +325,11 @@ public class Utils {
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
                 info.setPolicy(new AktoPolicyNew(false));
-                info.setDependencyAnalyser(new DependencyAnalyser());
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             info.getHttpCallParser().syncFunction(responses, true, false);
             info.getPolicy().main(responses, true, false);
-
-            for (HttpResponseParams responseParams: responses)  {
-                info.getDependencyAnalyser().analyse(responseParams);
-            }
-            info.getDependencyAnalyser().syncWithDb();
         }
     }
 
