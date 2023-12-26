@@ -12,10 +12,10 @@ function GithubAppIntegration() {
     const [githubAppSecretKey, setGithubAppSecretKey] = useState("")
     const [githubAppIdPresent, setGithubAppIdPresent] = useState("")
 
-    const deleteAppSettingText = "Are you sure you want to remove Github App settings? This will remove akto messages and checks from github pull request."
-    const addAppSettingText = "Are you sure you want to add Github App settings? This will enable akto messages and checks in github pull request."
+    const deleteAppSettingText = "Are you sure you want to remove GitHub App settings? This will remove Akto messages and checks from GitHub pull request."
+    const addAppSettingText = "Are you sure you want to add GitHub App settings? This will enable Akto messages and checks in GitHub pull request."
 
-    const cardContent = "Enable vulnerability reporting vulnerability via github app"
+    const cardContent = "Enable vulnerability reporting vulnerability via GitHub app"
 
     async function fetchGithubAppId() {
         let { githubAppId } = await settingRequests.fetchGithubAppId()
@@ -33,7 +33,7 @@ function GithubAppIntegration() {
             if (response.error) {
                 func.setToast(true, true, response.error)
             } else {
-                func.setToast(true, false, "Github App settings added successfully!")
+                func.setToast(true, false, "GitHub App settings added successfully!")
                 window.location.reload()
             }
         }
