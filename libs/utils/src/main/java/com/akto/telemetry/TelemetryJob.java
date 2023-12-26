@@ -55,6 +55,7 @@ public class TelemetryJob {
                 fetchAndSendLogs(now, LoggerMaker.LogDb.DASHBOARD, org.getId(), accountId);
                 fetchAndSendLogs(now, LoggerMaker.LogDb.RUNTIME, org.getId(), accountId);
                 fetchAndSendLogs(now, LoggerMaker.LogDb.ANALYSER, org.getId(), accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.BILLING, org.getId(), accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Telemetry cron failed due to:" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             }
