@@ -48,7 +48,7 @@
             </result>
         </action>
 
-        <action name="api/aggregateAccountWiseUsage" class="com.akto.action.usage.UsageAction" method="aggregateAccountWiseUsage">
+        <action name="api/fetchClientKey" class="com.akto.action.selfhosted.InfoAction" method="fetchClientKey">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -59,7 +59,29 @@
             </result>
         </action>
 
-        <action name="api/sendDataToSinks" class="com.akto.action.usage.UsageAction" method="sendDataToSinks">
+        <action name="api/fetchSignature" class="com.akto.action.selfhosted.InfoAction" method="fetchSignature">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEntitlements" class="com.akto.action.selfhosted.InfoAction" method="fetchEntitlements">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchOrgMetaData" class="com.akto.action.selfhosted.InfoAction" method="fetchOrgMetaData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

@@ -190,6 +190,17 @@ export default function Header() {
         />
     );
 
+    const secondaryMenuMarkup = (
+        <TopBar.Menu
+            activatorContent={
+                <span id="beamer-btn">
+                    <Icon source={NotificationMajor} />
+                </span>
+            }
+            actions={[]}
+        />
+    );
+
     const topBarMarkup = (
         <div className='topbar'>
             <TopBar
@@ -199,6 +210,7 @@ export default function Header() {
                 searchResultsVisible={isSearchActive}
                 searchResults={searchResultsMarkup}
                 onSearchResultsDismiss={handleSearchResultsDismiss}
+                secondaryMenu={secondaryMenuMarkup}
             />
             <Modal
                 open={showCreateAccount}

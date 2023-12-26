@@ -64,7 +64,7 @@ public class InitializerListener implements ServletContextListener {
                         setupUsageReportingScheduler();
                         //test();
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(String.format("Error: %s", e.getMessage()), LogDb.BILLING);
+                        loggerMaker.errorAndAddToDb(e, String.format("Error: %s", e.getMessage()), LogDb.BILLING);
                     } finally {
                         try {
                             Thread.sleep(1000);

@@ -294,9 +294,7 @@ function App() {
   }, [])
 
   return (
-    <AppProvider>
       <RouterProvider router={router} />
-    </AppProvider>
   );
 }
 

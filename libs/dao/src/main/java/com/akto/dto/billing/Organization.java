@@ -1,34 +1,8 @@
 package com.akto.dto.billing;
 
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-
 import org.bson.codecs.pojo.annotations.BsonId;
-import org.bson.types.ObjectId;
-
-import com.akto.dao.RBACDao;
-import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.usage.UsageMetricInfoDao;
-import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dto.RBAC;
-import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
-import com.akto.util.UsageUtils;
-import com.google.gson.Gson;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 public class Organization {
     
@@ -43,10 +17,17 @@ public class Organization {
     public static final String SYNCED_WITH_AKTO = "syncedWithAkto";
     public Set<Integer> accounts;
     public static final String ACCOUNTS = "accounts";
+    // feature label -> FeatureAccess
+    HashMap<String, FeatureAccess> featureWiseAllowed;
+    public static final String FEATURE_WISE_ALLOWED = "featureWiseAllowed";
 
 
     public static final String ON_PREM = "onPrem";
     private boolean onPrem;
+
+    public static final String GRACE_PERIOD = "gracePeriod";
+    private int gracePeriod;
+
     public Organization() { }
 
     public Organization(String id, String name, String adminEmail, Set<Integer> accounts, boolean onPrem) {
@@ -98,11 +79,27 @@ public class Organization {
         this.accounts = accounts;
     }
 
+    public HashMap<String, FeatureAccess> getFeatureWiseAllowed() {
+        return featureWiseAllowed;
+    }
+
+    public void setFeatureWiseAllowed(HashMap<String, FeatureAccess> featureWiseAllowed) {
+        this.featureWiseAllowed = featureWiseAllowed;
+    }
+
     public boolean isOnPrem() {
         return onPrem;
     }
 
     public void setOnPrem(boolean onPrem) {
         this.onPrem = onPrem;
+    }
+
+    public int getGracePeriod() {
+        return gracePeriod;
+    }
+
+    public void setGracePeriod(int gracePeriod) {
+        this.gracePeriod = gracePeriod;
     }
 }
