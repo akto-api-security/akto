@@ -20,14 +20,17 @@ function About() {
     const [newMerging, setNewMerging] = useState(false)
     const [trafficThreshold, setTrafficThreshold] = useState(trafficAlertDurations[0].value)
     const setupOptions = settingFunctions.getSetupOptions()
+    const [enableTelemetry, setEnableTelemetry] = useState(false)
 
     async function fetchDetails(){
         const {arr, resp} = await settingFunctions.fetchAdminInfo()
+        console.log('Settings', resp)
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
+        setEnableTelemetry(resp.enableTelemetry)
     }
 
     useEffect(()=>{
@@ -71,6 +74,11 @@ function About() {
         await settingRequests.toggleNewMergingEnabled(val);
     }
 
+    const toggleTelemetry = async(val) => {
+        setEnableTelemetry(val);
+        await settingRequests.toggleTelemetry(val);
+    }
+
     const handleSelectTraffic = async(val) => {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
@@ -81,10 +89,10 @@ function About() {
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup segmented>
-                    <Button size="slim" onClick={onToggle} pressed={initial === true}>
+                    <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
                     </Button>
-                    <Button size="slim" onClick={onToggle} pressed={initial === false}>
+                    <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
                         False
                     </Button>
                 </ButtonGroup>
@@ -114,6 +122,7 @@ function About() {
                     </VerticalStack>
                     <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                     <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
+                    <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                     <VerticalStack gap={1}>
                         <Text color="subdued">Traffic alert threshold</Text>
                         <Box width='15%'>

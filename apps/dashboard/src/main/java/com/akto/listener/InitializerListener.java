@@ -2,7 +2,6 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
-import com.akto.action.ApiCollectionsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
@@ -38,11 +37,6 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.rate_limit.ApiRateLimit;
-import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
-import com.akto.dto.testing.rate_limit.RateLimitHandler;
-import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -54,10 +48,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
-import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicyNew;
-import com.akto.telemetry.Cron;
+import com.akto.task.Cluster;
+import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
@@ -74,7 +66,6 @@ import com.akto.utils.Auth0;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.RedactSampleData;
-import com.akto.utils.Utils;
 import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.notifications.TrafficUpdates;
@@ -90,7 +81,6 @@ import com.mongodb.client.model.*;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
@@ -114,6 +104,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
+import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -1477,7 +1468,7 @@ public class InitializerListener implements ServletContextListener {
         return !isKubernetes();
     }
 
-    
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         setSubdomain();
@@ -1607,7 +1598,7 @@ public class InitializerListener implements ServletContextListener {
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
-        
+
         try {
             int gracePeriod = organization.getGracePeriod();
             String organizationId = organization.getId();
@@ -1649,7 +1640,7 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
                     LogDb.DASHBOARD);
         }
-        
+
         return organization;
     }
 
@@ -1710,7 +1701,6 @@ public class InitializerListener implements ServletContextListener {
             String val = singleTypeInfo.getApiCollectionId() + " " + singleTypeInfo.getUrl() + " " + URLMethods.Method.valueOf(singleTypeInfo.getMethod());
             loggerMaker.infoAndAddToDb(val + " - " + count, LoggerMaker.LogDb.DASHBOARD);
         }
-        
     }
 
     public void runInitializerFunctions() {
@@ -1753,8 +1743,13 @@ public class InitializerListener implements ServletContextListener {
 
         if(DashboardMode.isOnPremDeployment()) {
             telemetryExecutorService.scheduleAtFixedRate(() -> {
-                Cron cron = new Cron();
-                cron.init();
+                boolean dibs = callDibs(Cluster.TELEMETRY_CRON, 60, 60);
+                if (!dibs) {
+                    loggerMaker.infoAndAddToDb("Telemetry cron dibs not acquired, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
+                TelemetryJob job = new TelemetryJob();
+                OrganizationTask.instance.executeTask(job::run, "telemetry-cron");
             }, 0, 1, TimeUnit.MINUTES);
             loggerMaker.infoAndAddToDb("Registered telemetry cron", LogDb.DASHBOARD);
         }

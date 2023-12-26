@@ -4,9 +4,8 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Log;
+import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
-import com.akto.task.Cluster;
-import com.akto.util.AccountUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -21,49 +20,46 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.akto.task.Cluster.callDibs;
+public class TelemetryJob {
 
-public class Cron {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TelemetryJob.class);
+    private static final String telemetryUrl = "https://logs.akto.io/ingest";
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Cron.class);
-
-    private static final String accountName = AccountUtils.getAccountName();
-
-    private static final String telemetryUrl = "http://prod-usage-alb-1371096032.us-east-1.elb.amazonaws.com/ingest";
-
-    public void init(){
-        try {
-            Context.accountId.set(1_000_000);
-            loggerMaker.infoAndAddToDb("Starting telemetry cron", LoggerMaker.LogDb.DASHBOARD);
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            if (accountSettings == null) {
-                loggerMaker.infoAndAddToDb("AccountSettings is missing, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
-                return;
-            }
-            if (!accountSettings.isEnableTelemetry()) {
-                loggerMaker.infoAndAddToDb("Telemetry is disabled, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
-                return;
-            }
-            boolean dibs = callDibs(Cluster.TELEMETRY_CRON, 60, 60);
-            if(!dibs){
-                loggerMaker.infoAndAddToDb("Telemetry cron dibs not acquired, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
-                return;
-            }
-            loggerMaker.infoAndAddToDb("Running telemetry cron", LoggerMaker.LogDb.DASHBOARD);
-            Map<String, Integer> telemetryUpdateSentTsMap = accountSettings.getTelemetryUpdateSentTsMap();
-            if(telemetryUpdateSentTsMap == null){
-                telemetryUpdateSentTsMap = new HashMap<>();
-            }
-            int now = Context.now();
-            //Fetch logs from lastRunTs to now
-            fetchAndSendLogs(telemetryUpdateSentTsMap, now, LoggerMaker.LogDb.TESTING);
-            fetchAndSendLogs(telemetryUpdateSentTsMap, now, LoggerMaker.LogDb.DASHBOARD);
-            fetchAndSendLogs(telemetryUpdateSentTsMap, now, LoggerMaker.LogDb.RUNTIME);
-            fetchAndSendLogs(telemetryUpdateSentTsMap, now, LoggerMaker.LogDb.ANALYSER);
-        }catch (Exception e){
-            loggerMaker.errorAndAddToDb("Telemetry cron failed due to:" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+    public void run(Organization org) {
+        if (org == null) {
+            loggerMaker.infoAndAddToDb("Organization is missing, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
+            return;
         }
+        if(org.getAccounts() == null || org.getAccounts().isEmpty()){
+            loggerMaker.infoAndAddToDb("Organization has no accounts, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
+            return;
+        }
+        loggerMaker.infoAndAddToDb(String.format("Running telemetry cron for org: %s, which has %d accounts",org.getName(), org.getAccounts().size()), LoggerMaker.LogDb.DASHBOARD);
+        for (int accountId : org.getAccounts()) {
+            try {
+                Context.accountId.set(accountId);
+                loggerMaker.infoAndAddToDb("Running telemetry cron for account:" + accountId, LoggerMaker.LogDb.DASHBOARD);
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                if (accountSettings == null) {
+                    loggerMaker.infoAndAddToDb(String.format("AccountSettings is missing for account: %d, skipping telemetry cron", accountId), LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
+                if (!accountSettings.isEnableTelemetry()) {
+                    loggerMaker.infoAndAddToDb(String.format("Telemetry is disabled for account %d, skipping telemetry cron", accountId), LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
 
+                int now = Context.now();
+                //Fetch logs from lastRunTs to now
+                fetchAndSendLogs(now, LoggerMaker.LogDb.TESTING, org.getId(), accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.DASHBOARD, org.getId(), accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.RUNTIME, org.getId(), accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.ANALYSER, org.getId(), accountId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Telemetry cron failed due to:" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            }
+
+        }
     }
 
     private static AccountsContextDao<Log> getInstance(LoggerMaker.LogDb dbName){
@@ -74,28 +70,35 @@ public class Cron {
                 return RuntimeLogsDao.instance;
             case ANALYSER:
                 return AnalyserLogsDao.instance;
+            case BILLING:
+                return BillingLogsDao.instance;
             default:
                 return LogsDao.instance;
         }
     }
 
-    public static void fetchAndSendLogs(Map<String, Integer> telemetryUpdateSentTsMaps, int toTs, LoggerMaker.LogDb dbName){
+    public static void fetchAndSendLogs(int toTs, LoggerMaker.LogDb dbName, String orgId, int accountId){
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        Map<String, Integer> telemetryUpdateSentTsMap = accountSettings.getTelemetryUpdateSentTsMap();
+        if (telemetryUpdateSentTsMap == null) {
+            telemetryUpdateSentTsMap = new HashMap<>();
+        }
         int skip = 0;
         int limit = 100;
-        int fromTs = telemetryUpdateSentTsMaps.getOrDefault(dbName.name(), 0);
+        int fromTs = telemetryUpdateSentTsMap.getOrDefault(dbName.name(), 0);
         Bson filter = Filters.and(
                 Filters.gte(Log.TIMESTAMP, fromTs),
                 Filters.lte(Log.TIMESTAMP, toTs)
         );
         AccountsContextDao<Log> instance = getInstance(dbName);
         List<Log> logs;
-        loggerMaker.infoAndAddToDb("Starting to fetchAndSendLogs for " + dbName.name(), LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("Starting fetchAndSendLogs for " + dbName.name(), LoggerMaker.LogDb.DASHBOARD);
         do{
             //Send logs to telemetry server
             logs = instance.findAll(filter, skip, limit, Sorts.ascending(Log.TIMESTAMP), null);
             skip += limit;
             //send logs to telemetry server
-            int lastLogTs = sendLogs(logs, dbName);
+            int lastLogTs = sendLogs(logs, dbName, orgId, accountId);
             if(lastLogTs <=0) {
                 break;
             }
@@ -110,7 +113,7 @@ public class Cron {
                 .callTimeout(1, TimeUnit.SECONDS)
                 .build();
 
-    private static int sendLogs(List<Log> logs, LoggerMaker.LogDb dbName) {
+    private static int sendLogs(List<Log> logs, LoggerMaker.LogDb dbName, String orgId, int accountId) {
         if(logs.isEmpty()){
             loggerMaker.infoAndAddToDb("Logs list is empty for db:" + dbName + " skipping", LoggerMaker.LogDb.DASHBOARD);
             return 0;
@@ -126,7 +129,8 @@ public class Cron {
 
         BasicDBObject data = new BasicDBObject("service", dbName.name())
                 .append("logs", telemetryLogs)
-                .append("accountName", accountName)
+                .append("orgId", orgId)
+                .append("accountId", accountId)
                 .append("type", "TELEMETRY");
 
         MediaType mediaType = MediaType.parse("application/json");
