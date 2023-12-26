@@ -6,8 +6,7 @@ import com.akto.dao.DependencyNodeDao;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.URLStatic;
+import com.akto.dto.type.*;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
@@ -25,12 +24,14 @@ public class DependencyAnalyser {
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
     Map<Integer, DependencyNode> nodes = new HashMap<>();
+    public Map<Integer, APICatalog> dbState = new HashMap<>();
 
 
-    public DependencyAnalyser() {
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState) {
         valueStore = new HashSetStore(10_000);
         urlValueStore= new HashSetStore(10_000);
         urlParamValueStore = new HashSetStore(10_000);
+        this.dbState = dbState;
     }
 
     public void analyse(HttpResponseParams responseParams) {
@@ -48,6 +49,9 @@ public class DependencyAnalyser {
 
         if (url.endsWith(".js") || url.endsWith(".png") || url.endsWith(".css") || url.endsWith(".jpeg") ||
                 url.endsWith(".svg") || url.endsWith(".webp") || url.endsWith(".woff2")) return;
+
+        // find real url
+        url = realUrl(apiCollectionId, urlStatic).getUrl();
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
 
@@ -109,6 +113,23 @@ public class DependencyAnalyser {
 
     }
 
+    public URLStatic realUrl(int apiCollectionId, URLStatic urlStatic) {
+        APICatalog apiCatalog = this.dbState.get(apiCollectionId);
+        if (apiCatalog == null) return urlStatic;
+
+        boolean strictUrlFound = apiCatalog.getStrictURLToMethods().containsKey(urlStatic);
+        if (strictUrlFound) return urlStatic;
+
+        for (URLTemplate urlTemplate: apiCatalog.getTemplateURLToMethods().keySet()) {
+            boolean match = urlTemplate.match(urlStatic);
+            if (match) {
+                return new URLStatic(urlTemplate.getTemplateString(), urlStatic.getMethod());
+            }
+        }
+
+        return urlStatic;
+    }
+
 
     public boolean filterValues(Object val) {
         if (val == null) return false;
@@ -162,14 +183,25 @@ public class DependencyAnalyser {
     public void syncWithDb() {
         ArrayList<WriteModel<DependencyNode>> bulkUpdates = new ArrayList<>();
         for (DependencyNode dependencyNode: nodes.values()) {
+
+            String urlResp = dependencyNode.getUrlResp();
+            String apiCollectionIdResp = dependencyNode.getApiCollectionIdResp();
+            String methodResp = dependencyNode.getMethodResp();
+            urlResp = realUrl(Integer.parseInt(apiCollectionIdResp), new URLStatic(urlResp, URLMethods.Method.valueOf(methodResp))).getUrl();
+
+            String urlReq = dependencyNode.getUrlReq();
+            String apiCollectionIdReq = dependencyNode.getApiCollectionIdReq();
+            String methodReq = dependencyNode.getMethodReq();
+            urlReq = realUrl(Integer.parseInt(apiCollectionIdReq), new URLStatic(urlReq, URLMethods.Method.valueOf(methodReq))).getUrl();
+
             for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
                 Bson filter1 = Filters.and(
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, dependencyNode.getApiCollectionIdReq()),
-                        Filters.eq(DependencyNode.URL_REQ, dependencyNode.getUrlReq()),
-                        Filters.eq(DependencyNode.METHOD_REQ, dependencyNode.getMethodReq()),
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, dependencyNode.getApiCollectionIdResp()),
-                        Filters.eq(DependencyNode.URL_RESP, dependencyNode.getUrlResp()),
-                        Filters.eq(DependencyNode.METHOD_RESP, dependencyNode.getMethodResp())
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
+                        Filters.eq(DependencyNode.URL_REQ, urlReq),
+                        Filters.eq(DependencyNode.METHOD_REQ, methodReq),
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionIdResp),
+                        Filters.eq(DependencyNode.URL_RESP, urlResp),
+                        Filters.eq(DependencyNode.METHOD_RESP, methodResp)
                 );
 
                 Bson update1 = Updates.push(DependencyNode.PARAM_INFOS, new Document("$each", Collections.emptyList()));
@@ -181,12 +213,12 @@ public class DependencyAnalyser {
 
 
                 Bson filter2 = Filters.and(
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, dependencyNode.getApiCollectionIdReq()),
-                        Filters.eq(DependencyNode.URL_REQ, dependencyNode.getUrlReq()),
-                        Filters.eq(DependencyNode.METHOD_REQ, dependencyNode.getMethodReq()),
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, dependencyNode.getApiCollectionIdResp()),
-                        Filters.eq(DependencyNode.URL_RESP, dependencyNode.getUrlResp()),
-                        Filters.eq(DependencyNode.METHOD_RESP, dependencyNode.getMethodResp()),
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
+                        Filters.eq(DependencyNode.URL_REQ, urlReq),
+                        Filters.eq(DependencyNode.METHOD_REQ, methodReq),
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionIdResp),
+                        Filters.eq(DependencyNode.URL_RESP, urlResp),
+                        Filters.eq(DependencyNode.METHOD_RESP, methodResp),
                         Filters.not(Filters.elemMatch(DependencyNode.PARAM_INFOS,
                                 Filters.and(
                                         Filters.eq(DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam()),
@@ -207,12 +239,12 @@ public class DependencyAnalyser {
                 );
 
                 Bson filter3 = Filters.and(
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, dependencyNode.getApiCollectionIdReq()),
-                        Filters.eq(DependencyNode.URL_REQ, dependencyNode.getUrlReq()),
-                        Filters.eq(DependencyNode.METHOD_REQ, dependencyNode.getMethodReq()),
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, dependencyNode.getApiCollectionIdResp()),
-                        Filters.eq(DependencyNode.URL_RESP, dependencyNode.getUrlResp()),
-                        Filters.eq(DependencyNode.METHOD_RESP, dependencyNode.getMethodResp()),
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
+                        Filters.eq(DependencyNode.URL_REQ, urlReq),
+                        Filters.eq(DependencyNode.METHOD_REQ, methodReq),
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionIdResp),
+                        Filters.eq(DependencyNode.URL_RESP, urlResp),
+                        Filters.eq(DependencyNode.METHOD_RESP, methodResp),
                         Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam()),
                         Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam())
                 );

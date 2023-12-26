@@ -8,7 +8,6 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
-import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
@@ -67,7 +66,6 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
                 info.setPolicy(new AktoPolicyNew(false));
-                info.setDependencyAnalyser(new DependencyAnalyser());
                 accountHTTPParserMap.put(account.getId(), info);
 
                 try {
