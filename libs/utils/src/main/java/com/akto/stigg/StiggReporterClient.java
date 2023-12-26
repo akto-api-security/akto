@@ -1,17 +1,19 @@
 package com.akto.stigg;
 
-import com.akto.DaoInit;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Config;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 public class StiggReporterClient {
 
@@ -34,7 +36,7 @@ public class StiggReporterClient {
                         loggerMaker.errorAndAddToDb("Error while fetching stigg config: " + e.getMessage(), LoggerMaker.LogDb.BILLING);
                     }
 
-                    if (stiggConfig != null && stiggConfig.getFreePlanId() == null) {
+                    if (stiggConfig != null && stiggConfig.getSaasFreePlanId() == null  && stiggConfig.getOnPremFreePlanId() == null) {
                         loggerMaker.errorAndAddToDb("No free planId found in stigg config", LoggerMaker.LogDb.BILLING);
                     }
                 }
@@ -77,37 +79,7 @@ public class StiggReporterClient {
 
     }
 
-    public boolean isOverage(String customerId) {
-        BasicDBList l = fetchEntitlements(customerId);
-        if (l.size() == 0) return false;
 
-        boolean result = false;
-
-        for(Object o: l) {
-            try {
-                BasicDBObject bO = (BasicDBObject) o;
-                Object usageLimitObj = bO.get("usageLimit");
-
-                if (usageLimitObj == null) {
-                    continue;
-                }
-
-                if (StringUtils.isNumeric(usageLimitObj.toString())) {
-                    int usageLimit = Integer.parseInt(usageLimitObj.toString());
-                    int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
-                    if (usage > usageLimit) {
-                        return true;
-                    }
-
-                }
-            } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
-                continue;
-            }
-        }
-
-        return result;
-    }
 
     public BasicDBList fetchEntitlements(String customerId) {
         BasicDBObject varsObj = new BasicDBObject("input", new BasicDBObject("customerId", customerId));
@@ -120,6 +92,12 @@ public class StiggReporterClient {
                 "    customerId\\n" +
                 "    entitlementUpdatedAt\\n" +
                 "    usageLimit\\n" +
+                "    isGranted\\n" +
+                "    feature { "    +
+                "    id " +
+                "    refId " +
+                "    additionalMetaData " +
+                "  }" +
             "}}";
 
         BasicDBObject obj = BasicDBObject.parse(executeGraphQL(queryQ, inputVariables));
@@ -128,6 +106,30 @@ public class StiggReporterClient {
 
         BasicDBObject data = (BasicDBObject) obj.getOrDefault("data", new BasicDBObject());
         return (BasicDBList) data.getOrDefault("entitlements", new BasicDBList());
+    }
+
+    public BasicDBObject fetchOrgMetaData(String customerId) {
+        BasicDBObject varsObj = new BasicDBObject("input", new BasicDBObject("customerId", customerId));
+
+        String inputVariables = varsObj.toString();
+
+        String queryQ =
+            "query GetCustomerByRefId($input: GetCustomerByRefIdInput!) { getCustomerByRefId(input: $input) { " +
+            "  additionalMetaData\\n " + 
+            "}}";
+
+        BasicDBObject obj = BasicDBObject.parse(executeGraphQL(queryQ, inputVariables));
+
+        loggerMaker.infoAndAddToDb("OrgInfo for customerId: " + customerId + " " + obj.toJson(), LoggerMaker.LogDb.BILLING);
+
+        BasicDBObject data = (BasicDBObject) obj.getOrDefault("data", new BasicDBObject());
+        BasicDBObject customer = (BasicDBObject) data.getOrDefault("getCustomerByRefId", new BasicDBObject());
+        BasicDBObject additionalMetaData = (BasicDBObject) customer.getOrDefault("additionalMetaData",
+                new BasicDBObject());
+        if (additionalMetaData == null) {
+            additionalMetaData = new BasicDBObject();
+        }
+        return additionalMetaData;    
     }
 
     public String reportUsage(int value, String customerId, String featureId) throws IOException {
@@ -198,14 +200,14 @@ public class StiggReporterClient {
             new BasicDBObject("customerId", organization.getId())
             .append("name", organization.getName())
             .append("email", organization.getAdminEmail())
-            .append("subscriptionParams", new BasicDBObject("planId", stiggConfig.getFreePlanId()))
+            .append("subscriptionParams", new BasicDBObject("planId", organization.isOnPrem() ? stiggConfig.getOnPremFreePlanId(): stiggConfig.getSaasFreePlanId()))
         ).toString();
 
         String out = executeGraphQL(mutationQ, inputVariables);
 
         loggerMaker.infoAndAddToDb("Provisioning customer organization: " + organization.getId() + " " + out, LoggerMaker.LogDb.BILLING);
 
-        return provisionSubscription(organization.getId(), stiggConfig.getFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
+        return provisionSubscription(organization.getId(), organization.isOnPrem() ? stiggConfig.getOnPremFreePlanId() : stiggConfig.getSaasFreePlanId(), "ANNUALLY", "https://some.checkout.url", "https://some.checkout.url");
     }
 
     public Config.StiggConfig getStiggConfig() {

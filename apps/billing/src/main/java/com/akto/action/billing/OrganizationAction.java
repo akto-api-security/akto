@@ -5,11 +5,13 @@ import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.stigg.StiggReporterClient;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.bson.conversions.Bson;
 
+import static com.opensymphony.xwork2.Action.ERROR;
 import static com.opensymphony.xwork2.Action.SUCCESS;
 
 public class OrganizationAction {
@@ -40,7 +42,7 @@ public class OrganizationAction {
                 OrganizationsDao.instance.updateOne(Organization.ID, organization.getId(), updatesQ);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while creating organization. Error: %s", e.getMessage()), LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e,String.format("Error while creating organization. Error: %s", e.getMessage()), LogDb.BILLING);
             return Action.ERROR.toUpperCase();
         }
 

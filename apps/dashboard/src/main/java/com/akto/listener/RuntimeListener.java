@@ -72,7 +72,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                     initialiseDemoCollections();
                     addSampleData();
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
                 }
             }
         }, "runtime-listner-task");
@@ -97,7 +97,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         try {
             harString = new Scanner(new URL(url).openStream(), "UTF-8").useDelimiter("\\A").next();
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error downlaoding from github: " + e, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error downlaoding from github: " + e, LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -107,7 +107,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             String tokenJsonString = new Scanner(new URL(tokensUrl).openStream(), "UTF-8").useDelimiter("\\A").next();
             tokens = new Gson().fromJson(tokenJsonString, Map.class);
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error downloading from github: " + e, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error downloading from github: " + e, LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -124,7 +124,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         try {
             harAction.execute();
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error: " + e, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
 
         // auth mechanism
@@ -222,7 +222,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
         } catch (Exception e) {
             // add log
-            loggerMaker.errorAndAddToDb("error inserting vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"error inserting vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
 
     }
@@ -299,7 +299,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                         }
                     }
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("error inserting demo vul req", LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e,"error inserting demo vul req", LoggerMaker.LogDb.DASHBOARD);
                 }
                 
 
@@ -309,7 +309,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
         } catch (Exception e) {
             // add log
-            loggerMaker.errorAndAddToDb("error inserting llm vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"error inserting llm vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
 
     }
