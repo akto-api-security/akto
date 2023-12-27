@@ -1227,6 +1227,12 @@ handleKeyPress (event, funcToCall) {
     })
     return filters;
   },
+  addPlurality(count){
+    if(count == null || count==undefined){
+      return ""
+    }
+    return count === 1 ? "" : "s" 
+  },
   convertQueryParamsToUrl(queryParams) {
     let url = ""
     let first = true;
