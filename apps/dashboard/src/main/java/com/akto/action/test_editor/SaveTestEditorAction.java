@@ -88,50 +88,22 @@ public class SaveTestEditorAction extends UserAction {
             mapper.findAndRegisterModules();
             Map<String, Object> config = mapper.readValue(content, Map.class);
             Object info = config.get("info");
+            if (info == null) {
+                return ERROR.toUpperCase();
+            }
 
-            // adding all fields check for info in editor
+            // adding all necessary fields check for info in editor
             InfoParser parser = new InfoParser();
             Info convertedInfo = parser.parse(info);
-            Set<String> optionalFields = new HashSet<>();
-            optionalFields.add(Info._TAGS);
-            optionalFields.add(Info._REFERENCES);
-            optionalFields.add(Info._CWE);
-            optionalFields.add(Info._CVE);
-            List<String> fields = new ArrayList<>();
-            boolean anyFieldNull = Arrays.stream(Info.class.getDeclaredFields()).anyMatch(field -> {
-                try {
-                    if(!optionalFields.contains(field.getName())){
-                        field.setAccessible(true);
-                        if(field.get(convertedInfo) == null){
-                            fields.add(field.getName());
-                            return true;
-                        }else if(field.getName() == Info._CATEGORY){
-                            Category category = (Category) field.get(convertedInfo);
-                            if(category.getDisplayName() == null){
-                                fields.add("Category's displayName");
-                                return true;
-                            }else if(category.getName() == null){
-                                fields.add("Category's name");
-                                return true;
-                            }else if(category.getShortName() == null){
-                                fields.add("Category's shortName");
-                                return true;
-                            }
-                        }{
-                            return false;
-                        }
-                    }else{
-                        return false;
-                    }               
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                    return true;
-                }
-            });
-            if (info == null || anyFieldNull) {
-                String absentField = fields.isEmpty() ? TestConfig._INFO : String.join(", ", fields);
-                String message = "Error in template: " + absentField + " absent";
-                addActionError(message);
+
+            if (convertedInfo.getName() == null || convertedInfo.getDescription() == null
+                    || convertedInfo.getDetails() == null || convertedInfo.getCategory() == null
+                    || convertedInfo.getSeverity() == null || convertedInfo.getSubCategory() == null) {
+                return ERROR.toUpperCase();
+            }
+
+            Category category = convertedInfo.getCategory();
+            if (category.getName() == null || category.getDisplayName() == null || category.getShortName() == null) {
                 return ERROR.toUpperCase();
             }
 

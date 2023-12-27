@@ -10,7 +10,6 @@ public class TestConfig {
     private String id;
     
     private Info info;
-    public static final String _INFO = "info";
 
     private Auth auth;
 
