@@ -1304,7 +1304,11 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        updateCustomCollections();
+                        try {
+                            updateCustomCollections();
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
                     }
                 }, "update-custom-collections");
             }
