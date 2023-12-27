@@ -13,23 +13,18 @@ public class Info {
     private String impact;
 
     private Category category;
-    public static final String _CATEGORY = "category";
 
     private String subCategory;
 
     private String severity;
 
     private List<String> tags;
-    public static final String _TAGS = "tags";
 
     private List<String> references;
-    public static final String _REFERENCES = "references";
 
     private List<String> cwe;
-    public static final String _CWE = "cwe";
 
     private List<String> cve;
-    public static final String _CVE = "cve";
 
     public Info(String name, String description, String details, String impact, Category category, String subCategory,
             String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve) {
