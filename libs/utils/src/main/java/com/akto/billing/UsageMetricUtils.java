@@ -4,16 +4,20 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import org.json.JSONObject;
 
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
@@ -118,6 +122,52 @@ public class UsageMetricUtils {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD, true);
         }
+    }
+
+    public static boolean checkMeteredOverage(int accountId, String featureLabel) {
+
+        try {
+
+            if (!DashboardMode.isMetered()) {
+                return false;
+            }
+
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.in(Organization.ACCOUNTS, accountId));
+
+            if (organization == null) {
+                throw new Exception("Organization not found");
+            }
+
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+
+            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+                throw new Exception("feature map not found or empty for organization " + organization.getId());
+            }
+
+            FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(featureLabel, null);
+
+            int gracePeriod = organization.getGracePeriod();
+
+            // stop access if feature is not found or overage
+            return featureAccess == null || !featureAccess.getIsGranted()
+                    || featureAccess.checkOverageAfterGrace(gracePeriod);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to check metered overage. Error - " + e.getMessage(),
+                    LogDb.DASHBOARD);
+        }
+
+        // allow access by default and in case of errors.
+        return false;
+    }
+
+    public static boolean checkActiveEndpointOverage(int accountId){
+        return checkMeteredOverage(accountId, MetricTypes.ACTIVE_ENDPOINTS.name());
+    }
+
+    public static boolean checkTestRunsOverage(int accountId){
+        return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS.name());
     }
 
 }

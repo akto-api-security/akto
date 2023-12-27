@@ -133,7 +133,7 @@ function TestRoleSettings() {
                     draft[action.index].operator = func.getConditions(selectOptions, action.obj.type)[0].label
                 }
                 draft[action.index] = {...draft[action.index], ...action.obj}; break;
-            case "delete": draft = draft.filter((item, index) => index !== action.index);
+            case "delete": return draft.filter((item, index) => index !== action.index);
             default: break;
         }
     }

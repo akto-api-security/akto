@@ -35,31 +35,6 @@ public class UsageAction implements ServletRequestAware {
     private int usageLowerBound;
     private int usageUpperBound;
 
-    public String aggregateAccountWiseUsage() {
-
-        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-            @Override
-            public void accept(Organization organization) {
-
-                UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
-            }
-        }, "aggregateAccountWiseUsage");
-
-
-        return SUCCESS.toUpperCase();
-    }
-
-    public String sendDataToSinks() {
-        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-            @Override
-            public void accept(Organization organization) {
-                UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
-            }
-        }, "aggregateAccountWiseUsage");
-
-        return SUCCESS.toUpperCase();
-    }
-
     public String ingestUsage() {
         try {
             String organizationId = usageMetric.getOrganizationId();
@@ -95,14 +70,14 @@ public class UsageAction implements ServletRequestAware {
 
                     loggerMaker.infoAndAddToDb(String.format("Updated ACTIVE_ACCOUNTS for organization %s", organizationId), LogDb.BILLING);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while updating ACTIVE_ACCOUNTS for organization %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
+                    loggerMaker.errorAndAddToDb(e, String.format("Error while updating ACTIVE_ACCOUNTS for organization %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
                     return Action.ERROR.toUpperCase();
                 }
             }
 
             UsageMetricsDao.instance.insertOne(usageMetric);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while ingesting usage metric. Error: %s", e.getMessage()), LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e, String.format("Error while ingesting usage metric. Error: %s", e.getMessage()), LogDb.BILLING);
             return Action.ERROR.toUpperCase();
         }
     

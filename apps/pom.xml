@@ -48,7 +48,7 @@
                 <module>testing</module>
             </modules>
         </profile>
-         <profile>
+        <profile>
             <id>billing</id>
             <activation>
                 <file>
@@ -57,6 +57,17 @@
             </activation>
             <modules>
                 <module>billing</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>internal</id>
+            <activation>
+                <file>
+                    <exists>internal/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>internal</module>
             </modules>
         </profile>
         <profile>

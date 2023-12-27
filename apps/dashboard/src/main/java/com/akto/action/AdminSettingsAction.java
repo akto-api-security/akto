@@ -1,9 +1,12 @@
 package com.akto.action;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.runtime.Main;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.checkerframework.checker.units.qual.C;
@@ -17,10 +20,12 @@ public class AdminSettingsAction extends UserAction {
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
 
+    private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        organization = OrganizationsDao.instance.findOne(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -165,5 +170,9 @@ public class AdminSettingsAction extends UserAction {
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
+    }
+
+    public Organization getOrganization() {
+        return organization;
     }
 }

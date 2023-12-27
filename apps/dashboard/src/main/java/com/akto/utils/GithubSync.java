@@ -12,6 +12,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -67,7 +68,7 @@ public class GithubSync {
                 githubFile = new GithubFile(fileName, filePath, fileContents, latestSha);
             }
         } catch (IOException ex) {
-            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s from repo %s", filePath, repo), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(ex, String.format("Error while syncing file %s from repo %s", filePath, repo), LogDb.DASHBOARD);
         }
 
         return githubFile;
@@ -107,7 +108,7 @@ public class GithubSync {
                 }
             }
         } catch (Exception ex) {
-            loggerMaker.errorAndAddToDb(String.format("Error while syncing files from directory %s in Github repo %s %s ", repo, dirPath, ex.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(ex,String.format("Error while syncing files from directory %s in Github repo %s %s ", repo, dirPath, ex.toString()), LogDb.DASHBOARD);
             return null;
         }
         
@@ -115,9 +116,16 @@ public class GithubSync {
     }
 
     public byte[] syncRepo(String repo, String branch) {
-        byte[] repoZip = null;
 
         String url = String.format("https://github.com/%s/archive/refs/heads/%s.zip", repo, branch);
+
+        return syncRepo(url);
+    }
+
+    private static final long REPO_SIZE_LIMIT = 1024*1024*10; // 10 MB
+
+    public byte[] syncRepo(String url) {
+        byte[] repoZip = null;
 
         HttpClient httpClient = HttpClients.createDefault();
         HttpGet httpGet = new HttpGet(url);
@@ -126,15 +134,25 @@ public class GithubSync {
             HttpResponse response = httpClient.execute(httpGet);
 
             if (response.getStatusLine().getStatusCode() == 200) {
+
+                long content_length = 0;
+                Header content_length_header = response.getFirstHeader("content-length");
+                if (content_length_header != null) {
+                    content_length = Long.parseLong(content_length_header.getValue());
+                }
+                if (content_length > REPO_SIZE_LIMIT) {
+                    throw new Exception("Repo size is too large, max allowed size is 10 MB");
+                }
+
                 loggerMaker.infoAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 response.getEntity().writeTo(outputStream);
                 repoZip = outputStream.toByteArray();
             } else {
-                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD, true);
+                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD);
             }
         } catch (Exception ex) {
-            loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD, true);
+            loggerMaker.errorAndAddToDb(ex, String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD);
         } 
         finally {
             httpGet.releaseConnection();

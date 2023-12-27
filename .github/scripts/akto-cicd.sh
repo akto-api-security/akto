@@ -34,7 +34,7 @@ echo "### Akto test summary" >> $GITHUB_STEP_SUMMARY
 while true; do
   current_time=$(date +%s)
   elapsed_time=$((current_time - start_time))
-  
+
   if ((elapsed_time >= MAX_POLL_INTERVAL)); then
     echo "Max poll interval reached. Exiting."
     break
