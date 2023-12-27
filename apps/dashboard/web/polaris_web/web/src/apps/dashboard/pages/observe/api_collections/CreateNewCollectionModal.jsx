@@ -77,7 +77,6 @@ function CreateNewCollectionModal(props) {
 
     const VerifyConditions = async () => {
         let dt = prepareData();
-            console.log(dt);
         let res = await api.getEndpointsFromConditions(dt);
         if(res){
             setApiCount(
