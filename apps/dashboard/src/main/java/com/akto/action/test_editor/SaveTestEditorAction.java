@@ -106,6 +106,7 @@ public class SaveTestEditorAction extends UserAction {
             Map<String, Object> config = mapper.readValue(content, Map.class);
             Object info = config.get("info");
             if (info == null) {
+                addActionError("info is null");
                 return ERROR.toUpperCase();
             }
 
@@ -116,6 +117,7 @@ public class SaveTestEditorAction extends UserAction {
             if (convertedInfo.getName() == null || convertedInfo.getDescription() == null
                     || convertedInfo.getDetails() == null || convertedInfo.getCategory() == null
                     || convertedInfo.getSeverity() == null || convertedInfo.getSubCategory() == null) {
+                addActionError("info information is not complete.");
                 return ERROR.toUpperCase();
             }
 
