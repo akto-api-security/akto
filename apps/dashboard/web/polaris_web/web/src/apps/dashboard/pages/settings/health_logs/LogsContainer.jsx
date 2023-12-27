@@ -1,4 +1,4 @@
-import { Scrollable, Spinner } from "@shopify/polaris";
+import { Scrollable, Spinner, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import { tokens } from "@shopify/polaris-tokens"
 
@@ -30,16 +30,15 @@ const LogsContainer = ({ logs }) => {
              <div>
                 {logsFetchBetween()}
             </div>
-            <br />
+            <br/>
 
-            <Scrollable style={{height: '30vh'}}>
+            <Scrollable style={{maxHeight: '40vh'}}>
                {logContent.map((logText, idx) => (
-                <div key={idx}>
-                    <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"], lineHeight: "16px", letterSpacing: "0px", textAlign: "left"}}>
+                <VerticalStack gap={1} key={idx}>
+                    <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                         {logText}
                     </div>
-                    <br />
-                </div>
+                </VerticalStack>
                ))}
             </Scrollable>
         </div>

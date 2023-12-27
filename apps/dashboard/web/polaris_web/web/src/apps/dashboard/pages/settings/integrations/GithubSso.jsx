@@ -48,23 +48,23 @@ function GithubSso() {
     const cardContent = "Enable Login via GitHub on  your Akto dashboard"
 
     const listComponent = (
-        
-        <LegacyCard.Section 
+
+        <LegacyCard.Section
             title={`Github SSO Settings`}
         >
-            <TextField 
+            <TextField
                 label="Github Client Id"
-                value={githubClientId} 
-                onChange={githubPresent ? () => {} : (githubClientId) => setGithubClientId(githubClientId)} 
+                value={githubClientId}
+                onChange={githubPresent ? () => {} : (githubClientId) => setGithubClientId(githubClientId)}
             />
 
-            <TextField 
+            <TextField
                 label="Github Client Secret"
-                value={githubPresent ? "********************************": githubClientSecret} 
-                onChange={(githubClientSecret) => setGithubClientSecret(githubClientSecret)} 
+                value={githubPresent ? "********************************": githubClientSecret}
+                onChange={(githubClientSecret) => setGithubClientSecret(githubClientSecret)}
             />
         </LegacyCard.Section>
-        
+
     )
 
     let modal = (
@@ -88,7 +88,7 @@ function GithubSso() {
 
     const card = (
         <LegacyCard title="GitHub SSO"
-        primaryFooterAction={{ content: (githubPresent ? 'Delete GitHub SSO' : 'Add GitHub SSO'), onAction: () => setShowGithubSsoModal(true) }} 
+        primaryFooterAction={{ content: (githubPresent ? 'Delete GitHub SSO' : 'Add GitHub SSO'), onAction: () => setShowGithubSsoModal(true) }}
         >
             {listComponent}
         </LegacyCard>

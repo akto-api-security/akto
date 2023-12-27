@@ -273,7 +273,7 @@ function SingleTestRunPage() {
       await fetchData(true);
     }
     loadData();
-  }, [])
+  }, [subCategoryMap])
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
@@ -297,6 +297,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       case "COMPLETED":
         return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of
         ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
+      case "FAILED":
       case "FAIL":
         return "Test execution has failed during run";
       default:

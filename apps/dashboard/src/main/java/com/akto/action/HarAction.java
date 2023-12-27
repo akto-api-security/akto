@@ -3,11 +3,14 @@ package com.akto.action;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.file.FilesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.HttpResponseParams;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
+import com.akto.utils.GzipUtils;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -95,12 +98,15 @@ public class HarAction extends UserAction {
         try {
             HAR har = new HAR();
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
+            String zippedString = GzipUtils.zipString(harString);
+            com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR,zippedString);
+            FilesDao.instance.insertOne(file);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
             return SUCCESS.toUpperCase();
         }
