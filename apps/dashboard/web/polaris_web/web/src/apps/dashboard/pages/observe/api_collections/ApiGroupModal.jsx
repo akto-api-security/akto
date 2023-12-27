@@ -101,9 +101,11 @@ function ApiGroupModal(props){
         tabs.push(newTab)
     }
 
-    const title = operation === Operation.ADD ? "Add APIs to API group" : "Remove APIs from API group"
+    const plurality = func.addPlurality(getApis().length);
 
-    const buttonTitle = operation === Operation.ADD ? "Add APIs" : "Remove APIs"
+    const title = operation === Operation.ADD ?`Add API${plurality} to API group` : `Remove API${plurality} from API group`
+
+    const buttonTitle = operation === Operation.ADD ? `Add API${plurality}` : `Remove API${plurality}`
 
     const buttonAction = operation === Operation.ADD ? addAPIs : removeAPIs
 
@@ -134,7 +136,7 @@ function ApiGroupModal(props){
                     />
                 </Modal.Section> :
                 <Modal.Section>
-                    {`Are you sure you want to remove these ${getApis().length} API${getApis().length==1 ? "" : "s"} from ${apiGroupName} ?`}
+                    {`Are you sure you want to remove ${getApis().length} API${plurality} from ${apiGroupName} ?`}
                 </Modal.Section>
             }
         </Modal>
