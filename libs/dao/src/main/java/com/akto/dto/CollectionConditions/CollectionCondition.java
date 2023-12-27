@@ -1,11 +1,7 @@
 package com.akto.dto.CollectionConditions;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.bson.conversions.Bson;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -17,9 +13,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 
 public abstract class CollectionCondition extends TestingEndpoints {
     private Operator operator;
@@ -84,8 +78,7 @@ public abstract class CollectionCondition extends TestingEndpoints {
         return condition;
     }
 
-    private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
-
+    protected static String getFilterPrefix(CollectionType type) {
         String prefix = "";
         switch (type) {
             case Id_ApiCollectionId:
@@ -100,39 +93,25 @@ public abstract class CollectionCondition extends TestingEndpoints {
             default:
                 break;
         }
-
-        return Filters.and(
-            Filters.eq(prefix + SingleTypeInfo._URL, api.getUrl()),
-            Filters.eq(prefix + SingleTypeInfo._METHOD, api.getMethod().toString()),
-            Filters.in(SingleTypeInfo._COLLECTION_IDS, api.getApiCollectionId()));
-
+        return prefix;
     }
 
-    private static Map<CollectionType, Bson> createFiltersMapWithApiList(List<ApiInfoKey> apiList){
-        Set<ApiInfoKey> apiSet = new HashSet<>(apiList);
+    public abstract Bson createFilters(CollectionType type);
+
+    public Map<CollectionType, Bson> returnFiltersMap() {
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         filtersMap.put(CollectionType.ApiCollectionId, new BasicDBObject());
         filtersMap.put(CollectionType.Id_ApiCollectionId, new BasicDBObject());
         filtersMap.put(CollectionType.Id_ApiInfoKey_ApiCollectionId, new BasicDBObject());
 
-        for(Map.Entry<CollectionType, Bson> filters: filtersMap.entrySet()){
-            List<Bson> apiFilters = new ArrayList<>();
+        for (Map.Entry<CollectionType, Bson> filters : filtersMap.entrySet()) {
             CollectionType type = filters.getKey();
-            if(apiSet != null && !apiSet.isEmpty()){
-                for (ApiInfoKey api : apiSet) {
-                    apiFilters.add(createApiFilters(type, api));
-                }
-                filters.setValue(Filters.or(apiFilters));
-            } else {
-                filters.setValue(Filters.nor(new BasicDBObject()));
-            }
+            Bson filter = createFilters(type);
+            filters.setValue(filter);
         }
         return filtersMap;
     }
 
-    public Map<CollectionType, Bson> returnFiltersMap() {
-        return createFiltersMapWithApiList(returnApis());
-    };
 
     public static boolean checkApiUsingSTI(ApiInfoKey key, Bson filter){
                 List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(
