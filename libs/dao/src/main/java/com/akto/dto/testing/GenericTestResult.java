@@ -5,6 +5,7 @@ import com.akto.dto.testing.TestResult.Confidence;
 public class GenericTestResult {
 
     private boolean vulnerable;
+    public static final String _CONFIDENCE = "confidence";
     private Confidence confidence = Confidence.HIGH;
 
     public GenericTestResult() {

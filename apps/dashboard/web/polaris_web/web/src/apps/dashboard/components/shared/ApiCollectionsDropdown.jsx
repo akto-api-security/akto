@@ -22,7 +22,7 @@ function ApiCollectionsDropdown({ selectedCollections, setSelectedCollections })
         [],
     );
 
-    const [selectedOptions, setSelectedOptions] = useState(selectedCollections);
+    const [selectedOptions, setSelectedOptions] = useState(selectedCollections ? selectedCollections : []);
     const [inputValue, setInputValue] = useState('');
     const [options, setOptions] = useState(deselectedOptions);
 
@@ -68,7 +68,7 @@ function ApiCollectionsDropdown({ selectedCollections, setSelectedCollections })
                     <Listbox.Option
                         key={`${value}`}
                         value={value}
-                        selected={selectedOptions.includes(value)}
+                        selected={selectedOptions && selectedOptions.includes(value)}
                         accessibilityLabel={label}
                     >
                         {label}

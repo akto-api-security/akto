@@ -69,7 +69,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             loggerMaker.infoAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
             return createStackResult.getStackId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
             throw e;
         }
     }
@@ -126,7 +126,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
             return resources.get(0).getPhysicalResourceId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);
             return "";
         }
     }

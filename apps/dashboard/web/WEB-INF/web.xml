@@ -179,4 +179,7 @@
     <listener>
         <listener-class>com.akto.listener.InfraMetricsListener</listener-class>
     </listener>
+    <listener>
+        <listener-class>com.akto.listener.RequestEventListener</listener-class>
+    </listener>
 </web-app>

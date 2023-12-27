@@ -3,6 +3,7 @@ package com.akto.action.test_editor;
 import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
@@ -10,12 +11,14 @@ import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -24,20 +27,26 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
@@ -45,11 +54,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Stream;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 
 public class SaveTestEditorAction extends UserAction {
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
 
     @Override
     public String execute() throws Exception {
@@ -66,6 +80,9 @@ public class SaveTestEditorAction extends UserAction {
     private TestingRunIssues testingRunIssues;
     private Map<String, BasicDBObject> subCategoryMap;
     private boolean inactive;
+    private String repositoryUrl;
+    private HashMap<String, Integer> testCountMap;
+
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -175,17 +192,30 @@ public class SaveTestEditorAction extends UserAction {
 
         YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));        
         if (template == null || template.getSource() == YamlTemplateSource.CUSTOM) {
-            YamlTemplateDao.instance.updateOne(
-                    Filters.eq("_id", id),
-                    Updates.combine(
+
+            List<Bson> updates = new ArrayList<>(
+                    Arrays.asList(
                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                             Updates.set(YamlTemplate.CONTENT, content),
                             Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-                            Updates.setOnInsert(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM)
-                    )
-            );
+                            Updates.setOnInsert(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM)));
+            
+            try {
+                // If the field does not exist in the template then we will not overwrite the existing value
+                Object inactiveObject = TestConfigYamlParser.getFieldIfExists(content, YamlTemplate.INACTIVE);
+                if (inactiveObject != null && inactiveObject instanceof Boolean) {
+                    boolean inactive = (boolean) inactiveObject;
+                    updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
+                }
+            } catch (Exception e) {
+            }
+
+            YamlTemplateDao.instance.updateOne(
+                    Filters.eq(Constants.ID, id),
+                    Updates.combine(updates));
+
         } else {
             addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
@@ -282,6 +312,136 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        return SUCCESS.toUpperCase();
+    }
+
+    private void updateTemplates(int accountId, String author, String repositoryUrl) {
+    executorService.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+                    GithubSync githubSync = new GithubSync();
+                    byte[] repoZip = githubSync.syncRepo(repositoryUrl);
+                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
+    }
+
+    private boolean checkEmptyRepoString() {
+        return repositoryUrl == null && !repositoryUrl.isEmpty() ;
+    }
+
+    public String syncCustomLibrary(){
+
+        if (checkEmptyRepoString()) {
+            addActionError("Repository url cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+        List<TestLibrary> testLibraries = accountSettings.getTestLibraries();
+        TestLibrary testLibrary = null;
+
+        if(testLibraries != null){
+            testLibrary = testLibraries.stream()
+                    .filter(testLibrary1 -> testLibrary1.getRepositoryUrl().equals(repositoryUrl))
+                    .findFirst().orElse(null);
+        }
+
+        if(testLibrary == null){
+            addActionError("Test library not found");
+            return ERROR.toUpperCase();
+        }
+
+        int accountId = Context.accountId.get();
+        String author = testLibrary.getAuthor();
+
+        updateTemplates(accountId, author, repositoryUrl);
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    public String addTestLibrary(){
+
+        if (checkEmptyRepoString()) {
+            addActionError("Repository url cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+        List<TestLibrary> testLibraries = accountSettings.getTestLibraries();
+
+        if (testLibraries != null &&
+                testLibraries.stream()
+                        .anyMatch(testLibrary -> testLibrary.getRepositoryUrl().equals(repositoryUrl))) {
+            addActionError("Test library already exists");
+            return ERROR.toUpperCase();
+        }
+
+        int accountId = Context.accountId.get();
+        String author = getSUser().getLogin();
+
+        TestLibrary testLibrary = new TestLibrary(repositoryUrl, author, Context.now());
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.addToSet(AccountSettings.TEST_LIBRARIES, testLibrary));
+
+        updateTemplates(accountId, author, repositoryUrl);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String removeTestLibrary(){
+
+        if (checkEmptyRepoString()) {
+            addActionError("Repository url cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        String author = getSUser().getLogin();
+        
+        BasicDBObject repoPullObj = new BasicDBObject();
+        repoPullObj.put(TestLibrary.REPOSITORY_URL, repositoryUrl);
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.pull(AccountSettings.TEST_LIBRARIES, repoPullObj ));
+        
+        YamlTemplateDao.instance.deleteAll(
+                Filters.and(
+                    Filters.eq(YamlTemplate.AUTHOR, author),
+                    Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM),
+                    Filters.eq(YamlTemplate.REPOSITORY_URL, repositoryUrl)));
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchCustomTestsCount(){
+
+        List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
+            Filters.exists(YamlTemplate.REPOSITORY_URL),
+            Projections.include(YamlTemplate.REPOSITORY_URL));
+        
+        if(testCountMap == null){
+            testCountMap = new HashMap<>();
+        }
+
+        for(YamlTemplate template : templates){
+            String repo = template.getRepositoryUrl();
+            if(testCountMap.containsKey(repo)){
+                testCountMap.put(repo, testCountMap.get(repo) + 1);
+            }else{
+                testCountMap.put(repo, 1);
+            }
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -382,6 +542,22 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setInactive(boolean inactive) {
         this.inactive = inactive;
+    }
+
+    public String getRepositoryUrl() {
+        return repositoryUrl;
+    }
+
+    public void setRepositoryUrl(String repositoryUrl) {
+        this.repositoryUrl = repositoryUrl;
+    }
+
+    public HashMap<String, Integer> getTestCountMap() {
+        return testCountMap;
+    }
+
+    public void setTestCountMap(HashMap<String, Integer> testCountMap) {
+        this.testCountMap = testCountMap;
     }
 
 }
