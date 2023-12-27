@@ -2,10 +2,8 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +26,6 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.CollectionCondition;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -68,59 +65,24 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static Set<ApiInfoKey> getApisFromConditions(List<CollectionCondition> conditions){
-        Set<ApiInfoKey> apis = new HashSet<>();
+    public static int getApisCountFromConditions(List<CollectionCondition> conditions) {
 
-        /*
-         * all AND conditions should be last
-         * so that we add all the OR apis first and then do retainAll for AND apis.
-         */
-        conditions.sort((CollectionCondition c1, CollectionCondition c2) -> {
-            if (c1.getOperator().equals(c2.getOperator())) {
-                return 0;
-            } else if (c1.getOperator().equals(CollectionCondition.Operator.OR)) {
-                return -1;
-            }
-            return 1;
-        });
-
-        /*
-         * Add the first condition to the list, so that retainAll works
-         * even if there is only one AND condition
-         */
-        if(!conditions.isEmpty()){
-            apis.addAll(conditions.get(0).returnApis());
+        if(conditions == null || conditions.isEmpty()){
+            return 0;
         }
 
-        conditions.forEach((condition) -> {
-            if(CollectionCondition.Operator.AND.equals(condition.getOperator())){
-                apis.retainAll(condition.returnApis());
-            } else {
-                apis.addAll(condition.returnApis());
-            }
-        });
+        Bson StiFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        Bson HostFilters = SingleTypeInfoDao.filterForHostHeader(0, false);
+        Bson filter = Filters.and(HostFilters, StiFilters);
 
-        return apis;
-    }
-
-    public static Set<String> getUrlsFromConditions(List<CollectionCondition> conditions){
-        Set<ApiInfoKey> apis = getApisFromConditions(conditions);
-
-        Set<String> urls = new HashSet<>();
-        apis.forEach((api) -> {
-            urls.add(api.getUrl() + " " + api.getMethod());
-        });
-        return urls;
+        return (int) SingleTypeInfoDao.instance.count(filter);
     }
 
     public static void updateApiCollection(List<CollectionCondition> conditions, int id) {
-        Set<String> urls = getUrlsFromConditions(conditions);
 
         ApiCollectionsDao.instance.updateOne(
                 Filters.eq(Constants.ID, id),
-                Updates.combine(
-                    Updates.set(ApiCollection.CONDITIONS_STRING, conditions),
-                    Updates.set(ApiCollection.URLS_STRING, urls)));
+                Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
     }
 
     private static Bson getFilters(List<CollectionCondition> conditions, CollectionType type){

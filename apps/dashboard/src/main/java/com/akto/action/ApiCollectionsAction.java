@@ -48,16 +48,9 @@ public class ApiCollectionsAction extends UserAction {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
-            if (count != null && apiCollection.getHostName() != null ) {
+            if (count != null && (apiCollection.getHostName() != null ||
+                    ApiCollection.Type.API_GROUP.equals(apiCollection.getType()))) {
                 apiCollection.setUrlsCount(count);
-            } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-                int urlsCount = 0;
-                try {
-                    urlsCount = ApiCollectionUsers.getApisFromConditions(apiCollection.getConditions()).size();
-                } catch (Exception e) {
-                    urlsCount = fallbackCount;
-                }
-                apiCollection.setUrlsCount(urlsCount);
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
             }
