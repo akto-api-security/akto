@@ -258,7 +258,7 @@ public class ApiCollectionsAction extends UserAction {
     public String getEndpointsFromConditions(){
         List<CollectionCondition> conditions = generateConditions(this.conditions);
 
-        apiCount = ApiCollectionUsers.getApisFromConditions(conditions).size();
+        apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions);
     
         return SUCCESS.toUpperCase();
     }

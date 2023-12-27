@@ -136,7 +136,7 @@ function ApiGroupModal(props){
                     />
                 </Modal.Section> :
                 <Modal.Section>
-                    {`Are you sure you want to remove ${getApis().length} API${plurality} from ${apiGroupName} ?`}
+                    {`Are you sure you want to remove ${getApis().length} API${plurality} from ${apiGroupName} [Only APIs added manually can be removed]?`}
                 </Modal.Section>
             }
         </Modal>

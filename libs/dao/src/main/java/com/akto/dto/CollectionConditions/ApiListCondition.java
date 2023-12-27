@@ -1,6 +1,5 @@
 package com.akto.dto.CollectionConditions;
 
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

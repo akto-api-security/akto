@@ -4,8 +4,11 @@ import java.util.List;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 public class MethodCondition extends CollectionCondition{
@@ -33,22 +36,38 @@ public class MethodCondition extends CollectionCondition{
         this.method = method;
     }
 
-    private Bson createFilter() {
-        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
-        Bson filter = Filters.and(Filters.eq(ApiInfoKey.METHOD, method), hostFilterQ);
-        return filter;
-    }
-
     @Override
     public List<ApiInfoKey> returnApis() {
-        Bson filter = createFilter();
-        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter);
-
+        // This returns only 50 endpoints, to avoid a huge response
+        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(method);
     }
 
     @Override
     public boolean containsApi(ApiInfoKey key) {
-        return checkApiUsingSTI(key, createFilter());
+        return key.getMethod().equals(method);
+    }
+
+    public static Bson createMethodFilter(Method method) {
+        return createMethodFilter(method, "");
+    }
+
+    private static Bson createMethodFilter(Method method, String prefix) {
+        // using the URL field in filter to utilize mongo index
+        return Filters.and(
+                Filters.regex(prefix + SingleTypeInfo._URL, ".*"),
+                Filters.eq(prefix + SingleTypeInfo._METHOD, method.toString()));
+    }
+
+    @Override
+    public Bson createFilters(CollectionType type) {
+
+        String prefix = getFilterPrefix(type);
+
+        if (method != null) {
+            return createMethodFilter(method, prefix);
+        }
+
+        return Filters.nor(new BasicDBObject());
     }
     
 }

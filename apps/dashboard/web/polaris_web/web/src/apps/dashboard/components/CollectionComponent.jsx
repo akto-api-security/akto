@@ -1,14 +1,11 @@
+import { Button } from '@shopify/polaris';
+import { DeleteMinor } from "@shopify/polaris-icons"
 import React, { useState, useEffect } from 'react'
 import DropdownSearch from './shared/DropdownSearch';
 import func from "@/util/func"
 import PersistStore from '../../main/PersistStore';
 import api from '../pages/testing/api';
 import Dropdown from './layouts/Dropdown';
-import { TextField, Button, Icon } from '@shopify/polaris';
-import { DeleteMinor, HashtagMinor } from "@shopify/polaris-icons"
-import SingleDate from './layouts/SingleDate';
-import DateRangeFilter from './layouts/DateRangeFilter';
-import values from "@/util/values";
 
 const HTTP_METHODS = [
     {'label': 'GET', 'value': 'GET'},
@@ -25,7 +22,7 @@ const HTTP_METHODS = [
 
 function CollectionComponent(props) {
 
-    const { condition, index, dispatch } = props
+    const { condition, index, dispatch, operatorComponent } = props
     const [apiEndpoints, setApiEndpoints] = useState({})
 
     useEffect(() => {
@@ -106,8 +103,8 @@ function CollectionComponent(props) {
     }
 
     function collectionComponent(condition, index) {
-        return <div style={{ display: "flex", gap: "4px" }}>
-            <div style={{ flexGrow: "1" }}>
+        return <div style={{ display: "flex", gap: "4px", flexGrow: "1" }}>
+            <div style={{ flex: "3" }}>
                 <DropdownSearch
                     id={`api-collection-${index}`}
                     placeholder="Select API collection"
@@ -117,7 +114,7 @@ function CollectionComponent(props) {
                     value={mapCollectionIdToName[getCollectionId(condition.data)]}
                 />
             </div>
-            <div style={{ flexGrow: "1" }}>
+            <div style={{ flex: "5" }}>
                 <DropdownSearch
                     id={`api-endpoint-${index}`}
                     disabled={apiEndpoints?.endpoints == undefined || apiEndpoints.endpoints.length === 0}
@@ -144,10 +141,6 @@ function CollectionComponent(props) {
                 return {}
             case "METHOD":
                 return {method:"GET"}
-            case "PARAM":
-                return {paramLocation: "HEADER_REQUEST"}
-            case "TIMESTAMP":
-                return {key: "lastSeen", type:"START", startTimestamp: new Date() }
         }
     }
 
@@ -161,14 +154,6 @@ function CollectionComponent(props) {
             {
                 label: 'Method',
                 value: 'METHOD'
-            },
-            {
-                label: 'Param',
-                value: 'PARAM'
-            },
-            {
-                label: 'Timestamp',
-                value: 'TIMESTAMP'
             }]}
             initial={condition.type}
             selected={(value) => {
@@ -176,52 +161,6 @@ function CollectionComponent(props) {
                 dispatch({ type: "updateKey", index: index, key: "type", obj: value })
             }} />
     )
-
-    const timestampComponent = (condition, index) => {
-        
-        switch(condition.data.type){
-            case "START":
-                let data = condition?.data?.startTimestamp;
-                let dataKey = "startTimestamp";
-            case "END":
-                data = condition?.data?.endTimestamp;
-                dataKey = "endTimestamp";
-
-                return <SingleDate
-                    id={`TIMESTAMP-END-${index}`}
-                    key={`TIMESTAMP-END-${index}`}
-                    data={data}
-                    dispatch={dispatch}
-                    dataKey={dataKey}
-                    index={index}
-                />
-            case "BETWEEN":
-                return <div style={{width: "fit-content"}}>
-                    <DateRangeFilter 
-                id={`TIMESTAMP-BETWEEN-${index}`}
-                key={`TIMESTAMP-BETWEEN-${index}`}
-                initialDispatch = {condition?.data?.period} 
-                dispatch={(dateObj) => dispatch({type: "update", index: index, key: "data", 
-                obj: { period: dateObj.period, title: dateObj.title, alias: dateObj.alias } })}
-                />
-                </div>
-            case "PERIOD":
-                return  <TextField
-                id={`TIMESTAMP-PERIOD-${index}`}
-                key={`TIMESTAMP-PERIOD-${index}`}
-                prefix={<Icon source={HashtagMinor} color="subdued" />}
-                placeholder={"No. of days"}
-                type="number"
-                min={1}
-                value={condition?.data?.periodInSeconds != undefined ? condition?.data?.periodInSeconds/86400 : undefined}
-                onChange={(value) => {
-                    dispatch({ type: "update", index: index, key: "data", obj: { "periodInSeconds": Number(value)*86400 } })
-                }}
-            />
-            default: break; 
-        }
-
-    }
 
     const component = (condition, index) => {
         switch (condition.type) {
@@ -239,106 +178,6 @@ function CollectionComponent(props) {
                             dispatch({ type: "update", index: index, key: "data", obj: { "method": value } })
                         }} />
                 </>;
-            case "TIMESTAMP":
-                return <>
-                    <Dropdown
-                        id={`TIMESTAMP-${index}`}
-                        key={`TIMESTAMP-${index}`}
-                        menuItems={[{
-                            label: 'Last seen',
-                            value: 'lastSeen'
-                        },{
-                            label: 'Discovered',
-                            value: 'timestamp',
-                        }]}
-                        initial={condition?.data?.key || "Last seen"}
-                        selected={(value) => {
-                            dispatch({ type: "update", index: index, key: "data", obj: { "key": value } })
-                        }} />
-                    <Dropdown
-                        id={`TIMESTAMP-TYPE-${index}`}
-                        key={`TIMESTAMP-TYPE-${index}`}
-                        menuItems={[{
-                            label: 'Start time',
-                            value: 'START',
-                        },
-                        {
-                            label: 'End time',
-                            value: 'END'
-                        },
-                        {
-                            label: 'Start and end time',
-                            value: 'BETWEEN'
-                        },{
-                            label: 'Last X days',
-                            value: 'PERIOD'
-                        }]}
-                        initial={condition?.data?.type}
-                        selected={(value) => {
-                            dispatch({ type: "update", index: index, key: "data", obj: { "type": value } })
-                            switch(value){
-                                case "START":
-                                    dispatch({ type: "update", index: index, key: "data", obj: { "startTimestamp": new Date() } })
-                                    break;
-                                case "END":
-                                    dispatch({ type: "update", index: index, key: "data", obj: { "endTimestamp": new Date() } })
-                                    break;
-                                case "BETWEEN":
-                                    dispatch({ type: "update", index: index, key: "data", obj: { "period": values.ranges[3] } })
-                                    break;
-                                case "PERIOD":
-                                    dispatch({ type: "update", index: index, key: "data", obj: { "periodInSeconds": 86400*7 } })
-                                    break;
-                                default: break;
-                            }
-                        }} />
-                    {timestampComponent(condition, index)}
-                </>
-
-            case "PARAM":
-                return <>
-                    <Dropdown
-                        id={`PARAM-LOCATION-${index}`}
-                        key={`PARAM-LOCATION-${index}`}
-                        menuItems={[{
-                            label: 'In request header',
-                            value: 'HEADER_REQUEST',
-                        },
-                        {
-                            label: 'In response header',
-                            value: 'HEADER_RESPONSE'
-                        },
-                        {
-                            label: 'In request payload',
-                            value: 'PAYLOAD_REQUEST'
-                        },
-                        {
-                            label: 'In response payload',
-                            value: 'PAYLOAD_RESPONSE'
-                        }]}
-                        initial={condition?.data?.paramLocation}
-                        selected={(value) => {
-                            dispatch({ type: "update", index: index, key: "data", obj: { "paramLocation": value } })
-                        }} />
-                    <TextField
-                        id={`PARAM-PARAM-${index}`}
-                        key={`PARAM-PARAM-${index}`}
-                        placeholder={"param"}
-                        value={condition?.data?.param}
-                        onChange={(value) => {
-                            dispatch({ type: "update", index: index, key: "data", obj: { "param": value } })
-                        }}
-                    />
-                    <TextField
-                        id={`PARAM-VALUE-${index}`}
-                        key={`PARAM-VALUE-${index}`}
-                        placeholder={"value"}
-                        value={condition?.data?.value}
-                        onChange={(value) => {
-                            dispatch({ type: "update", index: index, key: "data", obj: { "value": value } })
-                        }}
-                    />
-                </>
             default: break;
         }
     }
@@ -349,6 +188,7 @@ function CollectionComponent(props) {
 
     return (
         <div style={{ display: "flex", gap: "4px" }}>
+            {operatorComponent}
             {prefixLeft(condition, index)}
             {component(condition, index)}
             <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
