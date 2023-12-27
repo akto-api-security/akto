@@ -1304,7 +1304,7 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        webhookSender();
+                        updateCustomCollections();
                     }
                 }, "update-custom-collections");
             }
