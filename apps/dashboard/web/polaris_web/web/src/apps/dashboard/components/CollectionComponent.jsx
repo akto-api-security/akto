@@ -181,23 +181,20 @@ function CollectionComponent(props) {
         
         switch(condition.data.type){
             case "START":
-                return  <SingleDate
-                id={`TIMESTAMP-START-${index}`}
-                key={`TIMESTAMP-START-${index}`}
-                data = {condition?.data?.startTimestamp}
-                dispatch = {dispatch}
-                dataKey={"startTimestamp"}
-                index = {index}
-            />
+                let data = condition?.data?.startTimestamp;
+                let dataKey = "startTimestamp";
             case "END":
+                data = condition?.data?.endTimestamp;
+                dataKey = "endTimestamp";
+
                 return <SingleDate
-                id={`TIMESTAMP-END-${index}`}
-                key={`TIMESTAMP-END-${index}`}
-                data = {condition?.data?.endTimestamp}
-                dispatch = {dispatch}
-                dataKey={"endTimestamp"}
-                index = {index}
-            />
+                    id={`TIMESTAMP-END-${index}`}
+                    key={`TIMESTAMP-END-${index}`}
+                    data={data}
+                    dispatch={dispatch}
+                    dataKey={dataKey}
+                    index={index}
+                />
             case "BETWEEN":
                 return <div style={{width: "fit-content"}}>
                     <DateRangeFilter 

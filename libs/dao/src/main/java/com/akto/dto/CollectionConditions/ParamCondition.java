@@ -1,13 +1,9 @@
 package com.akto.dto.CollectionConditions;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
+import java.util.List;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
@@ -35,8 +31,7 @@ public class ParamCondition extends CollectionCondition{
         super(Type.PARAM, operator);
     }
 
-    @Override
-    public Set<ApiInfoKey> returnApis() {
+    private Bson createFilter() {
 
         Bson responseFilter;
 
@@ -63,15 +58,18 @@ public class ParamCondition extends CollectionCondition{
             Filters.eq(SingleTypeInfo._PARAM, param),
             Filters.in(SingleTypeInfo._VALUES_ELEMENTS, value));
 
-        // values not present for mirrored collections.
-        // either use sampleData to STI and then do this or use regex queries on sample data.
-
-        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter).stream().collect(Collectors.toSet());
+        return filter;
     }
 
     @Override
-    public Map<CollectionType, Bson> returnFiltersMap() {
-        return CollectionCondition.createFiltersMapWithApiList(returnApis());
+    public List<ApiInfoKey> returnApis() {
+
+        Bson filter = createFilter();
+
+        // values not present for mirrored collections.
+        // either use sampleData to STI and then do this or use regex queries on sample data.
+
+        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter);
     }
 
     public boolean isHeader() {
@@ -104,6 +102,11 @@ public class ParamCondition extends CollectionCondition{
 
     public void setRequest(boolean isRequest) {
         this.isRequest = isRequest;
+    }
+
+    @Override
+    public boolean containsApi(ApiInfoKey key) {
+        return checkApiUsingSTI(key, createFilter());
     }
     
 }

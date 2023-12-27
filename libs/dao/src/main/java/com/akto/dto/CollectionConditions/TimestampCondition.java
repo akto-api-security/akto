@@ -1,17 +1,11 @@
 package com.akto.dto.CollectionConditions;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.mongodb.client.model.Filters;
 
@@ -46,34 +40,40 @@ public class TimestampCondition extends CollectionCondition{
         super(Type.TIMESTAMP, operator);
     }
 
-    @Override
-    public Set<ApiInfoKey> returnApis() {
+    private Bson createFilter() {
 
-        if(periodInSeconds != 0) {
+        if (periodInSeconds != 0) {
             startTimestamp = Context.now() - periodInSeconds;
         }
 
         List<Bson> filters = new ArrayList<>();
 
-        if(startTimestamp != 0) {
+        if (startTimestamp != 0) {
             filters.add(Filters.gte(key, startTimestamp));
         }
 
-        if(periodInSeconds==0 && endTimestamp != 0) {
+        if (periodInSeconds == 0 && endTimestamp != 0) {
             filters.add(Filters.lte(key, endTimestamp));
         }
 
         if(filters.isEmpty()) {
-            return new HashSet<>();
+            return null;
         }
 
-        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(Filters.and(filters)).stream().collect(Collectors.toSet());
-
+        return Filters.and(filters);
     }
 
     @Override
-    public Map<CollectionType, Bson> returnFiltersMap() {
-        return CollectionCondition.createFiltersMapWithApiList(returnApis());
+    public List<ApiInfoKey> returnApis() {
+
+        Bson filter = createFilter();
+
+        if (filter == null) {
+            return new ArrayList<>();
+        }
+
+        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter);
+
     }
 
     public int getEndTimestamp() {
@@ -106,6 +106,11 @@ public class TimestampCondition extends CollectionCondition{
 
     public void setKey(String key) {
         this.key = key;
+    }
+
+    @Override
+    public boolean containsApi(ApiInfoKey key) {
+        return checkApiUsingSTI(key, createFilter());
     }
     
 }

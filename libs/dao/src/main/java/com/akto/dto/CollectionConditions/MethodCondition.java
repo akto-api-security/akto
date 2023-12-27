@@ -1,13 +1,9 @@
 package com.akto.dto.CollectionConditions;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
+import java.util.List;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.model.Filters;
@@ -37,19 +33,22 @@ public class MethodCondition extends CollectionCondition{
         this.method = method;
     }
 
-    @Override
-    public Set<ApiInfoKey> returnApis() {
-
+    private Bson createFilter() {
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
         Bson filter = Filters.and(Filters.eq(ApiInfoKey.METHOD, method), hostFilterQ);
+        return filter;
+    }
 
-        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter).stream().collect(Collectors.toSet());
+    @Override
+    public List<ApiInfoKey> returnApis() {
+        Bson filter = createFilter();
+        return SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter);
 
     }
 
     @Override
-    public Map<CollectionType, Bson> returnFiltersMap() {
-        return CollectionCondition.createFiltersMapWithApiList(returnApis());
+    public boolean containsApi(ApiInfoKey key) {
+        return checkApiUsingSTI(key, createFilter());
     }
     
 }

@@ -14,6 +14,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
@@ -132,5 +133,20 @@ public abstract class CollectionCondition extends TestingEndpoints {
     public Map<CollectionType, Bson> returnFiltersMap() {
         return createFiltersMapWithApiList(returnApis());
     };
+
+    public static boolean checkApiUsingSTI(ApiInfoKey key, Bson filter){
+                List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, key.getApiCollectionId()),
+                        Filters.eq(SingleTypeInfo._URL, key.getUrl()),
+                        Filters.in(SingleTypeInfo._METHOD, key.getMethod()),
+                        filter));
+
+        if (singleTypeInfos != null && !singleTypeInfos.isEmpty()) {
+            return true;
+        }
+
+        return false;
+    }
 
 }

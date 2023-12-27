@@ -18,6 +18,7 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
+import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
@@ -225,40 +226,6 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     List<ConditionUtils> conditions;
-
-    public static class ConditionUtils {
-        private CollectionCondition.Type type;
-        private CollectionCondition.Operator operator;
-        private BasicDBObject data;
-
-        public BasicDBObject getData() {
-            return data;
-        }
-
-        public void setData(BasicDBObject data) {
-            this.data = data;
-        }
-
-        public ConditionUtils() {
-        }
-
-        public CollectionCondition.Type getType() {
-            return type;
-        }
-
-        public void setType(CollectionCondition.Type type) {
-            this.type = type;
-        }
-
-        public CollectionCondition.Operator getOperator() {
-            return operator;
-        }
-
-        public void setOperator(CollectionCondition.Operator operator) {
-            this.operator = operator;
-        }
-        
-    }
 
     private static List<CollectionCondition> generateConditions(List<ConditionUtils> conditions){
         List<CollectionCondition> ret = new ArrayList<>();
