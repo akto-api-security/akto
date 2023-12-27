@@ -50,7 +50,7 @@ public class LoginRecorderAction extends UserAction {
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
                     RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("error running recorded flow " + e.toString(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e,"error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
             }
         }, 1, TimeUnit.SECONDS);

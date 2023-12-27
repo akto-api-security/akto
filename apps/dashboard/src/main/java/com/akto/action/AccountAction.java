@@ -10,8 +10,10 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
-import com.akto.utils.DashboardMode;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubSync;
+import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
@@ -31,6 +33,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -72,7 +75,7 @@ public class AccountAction extends UserAction {
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
             loggerMaker.infoAndAddToDb("Function: " + functionName + ", response:" + resp, LogDb.DASHBOARD);
         } catch (AWSLambdaException e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while invoking Lambda, %s: %s", functionName, e), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Error while invoking Lambda, %s: %s", functionName, e), LogDb.DASHBOARD);
         }
     }
 
@@ -108,7 +111,7 @@ public class AccountAction extends UserAction {
 
 
         } catch (AWSLambdaException e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while updating Akto: %s",e), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,String.format("Error while updating Akto: %s",e), LogDb.DASHBOARD);
         }
     }
 
@@ -126,14 +129,14 @@ public class AccountAction extends UserAction {
                 Lambda.getInstance().invokeFunction(lambda);
                 loggerMaker.infoAndAddToDb("Successfully invoked lambda " + lambda, LogDb.DASHBOARD);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Failed to update Akto Context Analyzer" + e, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Failed to update Akto Context Analyzer" + e, LogDb.DASHBOARD);
             }
             try{
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(),MirroringStackDetails.AKTO_DASHBOARD_UPDATE_LAMBDA);
                 Lambda.getInstance().invokeFunction(lambda);
                 loggerMaker.infoAndAddToDb("Successfully invoked lambda " +lambda, LogDb.DASHBOARD);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Failed to update Akto Dashboard" + e, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Failed to update Akto Dashboard" + e, LogDb.DASHBOARD);
             }
 
             try{
@@ -141,7 +144,7 @@ public class AccountAction extends UserAction {
                 Lambda.getInstance().invokeFunction(lambda);
                 loggerMaker.infoAndAddToDb("Successfully invoked lambda " + lambda, LogDb.DASHBOARD);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Failed to update Akto Traffic Mirroring Instance" + e, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Failed to update Akto Traffic Mirroring Instance" + e, LogDb.DASHBOARD);
             }
     }
 
@@ -153,7 +156,7 @@ public class AccountAction extends UserAction {
                 loggerMaker.infoAndAddToDb("Dashboard instance rebooted", LogDb.DASHBOARD);
             }
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Failed to update Akto Dashboard via instance reboot" + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Failed to update Akto Dashboard via instance reboot" + e, LogDb.DASHBOARD);
         }
     }
 
@@ -236,14 +239,23 @@ public class AccountAction extends UserAction {
                     Set<Integer> organizationAccountsSet = organization.getAccounts();
                     organizationAccountsSet.add(newAccountId);
 
+                    Bson updatesQ = Updates.combine(
+                        Updates.set(Organization.ACCOUNTS, organizationAccountsSet),
+                        Updates.set(Organization.SYNCED_WITH_AKTO, false)
+                    );
+
                     OrganizationsDao.instance.updateOne(
                         Filters.eq(Organization.ID, organization.getId()),
-                        Updates.set(Organization.ACCOUNTS, organizationAccountsSet)
+                        updatesQ
                     );
                     loggerMaker.infoAndAddToDb(String.format("Added account %d to organization %s", newAccountId, organization.getId()), LogDb.DASHBOARD);
+
+                    OrganizationUtils.syncOrganizationWithAkto(organization);
+                    loggerMaker.infoAndAddToDb(String.format("Synced with billing service successfully %d to organization %s", newAccountId, organization.getId()), LogDb.DASHBOARD);
+
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(String.format("Error while adding account %d to organization", newAccountId), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, String.format("Error while adding account %d to organization", newAccountId), LogDb.DASHBOARD);
             }
         }
    
@@ -262,7 +274,7 @@ public class AccountAction extends UserAction {
         try {
             AccountSettingsDao.instance.updateVersion(DASHBOARD_VERSION);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while updating account version", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"Error while updating account version", LogDb.DASHBOARD);
         }
         if (isNew) intializeCollectionsForTheAccount(newAccountId);
         return user;
@@ -304,9 +316,9 @@ public class AccountAction extends UserAction {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(repoZip);
+                    InitializerListener.processTemplateFilesZip(repoZip, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);

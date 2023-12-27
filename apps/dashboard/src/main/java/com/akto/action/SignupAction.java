@@ -7,7 +7,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.billing.OrganizationUtils;
@@ -539,7 +539,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         Set<Integer> organizationAccountsSet = new HashSet<Integer>();
                         organizationAccountsSet.add(accountId);
 
-                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet);
+                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
                         OrganizationsDao.instance.insertOne(organization);
                         System.out.println(String.format("Created organization %s for new user %s", organizationUUID, userEmail));
                         

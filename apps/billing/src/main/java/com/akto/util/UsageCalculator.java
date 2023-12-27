@@ -29,14 +29,6 @@ public class UsageCalculator {
 
     private UsageCalculator() {}
 
-    private static int epochToDateInt(int epoch) {
-        Date dateFromEpoch = new Date( epoch * 1000L );
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(dateFromEpoch);
-        return cal.get(Calendar.YEAR) * 10000 + cal.get(Calendar.MONTH) * 100 + cal.get(Calendar.DAY_OF_MONTH);
-
-    }
-
     boolean statusDataSinks = false;
 
     boolean statusAggregateUsage = false;
@@ -55,6 +47,10 @@ public class UsageCalculator {
             List<OrganizationUsage> pendingUsages =
                     OrganizationUsageDao.instance.findAll(filterQ);
 
+            if(pendingUsages.isEmpty()) {
+                loggerMaker.infoAndAddToDb("No pending items for org: " + o.getId(), LoggerMaker.LogDb.BILLING);
+                return;
+            }
             loggerMaker.infoAndAddToDb("Found "+pendingUsages.size()+" items for org: " + o.getId(), LoggerMaker.LogDb.BILLING);
 
             pendingUsages.sort(
@@ -65,24 +61,10 @@ public class UsageCalculator {
 
             OrganizationUsage lastUsageItem = pendingUsages.get(0);
             loggerMaker.infoAndAddToDb("Shortlisting: " + lastUsageItem, LoggerMaker.LogDb.BILLING);
-            int today = epochToDateInt(Context.now());
-            //if (lastUsageItem.getDate() == today) return;
 
-            for (OrganizationUsage.DataSink dataSink : OrganizationUsage.DataSink.values()) {
-                switch (dataSink) {
-                    case STIGG:
-                        syncBillingEodWithStigg(lastUsageItem);
-                        break;
-                    case SLACK:
-                        //syncBillingEodWithSlack(lastUsageItem);
-                        break;
-                    case MIXPANEL:
 
-                        break;
-                    default:
-                        throw new IllegalStateException("Not a valid data sink. Found: " + dataSink);
-                }
-            }
+            syncBillingEodWithStigg(lastUsageItem);
+
 
             Bson ignoreFilterQ = Filters.and(filterQ, Filters.ne(OrganizationUsage.CREATION_EPOCH, lastUsageItem.getCreationEpoch()));
             Bson ignoreUpdateQ = Updates.set(SINKS, new BasicDBObject("ignore", Context.now()));
@@ -112,7 +94,7 @@ public class UsageCalculator {
             usageMetric.setUsage(usage);
             UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("can't sync to mixpanel", LoggerMaker.LogDb.BILLING, true);
+            loggerMaker.errorAndAddToDb(e,"can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
         }
     }
 
@@ -160,7 +142,7 @@ public class UsageCalculator {
                 syncBillingEodWithMixpanel(lastUsageItem, metricType, value);
             } catch (IOException e) {
                 String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
-                loggerMaker.errorAndAddToDb(errLog, LoggerMaker.LogDb.BILLING);
+                loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
             }
         }
 
@@ -184,8 +166,9 @@ public class UsageCalculator {
             String organizationId = o.getId();
             String organizationName = o.getName();
             Set<Integer> accounts = o.getAccounts();
+            int hour = DateUtils.getHour(usageLowerBound + 1000);
 
-            loggerMaker.infoAndAddToDb(String.format("Reporting usage for organization %s - %s", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
+            loggerMaker.infoAndAddToDb(String.format("Reporting usage for organization %s - %s for hour %d", organizationId, organizationName, hour), LoggerMaker.LogDb.BILLING);
 
             loggerMaker.infoAndAddToDb(String.format("Calculating Consolidated and account wise usage for organization %s - %s", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
 
@@ -213,6 +196,10 @@ public class UsageCalculator {
 
                     if (usageMetric != null) {
                         usage = usageMetric.getUsage();
+                    } else {
+                        String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
+                        loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
+                        throw new Exception(err);
                     }
 
                     int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
@@ -222,14 +209,16 @@ public class UsageCalculator {
                 }
             }
 
-            int date = epochToDateInt(usageLowerBound);
+            int date = DateUtils.getDateYYYYMMDD(usageLowerBound);
 
             OrganizationUsage usage = OrganizationUsageDao.instance.findOne(ORG_ID, organizationId, DATE, date);
 
             if (usage == null) {
                 loggerMaker.infoAndAddToDb("Inserting new usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
+                Map<String, Map<String, Integer>> hourlyUsage = new HashMap<>();
+                hourlyUsage.put(String.valueOf(hour), consolidatedUsage);
                 OrganizationUsageDao.instance.insertOne(
-                        new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>())
+                        new OrganizationUsage(organizationId, date, Context.now(), consolidatedUsage, new HashMap<>(), hourlyUsage)
                 );
 
                 if (date % 100 > 24 || organizationName.endsWith("@akto.io")) {
@@ -245,13 +234,15 @@ public class UsageCalculator {
 
             } else {
                 loggerMaker.infoAndAddToDb("Found usage for ("+ organizationId + date +")", LoggerMaker.LogDb.BILLING);
-                Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage));
+                Map<String, Map<String, Integer>> hourlyUsage = usage.getHourlyUsage();
+                hourlyUsage.put(String.valueOf(hour), consolidatedUsage);
+                Bson updates = Updates.combine(Updates.unset(SINKS), Updates.set(ORG_METRIC_MAP, consolidatedUsage), Updates.set(HOURLY_USAGE, hourlyUsage));
                 OrganizationUsageDao.instance.updateOne(ORG_ID, organizationId, DATE, date, updates);
             }
 
             loggerMaker.infoAndAddToDb(String.format("Consolidated and account wise usage for organization %s - %s calculated", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while reporting usage for organization %s - %s. Error: %s", o.getId(), o.getName(), e.getMessage()), LoggerMaker.LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e, String.format("Error while reporting usage for organization %s - %s. Error: %s", o.getId(), o.getName(), e.getMessage()), LoggerMaker.LogDb.BILLING);
         } finally {
             statusAggregateUsage = false;
         }
