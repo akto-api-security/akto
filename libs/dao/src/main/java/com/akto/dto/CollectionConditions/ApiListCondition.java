@@ -5,7 +5,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.bson.conversions.Bson;
+
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 public class ApiListCondition extends CollectionCondition{
 
@@ -48,6 +54,36 @@ public class ApiListCondition extends CollectionCondition{
         }
 
         apiListCondition.setApiList(tmp);
+    }
+
+    private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
+
+        String prefix = getFilterPrefix(type);
+
+        return Filters.and(
+                Filters.eq(prefix + SingleTypeInfo._URL, api.getUrl()),
+                Filters.eq(prefix + SingleTypeInfo._METHOD, api.getMethod().toString()),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, api.getApiCollectionId()));
+
+    }
+
+    /*
+     * since the API list is being sent from the dashboard,
+     * so by virtue of it, it won't be very large, 
+     * thus we can afford the following query.
+     */
+    @Override
+    public Bson createFilters(CollectionType type) {
+        Set<ApiInfoKey> apiSet = new HashSet<>(apiList);
+        List<Bson> apiFilters = new ArrayList<>();
+        if (apiSet != null && !apiSet.isEmpty()) {
+            for (ApiInfoKey api : apiSet) {
+                apiFilters.add(createApiFilters(type, api));
+            }
+            return Filters.or(apiFilters);
+        }
+
+        return Filters.nor(new BasicDBObject());
     }
 
 }
