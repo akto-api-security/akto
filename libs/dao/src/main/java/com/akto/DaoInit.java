@@ -40,8 +40,6 @@ import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
 import com.akto.dto.CollectionConditions.MethodCondition;
-import com.akto.dto.CollectionConditions.ParamCondition;
-import com.akto.dto.CollectionConditions.TimestampCondition;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.util.enums.GlobalEnums;
@@ -190,10 +188,6 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class)
                 .enableDiscriminator(true).build();
-        ClassModel<ParamCondition> paramConditionClassModel = ClassModel.builder(ParamCondition.class)
-                .enableDiscriminator(true).build();
-        ClassModel<TimestampCondition> timestampConditionClassModel = ClassModel.builder(TimestampCondition.class)
-                .enableDiscriminator(true).build();
         ClassModel<TestLibrary> testLibraryClassModel = ClassModel.builder(TestLibrary.class).enableDiscriminator(true).build();
 
         ClassModel<UsageMetric> UsageMetricClassModel = ClassModel.builder(UsageMetric.class).enableDiscriminator(true).build();
@@ -224,7 +218,6 @@ public class DaoInit {
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, testLibraryClassModel,
                 collectionConditionClassModel, apiListConditionClassModel, methodConditionClassModel,
-                paramConditionClassModel, timestampConditionClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

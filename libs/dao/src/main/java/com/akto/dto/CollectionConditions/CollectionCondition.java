@@ -1,19 +1,16 @@
 package com.akto.dto.CollectionConditions;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.bson.conversions.Bson;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.testing.TestingEndpoints;
-import com.mongodb.BasicDBObject;
 
 public abstract class CollectionCondition extends TestingEndpoints {
     private Operator operator;
@@ -53,20 +50,6 @@ public abstract class CollectionCondition extends TestingEndpoints {
                     break;
                 case METHOD:
                     condition = new MethodCondition(operator, Method.valueOf(data.getString("method")));
-                    break;
-                case PARAM:
-                    condition = new ParamCondition(operator,
-                            data.getBoolean("isHeader"),
-                            data.getBoolean("isRequest"),
-                            data.getString("param"),
-                            data.getString("value"));
-                    break;
-                case TIMESTAMP:
-                    condition = new TimestampCondition(operator,
-                            data.getString("key"),
-                            data.getInt("endTimestamp"),
-                            data.getInt("startTimestamp"),
-                            data.getInt("periodInSeconds"));
                     break;
                 default:
                     break;
@@ -110,22 +93,6 @@ public abstract class CollectionCondition extends TestingEndpoints {
             filters.setValue(filter);
         }
         return filtersMap;
-    }
-
-
-    public static boolean checkApiUsingSTI(ApiInfoKey key, Bson filter){
-                List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, key.getApiCollectionId()),
-                        Filters.eq(SingleTypeInfo._URL, key.getUrl()),
-                        Filters.in(SingleTypeInfo._METHOD, key.getMethod()),
-                        filter));
-
-        if (singleTypeInfos != null && !singleTypeInfos.isEmpty()) {
-            return true;
-        }
-
-        return false;
     }
 
 }

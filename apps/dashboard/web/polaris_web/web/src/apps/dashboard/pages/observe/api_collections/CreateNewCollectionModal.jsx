@@ -4,7 +4,7 @@ import func from "@/util/func"
 import CollectionComponent from "../../../components/CollectionComponent";
 import React, { useState, useReducer, useCallback } from 'react'
 import { produce } from "immer"
-import Dropdown from "../../../components/layouts/Dropdown";
+import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 
 function CreateNewCollectionModal(props) {
 
@@ -28,62 +28,6 @@ function CreateNewCollectionModal(props) {
                             }))
                     }
                     dt.push({ type: condition.type, operator: condition.operator, data: { apiList: apiList } })
-                } else if (condition.type == "TIMESTAMP") {
-                    switch (condition.data.type) {
-                        case "START":
-                            dt.push({
-                                type: condition.type, operator: condition.operator,
-                                data: { key: condition.data.key, 
-                                    startTimestamp: parseInt(condition.data.startTimestamp.valueOf() / 1000),
-                                    endTimestamp: 0,
-                                    periodInSeconds: 0
-                                }
-                            })
-                            break;
-                        case "END":
-                            dt.push({
-                                type: condition.type, operator: condition.operator,
-                                data: { key: condition.data.key, 
-                                    endTimestamp: parseInt(condition.data.endTimestamp.valueOf() / 1000),
-                                    startTimestamp: 0,
-                                    periodInSeconds: 0 
-                                }
-                            })
-                            break;
-                        case "BETWEEN":
-                            dt.push({
-                                type: condition.type, operator: condition.operator,
-                                data: {
-                                    key: condition.data.key,
-                                    startTimestamp: parseInt(condition.data.period.period.since.valueOf() / 1000),
-                                    endTimestamp: parseInt(condition.data.period.period.until.valueOf() / 1000),
-                                    periodInSeconds: 0
-                                }
-                            })
-                            break;
-                        case "PERIOD":
-                            dt.push({
-                                type: condition.type, operator: condition.operator,
-                                data: { key: condition.data.key, 
-                                    endTimestamp: 0,
-                                    startTimestamp: 0,
-                                    periodInSeconds: condition.data.periodInSeconds 
-                                }
-                            })
-                        default: break;
-                    }
-                } else if(condition.type == "PARAM") {
-                    let isHeader = false;
-                    let isRequest = false;
-                    if(condition.data.paramLocation.startsWith("HEADER")){
-                        isHeader = true;
-                    }
-                    if(condition.data.paramLocation.endsWith("REQUEST")){
-                        isRequest = true;
-                    }
-                    dt.push({ type: condition.type, operator: condition.operator, 
-                        data: { value: condition.data.value, param: condition.data.param,
-                            isHeader: isHeader, isRequest: isRequest } })
                 } else {
                     dt.push(condition)
                 }
@@ -120,8 +64,8 @@ function CreateNewCollectionModal(props) {
     function conditionsReducer(draft, action) {
         switch (action.type) {
             case "add": draft.push(action.obj); break;
+            case "overwrite": draft[action.index][action.key] = { };
             case "update": draft[action.index][action.key] = { ...draft[action.index][action.key], ...action.obj }; break;
-            case "overwrite": draft[action.index][action.key] = { ...action.obj }; break;
             case "updateKey": draft[action.index] = { ...draft[action.index], [action.key]: action.obj }; break;
             case "delete": return draft.filter((item, index) => index !== action.index);
             case "clear": return [];
@@ -197,31 +141,24 @@ function CreateNewCollectionModal(props) {
                         <VerticalStack gap={2}>
                             {
                                 conditions.length > 0 && conditions.map((condition, index) => (
-                                    <div style={{ display: "flex", gap: "4px" }} key={index}>
-
-                                        <div style={{ flex: "1" }}>
-                                            <Dropdown
-                                                menuItems={[{
-                                                    label: 'OR',
-                                                    value: 'OR',
-                                                },
-                                                {
-                                                    label: 'AND',
-                                                    value: 'AND'
-                                                }]}
-                                                initial={condition.operator}
-                                                selected={(value) => {
-                                                    dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
-                                                }} />
-                                        </div>
-                                        <div style={{ flex: "6" }}>
-                                            <CollectionComponent
-                                                condition={condition}
-                                                index={index}
-                                                dispatch={dispatchConditions}
-                                            />
-                                        </div>
-                                    </div>
+                                    <CollectionComponent
+                                        condition={condition}
+                                        index={index}
+                                        dispatch={dispatchConditions}
+                                        operatorComponent={<OperatorDropdown
+                                            items={[{
+                                                label: 'OR',
+                                                value: 'OR',
+                                            },
+                                            {
+                                                label: 'AND',
+                                                value: 'AND'
+                                            }]}
+                                            label={condition.operator}
+                                            selected={(value) => {
+                                                dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
+                                            }} />}
+                                    />
                                 ))
                             }
                         <HorizontalStack gap={4} align="start">

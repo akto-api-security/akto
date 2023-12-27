@@ -1293,8 +1293,7 @@ public class InitializerListener implements ServletContextListener {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection : apiCollections) {
             if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
-                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(),
-                        apiCollection.getId());
+                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
             }
         }
     }
@@ -1386,6 +1385,9 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
+
+                        setUpUpdateCustomCollections();
+
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
