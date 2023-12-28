@@ -63,7 +63,7 @@ public class ApiWorkflowExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiWorkflowExecutor.class);
     private static final Gson gson = new Gson();
 
-    public void init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
+    public WorkflowTestResult init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -89,7 +89,7 @@ public class ApiWorkflowExecutor {
             if (nodeResult.getErrors().size() > 0) break;
         }
 
-        WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
+        return workflowTestResult;
     }
 
     public LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {

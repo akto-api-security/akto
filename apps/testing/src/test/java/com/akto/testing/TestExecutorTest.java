@@ -4,6 +4,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.Key;
@@ -35,7 +36,7 @@ public class TestExecutorTest extends MongoBasedTest {
 
     @Test
     public void testTrim() {
-        List<TestResult> testResultList = new ArrayList<>();
+        List<GenericTestResult> testResultList = new ArrayList<>();
         testResultList.add(generateTestResult(false));
         testResultList.add(generateTestResult(false));
         testResultList.add(generateTestResult(false));

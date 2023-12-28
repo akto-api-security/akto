@@ -1,15 +1,29 @@
 package com.akto.test_editor;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.dto.HttpResponseParams;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 public class Utils {
+
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final JsonFactory factory = mapper.getFactory();
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
@@ -175,6 +189,61 @@ public class Utils {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    public static List<String> findAllValuesForKey(String payload, String key, boolean isRegex) {
+        JsonParser jp = null;
+        JsonNode node;
+        List<String> values = new ArrayList<>();
+        try {
+            jp = factory.createParser(payload);
+            node = mapper.readTree(jp);
+        } catch (IOException e) {
+            return values;
+        }
+        if (node == null) {
+            return values;
+        }
+
+        findAllValues(node, key, values, isRegex);
+        return values;
+    }
+
+    public static void findAllValues(JsonNode node, String matchFieldName, List<String> values, boolean isRegex) {
+
+        if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                JsonNode arrayElement = arrayNode.get(i);
+                findAllValues(arrayElement, matchFieldName, values, isRegex);
+            }
+        } else {
+            Iterator<String> fieldNames = node.fieldNames();
+            while(fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                if (Utils.checkIfMatches(fieldName, matchFieldName, isRegex)) {
+                    String val;
+                    try {
+                        TextNode n = (TextNode) node.get(fieldName);
+                        val = n.asText();
+                    } catch (Exception e) {
+                        val = node.get(fieldName).toString();
+                    }
+                    values.add(val);
+                }
+                JsonNode fieldValue = node.get(fieldName);
+                findAllValues(fieldValue, matchFieldName, values, isRegex);
+            }
+        }
+
+    }
+
+    public static boolean checkIfMatches(String data, String query, boolean isRegex) {
+        if (!isRegex) {
+            return data.equalsIgnoreCase(query);
+        }
+
+        return Utils.checkIfContainsMatch(data, query);
     }
 
 }

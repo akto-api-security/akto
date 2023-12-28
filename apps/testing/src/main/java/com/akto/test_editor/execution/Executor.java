@@ -7,28 +7,26 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.LoginWorkflowGraphEdge;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.dto.testing.WorkflowUpdatedSampleData;
-import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
 import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
-import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.workflow_node_executor.NodeExecutor;
-import com.akto.testing.workflow_node_executor.NodeExecutorFactory;
+import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -44,9 +42,9 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
-    public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
+    public List<GenericTestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
-        List<TestResult> result = new ArrayList<>();
+        List<GenericTestResult> result = new ArrayList<>();
         
         TestResult invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.INVALID_EXECUTION_BLOCK.getMessage()), 0, false, TestResult.Confidence.HIGH, null);
 
@@ -55,9 +53,6 @@ public class Executor {
             result.add(invalidExecutionResult);
             return result;
         }
-
-        // If type multiple, build workflow edges
-
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
         RawApi sampleRawApi = rawApi.copy();
@@ -73,7 +68,8 @@ public class Executor {
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple")) {
-            triggerMultiExecution(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode));
+            return result;
         }
 
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
@@ -93,7 +89,7 @@ public class Executor {
                 if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
                     break;
                 }
-            try {
+                try {
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     requestSent = true;
@@ -122,33 +118,20 @@ public class Executor {
         return result;
     }
 
-    public void triggerMultiExecution(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+    public MultiExecTestResult triggerMultiExecution(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
         List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
         WorkflowTest workflowTest = convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
         
-        Graph graph = new Graph();
-        graph.buildGraph(workflowTest);
-
-        ArrayList<Object> responses = new ArrayList<Object>();
-
-        List<Node> nodes = graph.sort();
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, null, null);
         
-        NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory();
-        for (Node node: nodes) {
-            WorkflowTestResult.NodeResult nodeResult;
-            try {
-                NodeExecutor nodeExecutor = nodeExecutorFactory.getExecutor(node);
-                nodeResult = nodeExecutor.processNode(node, varMap, true);
-            } catch (Exception e) {
-                ;
-                List<String> testErrors = new ArrayList<>();
-                testErrors.add("Something went wrong");
-                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
+        for (Map.Entry<String, NodeResult> entry : workflowTestResult.getNodeResultMap().entrySet()) {
+            NodeResult nodeResult = entry.getValue();
+            if (!nodeResult.isVulnerable()) {
+                return new MultiExecTestResult(workflowTestResult.getNodeResultMap(), false, Confidence.HIGH);
             }
         }
-
-        // convert 
-
+        return new MultiExecTestResult(workflowTestResult.getNodeResultMap(), true, Confidence.HIGH);
     }
 
     public WorkflowTest convertToWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism, 
@@ -207,10 +190,9 @@ public class Executor {
         edgeObj = new LoginWorkflowGraphEdge("x"+ (edgeNumber - 1), "3", "x"+ edgeNumber);
         edges.add(edgeObj.toString());
 
-        return new WorkflowTest(234, apiInfoKey.getApiCollectionId(), "", Context.now(), "", Context.now(),
+        return new WorkflowTest(Context.now(), apiInfoKey.getApiCollectionId(), "", Context.now(), "", Context.now(),
                 null, edges, mapNodeIdToWorkflowNodeDetails, WorkflowTest.State.DRAFT);
     }
-    
 
     public TestResult validate(ExecutionResult attempt, RawApi rawApi, Map<String, Object> varMap, String logId, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {
         if (attempt == null || attempt.getResponse() == null) {

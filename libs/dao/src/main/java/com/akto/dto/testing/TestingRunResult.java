@@ -26,7 +26,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_SUB_TYPE = "testSubType";
     private String testSubType;
     public static final String TEST_RESULTS = "testResults";
-    private List<TestResult> testResults;
+    private List<GenericTestResult> testResults;
     public static final String VULNERABLE = "vulnerable";
     private boolean vulnerable;
     public static final String SINGLE_TYPE_INFOS = "singleTypeInfos";
@@ -44,7 +44,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public TestingRunResult() { }
 
     public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,
-                            List<TestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
+                            List<GenericTestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
                             int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
@@ -133,11 +133,11 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.testSubType = testSubType;
     }
 
-    public List<TestResult> getTestResults() {
+    public List<GenericTestResult> getTestResults() {
         return testResults;
     }
 
-    public void setTestResults(List<TestResult> testResults) {
+    public void setTestResults(List<GenericTestResult> testResults) {
         this.testResults = testResults;
     }
 
@@ -197,7 +197,11 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         bld.append("API: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().toString() + "\n");
         bld.append("Test: " + testSuperType + " " + testSubType + " Vulnerable: " + vulnerable +
         (vulnerable ? " Severity : " + severity : "") + "\n");
-        for (TestResult testResult : testResults) {
+        for (GenericTestResult tr : testResults) {
+            if (tr instanceof MultiExecTestResult) {
+                continue;
+            }
+            TestResult testResult = (TestResult) tr;
             Gson gson = new Gson();
             Map<String, Object> json = gson.fromJson(testResult.getOriginalMessage(), new TypeToken<Map<String, Object>>(){}.getType());
             try {
