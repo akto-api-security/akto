@@ -1,11 +1,16 @@
 package com.akto.dto.CollectionConditions;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.bson.conversions.Bson;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.URLMethods.Method;
+import com.mongodb.BasicDBObject;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.testing.TestingEndpoints;
-import com.mongodb.BasicDBObject;
 
 public abstract class CollectionCondition extends TestingEndpoints {
     private Operator operator;
@@ -25,6 +30,35 @@ public abstract class CollectionCondition extends TestingEndpoints {
 
     public void setOperator(Operator operator) {
         this.operator = operator;
+    }
+
+    public static CollectionCondition generateCondition(Type type, Operator operator, BasicDBObject data) {
+        CollectionCondition condition = null; 
+
+        try {
+            switch (type) {
+                case API_LIST:
+                    List<HashMap> list = (List<HashMap>) data.get("apiList");
+                    List<ApiInfoKey> apiList = new ArrayList<>();
+                    for (HashMap api : list) {
+                        apiList.add(new ApiInfoKey(
+                                ((Long) api.get("apiCollectionId")).intValue(),
+                                (String) api.get("url"),
+                                Method.valueOf((String) api.get("method"))));
+                    }
+                    condition = new ApiListCondition(new HashSet<ApiInfoKey>(apiList), operator);
+                    break;
+                case METHOD:
+                    condition = new MethodCondition(operator, Method.valueOf(data.getString("method")));
+                    break;
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+
+        }
+
+        return condition;
     }
 
     protected static String getFilterPrefix(CollectionType type) {

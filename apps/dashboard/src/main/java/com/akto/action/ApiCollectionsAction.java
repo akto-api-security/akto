@@ -18,6 +18,7 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
+import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
@@ -184,7 +185,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList));
+        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList), ApiListCondition.Operator.OR);
         apiCollection.addToConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
@@ -207,12 +208,57 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList));
+        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList), ApiListCondition.Operator.OR);
         apiCollection.removeFromConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
         fetchAllCollections();
+    
+        return SUCCESS.toUpperCase();
+    }
+
+    List<ConditionUtils> conditions;
+
+    private static List<CollectionCondition> generateConditions(List<ConditionUtils> conditions){
+        List<CollectionCondition> ret = new ArrayList<>();
+
+        if (conditions != null) {
+            for (ConditionUtils conditionUtils : conditions) {
+                CollectionCondition condition = CollectionCondition.generateCondition(conditionUtils.getType(),
+                        conditionUtils.getOperator(), conditionUtils.getData());
+                if (condition != null) {
+                    ret.add(condition);
+                }
+            }
+        }
+        return ret;
+    }
+
+    public String createCustomCollection() {
+        if (!isValidApiCollectionName()) {
+            return ERROR.toUpperCase();
+        }
+
+        List<CollectionCondition> conditions = generateConditions(this.conditions);
+
+        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+        
+        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+        
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(apiCollection);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    int apiCount;
+
+    public String getEndpointsFromConditions(){
+        List<CollectionCondition> conditions = generateConditions(this.conditions);
+
+        apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions);
     
         return SUCCESS.toUpperCase();
     }
@@ -250,4 +296,19 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollectionId = apiCollectionId;
     } 
 
+    public List<ConditionUtils> getConditions() {
+        return conditions;
+    }
+
+    public void setConditions(List<ConditionUtils> conditions) {
+        this.conditions = conditions;
+    }
+
+    public int getApiCount() {
+        return apiCount;
+    }
+
+    public void setApiCount(int apiCount) {
+        this.apiCount = apiCount;
+    }
 }

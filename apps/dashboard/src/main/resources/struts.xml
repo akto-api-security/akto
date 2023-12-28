@@ -618,6 +618,30 @@
             </result>
         </action>
 
+        <action name="api/createCustomCollection" class="com.akto.action.ApiCollectionsAction" method="createCustomCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getEndpointsFromConditions" class="com.akto.action.ApiCollectionsAction" method="getEndpointsFromConditions">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/addOrUpdatePostmanCred" class="com.akto.action.PostmanAction" method="addOrUpdateApiKey">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

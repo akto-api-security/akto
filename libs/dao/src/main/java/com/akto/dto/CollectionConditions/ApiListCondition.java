@@ -29,8 +29,12 @@ public class ApiListCondition extends CollectionCondition{
         super(Type.API_LIST, Operator.OR);
     }
 
-    public ApiListCondition(Set<ApiInfoKey> apiList) {
-        super(Type.API_LIST, Operator.OR);
+    public ApiListCondition(Operator operator) {
+        super(Type.API_LIST, operator);
+    }
+
+    public ApiListCondition(Set<ApiInfoKey> apiList, Operator operator) {
+        super(Type.API_LIST, operator);
         this.apiList = apiList;
     }
 
