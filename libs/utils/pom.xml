@@ -73,6 +73,11 @@
             <version>4.4.1</version>
         </dependency>
         <dependency>
+            <groupId>com.slack.api</groupId>
+            <artifactId>slack-api-client</artifactId>
+            <version>1.7.1</version>
+        </dependency>
+        <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
@@ -114,6 +119,12 @@
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
             <version>3.0.0</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.kohsuke/github-api -->
+        <dependency>
+            <groupId>org.kohsuke</groupId>
+            <artifactId>github-api</artifactId>
+            <version>1.316</version>
         </dependency>
         <dependency>
             <groupId>com.graphql-java</groupId>
