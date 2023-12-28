@@ -19,7 +19,7 @@ public class CacheLoggerMaker extends LoggerMaker {
                     internalLogger.error("ERROR: In clearing log cache: " + e.toString());
                 }
             }
-        }, 2, 2, TimeUnit.MINUTES);
+        }, 2, 5, TimeUnit.MINUTES);
     }
 
     public CacheLoggerMaker(Class<?> c) {
