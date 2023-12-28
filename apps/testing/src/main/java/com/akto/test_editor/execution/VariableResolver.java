@@ -1,16 +1,32 @@
 package com.akto.test_editor.execution;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bson.conversions.Bson;
+
+import com.akto.dao.SampleDataDao;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.parsers.HttpCallParser;
+import com.akto.test_editor.Utils;
 import com.akto.util.modifier.AddJkuJWTModifier;
 import com.akto.util.modifier.InvalidSignatureJWTModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 public class VariableResolver {
     
@@ -270,6 +286,121 @@ public class VariableResolver {
         }
 
         return result;
+    }
+
+    public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>>  sampleDataMap, boolean allApisContext) {
+
+        for (String k: varMap.keySet()) {
+            if (!allApisContext && !k.contains("wordList_")) {
+                continue;
+            }
+            Map<String, String> m = new HashMap<>();
+            Object keyObj;
+            String key, location, dataType;
+            boolean isRegex = false;
+            boolean allApis = false;
+            try {
+                List<String> wordList = (List<String>) varMap.get(k);
+                continue;
+            } catch (Exception e) {
+                try {
+                    m = (Map) varMap.get(k);
+                } catch (Exception er) {
+                    continue;
+                }
+            }
+            keyObj = m.get("key");
+            if (keyObj instanceof Map) {
+                Map<String, String> kMap = (Map) keyObj;
+                key = (String) kMap.get("regex");
+                isRegex = true;
+            } else {
+                key = (String) m.get("key");
+            }
+            location = m.get("location");
+            if (m.containsKey("all_apis")) {
+                allApis = Objects.equals(m.get("all_apis"), true);
+            }
+
+            if (sampleDataMap.size() > 1 && !allApis) {
+                continue;
+            }
+
+            Set<String> wordListSet = new HashSet<>();
+            List<String> wordListVal = new ArrayList<>();
+
+            for (ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
+                List<String> samples = sampleDataMap.get(apiInfoKey);
+                wordListSet.addAll(extractValuesFromSampleData(varMap, samples, key, location, isRegex));
+
+            }
+
+
+            for (String s : wordListSet) {
+                wordListVal.add(s);
+            }
+
+            varMap.put(k, wordListVal);
+        }
+
+    }
+
+    public static Set<String> extractValuesFromSampleData(Map<String, Object> varMap, List<String> samples, String key, String location, boolean isRegex) {
+
+        Set<String> worklistVal = new HashSet<>();
+        for (String sample: samples) {
+            HttpResponseParams httpResponseParams;
+            HttpRequestParams httpRequestParams;
+            try {
+                httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpRequestParams = httpResponseParams.getRequestParams();
+                if (location == null || location.equals("header")) {
+                    Map<String, List<String>> headers = httpResponseParams.getHeaders();
+                    for (String headerName: headers.keySet()) {
+                        if (!Utils.checkIfMatches(headerName, key, isRegex)) {
+                            continue;
+                        }
+                        List<String> headerValues = headers.get(headerName);
+                        for (String value: headerValues) {
+                            worklistVal.add(value);
+                        }
+                    }
+
+                    Map<String, List<String>> reqHeaders = httpRequestParams.getHeaders();
+
+                    for (String headerName: reqHeaders.keySet()) {
+                        if (!Utils.checkIfMatches(headerName, key, isRegex)) {
+                            continue;
+                        }
+                        List<String> headerValues = reqHeaders.get(headerName);
+                        for (String value: headerValues) {
+                            worklistVal.add(value);
+                        }
+                    }
+                }
+
+                if (location == null || location.equals("payload")) {
+                    worklistVal.addAll(Utils.findAllValuesForKey(httpRequestParams.getPayload(), key, isRegex));
+                    worklistVal.addAll(Utils.findAllValuesForKey(httpResponseParams.getPayload(), key, isRegex));
+                }
+                
+                if (location == null || location.equals("query_param")) {
+                    BasicDBObject queryParams = RequestTemplate.getQueryJSON(httpRequestParams.getURL());
+                    for (String qu: queryParams.keySet()) {
+                        if (!Utils.checkIfMatches(qu, key, isRegex)) {
+                            continue;
+                        }
+                        worklistVal.add(queryParams.getString(qu));
+                    }
+                }
+
+            } catch (Exception e) {
+                continue;
+            }
+            
+        }
+
+        return worklistVal;
     }
 
     // public Object resolveExpression(Map<String, Object> varMap, String expression) {

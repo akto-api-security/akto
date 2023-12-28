@@ -19,6 +19,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
@@ -63,7 +64,8 @@ public class YamlNodeExecutor extends NodeExecutor {
         boolean vulnerable = true;
 
         OriginalHttpResponse testResponse;
-        String message = null;
+        List<String> message = new ArrayList<>();
+        //String message = null;
 
         for (RawApi testReq: testRawApis) {
             try {
@@ -76,7 +78,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 vulnerable = res.getVulnerable();
                 if (vulnerable) {
                     try {
-                        message = RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse);
+                        message.add(RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse));
                     } catch (Exception e) {
                         ;
                     }
@@ -98,7 +100,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         // 
 
-        return new WorkflowTestResult.NodeResult(message, vulnerable, testErrors);
+        return new WorkflowTestResult.NodeResult(message.toString(), vulnerable, testErrors);
 
     }
 
@@ -146,8 +148,16 @@ public class YamlNodeExecutor extends NodeExecutor {
         TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null);
 
         List<String> errors = new ArrayList<>();
+        List<String> messages = new ArrayList<>();
+        if (testingRunResult.isVulnerable()) {
+            List<GenericTestResult> testResults = testingRunResult.getTestResults();
+            for (GenericTestResult testResult: testResults) {
+                TestResult t = (TestResult) testResult;
+                messages.add(t.getMessage());
+            }
+        }
 
-        return new WorkflowTestResult.NodeResult(null, testingRunResult.isVulnerable(), errors);
+        return new WorkflowTestResult.NodeResult(messages.toString(), testingRunResult.isVulnerable(), errors);
     }
     
 }

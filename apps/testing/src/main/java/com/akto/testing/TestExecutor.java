@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -28,6 +29,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
@@ -92,7 +94,8 @@ public class TestExecutor {
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         try {
-            apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+            WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+            WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
         }
@@ -176,6 +179,14 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
         String hostName;
+        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+            TestConfig testConfig = testConfigMap.get(testSubCategory);
+            if (testConfig == null) {
+                continue;
+            }
+            Map<String, Object> wordListsMap = (Map) testConfig.getWordlists();
+            VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), true);
+        }
         for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
@@ -482,12 +493,18 @@ public class TestExecutor {
     }
 
     public static void trim(TestingRunResult testingRunResult) {
-        List<TestResult> testResults = testingRunResult.getTestResults();
+        List<GenericTestResult> testResults = testingRunResult.getTestResults();
         int endIdx = testResults.size();
         long currentSize = 0;
 
         for (int idx=0;idx< testResults.size();idx++) {
-            TestResult testResult = testResults.get(idx);
+            GenericTestResult tr = testResults.get(idx);
+
+            if (tr instanceof MultiExecTestResult) {
+                return;
+            }
+
+            TestResult testResult = (TestResult) tr;
 
             String originalMessage = testResult.getOriginalMessage();
             long originalMessageSize = originalMessage == null ? 0 : originalMessage.getBytes().length;
@@ -538,6 +555,7 @@ public class TestExecutor {
             List<TestingRunResult> testingRunResults = new ArrayList<>();
 
             TestConfig testConfig = testConfigMap.get(testSubCategory);
+            
             if (testConfig == null) continue;
             TestingRunResult testingRunResult = null;
             if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
@@ -579,7 +597,7 @@ public class TestExecutor {
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
-            List<TestResult> testResults = new ArrayList<>();
+            List<GenericTestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
             return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
@@ -607,6 +625,10 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
+        Map<ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        sampleDataMap.put(apiInfoKey, messages);
+        VariableResolver.resolveWordList(varMap, sampleDataMap, false);
+
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
@@ -615,7 +637,7 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes);
-        List<TestResult> testResults = yamlTestTemplate.run();
+        List<GenericTestResult> testResults = yamlTestTemplate.run();
         if (testResults == null || testResults.isEmpty()) {
             testResults = new ArrayList<>();
             testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
@@ -623,7 +645,7 @@ public class TestExecutor {
         int endTime = Context.now();
 
         boolean vulnerable = false;
-        for (TestResult testResult: testResults) {
+        for (GenericTestResult testResult: testResults) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
             try {

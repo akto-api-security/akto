@@ -441,8 +441,10 @@ public class StartTestAction extends UserAction {
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             for (TestingRunResult runResult: testingRunResultList) {
-                List<TestResult> testResults = new ArrayList<>();
-                for (TestResult testResult : runResult.getTestResults()) {
+                List<GenericTestResult> testResults = new ArrayList<>();
+                // todo: fix
+                for (GenericTestResult tr : runResult.getTestResults()) {
+                    TestResult testResult = (TestResult) tr;
                     if (testResult.isVulnerable()) {
                         testResults.add(testResult);
                         sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
