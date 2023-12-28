@@ -203,7 +203,7 @@ public class InitializerListener implements ServletContextListener {
                                 trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds);
                             }
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
+                            loggerMaker.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
                 }, "traffic-alerts-scheduler");

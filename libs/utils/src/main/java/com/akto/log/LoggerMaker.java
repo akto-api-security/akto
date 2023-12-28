@@ -84,7 +84,7 @@ public class LoggerMaker  {
         }
     }
 
-    protected String basicError(String err, LogDb db){
+    protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
         }
