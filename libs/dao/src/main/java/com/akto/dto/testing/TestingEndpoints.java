@@ -17,7 +17,7 @@ public abstract class TestingEndpoints {
 
 
     public enum Type {
-        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, API_LIST
+        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, API_LIST, METHOD
     }
 
     public Type getType() {

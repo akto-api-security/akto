@@ -1,17 +1,33 @@
+import { Button } from '@shopify/polaris';
+import { DeleteMinor } from "@shopify/polaris-icons"
 import React, { useState, useEffect } from 'react'
 import DropdownSearch from './shared/DropdownSearch';
 import func from "@/util/func"
 import PersistStore from '../../main/PersistStore';
 import api from '../pages/testing/api';
+import Dropdown from './layouts/Dropdown';
+
+const HTTP_METHODS = [
+    {'label': 'GET', 'value': 'GET'},
+    {'label': 'POST', 'value': 'POST'},
+    {'label': 'PUT', 'value': 'PUT'},
+    {'label': 'DELETE', 'value': 'DELETE'},
+    {'label': 'HEAD', 'value': 'HEAD'},
+    {'label': 'OPTIONS', 'value': 'OPTIONS'},
+    {'label': 'TRACE', 'value': 'TRACE'},
+    {'label': 'PATCH', 'value': 'PATCH'},
+    {'label': 'OTHER', 'value': 'OTHER'},
+    {'label': 'TRACK', 'value': 'TRACK'}
+]
 
 function CollectionComponent(props) {
 
-    const { data, index, dispatch } = props
+    const { condition, index, dispatch, operatorComponent } = props
     const [apiEndpoints, setApiEndpoints] = useState({})
 
     useEffect(() => {
-        fetchApiEndpoints(data)
-    }, [data])
+        fetchApiEndpoints(condition.data)
+    }, [condition])
 
     const allCollections = PersistStore(state => state.allCollections);
     const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
@@ -23,12 +39,16 @@ function CollectionComponent(props) {
         })
 
     const handleCollectionSelected = (collectionId) => {
-        dispatch({ type: "update", index: index, obj: { [collectionId]: [] } })
+        dispatch({ type: "overwrite", index: index, key: "data", obj: { [collectionId]: [] } })
     }
 
     function getCollectionId(data) {
         if (data == undefined || Object.keys(data) == undefined || Object.keys(data)[0] == undefined)
             return undefined;
+
+        if( condition.type != "API_LIST" ){
+            return undefined;
+        }
 
         return Object.keys(data)[0];
     }
@@ -38,7 +58,7 @@ function CollectionComponent(props) {
     const handleEndpointsSelected = (apiEndpoints, data) => {
         let collectionId = getCollectionId(data);
         if (collectionId) {
-            dispatch({ type: "update", index: index, obj: { [collectionId]: apiEndpoints } })
+            dispatch({ type: "overwrite", index: index, key: "data", obj: { [collectionId]: apiEndpoints } })
         }
     }
 
@@ -82,19 +102,19 @@ function CollectionComponent(props) {
         }
     }
 
-    return (
-        <div style={{ display: "flex", gap: "4px" }}>
-            <div style={{ flexGrow: "1" }}>
+    function collectionComponent(condition, index) {
+        return <div style={{ display: "flex", gap: "4px", flexGrow: "1" }}>
+            <div style={{ flex: "3" }}>
                 <DropdownSearch
                     id={`api-collection-${index}`}
                     placeholder="Select API collection"
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
-                    preSelected={[Number(getCollectionId(data))]}
-                    value={mapCollectionIdToName[getCollectionId(data)]}
+                    preSelected={[Number(getCollectionId(condition.data))]}
+                    value={mapCollectionIdToName[getCollectionId(condition.data)]}
                 />
             </div>
-            <div style={{ flexGrow: "1" }}>
+            <div style={{ flex: "5" }}>
                 <DropdownSearch
                     id={`api-endpoint-${index}`}
                     disabled={apiEndpoints?.endpoints == undefined || apiEndpoints.endpoints.length === 0}
@@ -104,14 +124,74 @@ function CollectionComponent(props) {
                     setSelected={(apiEndpoints) => {
                         handleEndpointsSelected(apiEndpoints.map((obj) => {
                             return func.toMethodUrlObject(obj)
-                        }), data)
+                        }), condition.data)
                     }}
-                    preSelected={getEndpoints(data)}
+                    preSelected={getEndpoints(condition.data)}
                     itemName={"endpoint"}
-                    value={getEndpointCount(data)}
+                    value={getEndpointCount(condition.data)}
                     allowMultiple
                 />
             </div>
+        </div>
+    }
+
+    function getDefaultValues(type){
+        switch(type){
+            case "API_LIST":
+                return {}
+            case "METHOD":
+                return {method:"GET"}
+        }
+    }
+
+    const prefixLeft = (condition, index) => (
+        <Dropdown
+            key={`condition-type-${index}`}
+            menuItems={[{
+                label: 'Api list',
+                value: 'API_LIST',
+            },
+            {
+                label: 'Method',
+                value: 'METHOD'
+            }]}
+            initial={condition.type}
+            selected={(value) => {
+                dispatch({ type: "overwrite", index: index, key: "data", obj: getDefaultValues(value) })
+                dispatch({ type: "updateKey", index: index, key: "type", obj: value })
+            }} />
+    )
+
+    const component = (condition, index) => {
+        switch (condition.type) {
+            case "API_LIST":
+                return collectionComponent(condition, index)
+
+            case "METHOD":
+                return <>
+                    <Dropdown
+                        id={`METHOD-${index}`}
+                        key={`METHOD-${index}`}
+                        menuItems={HTTP_METHODS}
+                        initial={condition?.data?.method || "GET"}
+                        selected={(value) => {
+                            dispatch({ type: "update", index: index, key: "data", obj: { "method": value } })
+                        }} />
+                </>;
+            default: break;
+        }
+    }
+
+    const handleDelete = (index) => {
+        dispatch({ type: "delete", index: index })
+    };
+
+    return (
+        <div style={{ display: "flex", gap: "4px" }}>
+            {operatorComponent}
+            {prefixLeft(condition, index)}
+            {component(condition, index)}
+            <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
         </div>
     )
 

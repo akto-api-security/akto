@@ -1,10 +1,10 @@
-import { Text, Modal, TextField, Link, VerticalStack, HorizontalStack, Button } from "@shopify/polaris"
+import { Text, Modal, TextField, VerticalStack, HorizontalStack, Button, Card } from "@shopify/polaris"
 import api from "../api"
 import func from "@/util/func"
 import CollectionComponent from "../../../components/CollectionComponent";
 import React, { useState, useReducer, useCallback } from 'react'
 import { produce } from "immer"
-import { DeleteMinor } from "@shopify/polaris-icons"
+import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 
 function CreateNewCollectionModal(props) {
 
@@ -13,22 +13,33 @@ function CreateNewCollectionModal(props) {
     const [newCollectionName, setNewCollectionName] = useState('');
     const [showApiSelector, setShowApiSelector] = useState(false);
 
+    function prepareData(){
+        let dt = []
+            conditions.forEach(condition => {
+                if (condition.type == "API_LIST") {
+                    let apiList = []
+                    let collectionId = Object.keys(condition.data)[0]
+                    if (collectionId != undefined && condition.data[collectionId].length > 0) {
+                        condition.data[collectionId].forEach(x =>
+                            apiList.push({
+                                apiCollectionId: parseInt(collectionId),
+                                url: x.url,
+                                method: x.method
+                            }))
+                    }
+                    dt.push({ type: condition.type, operator: condition.operator, data: { apiList: apiList } })
+                } else {
+                    dt.push(condition)
+                }
+            })
+        return dt;
+    }
+
     const createNewCollection = async () => {
 
         if (showApiSelector) {
-            let apiList = []
-            conditions.forEach(condition => {
-                let collectionId = Object.keys(condition)[0]
-                if (collectionId != undefined && condition[collectionId].length > 0) {
-                    condition[collectionId].forEach(x =>
-                        apiList.push({
-                            apiCollectionId: Number(collectionId),
-                            url: x.url,
-                            method: x.method
-                        }))
-                }
-            })
-            await api.addApisToCustomCollection(apiList, newCollectionName);
+            let dt = prepareData();
+            await api.createCustomCollection(newCollectionName, dt);
         } else {
             await api.createCollection(newCollectionName)
             setNewCollectionName('')
@@ -43,27 +54,49 @@ function CreateNewCollectionModal(props) {
             (newValue) => setNewCollectionName(newValue),
             []);
 
-    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), [{}]);
-
-    const handleDelete = (index) => {
-        dispatchConditions({ type: "delete", index: index })
-    };
+    const emptyCondition = { data: {}, operator: "AND", type: "API_LIST" };
+    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), [emptyCondition]);
 
     const handleAddField = () => {
-        dispatchConditions({ type: "add", obj: {} })
+        dispatchConditions({ type: "add", obj: emptyCondition })
     };
 
     function conditionsReducer(draft, action) {
         switch (action.type) {
             case "add": draft.push(action.obj); break;
-            case "update": draft[action.index] = { ...action.obj }; break;
+            case "overwrite": draft[action.index][action.key] = { };
+            case "update": draft[action.index][action.key] = { ...draft[action.index][action.key], ...action.obj }; break;
+            case "updateKey": draft[action.index] = { ...draft[action.index], [action.key]: action.obj }; break;
             case "delete": return draft.filter((item, index) => index !== action.index);
             case "clear": return [];
             default: break;
         }
     }
 
+    const [apiCount, setApiCount] = useState({});
+
+    const VerifyConditions = async () => {
+        let dt = prepareData();
+        let res = await api.getEndpointsFromConditions(dt);
+        if(res){
+            setApiCount(
+                {conditions: conditions, apiCount: res.apiCount}
+            )
+        }
+    }
+
+    const ApiCountComponent = () => {
+        if(func.deepComparison(apiCount.conditions, conditions)){
+            return <Text>
+                {`${apiCount.apiCount} endpoints selected with the above condition`}
+            </Text>
+        } else {
+            return <></>
+        }
+    }
+
     return (<Modal
+        large
         key="modal"
         activator={createCollectionModalActivatorRef}
         open={active}
@@ -74,6 +107,11 @@ function CreateNewCollectionModal(props) {
             content: 'Create',
             onAction: createNewCollection,
         }}
+        secondaryActions={showApiSelector ? [{
+            id: "verify-new-collection",
+                content: 'Verify',
+                onAction: VerifyConditions,
+        }] : []}
     >
         <Modal.Section>
             <VerticalStack gap={3}>
@@ -94,32 +132,43 @@ function CreateNewCollectionModal(props) {
                         {showApiSelector ? "Create empty collection" : "Add endpoints"}
                     </Button>
                 </span>
-        {
-        showApiSelector ? <>
-                    <VerticalStack gap={2}>
-                        {
-                            conditions.length > 0 && conditions.map((condition, index) => (
-                                <div style={{ display: "flex", gap: "4px" }} key={index}>
-                                    <div style={{ flex: "4" }}>
-                                        <CollectionComponent
-                                            data={condition}
-                                            index={index}
-                                            dispatch={dispatchConditions}
-                                        />
-                                    </div>
-                                    <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
-                                </div>
-                            ))
-                        }
-                    </VerticalStack>
-                    <HorizontalStack gap={4} align="start">
-                        <Button onClick={handleAddField}>Add condition</Button>
-                        <Button plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</Button>
-                    </HorizontalStack>
-                    </> : null
-        }
-        </VerticalStack>
-    </Modal.Section>
+                {
+                    ApiCountComponent()
+                }
+                {
+                    showApiSelector ? <Card background="bg-subdued">
+                        <VerticalStack gap={2}>
+                            {
+                                conditions.length > 0 && conditions.map((condition, index) => (
+                                    <CollectionComponent
+                                        condition={condition}
+                                        index={index}
+                                        dispatch={dispatchConditions}
+                                        operatorComponent={<OperatorDropdown
+                                            items={[{
+                                                label: 'OR',
+                                                value: 'OR',
+                                            },
+                                            {
+                                                label: 'AND',
+                                                value: 'AND'
+                                            }]}
+                                            label={condition.operator}
+                                            selected={(value) => {
+                                                dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
+                                            }} />}
+                                    />
+                                ))
+                            }
+                        <HorizontalStack gap={4} align="start">
+                            <Button onClick={() => handleAddField()}>Add condition</Button>
+                            <Button plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</Button>
+                        </HorizontalStack>
+                        </VerticalStack>
+                    </Card> : null
+                }
+            </VerticalStack>
+        </Modal.Section>
 
     </Modal>)
 

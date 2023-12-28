@@ -1289,6 +1289,32 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void updateCustomCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for (ApiCollection apiCollection : apiCollections) {
+            if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
+                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            }
+        }
+    }
+
+    public void setUpUpdateCustomCollections() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            updateCustomCollections();
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "update-custom-collections");
+            }
+        }, 0, 24, TimeUnit.HOURS);
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1363,6 +1389,9 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
+
+                        setUpUpdateCustomCollections();
+
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
