@@ -1,4 +1,4 @@
-package com.akto.utils;
+package com.akto.util;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -35,5 +35,9 @@ public enum DashboardMode {
     public static boolean isSaasDeployment(){
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();
         return dashboardMode.equals(LOCAL_DEPLOY) && "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    }
+
+    public static boolean isMetered() {
+        return isSaasDeployment() || isOnPremDeployment();
     }
 }

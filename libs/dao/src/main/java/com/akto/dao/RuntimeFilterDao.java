@@ -21,7 +21,6 @@ public class RuntimeFilterDao extends AccountsContextDao<RuntimeFilter>{
 
     public void initialiseFilters() {
         List<RuntimeFilter> runtimeFilters = instance.findAll(new BasicDBObject());
-        logger.info("FOUND: " + runtimeFilters.size() + " runtime filters");
         Map<String, RuntimeFilter> runtimeFilterMap = new HashMap<>();
         int t = Context.now();
         // to avoid duplicate keys we increment the index by 1
