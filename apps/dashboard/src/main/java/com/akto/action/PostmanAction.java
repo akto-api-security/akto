@@ -3,8 +3,10 @@ package com.akto.action;
 import com.akto.ApiRequest;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.file.FilesDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dto.*;
+import com.akto.dto.files.File;
 import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
@@ -15,6 +17,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.postman.Main;
 import com.akto.util.DashboardMode;
+import com.akto.utils.GzipUtils;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -368,6 +371,9 @@ public class PostmanAction extends UserAction {
         JsonNode collectionDetailsObj;
         try {
             collectionDetailsObj = mapper.readTree(postmanCollectionFile);
+            String zipped = GzipUtils.zipString(postmanCollectionFile);
+            File file = new File(HttpResponseParams.Source.POSTMAN, zipped);
+            FilesDao.instance.insertOne(file);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Error while parsing the file");

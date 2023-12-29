@@ -251,17 +251,18 @@ prettifyEpoch(epoch) {
     }
   }
   ,
-  copyToClipboard(text) {
+  copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.opacity = 0;
-      document.body.appendChild(textarea);
+      ref.current.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
+      ref.current.removeChild(textarea);
+      this.setToast(true,false,toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       return;
     }
 
@@ -269,7 +270,7 @@ prettifyEpoch(epoch) {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        this.setToast(true,false,'Text copied to clipboard successfully!');
+        this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
@@ -1070,6 +1071,12 @@ getSizeOfFile(bytes) {
       event.preventDefault();
       funcToCall();
     }
+  },
+  addPlurality(count){
+    if(count == null || count==undefined){
+      return ""
+    }
+    return count === 1 ? "" : "s" 
   },
   convertQueryParamsToUrl(queryParams) {
     let url = ""
