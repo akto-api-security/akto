@@ -4,8 +4,8 @@ import {
     Badge,
     VerticalStack,
     HorizontalStack,
-    Button, 
-    Popover, 
+    Button,
+    Popover,
     ActionList,
     Link
 } from '@shopify/polaris';
@@ -13,36 +13,36 @@ import {
     HorizontalDotsMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useCallback, useEffect} from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, selectedIndex, setSelectedIndex } = props;
+    const { dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, selectedIndex, setSelectedIndex, useSummaryRow } = props;
     const navigate = useNavigate();
     const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
 
     const togglePopoverActive = (index) => useCallback(
         () => setPopoverActive((prev) => {
-            if(prev==index){
+            if (prev == index) {
                 return -1;
-            } 
+            }
             return index;
         }),
         [],
     );
-    async function nextPage(data){
-        if(data.nextUrl || getNextUrl){
-            navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), {replace:true}));
+    async function nextPage(data) {
+        if (data.nextUrl || getNextUrl) {
+            navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), { replace: true }));
         }
     }
 
-    function handleRowClick(data){
+    function handleRowClick(data) {
         setSelectedIndex(index)
-        if(onRowClick){
+        if (onRowClick) {
             onRowClick(data);
         } else {
             nextPage(data);
@@ -53,13 +53,93 @@ function GithubRow(props) {
 
     useEffect(() => {
         setData((prev) => {
-            if(func.deepComparison(prev,dataObj))
-            {
+            if (func.deepComparison(prev, dataObj)) {
                 return prev;
             }
-            return {...dataObj};
+            return { ...dataObj };
         })
     }, [dataObj])
+
+    const OldCell = () => {
+        return (
+            <>
+                <IndexTable.Cell>
+                    <div className='linkClass'>
+                        <Link
+                            {...(rowClickable ? { dataPrimaryLink: rowClickable } : {})}
+                            monochrome
+                            removeUnderline
+                            onClick={() => (handleRowClick(data))}
+                        >
+                            <GithubCell
+                                headers={headers}
+                                data={data}
+                                getStatus={getStatus}
+                                width="65vw"
+                                nameWidth="50vw"
+                            />
+                        </Link>
+                    </div>
+                </IndexTable.Cell>
+                {headers?.filter((header) => {
+                    return header.itemCell == 2
+                }).filter((header) => {
+                    return data[header.value] != undefined
+                }).map((header) => {
+                    return (
+                        <IndexTable.Cell key={header.text}>
+                            <VerticalStack gap="2">
+                                <Text variant='bodyMd' fontWeight="medium">
+                                    {header.text}
+                                </Text>
+                                <HorizontalStack>
+                                    <Badge key={header.text}>
+                                        {data[header.value]}
+                                    </Badge>
+                                </HorizontalStack>
+                            </VerticalStack>
+                        </IndexTable.Cell>
+                    )
+                })
+                }
+                {hasRowActions &&
+                    <IndexTable.Cell >
+                        <HorizontalStack align='end'>
+                            {
+                                <Popover
+                                    active={popoverActive == data.id}
+                                    activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                                    autofocusTarget="first-node"
+                                    onClose={togglePopoverActive(popoverActive)}
+                                >
+                                    <ActionList
+                                        actionRole="menuitem"
+                                        sections={getActions(data)}
+                                    />
+                                </Popover>
+                            }
+                        </HorizontalStack>
+                    </IndexTable.Cell>
+                }
+            </>
+        )
+    }
+
+    const NewCell = () => {
+        return(
+            <>
+                {headers.map((header,index) => {
+                    return(
+                        <IndexTable.Cell key={index}>
+                            {header.isCustom ? data[header.value] 
+                                : <Text variant="bodyMd">{data[header.value]}</Text>
+                            }
+                        </IndexTable.Cell>
+                    )
+                })}
+            </>
+        )
+    }
 
     return (
         <IndexTable.Row
@@ -68,64 +148,7 @@ function GithubRow(props) {
             selected={selectedResources.includes(data.id) || selectedIndex === index}
             position={index}
         >
-            <IndexTable.Cell>
-                <div className='linkClass'>
-                    <Link
-                        {...(rowClickable ? { dataPrimaryLink: rowClickable } : {})}
-                        monochrome
-                        removeUnderline
-                        onClick={() => (handleRowClick(data))}
-                    >
-                        <GithubCell
-                            headers={headers}
-                            data={data}
-                            getStatus={getStatus}
-                            width="65vw"
-                            nameWidth="50vw"
-                        />
-                    </Link>
-                </div>
-            </IndexTable.Cell>
-            {headers?.filter((header) => {
-                return header.itemCell == 2
-            }).filter((header) => {
-                return data[header.value] != undefined
-            }).map((header) => {
-                return (
-                    <IndexTable.Cell key={header.text}>
-                        <VerticalStack gap="2">
-                            <Text variant='bodyMd' fontWeight="medium">
-                                {header.text}
-                            </Text>
-                            <HorizontalStack>
-                                <Badge key={header.text}>
-                                    {data[header.value]}
-                                </Badge>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </IndexTable.Cell>
-                )
-            })
-            }
-            {hasRowActions &&
-                <IndexTable.Cell >
-                    <HorizontalStack align='end'>
-                        {
-                            <Popover
-                                active={popoverActive == data.id}
-                                activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
-                                autofocusTarget="first-node"
-                                onClose={togglePopoverActive(popoverActive)}
-                            >
-                                <ActionList
-                                    actionRole="menuitem"
-                                    sections={getActions(data)}
-                                />
-                            </Popover>
-                        }
-                    </HorizontalStack>
-                </IndexTable.Cell>
-            }
+            {useSummaryRow ? <NewCell /> : <OldCell />}
         </IndexTable.Row>
     )
 

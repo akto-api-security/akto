@@ -1,5 +1,6 @@
 import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
+import { Badge, HorizontalStack, Text } from "@shopify/polaris";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -142,7 +143,31 @@ const transform = {
         })
         const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
         return finalArr
-    }
+    },
+    getColor(key){
+        switch(key.toUpperCase()){
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "attention";
+            case "LOW": return "info";
+            default:
+                return "bg";
+        }
+    },
+
+    getIssuesList(severityInfo){
+        return (
+            <HorizontalStack gap="1">
+                {
+                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                        return(
+                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                        )
+                    }):
+                    <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
+                }
+            </HorizontalStack>
+        )
+    },
       
 }
 

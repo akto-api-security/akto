@@ -299,7 +299,7 @@ const coreTable = (
     loading={loading}
     getStatus={func.getTestResultStatus}
     promotedBulkActions={promotedBulkActions}
-    selectable={true}
+    selectable= {true}
   />   
 )
 

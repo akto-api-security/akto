@@ -38,6 +38,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.DeleteRunsInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -80,6 +81,7 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1353,6 +1355,8 @@ public class InitializerListener implements ServletContextListener {
                             setupUsageSyncScheduler();
                         }
 
+                        deleteTestRunsScheduler();
+
 
                         if(isSaas){
                             try {
@@ -1941,6 +1945,24 @@ public class InitializerListener implements ServletContextListener {
                 syncWithAkto();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
+    }
+
+    public void deleteTestRunsScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run(){
+                List<DeleteRunsInfo> deleteRunsInfos = DeleteRunsInfoDao.instance.findAll(Filters.empty());
+                if(deleteRunsInfos.size() > 0){
+                    for(DeleteRunsInfo deleteRunsInfo : deleteRunsInfos){
+                        List<ObjectId> latestSummaryIds = deleteRunsInfo.getLatestTestingSummaryIds();
+                        if(DeleteRunsInfoDao.instance.isTestRunDeleted(deleteRunsInfo)){
+                            DeleteRunsInfoDao.instance.getMCollection().deleteOne(Filters.in(DeleteRunsInfo.LATEST_TESTING_SUMMARY_IDS, latestSummaryIds));
+                        }else{
+                            DeleteRunsInfoDao.instance.deleteTestRunsFromDb(deleteRunsInfo);
+                        }
+                    }
+                }
+            }
+        }, 0 , 1, TimeUnit.DAYS);
     }
 }
 

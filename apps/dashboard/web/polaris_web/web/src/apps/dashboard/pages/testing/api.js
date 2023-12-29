@@ -204,5 +204,16 @@ export default {
                testRunIds
             }
         })
-    }
+    },
+
+    deleteTestRunsFromSummaries(latestSummaryIds){
+        return request({
+            url: '/api/deleteTestRunsFromSummaries',
+            method: 'post',
+            data: {
+                latestSummaryIds
+            }
+        })
+    },
+    
 }

@@ -577,10 +577,21 @@ public class StartTestAction extends UserAction {
     }
 
     private List<String> testRunIds;
+    private List<String> latestSummaryIds;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
-    public String deleteTestRuns() {
+    private static void executeDelete(DeleteRunsInfo deleteRunsInfo){
+        DeleteRunsInfoDao.instance.insertOne(deleteRunsInfo);
+        int accountId = Context.accountId.get();
+        Runnable r = () -> {
+            Context.accountId.set(accountId);
+            DeleteRunsInfoDao.instance.deleteTestRunsFromDb(deleteRunsInfo);
+        };
+        executorService.submit(r);
+    }
+
+    public String deleteTestRunsAction() {
         try {
             List<ObjectId> testRunIdsCopy = new ArrayList<>();
             for (String id : testRunIds) {
@@ -593,16 +604,7 @@ public class StartTestAction extends UserAction {
 
             DeleteRunsInfo deleteRunsInfo = new DeleteRunsInfo(testRunIdsCopy, Context.now(), new HashMap<>(),
                     testConfigIds, latestSummaryIds);
-            DeleteRunsInfoDao.instance.insertOne(deleteRunsInfo);
-
-            // delete code goes here
-            int accountId = Context.accountId.get();
-            Runnable r = () -> {
-                Context.accountId.set(accountId);
-                deleteTestRunsFromDb(deleteRunsInfo);
-            };
-
-            executorService.submit(r);
+            executeDelete(deleteRunsInfo);
 
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
@@ -610,69 +612,23 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void deleteTestRunsFromDb(DeleteRunsInfo deleteRunsInfo) {
-        Map<String, Boolean> testingCollectionsDeleted = deleteRunsInfo.getTestingCollectionsDeleted();
-        List<ObjectId> testRunIds = deleteRunsInfo.getTestRunIds();
-        List<ObjectId> latestSummaryIds = deleteRunsInfo.getLatestTestingSummaryIds();
-        List<Integer> testConfigIds = deleteRunsInfo.getTestConfigIds();
-
-        // check if testing run deleted or not
-        if (!testingCollectionsDeleted.getOrDefault("testing_run", false)) {
-            try {
-                TestingRunDao.instance.deleteAll(Filters.in("_id", testRunIds));
-                testingCollectionsDeleted.put("testing_run", true);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in deleting documents from testing_run " + e.getMessage(),
-                        LogDb.DASHBOARD);
+    public String deleteTestDataFromSummaryId(){
+        try {
+            List<ObjectId> summaryIdsCopy = new ArrayList<>();
+            for (String id : latestSummaryIds) {
+                ObjectId objectId = new ObjectId(id);
+                summaryIdsCopy.add(objectId);
             }
-        }
 
-        if (!testingCollectionsDeleted.getOrDefault("testing_run_result", false)) {
-            try {
-                TestingRunResultDao.instance.deleteAll(Filters.in(TestingRunResult.TEST_RUN_ID, testRunIds));
-                testingCollectionsDeleted.put("testing_run_result", true);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in deleting documents from testing_run_result " + e.getMessage(),
-                        LogDb.DASHBOARD);
-            }
+            DeleteRunsInfo deleteRunsInfo = new DeleteRunsInfo(new ArrayList<>(), Context.now(), new HashMap<>(),
+                    new ArrayList<>(), summaryIdsCopy);
+            executeDelete(deleteRunsInfo);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
         }
-
-        if (!testingCollectionsDeleted.getOrDefault("testing_run_result_summaries", false)) {
-            try {
-                TestingRunResultSummariesDao.instance
-                        .deleteAll(Filters.in(TestingRunResultSummary.TESTING_RUN_ID, testRunIds));
-                testingCollectionsDeleted.put("testing_run_result_summaries", true);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(
-                        "error in deleting documents from testing_run_result_summaries " + e.getMessage(),
-                        LogDb.DASHBOARD);
-            }
-        }
-
-        if (!testingCollectionsDeleted.getOrDefault("testing_run_config", false)) {
-            try {
-                TestingRunConfigDao.instance.deleteAll(Filters.in("_id", testConfigIds));
-                testingCollectionsDeleted.put("testing_run_config", true);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in deleting documents from testing_run_config " + e.getMessage(),
-                        LogDb.DASHBOARD);
-            }
-        }
-
-        if (!testingCollectionsDeleted.getOrDefault("testing_run_issues", false)) {
-            try {
-                TestingRunIssuesDao.instance
-                        .deleteAll(Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, latestSummaryIds));
-                testingCollectionsDeleted.put("testing_run_issues", true);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in deleting documents from testing_run_issues " + e.getMessage(),
-                        LogDb.DASHBOARD);
-            }
-        }
-
-        DeleteRunsInfoDao.instance.updateOne(Filters.in(DeleteRunsInfo.TEST_RUNS_IDS, testRunIds),
-                Updates.set(DeleteRunsInfo.TESTING_COLLECTIONS_DELETED, testingCollectionsDeleted));
+        return SUCCESS.toUpperCase();
     }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -938,6 +894,15 @@ public class StartTestAction extends UserAction {
     public void setTestRunIds(List<String> testRunIds) {
         this.testRunIds = testRunIds;
     }
+
+    public List<String> getLatestSummaryIds() {
+        return latestSummaryIds;
+    }
+
+    public void setLatestSummaryIds(List<String> latestSummaryIds) {
+        this.latestSummaryIds = latestSummaryIds;
+    }
+
 
     public enum CallSource {
         TESTING_UI,
