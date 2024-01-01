@@ -25,6 +25,8 @@ import com.slack.api.Slack;
 
 public class LoggerMaker  {
 
+    public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
+
     public final Logger logger;
     private final Class<?> aClass;
 
@@ -82,6 +84,9 @@ public class LoggerMaker  {
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
+        if(Context.accountId.get() != null){
+            err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
+        }
         logger.error(err);
         try{
             insert(err, "error", db);
@@ -92,6 +97,12 @@ public class LoggerMaker  {
         if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
             sendToSlack(err);
         }
+    }
+
+    public void errorAndAddToDb(Exception e, String err, LogDb db) {
+        StackTraceElement stackTraceElement = e.getStackTrace()[0];
+        err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+        errorAndAddToDb(err, db);
     }
 
     public void infoAndAddToDb(String info, LogDb db) {

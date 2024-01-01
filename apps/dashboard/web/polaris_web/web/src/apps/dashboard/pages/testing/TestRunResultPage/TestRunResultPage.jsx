@@ -239,7 +239,7 @@ function TestRunResultPage(props) {
       </LegacyCard>
     ,
     ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
-    selectedTestRunResult.testResults &&
+    (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}
       sampleData={selectedTestRunResult?.testResults.map((result) => {

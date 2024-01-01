@@ -27,6 +27,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     const navigate = useNavigate()
 
     const chatLogRef = useRef(null);
+    const ref = useRef(null)
 
     const setSelectedObj = (item) => {
         setCurrentObj(item)
@@ -149,8 +150,9 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                 </div>
                                 :queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
+                                    <div ref={ref}/>
                                     <Tooltip content="Copy curl command">
-                                        <Button icon={ClipboardMinor} onClick={()=> navigator.clipboard.writeText( response.responses[0].curl)} />
+                                        <Button icon={ClipboardMinor} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
                                     </Tooltip>
                                 </div>
                                 :null

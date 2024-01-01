@@ -24,6 +24,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.AuthMechanismStore;
@@ -38,11 +39,7 @@ import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -279,12 +276,16 @@ public class TestExecutor {
 
         } while (fetchMore);
 
-        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+        options.returnDocument(ReturnDocument.AFTER);
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)));
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
+                options);
+        GithubUtils.publishGithubComments(testingRunResultSummary);
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
         if(totalCountIssues.get(Severity.HIGH.toString()) > 0){

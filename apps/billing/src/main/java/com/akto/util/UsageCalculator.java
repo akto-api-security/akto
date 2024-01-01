@@ -94,7 +94,7 @@ public class UsageCalculator {
             usageMetric.setUsage(usage);
             UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e,"can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
         }
     }
 
@@ -142,7 +142,7 @@ public class UsageCalculator {
                 syncBillingEodWithMixpanel(lastUsageItem, metricType, value);
             } catch (IOException e) {
                 String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
-                loggerMaker.errorAndAddToDb(errLog, LoggerMaker.LogDb.BILLING);
+                loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
             }
         }
 
@@ -242,7 +242,7 @@ public class UsageCalculator {
 
             loggerMaker.infoAndAddToDb(String.format("Consolidated and account wise usage for organization %s - %s calculated", organizationId, organizationName), LoggerMaker.LogDb.BILLING);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while reporting usage for organization %s - %s. Error: %s", o.getId(), o.getName(), e.getMessage()), LoggerMaker.LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e, String.format("Error while reporting usage for organization %s - %s. Error: %s", o.getId(), o.getName(), e.getMessage()), LoggerMaker.LogDb.BILLING);
         } finally {
             statusAggregateUsage = false;
         }

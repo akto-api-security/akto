@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
+import { StiggProvider } from '@stigg/react-sdk';
 import "@shopify/polaris/build/esm/styles.css";
 import { StiggProvider } from '@stigg/react-sdk';
 const container = document.getElementById("root");

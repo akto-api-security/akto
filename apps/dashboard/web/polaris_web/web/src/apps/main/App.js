@@ -24,6 +24,7 @@ import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
+import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -54,6 +55,7 @@ import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
+import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
@@ -192,6 +194,10 @@ const router = createBrowserRouter([
             element: <GithubSso />
           },
           {
+            path: "integrations/github_app",
+            element: <GithubAppIntegration />
+          },
+          {
             path: "integrations/slack",
             element: <Slack />,
           },
@@ -226,6 +232,10 @@ const router = createBrowserRouter([
           {
             path: "tags/details",
             element: <TagDetails/>
+          },
+          {
+            path: "test-library",
+            element: <TestLibrary/>
           },
           {
             path: "billing",
@@ -294,9 +304,7 @@ function App() {
   }, [])
 
   return (
-    <AppProvider>
       <RouterProvider router={router} />
-    </AppProvider>
   );
 }
 

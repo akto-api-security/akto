@@ -42,7 +42,7 @@ public class OrganizationAction {
                 OrganizationsDao.instance.updateOne(Organization.ID, organization.getId(), updatesQ);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while creating organization. Error: %s", e.getMessage()), LogDb.BILLING);
+            loggerMaker.errorAndAddToDb(e,String.format("Error while creating organization. Error: %s", e.getMessage()), LogDb.BILLING);
             return Action.ERROR.toUpperCase();
         }
 

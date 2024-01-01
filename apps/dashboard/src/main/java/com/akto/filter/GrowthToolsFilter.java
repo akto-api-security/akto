@@ -2,7 +2,7 @@ package com.akto.filter;
 
 import com.akto.dao.context.Context;
 import com.akto.listener.InitializerListener;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
     ClipboardMinor,ArrowDownMinor, ArrowUpMinor
 } from '@shopify/polaris-icons';
@@ -46,6 +46,8 @@ function SampleDataComponent(props) {
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
+
+    const ref = useRef(null)
 
     useEffect(()=>{
         let parsed;
@@ -130,7 +132,7 @@ function SampleDataComponent(props) {
     async function copyRequest(reqType, type, completeData) {
         let { copyString, snackBarMessage } = await copyContent(type, completeData)
         if (copyString) {
-            navigator.clipboard.writeText(copyString)
+            func.copyToClipboard(copyString, ref, snackBarMessage)
             func.setToast(true, false, snackBarMessage)
             setPopoverActive({ [reqType]: !popoverActive[reqType] })
         }
@@ -248,6 +250,7 @@ function SampleDataComponent(props) {
                                     setPopoverActive({ [type]: !popoverActive[type] })} />}
                                 onClose={() => setPopoverActive(false)}
                             >
+                                <div ref={ref}/>
                                 <ActionList
                                     actionRole="menuitem"
                                     items={getItems(type, sampleData)}
