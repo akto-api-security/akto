@@ -28,7 +28,7 @@ function HomeDashboard() {
     const [loading, setLoading] = useState(false) ;
     const [countInfo, setCountInfo] = useState({totalUrls: 0, coverage: '0%'})
     const [riskScoreObj, setRiskScoreObj]= useState({}) ;
-    const [sensitiveArr, setSensitiveArr]= useState([]) ;
+    const [sensitiveCount, setSensitiveCount]= useState([]) ;
     const [sensitiveData, setSensitiveData] = useState({request: {}, response: {}})
     const [subCategoryInfo, setSubCategoryInfo] = useState({});
     const [coverageObj, setCoverageObj] = useState({})
@@ -71,7 +71,7 @@ function HomeDashboard() {
         setRiskScoreRangeMap(riskScoreRangeMap);
         setIssuesTrendMap(transform.formatTrendData(issuesTrendResp));
         setSensitiveData(transform.getFormattedSensitiveData(sensitiveDataResp.response))
-        setSubCategoryInfo(testingFunc.convertSubIntoSubcategory(subcategoryDataResp.subcategoryInfo))
+        setSubCategoryInfo(testingFunc.convertSubIntoSubcategory(subcategoryDataResp).subCategoryMap)
         setRecentActivities(recentActivitiesResp.recentActivities)
         setTotalActivities(recentActivitiesResp.totalActivities)
         setInitialSteps(connectionsInfo)
@@ -83,7 +83,7 @@ function HomeDashboard() {
 
         const sensitiveInfo = await observeFunc.fetchSensitiveInfo() ;
         setRiskScoreObj(riskScoreMap) ;
-        setSensitiveArr(sensitiveInfo) ;
+        setSensitiveCount(sensitiveInfo.sensitiveUrls) ;
 
         setLoading(false)
         
@@ -111,7 +111,7 @@ function HomeDashboard() {
         },
         {
             title: 'Sensitive data',
-            data: observeFunc.formatNumberWithCommas(transform.getSensitiveCount(sensitiveArr)),
+            data: observeFunc.formatNumberWithCommas(sensitiveCount),
             variant: 'headingLg'
         }
     ]

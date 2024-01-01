@@ -66,7 +66,7 @@ public class StartTestAction extends UserAction {
     private boolean fetchAllTestRuns;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
-    private Map<String, Map<String,Integer>> issuesSummaryInfoMap = new HashMap<>();
+    private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -614,14 +614,8 @@ public class StartTestAction extends UserAction {
             this.startTimestamp = Context.now() - (2 * Constants.ONE_MONTH_TIMESTAMP);
         }
 
-        Map<String,Integer> totalSeveritiesCountMap = TestingRunIssuesDao.instance.getTotalSeveritiesCountMap(this.startTimestamp,this.endTimestamp);
         Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp);
-
-        Map<String,Map<String,Integer>> result = new HashMap<>();
-        result.put("subcategoryInfo", totalSubcategoriesCountMap);
-        result.put("severityInfo", totalSeveritiesCountMap);
-
-        this.issuesSummaryInfoMap = result;
+        this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
 
         return SUCCESS.toUpperCase();
     }
@@ -889,7 +883,7 @@ public class StartTestAction extends UserAction {
         this.fetchAllTestRuns = fetchAllTestRuns;
     }
     
-    public Map<String, Map<String, Integer>> getIssuesSummaryInfoMap() {
+    public Map<String, Integer> getIssuesSummaryInfoMap() {
         return issuesSummaryInfoMap;
     }
 

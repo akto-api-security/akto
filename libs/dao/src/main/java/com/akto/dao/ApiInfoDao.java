@@ -3,8 +3,6 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
@@ -12,10 +10,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.Document;
@@ -23,7 +19,6 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -45,43 +40,18 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
+        String[] fieldNames = {ApiInfo.ID_URL};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiCollectionId"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        fieldNames = new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 2) {
-            String[] fieldNames = {"_id.url"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        fieldNames = new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.LAST_SEEN};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        if (counter == 3) {
-            String[] fieldNames = {"_id.apiCollectionId", "_id.url"};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
-            counter++;
-        }
+        fieldNames = new String[]{ApiInfo.LAST_TESTED};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        if (counter == 4) {
-            String[] fieldNames = {ApiInfo.LAST_SEEN};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
-            counter++;
-        }
-
-        if (counter == 5) {
-            String[] fieldNames = {ApiInfo.LAST_TESTED};
-            ApiInfoDao.instance.getMCollection().createIndex(Indexes.descending(fieldNames));    
-            counter++;
-        }
-        
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
     }
@@ -101,14 +71,18 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
+        pipeline.add(Aggregates.project(
+            Projections.fields(
+                Projections.include("count"),
+                Projections.computed("apiCollectionId", "$_id.apiCollectionId")
+            )
+        ));
 
         MongoCursor<BasicDBObject> collectionsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(collectionsCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
-                int count = basicDBObject.getInt("count");
-                result.put(apiCollectionId, count);
+                result.put(basicDBObject.getInt("apiCollectionId"), basicDBObject.getInt("count"));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -120,16 +94,14 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
-        pipeline.add(Aggregates.sort(Sorts.descending(ApiInfo.LAST_SEEN)));
+        pipeline.add(Aggregates.sort(Sorts.orderBy(Sorts.descending(ApiInfo.ID_API_COLLECTION_ID), Sorts.descending(ApiInfo.LAST_SEEN))));
         pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
-
-        MongoCursor<BasicDBObject> collectionsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        while(collectionsCursor.hasNext()){
+        
+        MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, ApiInfo.class).cursor();
+        while(cursor.hasNext()){
             try {
-                BasicDBObject basicDBObject = collectionsCursor.next();
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
-                int lastTrafficSeen = basicDBObject.getInt("lastSeen");
-                result.put(apiCollectionId, lastTrafficSeen);
+               ApiInfo apiInfo = cursor.next();
+               result.put(apiInfo.getId().getApiCollectionId(), apiInfo.getLastSeen());
             } catch (Exception e) {
                 e.printStackTrace();
             }

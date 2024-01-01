@@ -80,20 +80,14 @@ function convertToCollectionData(c) {
     }    
 }
 
-const convertToNewData = (collectionsArr, sensitiveInfoArr, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
-    const sensitiveInfoMap = {} 
-    sensitiveInfoArr.forEach((curr) =>{
-        const { apiCollectionId, ...obj } = curr
-        sensitiveInfoMap[apiCollectionId] = obj
-    })
+const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
-            sensitiveInRespCount: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveUrlsInResponse'] : 0,
-            sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id]['sensitiveSubtypesInResponse'] : [],
+            sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
             riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
@@ -165,13 +159,14 @@ function ApiCollections() {
         const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
         const riskScoreObj = issuesObj.riskScoreObj;
-        const sensitveInfoArr = await transform.fetchSensitiveInfo();
+        const sensitiveInfo = await transform.fetchSensitiveInfo();
         setLoading(false)
 
-        const dataObj = convertToNewData(tmp, sensitveInfoArr, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
+        const dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
 
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
+        summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
         setAllCollections(apiCollectionsResp.apiCollections || [])

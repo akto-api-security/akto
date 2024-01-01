@@ -8,11 +8,11 @@ import java.util.function.Consumer;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
+import com.akto.util.LastCronRunInfo;
 import com.akto.utils.RiskScoreOfCollections;
 
 import static com.akto.task.Cluster.callDibs;

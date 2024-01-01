@@ -159,27 +159,6 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public float calculateRiskValueForSeverity(String severity){
-        float riskScore = 0 ;
-        switch (severity) {
-            case "HIGH":
-                riskScore += 100;
-                break;
-
-            case "MEDIUM":
-                riskScore += 10;
-                break;
-
-            case "LOW":
-                riskScore += 1;
-        
-            default:
-                break;
-        }
-
-        return riskScore;
-    }
-
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
         for (BasicDBObject singleTypeInfo: list) {

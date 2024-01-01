@@ -539,8 +539,14 @@ setTestMetadata () {
 },
 convertSubIntoSubcategory(resp){
   let obj = {}
+  let countObj = {
+    HIGH: 0,
+    MEDIUM: 0,
+    LOW: 0,
+  }
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
+
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
@@ -549,17 +555,20 @@ convertSubIntoSubcategory(resp){
         text: resp[key] + tempObj.text
       }
       obj[objectKey] = newObj;
+      countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
     else if(!subCategoryMap[key]){
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(key)
       }
+      countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
       }
+      countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
 
   })
@@ -570,7 +579,10 @@ convertSubIntoSubcategory(resp){
     return prop2 - prop1 ;
   });
 
-  return Object.fromEntries(sortedEntries);
+  return {
+    subCategoryMap: Object.fromEntries(sortedEntries),
+    countMap: countObj
+  }
 
 },
 

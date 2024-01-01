@@ -385,4 +385,25 @@ public class Utils {
         return payload;
     }
 
+    public static float calculateRiskValueForSeverity(String severity){
+        float riskScore = 0 ;
+        switch (severity) {
+            case "HIGH":
+                riskScore += 100;
+                break;
+
+            case "MEDIUM":
+                riskScore += 10;
+                break;
+
+            case "LOW":
+                riskScore += 1;
+        
+            default:
+                break;
+        }
+
+        return riskScore;
+    }
+
 }

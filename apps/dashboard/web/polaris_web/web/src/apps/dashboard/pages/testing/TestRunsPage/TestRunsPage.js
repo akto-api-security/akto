@@ -296,12 +296,14 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   const fetchSummaryInfo = async()=>{
     await api.getSummaryInfo(timeStamp.startTimestamp, timeStamp.endTimestamp).then((resp)=>{
-      setSubCategoryInfo(transform.convertSubIntoSubcategory(resp.subcategoryInfo))
-      const copyMap = JSON.parse(JSON.stringify(severityCountMap))
-      Object.keys(resp.severityInfo).length > 0 && Object.keys(resp.severityInfo).forEach((key)=>{
-        copyMap[key].text = resp?.severityInfo[key]
+      const severityObj = transform.convertSubIntoSubcategory(resp)
+      setSubCategoryInfo(severityObj.subCategoryMap)
+      const severityMap = severityObj.countMap;
+      let tempMap = JSON.parse(JSON.stringify(severityCountMap))
+      Object.keys(tempMap).forEach((key) => {
+        tempMap[key].text = severityMap[key]
       })
-      setSeverityCountMap(copyMap)
+      setSeverityCountMap(tempMap)
     })
   }
 
