@@ -176,7 +176,18 @@ public class Utils {
                     return null;
                 }
             } else {
-                Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
+                JsonNode respHeaders = response.get("header");
+                Map<String, String> responseHeadersMap = new HashMap<>();
+                if (respHeaders == null) {
+                    responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
+                }
+
+                JsonNode originalRequest = response.get("originalRequest");
+
+                if (originalRequest != null) {
+                    result.put("path", getPath(originalRequest, variables));
+                }
+
                 responseHeadersString = mapper.writeValueAsString(responseHeadersMap);
 
                 JsonNode responsePayloadNode = response.get("body");

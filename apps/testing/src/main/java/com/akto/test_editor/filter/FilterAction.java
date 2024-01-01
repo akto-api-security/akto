@@ -1013,6 +1013,8 @@ public final class FilterAction {
         if (APICatalog.isTemplateUrl(url)) {
             URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
             String[] tokens = urlTemplate.getTokens();
+
+            String[] urlWithParamsTokens = APICatalogSync.createUrlTemplate(urlWithParams, method).getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);
@@ -1021,6 +1023,14 @@ public final class FilterAction {
                         privateCnt++;
                     }
                     if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate() || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+                        if (urlWithParamsTokens.length > i) {
+                            obj.put("key", i+"");
+                            obj.put("value", urlWithParamsTokens[i]);
+                            if (privateValues.size() < 5) {
+                                privateValues.add(obj);
+                            }
+                            privateCnt++;
+                        }
                         continue;
                     }
                     Set<String> valSet = singleTypeInfo.getValues().getElements();
