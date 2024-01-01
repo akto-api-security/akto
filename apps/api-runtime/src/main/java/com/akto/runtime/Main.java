@@ -7,6 +7,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
@@ -205,6 +206,8 @@ public class Main {
 
         long lastSyncOffset = 0;
 
+        Map<Integer, Integer> logSentMap = new HashMap<>();
+
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {
@@ -264,6 +267,17 @@ public class Main {
                     }
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        continue;
+                    }
+
+                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
+                        int now = Context.now();
+                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
+                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                            logSentMap.put(accountIdInt, now);
+                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
+                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
+                        }
                         continue;
                     }
 

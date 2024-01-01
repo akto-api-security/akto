@@ -1,12 +1,12 @@
 import { Modal, Text, TextField } from "@shopify/polaris"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
 
 const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) => {
     const setToastConfig = Store(state => state.setToastConfig)
-
+    const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
 
     const handleSendInvitation = async () => {
@@ -42,12 +42,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
     }
 
     const handleCopyInvitation = () => {
-        func.copyToClipboard(inviteUser.inviteLink)
-        setToastConfig({
-            isActive: true,
-            isError: false,
-            message: "Invitation link copied to clipboard"
-        })
+        func.copyToClipboard(inviteUser.inviteLink, ref, "Invitation link copied to clipboard")
     }
 
     if (inviteUser.state !== "success") {
@@ -112,6 +107,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
                      <Text variant="bodyMd" color="subdued">
                         Alternatively, you can copy the invite link and share it with your invitee directly.
                     </Text>
+                    <div ref={ref} />
                 </Modal.Section>
             </Modal>
         )

@@ -7,6 +7,8 @@ import java.util.Map;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.LastCronRunInfo;
 
+import com.akto.dto.test_editor.TestLibrary;
+
 public class AccountSettings {
     private int id;
     public static final String PRIVATE_CIDR_LIST = "privateCidrList";
@@ -42,7 +44,10 @@ public class AccountSettings {
 
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
-
+    public static final String GITHUB_APP_SECRET_KEY = "githubAppSecretKey";
+    private String githubAppSecretKey;
+    public static final String GITHUB_APP_ID = "githubAppId";
+    private String githubAppId;
     private int trafficAlertThresholdSeconds = defaultTrafficAlertThresholdSeconds;
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
@@ -52,6 +57,16 @@ public class AccountSettings {
     
     public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
     private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
+    private List<TestLibrary> testLibraries;
+    public static final String TEST_LIBRARIES = "testLibraries";
+
+    public List<TestLibrary> getTestLibraries() {
+        return testLibraries;
+    }
+
+    public void setTestLibraries(List<TestLibrary> testLibraries) {
+        this.testLibraries = testLibraries;
+    }
 
     public AccountSettings() {
     }
@@ -69,6 +84,22 @@ public class AccountSettings {
 
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
+    }
+
+    public String getGithubAppSecretKey() {
+        return githubAppSecretKey;
+    }
+
+    public void setGithubAppSecretKey(String githubAppSecretKey) {
+        this.githubAppSecretKey = githubAppSecretKey;
+    }
+
+    public String getGithubAppId() {
+        return githubAppId;
+    }
+
+    public void setGithubAppId(String githubAppId) {
+        this.githubAppId = githubAppId;
     }
 
     public enum SetupType {

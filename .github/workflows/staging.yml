@@ -101,7 +101,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    env: 
+    env:
       IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
@@ -125,7 +125,7 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_AKI_DEV_CLUSTER_02 }}
         aws-secret-access-key: ${{ secrets.AWS_SAK_DEV_CLUSTER_02 }}
         aws-region: ap-south-1
-        
+
     - name: deploy to cluster
       id: deploy_cluster
       uses: koslib/helm-eks-action@master
@@ -189,11 +189,12 @@ jobs:
         with:
           node-version: '17'
 
-      - uses: akto-api-security/run-scan@v1.0.11
+      - uses: akto-api-security/run-scan@v1.0.12
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 6558b295e9fca33d79d44994
+          AKTO_TEST_ID: 65590b1ce9fca33d79d45440
+          GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
           START_TIME_DELAY: 2
           OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
           WAIT_TIME_FOR_RESULT: 1200
@@ -216,7 +217,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    env: 
+    env:
       IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
