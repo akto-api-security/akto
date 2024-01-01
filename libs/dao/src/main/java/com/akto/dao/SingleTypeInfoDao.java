@@ -9,7 +9,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.SensitiveInfoInApiCollections;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -91,9 +90,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             counter++;    
         }
 
-        if(counter == 7){
-            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.descending(new String[]{"lastSeen", "apiCollectionId"}));
-        }
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo.LAST_SEEN, SingleTypeInfo._API_COLLECTION_ID }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
@@ -406,58 +404,20 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return countMap;
     }
 
-    public Map<Integer,Integer> getSensitiveCountForCollections(List<String> sensitiveParameters, int responseCode){
-        Bson filterOnResponse;
-        if(responseCode == -1){
-            filterOnResponse = Filters.eq("responseCode", -1);
-        }else{
-            filterOnResponse = Filters.gt("responseCode", -1);
-        }
-        Bson sensitiveSubTypeFilter = Filters.and(Filters.in("subType",sensitiveParameters), filterOnResponse);
-        BasicDBObject groupedId1 =
-                new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                        .append("url", "$url")
-                        .append("method", "$method");
-
+    private List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly){
+        int codeValue = inResponseOnly ? 0 : -1 ;
         List<Bson> pipeline = new ArrayList<>();
+        Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);
+        Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse);
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-        pipeline.add(Aggregates.group(groupedId1));
-
-        BasicDBObject groupedId2 =
-                new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
-        pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
-
-        MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        Map<Integer,Integer> result = new HashMap<>();
-        while(collectionsCursor.hasNext()){
-            try {
-                BasicDBObject basicDBObject = collectionsCursor.next();
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
-                int count = basicDBObject.getInt("count");
-                result.put(apiCollectionId, count);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        return result ;
+        pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
+        return pipeline;
     }
 
-    public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollection(List<String> sensitiveParameters, Integer responseCode){
-        Bson filterOnResponse;
-        if(responseCode == -1){
-            filterOnResponse = Filters.eq("responseCode", -1);
-        }else{
-            filterOnResponse = Filters.gt("responseCode", -1);
-        }
-        Bson sensitiveSubTypeFilter = Filters.and(Filters.in("subType",sensitiveParameters), filterOnResponse);
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId");
-        pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
-
+    public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollection(List<String> sensitiveParameters){
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId");
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false);
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-
         Map<Integer,List<String>> result = new HashMap<>();
         while(collectionsCursor.hasNext()){
             try {
@@ -472,47 +432,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return result ;
     }
 
-    public List<SensitiveInfoInApiCollections> getSensitiveInfoForCollections(){
+    public Integer getSensitiveApisCount(List<String> sensitiveParameters){
+       
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                                        .append(SingleTypeInfo._URL, "$url")
+                                        .append(SingleTypeInfo._METHOD, "$method");
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, true);
+        pipeline.add(Aggregates.count("totalSensitiveApis"));
 
-        List<SensitiveInfoInApiCollections> result = new ArrayList<>() ;
-
-        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Map<Integer,Integer> countSensitiveInRequest = getSensitiveCountForCollections(sensitiveInRequest, -1) ;
-        Map<Integer,List<String>> subtypesInRequest = getSensitiveSubtypesDetectedForCollection(sensitiveInRequest, -1);
-
-        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Map<Integer,Integer> countSensitiveInResponse = getSensitiveCountForCollections(sensitiveInResponse,1) ;
-        Map<Integer,List<String>> subtypesInResponse = getSensitiveSubtypesDetectedForCollection(sensitiveInResponse, 1);
-
-        for (Map.Entry<Integer, List<String>> entry : subtypesInRequest.entrySet()) {
-            int apiCollectionId = entry.getKey();
-
-            int countSensitiveRequest = countSensitiveInRequest.getOrDefault(apiCollectionId,0) ;
-            int countSensitiveResponse = countSensitiveInResponse.getOrDefault(apiCollectionId, 0);
-
-            List<String> subTypesRequest = entry.getValue();
-            List<String> subTypesResponse = subtypesInResponse.getOrDefault(apiCollectionId, new ArrayList<>()) ;
-
-            SensitiveInfoInApiCollections obj = new SensitiveInfoInApiCollections(apiCollectionId,countSensitiveRequest,subTypesRequest,countSensitiveResponse,subTypesResponse); 
-            result.add(obj); 
-        }
-
-        for (Map.Entry<Integer, List<String>> entry : subtypesInResponse.entrySet()) {
-            int apiCollectionId = entry.getKey();
-            if(!subtypesInRequest.containsKey(apiCollectionId)){
-                int countSensitiveRequest = countSensitiveInRequest.getOrDefault(apiCollectionId,0) ;
-                int countSensitiveResponse = countSensitiveInResponse.getOrDefault(apiCollectionId, 0);
-
-                List<String> subTypesResponse = entry.getValue();
-                List<String> subTypesRequest = subtypesInRequest.getOrDefault(apiCollectionId, new ArrayList<>()) ;
-
-                SensitiveInfoInApiCollections obj = new SensitiveInfoInApiCollections(apiCollectionId,countSensitiveRequest,subTypesRequest,countSensitiveResponse,subTypesResponse); 
-                result.add(obj); 
-            }
-        }
-
-        return result; 
+        MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        BasicDBObject basicDBObject = cursor.next();
+        return basicDBObject.getInt("totalSensitiveApis");
     }
 }

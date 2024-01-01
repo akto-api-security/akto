@@ -13,11 +13,10 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.SensitiveInfoInApiCollections;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.util.Constants;
+import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
@@ -26,11 +25,12 @@ import com.opensymphony.xwork2.Action;
 public class ApiCollectionsAction extends UserAction {
 
     List<ApiCollection> apiCollections = new ArrayList<>();
-    List<SensitiveInfoInApiCollections> sensitiveInfoInApiCollections = new ArrayList<>() ;
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
     Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
     Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
     int criticalEndpointsCount;
+    int sensitiveUrlsInResponse;
+    Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
     LastCronRunInfo timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
@@ -131,7 +131,14 @@ public class ApiCollectionsAction extends UserAction {
 
     // required for icons and total sensitive endpoints in collections
     public String fetchSensitiveInfoInCollections(){
-        this.sensitiveInfoInApiCollections = SingleTypeInfoDao.instance.getSensitiveInfoForCollections() ;
+        List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+
+        List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes);
+
+        sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
+        this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -221,8 +228,12 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollectionId = apiCollectionId;
     }
     
-    public List<SensitiveInfoInApiCollections> getSensitiveInfoInApiCollections() {
-        return sensitiveInfoInApiCollections;
+    public int getSensitiveUrlsInResponse() {
+        return sensitiveUrlsInResponse;
+    }
+
+    public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
+        return sensitiveSubtypesInCollection;
     }
 
     public Map<Integer, Integer> getTestedEndpointsMaps() {

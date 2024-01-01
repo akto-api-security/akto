@@ -48,7 +48,6 @@ function InitialSteps({initialSteps}) {
     ]
 
     const markAsComplete = async(id) => {
-        console.log(id)
         await api.skipConnection(id) ;
         await api.getIntegratedConnections().then((resp)=> {
             setConnectionSteps(resp);

@@ -7,7 +7,6 @@ import java.util.List;
 
 import org.bson.conversions.Bson;
 
-import com.akto.action.observe.InventoryAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.ApiInfoDao;
@@ -20,12 +19,12 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomDataType;
-import com.akto.dto.AccountSettings.LastCronRunInfo;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.LastCronRunInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -37,6 +36,8 @@ import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
+
+import static com.akto.utils.Utils.calculateRiskValueForSeverity;
 
 public class RiskScoreOfCollections {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class);
@@ -70,12 +71,11 @@ public class RiskScoreOfCollections {
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
         // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
-        InventoryAction inventoryAction = new InventoryAction();
         Map<ApiInfoKey, Float> severityScoreMap = new HashMap<>();
 
         for(TestingRunIssues issue: issues){
             String severity = issue.getSeverity().toString();
-            float severityScore = (float) inventoryAction.calculateRiskValueForSeverity(severity);
+            float severityScore = (float) calculateRiskValueForSeverity(severity);
             ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
             if(severityScoreMap.isEmpty() || !severityScoreMap.containsKey(apiInfoKey)){
                 severityScoreMap.put(apiInfoKey, severityScore);
@@ -154,13 +154,6 @@ public class RiskScoreOfCollections {
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
         }
-
-        // update the last score calculated field in account settings collection in db
-        AccountSettingsDao.instance.getMCollection().updateOne(
-            AccountSettingsDao.generateFilter(),
-            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_ISSUES, Context.now()),
-            new UpdateOptions().upsert(true)
-        );
             
     }
 

@@ -21,7 +21,6 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
-import com.akto.dto.AccountSettings.ConnectionInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
@@ -53,6 +52,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -65,10 +65,8 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
-import com.akto.utils.crons.FetchRecentEndpointsCron;
-import com.akto.utils.crons.FetchRecentParamsCron;
+import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
-import com.akto.utils.crons.UpdateSeverityScoreInApiInfo;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.akto.utils.usage.UsageMetricCalculator;
@@ -121,10 +119,9 @@ public class InitializerListener implements ServletContextListener {
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     public static String aktoVersion;
     public static boolean connectedToMongo = false;
-    UpdateSeverityScoreInApiInfo updateSeverityScoreInApiInfo = new UpdateSeverityScoreInApiInfo();
+    
+    SyncCron syncCronInfo = new SyncCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
-    FetchRecentEndpointsCron fetchRecentEndpointsCron = new FetchRecentEndpointsCron();
-    FetchRecentParamsCron fetchRecentParamsCron = new FetchRecentParamsCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -1398,9 +1395,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpPiiAndTestSourcesScheduler();
                         setUpTestEditorTemplatesScheduler();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        updateSeverityScoreInApiInfo.updateSeverityScoreScheduler();
-                        fetchRecentEndpointsCron.setUpRecentEndpointsActivityScheduler();
-                        fetchRecentParamsCron.setUpRecentParamsActivityScheduler();
+                        syncCronInfo.setUpUpdateCronScheduler();
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
 

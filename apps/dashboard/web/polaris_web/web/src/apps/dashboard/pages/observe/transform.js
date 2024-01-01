@@ -376,7 +376,6 @@ const transform = {
         collectionsData?.forEach((c) =>{
             totalUrl += c.endpoints ;
             totalTested += c.testedEndpoints;
-            sensitiveInRes += c.sensitiveInRespCount;
         })
 
         return {
@@ -509,7 +508,7 @@ const transform = {
         let tempRiskScoreObj = lastFetchedResp
         let tempSeverityObj = lastFetchedSeverityResp
         await api.lastUpdatedInfo().then(async(resp) => {
-            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
+            if(resp.lastSyncedCron > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
                 await api.getRiskScoreInfo().then((res) =>{
                     const newObj = {
                         criticalUrls: res.criticalEndpointsCount,
@@ -519,14 +518,14 @@ const transform = {
                     setLastFetchedResp(newObj);
                 })
             }
-            if(resp.lastUpdatedIssues > lastFetchedInfo.lastRiskScoreInfo){
+            if(resp.lastSyncedCron > lastFetchedInfo.lastRiskScoreInfo){
                 await api.getSeverityInfoForCollections().then((resp) => {
                     tempSeverityObj = JSON.parse(JSON.stringify(resp))
                     setLastFetchedSeverityResp(resp)
                 })
             }
             setLastFetchedInfo({
-                lastRiskScoreInfo: func.timeNow() > resp.lastUpdatedIssues ? func.timeNow() : resp.lastUpdatedIssues,
+                lastRiskScoreInfo: func.timeNow() > resp.lastSyncedCron ? func.timeNow() : resp.lastSyncedCron,
                 lastSensitiveInfo: func.timeNow() > resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
             })
         })
@@ -538,15 +537,19 @@ const transform = {
     },
 
     async fetchSensitiveInfo(){
-        let tempSensitveArr = lastFetchedSensitiveResp
+        let tempSensitiveInfo = lastFetchedSensitiveResp
         if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
             await api.getSensitiveInfoForCollections().then((resp) => {
-                tempSensitveArr = JSON.parse(JSON.stringify(resp))
+                const sensitiveObj = {
+                    sensitiveUrls: resp.sensitiveUrlsInResponse,
+                    sensitiveInfoMap: resp.sensitiveSubtypesInCollection
+                }
                 setLastCalledSensitiveInfo(func.timeNow())
-                setLastFetchedSensitiveResp(resp)
+                setLastFetchedSensitiveResp(sensitiveObj)
+                tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
             })
         }
-        return tempSensitveArr 
+        return tempSensitiveInfo; 
     }
 
       

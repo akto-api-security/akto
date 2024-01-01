@@ -14,10 +14,10 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Activity;
-import com.akto.dto.IssueTrendType;
-import com.akto.dto.AccountSettings.ConnectionInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.ConnectionInfo;
+import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -42,6 +42,7 @@ public class DashboardAction extends UserAction {
         return (score >= low && score < high) ;
     }
     
+    // function for getting number of api in between multiple ranges to show trend on dashboard pagecalculateRiskValueForSeverity
     public String fetchRiskScoreCountMap(){
         List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
         Map<Integer, Integer> riskScoreCounts = new HashMap<>();
