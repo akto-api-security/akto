@@ -63,12 +63,11 @@ public class ApiWorkflowExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiWorkflowExecutor.class);
     private static final Gson gson = new Gson();
 
-    public WorkflowTestResult init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
+    public WorkflowTestResult init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId, Map<String, Object> valuesMap) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
         List<Node> nodes = graph.sort();
-        Map<String, Object> valuesMap = new HashMap<>();
 
         int id = Context.now();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId, testingRunSummaryId);

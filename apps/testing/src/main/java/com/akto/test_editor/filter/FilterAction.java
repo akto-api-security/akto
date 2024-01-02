@@ -658,6 +658,12 @@ public final class FilterAction {
                     continue;
                 }
 
+                if (varMap.containsKey(objVal)) {
+                    obj = varMap.get(objVal);
+                    listVal.set(index, obj);
+                    index++;
+                    continue;
+                }
                 Object contextVal = VariableResolver.resolveContextVariable(varMap, objVal.toString());
                 if (contextVal instanceof  List) {
                     List<String> contextList = (List<String>) contextVal;
@@ -673,6 +679,13 @@ public final class FilterAction {
                 if (matches) {
                     val = val.substring(2, val.length());
                     val = val.substring(0, val.length() - 1);
+
+                    if (varMap.containsKey(val)) {
+                        obj = varMap.get(val);
+                        listVal.set(index, obj);
+                        index++;
+                        continue;
+                    }
 
                     String[] params = val.split("\\.");
                     String firstParam = params[0];

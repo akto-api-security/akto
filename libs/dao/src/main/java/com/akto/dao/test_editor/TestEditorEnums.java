@@ -214,13 +214,18 @@ public class TestEditorEnums {
         TEST_NAME
     }
 
+    public enum ValidateExecutorDataOperands {
+        Validate
+    }
+
     public enum ExecutorOperandTypes {
         Parent,
         Req,
         Terminal,
         NonTerminal,
         Data,
-        TerminalTest
+        TerminalTest,
+        Validate
     }
 
     public String getExecutorOperandValue(String key) {
@@ -244,6 +249,12 @@ public class TestEditorEnums {
         }
 
         for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return operand.toString();
             }
@@ -281,6 +292,12 @@ public class TestEditorEnums {
         for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return "terminaltest";
+            }
+        }
+
+        for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "validate";
             }
         }
 
