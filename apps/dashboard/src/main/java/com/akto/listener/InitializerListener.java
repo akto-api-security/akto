@@ -38,7 +38,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.DeleteRunsInfo;
+import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -67,6 +67,7 @@ import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.billing.OrganizationUtils;
+import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.akto.utils.usage.UsageMetricCalculator;
 import com.akto.billing.UsageMetricUtils;
@@ -121,6 +122,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
+    Crons crons = new Crons();
 
     public static String getDomain() {
         if (domain == null) {
@@ -1356,7 +1358,7 @@ public class InitializerListener implements ServletContextListener {
                             setupUsageSyncScheduler();
                         }
 
-                        deleteTestRunsScheduler();
+                        crons.deleteTestRunsScheduler();
 
 
                         if(isSaas){
@@ -1972,23 +1974,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
-
-    public void deleteTestRunsScheduler(){
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run(){
-                List<DeleteRunsInfo> deleteRunsInfos = DeleteRunsInfoDao.instance.findAll(Filters.empty());
-                if(deleteRunsInfos.size() > 0){
-                    for(DeleteRunsInfo deleteRunsInfo : deleteRunsInfos){
-                        List<ObjectId> latestSummaryIds = deleteRunsInfo.getLatestTestingSummaryIds();
-                        if(DeleteRunsInfoDao.instance.isTestRunDeleted(deleteRunsInfo)){
-                            DeleteRunsInfoDao.instance.getMCollection().deleteOne(Filters.in(DeleteRunsInfo.LATEST_TESTING_SUMMARY_IDS, latestSummaryIds));
-                        }else{
-                            DeleteRunsInfoDao.instance.deleteTestRunsFromDb(deleteRunsInfo);
-                        }
-                    }
-                }
-            }
-        }, 0 , 1, TimeUnit.DAYS);
-    }
+  
 }
 

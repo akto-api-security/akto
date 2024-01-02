@@ -581,12 +581,12 @@ public class StartTestAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
-    private static void executeDelete(DeleteRunsInfo deleteRunsInfo){
-        DeleteRunsInfoDao.instance.insertOne(deleteRunsInfo);
+    private static void executeDelete(DeleteTestRuns DeleteTestRuns){
+        DeleteTestRunsDao.instance.insertOne(DeleteTestRuns);
         int accountId = Context.accountId.get();
         Runnable r = () -> {
             Context.accountId.set(accountId);
-            DeleteRunsInfoDao.instance.deleteTestRunsFromDb(deleteRunsInfo);
+            DeleteTestRunsDao.instance.deleteTestRunsFromDb(DeleteTestRuns);
         };
         executorService.submit(r);
     }
@@ -602,9 +602,9 @@ public class StartTestAction extends UserAction {
             List<Integer> testConfigIds = TestingRunDao.instance.getTestConfigIdsToDelete(testRunIdsCopy);
             List<ObjectId> latestSummaryIds = TestingRunDao.instance.getSummaryIdsFromRunIds(testRunIdsCopy);
 
-            DeleteRunsInfo deleteRunsInfo = new DeleteRunsInfo(testRunIdsCopy, Context.now(), new HashMap<>(),
+            DeleteTestRuns DeleteTestRuns = new DeleteTestRuns(testRunIdsCopy, Context.now(), new HashMap<>(),
                     testConfigIds, latestSummaryIds);
-            executeDelete(deleteRunsInfo);
+            executeDelete(DeleteTestRuns);
 
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
@@ -620,9 +620,9 @@ public class StartTestAction extends UserAction {
                 summaryIdsCopy.add(objectId);
             }
 
-            DeleteRunsInfo deleteRunsInfo = new DeleteRunsInfo(new ArrayList<>(), Context.now(), new HashMap<>(),
+            DeleteTestRuns DeleteTestRuns = new DeleteTestRuns(new ArrayList<>(), Context.now(), new HashMap<>(),
                     new ArrayList<>(), summaryIdsCopy);
-            executeDelete(deleteRunsInfo);
+            executeDelete(DeleteTestRuns);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }

@@ -9,14 +9,14 @@ import org.bson.types.ObjectId;
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.DeleteRunsInfo;
+import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.testing.TestingRunResult;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-public class DeleteRunsInfoDao extends AccountsContextDao<DeleteRunsInfo> {
+public class DeleteTestRunsDao extends AccountsContextDao<DeleteTestRuns> {
 
-    public static final DeleteRunsInfoDao instance = new DeleteRunsInfoDao();
+    public static final DeleteTestRunsDao instance = new DeleteTestRunsDao();
 
     private static Map<String, Boolean> deleteTestRunsCollections(List<ObjectId> testRunIds,
             List<ObjectId> latestSummaryIds, List<Integer> testConfigIds,
@@ -52,37 +52,37 @@ public class DeleteRunsInfoDao extends AccountsContextDao<DeleteRunsInfo> {
         return testingCollectionsDeleted;
     }
 
-    public void deleteTestRunsFromDb(DeleteRunsInfo deleteRunsInfo) {
-        Map<String, Boolean> testingCollectionsDeleted = deleteRunsInfo.getTestingCollectionsDeleted();
-        List<ObjectId> testRunIds = deleteRunsInfo.getTestRunIds();
-        List<ObjectId> latestSummaryIds = deleteRunsInfo.getLatestTestingSummaryIds();
-        List<Integer> testConfigIds = deleteRunsInfo.getTestConfigIds();
+    public void deleteTestRunsFromDb(DeleteTestRuns deleteTestRuns) {
+        Map<String, Boolean> testingCollectionsDeleted = deleteTestRuns.getTestingCollectionsDeleted();
+        List<ObjectId> testRunIds = deleteTestRuns.getTestRunIds();
+        List<ObjectId> latestSummaryIds = deleteTestRuns.getLatestTestingSummaryIds();
+        List<Integer> testConfigIds = deleteTestRuns.getTestConfigIds();
 
         testingCollectionsDeleted = deleteTestRunsCollections(testRunIds, latestSummaryIds, testConfigIds,
                 testingCollectionsDeleted);
 
-        Bson filter = Filters.in(DeleteRunsInfo.TEST_RUNS_IDS, testRunIds);
-        deleteRunsInfo.setTestingCollectionsDeleted(testingCollectionsDeleted);
-        if (DeleteRunsInfoDao.instance.isTestRunDeleted(deleteRunsInfo)) {
-            DeleteRunsInfoDao.instance.getMCollection().deleteOne(filter);
+        Bson filter = Filters.in(DeleteTestRuns.TEST_RUNS_IDS, testRunIds);
+        deleteTestRuns.setTestingCollectionsDeleted(testingCollectionsDeleted);
+        if (DeleteTestRunsDao.instance.isTestRunDeleted(deleteTestRuns)) {
+            DeleteTestRunsDao.instance.getMCollection().deleteOne(filter);
         } else {
-            DeleteRunsInfoDao.instance.updateOne(filter,
-                    Updates.set(DeleteRunsInfo.TESTING_COLLECTIONS_DELETED, testingCollectionsDeleted));
+            DeleteTestRunsDao.instance.updateOne(filter,
+                    Updates.set(DeleteTestRuns.TESTING_COLLECTIONS_DELETED, testingCollectionsDeleted));
         }
     }
 
-    public boolean isTestRunDeleted(DeleteRunsInfo deleteRunsInfo) {
-        Map<String,Boolean> testingCollectionsDeleted = deleteRunsInfo.getTestingCollectionsDeleted();
+    public boolean isTestRunDeleted(DeleteTestRuns deleteTestRuns) {
+        Map<String,Boolean> testingCollectionsDeleted = deleteTestRuns.getTestingCollectionsDeleted();
         return !(testingCollectionsDeleted.values().stream().anyMatch(value -> !value));
     }
 
     @Override
     public String getCollName() {
-        return "delete_runs_info";
+        return "delete_test_runs_info";
     }
 
     @Override
-    public Class<DeleteRunsInfo> getClassT() {
-        return DeleteRunsInfo.class;
+    public Class<DeleteTestRuns> getClassT() {
+        return DeleteTestRuns.class;
     }
 }

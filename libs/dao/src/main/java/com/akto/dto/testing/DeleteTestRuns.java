@@ -5,7 +5,7 @@ import java.util.Map;
 
 import org.bson.types.ObjectId;
 
-public class DeleteRunsInfo {
+public class DeleteTestRuns {
     
     public static final String TEST_RUNS_IDS = "testRunIds";
     private List<ObjectId> testRunIds;
@@ -22,9 +22,9 @@ public class DeleteRunsInfo {
     public static final String LATEST_TESTING_SUMMARY_IDS = "latestTestingSummaryIds";
     private List<ObjectId> latestTestingSummaryIds;
 
-    public DeleteRunsInfo(){}
+    public DeleteTestRuns(){}
 
-    public DeleteRunsInfo(List<ObjectId> testRunIds, int lastPickedUp, Map<String, Boolean> testingCollectionsDeleted, List<Integer> testConfigIds, List<ObjectId> latestTestingSummaryIds){
+    public DeleteTestRuns(List<ObjectId> testRunIds, int lastPickedUp, Map<String, Boolean> testingCollectionsDeleted, List<Integer> testConfigIds, List<ObjectId> latestTestingSummaryIds){
         this.testRunIds = testRunIds;
         this.lastPickedUp = lastPickedUp;
         this.testingCollectionsDeleted = testingCollectionsDeleted;
