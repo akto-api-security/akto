@@ -5,9 +5,11 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
@@ -135,7 +137,8 @@ public class UsageAction extends UserAction {
         int anyAccountId = Integer.parseInt(sUser.findAnyAccountId());
         OrgUtils.getSiblingAccounts(anyAccountId).forEach(account -> {
             loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(), LoggerMaker.LogDb.BILLING);
-            InitializerListener.calculateUsageForAccount(account);
+            Context.accountId.set(account.getId());
+            UsageMetricUtils.calcAndSyncUsageMetrics(MetricTypes.values());
         });
 
         Organization organization = OrganizationsDao.instance.findOne(
