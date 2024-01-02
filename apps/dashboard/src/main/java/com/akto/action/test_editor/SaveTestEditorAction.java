@@ -114,10 +114,24 @@ public class SaveTestEditorAction extends UserAction {
             InfoParser parser = new InfoParser();
             Info convertedInfo = parser.parse(info);
 
-            if (convertedInfo.getName() == null || convertedInfo.getDescription() == null
-                    || convertedInfo.getDetails() == null || convertedInfo.getCategory() == null
-                    || convertedInfo.getSeverity() == null || convertedInfo.getSubCategory() == null) {
-                addActionError("info information is not complete.");
+            if (convertedInfo.getName() == null){
+                addActionError("Error in template: name key absent");
+                return ERROR.toUpperCase();
+            }
+            if(convertedInfo.getDescription() == null){
+                addActionError("Error in template: description key absent");
+                return ERROR.toUpperCase();
+            }
+            if(convertedInfo.getDetails() == null){
+                addActionError("Error in template: details key absent");
+                return ERROR.toUpperCase();
+            }
+            if(convertedInfo.getCategory() == null){
+                addActionError("Error in template: category key absent");
+                return ERROR.toUpperCase();
+            }
+            if(convertedInfo.getSeverity() == null || convertedInfo.getSubCategory() == null) {
+                addActionError("severity or subCategory key is absent");
                 return ERROR.toUpperCase();
             }
 
