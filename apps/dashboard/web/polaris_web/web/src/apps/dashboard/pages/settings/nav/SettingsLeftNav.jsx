@@ -1,6 +1,7 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor} from "@shopify/polaris-icons"
+import { VariantMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 
 const SettingsLeftNav = () => {
@@ -79,6 +80,12 @@ const SettingsLeftNav = () => {
                         icon: LockFilledMajor,
                         selected: page === "auth-types",
                         onClick: () => navigate("/dashboard/settings/auth-types")
+                    },
+                    {
+                        label: 'Default payloads',
+                        icon: VariantMajor,
+                        selected: page === "default-payloads",
+                        onClick: () => navigate("/dashboard/settings/default-payloads")
                     },
                     {
                         label: 'Tags',
