@@ -94,7 +94,8 @@ public class TestExecutor {
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         try {
-            WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+            Map<String, Object> valuesMap = new HashMap<>();
+            WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId, valuesMap);
             WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);

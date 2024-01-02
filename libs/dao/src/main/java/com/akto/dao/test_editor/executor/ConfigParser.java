@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ConfigParserValidationResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.ExecutorNode;
@@ -46,6 +47,15 @@ public class ConfigParser {
         if (curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Data.toString()) || 
                 curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Terminal.toString()) || 
                 curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.TerminalTest.toString())) {
+            return new ExecutorConfigParserResult(curNode, true, "");
+        }
+
+        if (curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString())) {
+            com.akto.dao.test_editor.filter.ConfigParser configParser = new com.akto.dao.test_editor.filter.ConfigParser();
+            ConfigParserResult configParserResult = configParser.parse(curNode.getValues());
+            List<ExecutorNode> childNodes = curNode.getChildNodes();
+            childNodes.add(new ExecutorNode(TestEditorEnums.ExecutorOperandTypes.Validate.toString(), new ArrayList<>(), configParserResult.getNode(), TestEditorEnums.ExecutorOperandTypes.Validate.toString()));
+            curNode.setChildNodes(childNodes);
             return new ExecutorConfigParserResult(curNode, true, "");
         }
 
@@ -126,6 +136,10 @@ public class ConfigParser {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("terminalOperand should have terminalExecutorOperand/nonTerminalExecutorOperand as the parent node");
             return configParserValidationResult;
+        }
+
+        if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Validate.toString())) {
+            return new ConfigParserValidationResult(true, "");
         }
 
         if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {

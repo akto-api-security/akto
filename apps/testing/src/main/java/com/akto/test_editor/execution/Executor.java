@@ -123,7 +123,7 @@ public class Executor {
         WorkflowTest workflowTest = convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, null, null);
+        WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, null, null, varMap);
         
         for (Map.Entry<String, NodeResult> entry : workflowTestResult.getNodeResultMap().entrySet()) {
             NodeResult nodeResult = entry.getValue();
@@ -155,6 +155,18 @@ public class Executor {
                 Map<String,Object> mapValues = m.convertValue(reqNode.getValues(), Map.class);
                 testId = (String) mapValues.get("test_name");
             } catch (Exception e) {
+                try {
+                    List<Object> listValues = (List<Object>) reqNode.getValues();
+                    for (int i = 0; i < listValues.size(); i++) {
+                        Map<String,Object> mapValues = m.convertValue(listValues.get(i), Map.class);
+                        testId = (String) mapValues.get("test_name");
+                        if (testId != null) {
+                            break;
+                        }
+                    }
+                } catch (Exception er) {
+                    // TODO: handle exception
+                }
                 // TODO: handle exception
             }
 
@@ -171,7 +183,7 @@ public class Executor {
                 // WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), rawApi.getRequest().getQueryParams(),
                 //     rawApi.getRequest().getHeaders().toString(), rawApi.getRequest().getBody(), rawApi.getRequest().getUrl());
 
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, null, null, customAuthTypes, authMechanism, rawApi, apiInfoKey);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, null, customAuthTypes, authMechanism, rawApi, apiInfoKey);
                 WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
                 mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
             } else {
@@ -227,6 +239,10 @@ public class Executor {
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
             return new ExecutorSingleRequest(true, "", null, true);
+        }
+
+        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString())) {
+            return new ExecutorSingleRequest(true, "", rawApis, true);
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {

@@ -8,15 +8,18 @@ import java.util.Map;
 
 import org.json.JSONObject;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
@@ -54,6 +57,14 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         Executor executor = new Executor();
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
+        FilterNode validatorNode = yamlNodeDetails.getValidatorNode();
+
+        for (ExecutorNode execNode: executorNode.getChildNodes()) {
+            if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
+                validatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
+            }
+        }
+
         AuthMechanism authMechanism = yamlNodeDetails.getAuthMechanism();
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
         ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
@@ -66,29 +77,33 @@ public class YamlNodeExecutor extends NodeExecutor {
         OriginalHttpResponse testResponse;
         List<String> message = new ArrayList<>();
         //String message = null;
+        String savedResponses = null;
 
         for (RawApi testReq: testRawApis) {
             try {
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);                
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, yamlNodeDetails.getValidatorNode(), yamlNodeDetails.getApiInfoKey());
+                TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                 if (res != null) {
                     result.add(res);
                 }
                 vulnerable = res.getVulnerable();
-                if (vulnerable) {
-                    try {
-                        message.add(RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse));
-                    } catch (Exception e) {
-                        ;
-                    }
+                try {
+                    message.add(RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                } catch (Exception e) {
+                    ;
                 }
+
+                // save response in a list
+                savedResponses = testResponse.getBody();
+
             } catch (Exception e) {
                 // TODO: handle exception
             }
-            if (vulnerable) {
-                // fill varMap with entries
-            }
+        }
+
+        if (savedResponses != null) {
+            varMap.put(node.getId() + ".response", savedResponses);
         }
 
         // call executor's build request, which returns all rawapi by taking a rawapi argument
@@ -109,7 +124,19 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         String testSubCategory = yamlNodeDetails.getTestId();
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
-        TestConfig testConfig = testConfigMap.get(testSubCategory); 
+        TestConfig testConfig = testConfigMap.get(testSubCategory);
+
+        ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
+
+        for (ExecutorNode execNode: executorNode.getChildNodes()) {
+            if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
+                FilterNode validatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
+                ConfigParserResult configParserResult = testConfig.getValidation();
+                configParserResult.setNode(validatorNode);
+                testConfig.setValidation(configParserResult);
+            }
+        }
+
         RawApi rawApi = yamlNodeDetails.getRawApi();
 
         Map<String, Object> m = new HashMap<>();
