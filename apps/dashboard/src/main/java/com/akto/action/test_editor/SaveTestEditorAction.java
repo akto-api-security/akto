@@ -95,6 +95,29 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String getInfoKeyMissing(Info info){
+        if (info.getName() == null){
+            return "name";
+        }
+        if(info.getDescription() == null){
+            return "description";
+        }
+        if(info.getDetails() == null){
+            return "details";
+        }
+        if(info.getCategory() == null){
+            return "category";
+        }
+        if(info.getSeverity() == null){
+            return "severity";
+        }
+        if(info.getSubCategory() == null){
+            return "subcategory";
+        }
+
+        return "";
+    }
+
     public String saveTestEditorFile() {
         TestConfig testConfig;
         try {
@@ -113,25 +136,10 @@ public class SaveTestEditorAction extends UserAction {
             // adding all necessary fields check for info in editor
             InfoParser parser = new InfoParser();
             Info convertedInfo = parser.parse(info);
-
-            if (convertedInfo.getName() == null){
-                addActionError("Error in template: name key absent");
-                return ERROR.toUpperCase();
-            }
-            if(convertedInfo.getDescription() == null){
-                addActionError("Error in template: description key absent");
-                return ERROR.toUpperCase();
-            }
-            if(convertedInfo.getDetails() == null){
-                addActionError("Error in template: details key absent");
-                return ERROR.toUpperCase();
-            }
-            if(convertedInfo.getCategory() == null){
-                addActionError("Error in template: category key absent");
-                return ERROR.toUpperCase();
-            }
-            if(convertedInfo.getSeverity() == null || convertedInfo.getSubCategory() == null) {
-                addActionError("severity or subCategory key is absent");
+            
+            String keyMissingInInfo = getInfoKeyMissing(convertedInfo);
+            if(keyMissingInInfo.length() > 0){
+                addActionError("Error in template: " + keyMissingInInfo + " key absent");
                 return ERROR.toUpperCase();
             }
 
