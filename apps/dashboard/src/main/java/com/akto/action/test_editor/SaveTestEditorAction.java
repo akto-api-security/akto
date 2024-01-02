@@ -106,7 +106,7 @@ public class SaveTestEditorAction extends UserAction {
             Map<String, Object> config = mapper.readValue(content, Map.class);
             Object info = config.get("info");
             if (info == null) {
-                addActionError("info is null");
+                addActionError("Error in template: info key absent");
                 return ERROR.toUpperCase();
             }
 
