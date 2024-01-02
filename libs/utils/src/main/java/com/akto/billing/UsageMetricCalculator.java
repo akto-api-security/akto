@@ -1,11 +1,12 @@
-package com.akto.utils.usage;
+package com.akto.billing;
 
 import java.util.ArrayList;
 import java.util.Set;
 
-import com.akto.action.observe.Utils;
+// import com.akto.action.observe.Utils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -23,7 +24,7 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
-import com.akto.utils.billing.OrganizationUtils;
+// import com.akto.utils.billing.OrganizationUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -46,7 +47,7 @@ public class UsageMetricCalculator {
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
 
-        int activeEndpoints = Utils.countEndpoints(
+        int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
                         Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
