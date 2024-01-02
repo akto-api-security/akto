@@ -1,5 +1,6 @@
 package com.akto.runtime.policies;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -8,6 +9,7 @@ import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
@@ -138,6 +140,7 @@ public class AktoPolicyNew {
 
         if (syncNow) {
             syncWithDb(false, fetchAllSTI);
+            UsageMetricUtils.calcAndSaveUsageMetrics(new MetricTypes[] { MetricTypes.ACTIVE_ENDPOINTS });
         }
     }
 

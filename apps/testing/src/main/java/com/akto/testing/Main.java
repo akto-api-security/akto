@@ -19,6 +19,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -289,6 +290,7 @@ public class Main {
 
                 if(summaryId != null && testingRun.getTestIdConfig() != 1){
                     TestExecutor.updateTestSummary(summaryId);
+                    UsageMetricUtils.calcAndSaveUsageMetrics(new MetricTypes[] { MetricTypes.TEST_RUNS });
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
