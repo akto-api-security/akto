@@ -501,7 +501,7 @@ public class Executor {
             case "test_name":
                 return new ExecutorSingleOperationResp(true, "");
             case "jwt_replace_body":
-                JWTPayloadModifier jwtPayloadModifier = new JWTPayloadModifier(value.toString());
+                JWTPayloadModifier jwtPayloadModifier = new JWTPayloadModifier(key.toString());
                 for (String k: rawApi.getRequest().getHeaders().keySet()) {
                     List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
                     if (hList.size() == 0){
