@@ -27,7 +27,6 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class);
 
-    private String orgId;
     @Override
     public String execute() throws Exception {
         InfraMetricsListener.registry.scrape(servletResponse.getWriter());
@@ -38,8 +37,11 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
         PrintWriter out = servletResponse.getWriter();
         InfraMetricsListener.registry.scrape(out);
         Organization organization = OrganizationsDao.instance.findOne(new BasicDBObject());
-        this.orgId = StringUtils.isNotEmpty(organization.getId()) ? redact(organization.getId()) : "null";
-        out.append("orgId: ").append(this.orgId).append("\n");
+        String orgId = "null";
+        if(organization != null){
+            orgId = redact(organization.getId());
+        }
+        out.append("orgId: ").append(orgId).append("\n");
         out.flush();
         out.close();
         return null;
@@ -94,13 +96,5 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     public BasicDBObject getAkto_health() {
         return akto_health;
-    }
-
-    public String getOrgId() {
-        return orgId;
-    }
-
-    public void setOrgId(String orgId) {
-        this.orgId = orgId;
     }
 }
