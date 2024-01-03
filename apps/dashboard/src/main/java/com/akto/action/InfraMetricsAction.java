@@ -3,7 +3,9 @@ package com.akto.action;
 
 import com.akto.dao.KafkaHealthMetricsDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.KafkaHealthMetric;
+import com.akto.dto.billing.Organization;
 import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -11,22 +13,36 @@ import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.Document;
 
+import java.io.PrintWriter;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class InfraMetricsAction implements Action,ServletResponseAware, ServletRequestAware  {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class);
+
+    private String orgId;
     @Override
     public String execute() throws Exception {
-        InfraMetricsListener.registry.scrape(servletResponse.getWriter());
+        PrintWriter out = servletResponse.getWriter();
+        InfraMetricsListener.registry.scrape(out);
+        Organization organization = OrganizationsDao.instance.findOne(new BasicDBObject());
+        this.orgId = StringUtils.isNotEmpty(organization.getId()) ? redact(organization.getId()) : "null";
+        out.append("orgId: ").append(this.orgId).append("\n");
+        out.flush();
+        out.close();
         return null;
+    }
+
+    public String redact(String id) {
+        String lastFour = id.substring(id.length() - 4);
+        return "****-****-****-****-" + lastFour;
     }
 
     private final BasicDBObject akto_health = new BasicDBObject();
@@ -73,5 +89,13 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     public BasicDBObject getAkto_health() {
         return akto_health;
+    }
+
+    public String getOrgId() {
+        return orgId;
+    }
+
+    public void setOrgId(String orgId) {
+        this.orgId = orgId;
     }
 }
