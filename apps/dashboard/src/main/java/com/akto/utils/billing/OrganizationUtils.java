@@ -29,7 +29,7 @@ public class OrganizationUtils {
                         && e.getValue().getOverageFirstDetected() != -1);
     }
 
-    public static HashMap<String, FeatureAccess> getFeatureWiseAllowed(BasicDBList l) {
+    public static HashMap<String, FeatureAccess> getFeatureWiseAllowed(BasicDBList l, Map<String, Integer> usageMetrics) {
         if (l == null || l.size() == 0) return new HashMap<>();
 
         HashMap<String, FeatureAccess> result = new HashMap<>();
@@ -68,6 +68,9 @@ public class OrganizationUtils {
                 if (StringUtils.isNumeric(usageLimitObj.toString())) {
                     int usageLimit = Integer.parseInt(usageLimitObj.toString());
                     int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
+                    int usageFromDb = usageMetrics.getOrDefault(featureLabel, 0);
+                    usage = Math.max(usage, usageFromDb);
+
                     if (usage > usageLimit) {
                         result.put(featureLabel, new FeatureAccess(isGranted, now));
                     }

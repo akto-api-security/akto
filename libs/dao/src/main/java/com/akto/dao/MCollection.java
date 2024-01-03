@@ -7,7 +7,6 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import org.bson.BsonDocument;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -26,6 +25,7 @@ public abstract class MCollection<T> {
     public static final String SET = "$set";
     public static final String ID = "_id";
     public static final String NAME = "name";
+    public static final String ROOT_ELEMENT = "$$ROOT";
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();

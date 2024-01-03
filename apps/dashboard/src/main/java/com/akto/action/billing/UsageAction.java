@@ -6,35 +6,30 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.User;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetric;
-import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
-import com.akto.stigg.StiggReporterClient;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import com.akto.utils.usage.OrgUtils;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class UsageAction extends UserAction {
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static final String[] freeDomains = new String[] {"gmail.com","yahoo.com","hotmail.com","aol.com","hotmail.co.uk",
             "hotmail.fr","msn.com","yahoo.fr","wanadoo.fr","orange.fr","comcast.net","yahoo.co.uk","yahoo.com.br",
@@ -135,35 +130,31 @@ public class UsageAction extends UserAction {
     public String refreshUsageData(){
         User sUser = getSUser();
         int anyAccountId = Integer.parseInt(sUser.findAnyAccountId());
-        OrgUtils.getSiblingAccounts(anyAccountId).forEach(account -> {
-            loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(), LoggerMaker.LogDb.BILLING);
-            Context.accountId.set(account.getId());
-            UsageMetricUtils.calcAndSyncUsageMetrics(MetricTypes.values());
-        });
+        
+        // calculation may take time, so we do it in a separate thread to avoid timeout.
+        executorService.schedule(new Runnable() {
+            public void run() {
 
-        Organization organization = OrganizationsDao.instance.findOne(
-                Filters.in(Organization.ACCOUNTS, anyAccountId)
-        );
+                OrgUtils.getSiblingAccounts(anyAccountId).forEach(account -> {
+                    loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(),
+                            LogDb.DASHBOARD);
+                    Context.accountId.set(account.getId());
+                    UsageMetricUtils.calcAndSyncUsageMetrics(MetricTypes.values());
+                });
 
-        List<UsageMetric> usageMetrics = UsageMetricsDao.instance.findAll(
-                Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false),
-                Filters.eq(UsageMetric.ORGANIZATION_ID, organization.getId())
-        );
+                Organization organization = OrganizationsDao.instance.findOne(
+                        Filters.in(Organization.ACCOUNTS, anyAccountId));
 
-        for (UsageMetric usageMetric : usageMetrics) {
-            loggerMaker.infoAndAddToDb("Syncing usage metric with billing and mixpanel: " + usageMetric.getId(), LoggerMaker.LogDb.BILLING);
-            UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
-            UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
-        }
+                try {
+                    loggerMaker.infoAndAddToDb("Flushing usage pipeline", LogDb.DASHBOARD);
+                    UsageMetricUtils.flushUsagePipelineForOrg(organization.getId());
+                    loggerMaker.infoAndAddToDb("Usage pipeline flushed", LogDb.DASHBOARD);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
 
-        try{
-            loggerMaker.infoAndAddToDb("Flushing usage pipeline", LoggerMaker.LogDb.BILLING);
-            UsageMetricUtils.flushUsagePipelineForOrg(organization.getId());
-        } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Failed to flush usage pipeline", LoggerMaker.LogDb.BILLING);
-            return ERROR.toUpperCase();
-        }
-        loggerMaker.infoAndAddToDb("Usage pipeline flushed", LoggerMaker.LogDb.BILLING);
         return SUCCESS.toUpperCase();
     }
 

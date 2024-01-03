@@ -122,7 +122,12 @@ public class UsageAction implements ServletRequestAware {
             if (usageLowerBound == 0 || usageUpperBound == 0) {
                 loggerMaker.infoAndAddToDb("Usage bounds not provided. Using default bounds", LogDb.BILLING);
                 int now = Context.now();
-                usageLowerBound = now - (now % UsageUtils.USAGE_UPPER_BOUND_DL) - UsageUtils.USAGE_UPPER_BOUND_DL;
+                /*
+                 * since we just recorded and sent the data from dashboard, 
+                 * we need to set the limits to check for the current epoch, 
+                 * even though it would be a non-standard epoch.
+                 */
+                usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL;
                 usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
             }
             loggerMaker.infoAndAddToDb(String.format("Aggregating usage for organization %s between %d and %d", organizationId, usageLowerBound, usageUpperBound), LogDb.BILLING);
