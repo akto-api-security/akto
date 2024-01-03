@@ -1432,7 +1432,10 @@ public class InitializerListener implements ServletContextListener {
 
             BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId,
                     organization.getAdminEmail());
-            featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
+
+            Map<String, Integer> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(organizationId);
+
+            featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements, consolidatedOrgUsage);
 
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 String label = entry.getKey();

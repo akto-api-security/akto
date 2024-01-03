@@ -1,7 +1,9 @@
 package com.akto.billing;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -205,8 +207,10 @@ public class UsageMetricUtils {
         return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS.name());
     }
 
-    public static UsageMetric calcAndSaveUsageMetrics(MetricTypes[] metricTypes){
+    public static List<UsageMetric> calcAndSaveUsageMetrics(MetricTypes[] metricTypes){
         int accountId = Context.accountId.get();
+
+        List<UsageMetric> usageMetrics = new ArrayList<>();
 
         try {
 
@@ -262,39 +266,30 @@ public class UsageMetricUtils {
 
                 UsageMetricsDao.instance.insertOne(usageMetric);
                 loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
-                return usageMetric;
+                usageMetrics.add(usageMetric);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,
                     String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()),
                     LogDb.DASHBOARD);
         }
-        return null;
+        return usageMetrics;
     }
 
     public static void calcAndSyncUsageMetrics(MetricTypes[] metricTypes) {
 
-        UsageMetric usageMetric = calcAndSaveUsageMetrics(metricTypes);
+        List<UsageMetric> usageMetrics = calcAndSaveUsageMetrics(metricTypes);
 
-        try {
-
-            if (usageMetric == null) {
-                throw new Exception("Usage metric is null");
+        for (UsageMetric usageMetric : usageMetrics) {
+            try {
+                UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
+                UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
+                loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
+                        usageMetric.getId().toString(), usageMetric.getOrganizationId(),
+                        usageMetric.getAccountId(), usageMetric.getMetricType().toString()), LogDb.DASHBOARD);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while syncing usage metric", LogDb.DASHBOARD);
             }
-
-            UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
-
-            UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
-            loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
-                    usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(),
-                    usageMetric.getMetricType().toString()),
-                    LogDb.DASHBOARD);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,
-                    String.format("Error while syncing usage metric %s  %s/%d %s",
-                            usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(),
-                            usageMetric.getMetricType().toString()),
-                    LogDb.DASHBOARD);
         }
     }
 
