@@ -1276,48 +1276,7 @@ public class InitializerListener implements ServletContextListener {
 //                Updates.set(BackwardCompatibility.INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO, Context.now())
 //            );
 
-            int accountId = Context.accountId.get();
-
-            Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
-            Organization organization = OrganizationsDao.instance.findOne(filterQ);
-            boolean alreadyExists = organization != null;
-            if (alreadyExists) {
-                fetchAndSaveFeatureWiseAllowed(organization);
-                loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
-                return;
-            }
-
-            RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
-
-            if (rbac == null) {
-                loggerMaker.errorAndAddToDb("Account "+ accountId +" has no admin! Unable to make org.", LogDb.DASHBOARD);
-                return;
-            }
-
-            int userId = rbac.getUserId();
-
-            User user = UsersDao.instance.findOne(User.ID, userId);
-            if (user == null) {
-                loggerMaker.errorAndAddToDb("User "+ userId +" is absent! Unable to make org.", LogDb.DASHBOARD);
-                return;
-            }
-
-            Organization org = OrganizationsDao.instance.findOne(Organization.ADMIN_EMAIL, user.getLogin());
-
-            if (org == null) {
-                loggerMaker.infoAndAddToDb("Creating a new org for email id: " + user.getLogin() + " and acc: " + accountId, LogDb.DASHBOARD);
-                org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(), new HashSet<>(), !DashboardMode.isSaasDeployment());
-                OrganizationsDao.instance.insertOne(org);
-            } else {
-                loggerMaker.infoAndAddToDb("Found a new org for acc: " + accountId + " org="+org.getId(), LogDb.DASHBOARD);
-            }
-
-            fetchAndSaveFeatureWiseAllowed(org);
-
-            Bson updates = Updates.addToSet(Organization.ACCOUNTS, accountId);
-            OrganizationsDao.instance.updateOne(Organization.ID, org.getId(), updates);
-            org = OrganizationsDao.instance.findOne(Organization.ID, org.getId());
-            OrganizationUtils.syncOrganizationWithAkto(org);
+            createOrg(Context.accountId.get());
 
             // if (DashboardMode.isSaasDeployment()) {
             //     try {
@@ -1422,6 +1381,49 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void createOrg(int accountId) {
+        Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
+        Organization organization = OrganizationsDao.instance.findOne(filterQ);
+        boolean alreadyExists = organization != null;
+        if (alreadyExists) {
+            fetchAndSaveFeatureWiseAllowed(organization);
+            loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
+            return;
+        }
+
+        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+
+        if (rbac == null) {
+            loggerMaker.errorAndAddToDb("Account "+ accountId +" has no admin! Unable to make org.", LogDb.DASHBOARD);
+            return;
+        }
+
+        int userId = rbac.getUserId();
+
+        User user = UsersDao.instance.findOne(User.ID, userId);
+        if (user == null) {
+            loggerMaker.errorAndAddToDb("User "+ userId +" is absent! Unable to make org.", LogDb.DASHBOARD);
+            return;
+        }
+
+        Organization org = OrganizationsDao.instance.findOne(Organization.ADMIN_EMAIL, user.getLogin());
+
+        if (org == null) {
+            loggerMaker.infoAndAddToDb("Creating a new org for email id: " + user.getLogin() + " and acc: " + accountId, LogDb.DASHBOARD);
+            org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(), new HashSet<>(), !DashboardMode.isSaasDeployment());
+            OrganizationsDao.instance.insertOne(org);
+        } else {
+            loggerMaker.infoAndAddToDb("Found a new org for acc: " + accountId + " org="+org.getId(), LogDb.DASHBOARD);
+        }
+
+        Bson updates = Updates.addToSet(Organization.ACCOUNTS, accountId);
+        OrganizationsDao.instance.updateOne(Organization.ID, org.getId(), updates);
+        org = OrganizationsDao.instance.findOne(Organization.ID, org.getId());
+        OrganizationUtils.syncOrganizationWithAkto(org);
+
+        fetchAndSaveFeatureWiseAllowed(org);
+    }
+
 
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
@@ -1504,6 +1506,7 @@ public class InitializerListener implements ServletContextListener {
                         } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
+                createOrg(1_000_000);
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
@@ -1675,6 +1678,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        initializeOrganizationAccountBelongsTo(backwardCompatibility);
         setOrganizationsInBilling(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
@@ -1689,7 +1693,6 @@ public class InitializerListener implements ServletContextListener {
         enableNewMerging(backwardCompatibility);
         enableMergeAsyncOutside(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
-        initializeOrganizationAccountBelongsTo(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
