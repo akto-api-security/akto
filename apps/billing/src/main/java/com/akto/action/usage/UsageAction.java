@@ -1,24 +1,18 @@
 package com.akto.action.usage;
 
 import java.util.Set;
-import java.util.function.Consumer;
-
 import javax.servlet.http.HttpServletRequest;
 
 import com.akto.util.UsageCalculator;
 import com.akto.util.UsageUtils;
-import com.akto.util.tasks.OrganizationTask;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -26,9 +20,9 @@ import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import static com.opensymphony.xwork2.Action.SUCCESS;
+import com.opensymphony.xwork2.ActionSupport;
 
-public class UsageAction implements ServletRequestAware {
+public class UsageAction extends ActionSupport implements ServletRequestAware {
     private UsageMetric usageMetric;
     private HttpServletRequest request;
 
@@ -37,31 +31,6 @@ public class UsageAction implements ServletRequestAware {
     private int usageUpperBound;
 
     private String organizationId;
-
-    public String aggregateAccountWiseUsage() {
-
-        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-            @Override
-            public void accept(Organization organization) {
-
-                UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
-            }
-        }, "aggregateAccountWiseUsage");
-
-
-        return SUCCESS.toUpperCase();
-    }
-
-    public String sendDataToSinks() {
-        OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-            @Override
-            public void accept(Organization organization) {
-                UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
-            }
-        }, "aggregateAccountWiseUsage");
-
-        return SUCCESS.toUpperCase();
-    }
 
     public String ingestUsage() {
         try {
@@ -113,10 +82,18 @@ public class UsageAction implements ServletRequestAware {
     }
 
     public String flushUsageDataForOrg(){
+
+        if(organizationId == null || organizationId.isEmpty()){
+            addActionError("Organization id not provided");
+            return Action.ERROR.toUpperCase();
+        }
+
         try {
             Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organizationId));
             if (organization == null) {
-                loggerMaker.errorAndAddToDb(String.format("Organization %s does not exist", organizationId), LogDb.BILLING);
+                String message = String.format("Organization %s does not exist", organizationId);
+                addActionError(message);
+                loggerMaker.errorAndAddToDb(message, LogDb.BILLING);
                 return Action.ERROR.toUpperCase();
             }
             if (usageLowerBound == 0 || usageUpperBound == 0) {
@@ -137,7 +114,9 @@ public class UsageAction implements ServletRequestAware {
             loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while flushing usage data for organization %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
+            String commonMessage = "Error while flushing usage data for organization";
+            loggerMaker.errorAndAddToDb(e, String.format( commonMessage + " %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
+            addActionError(commonMessage);
             return Action.ERROR.toUpperCase();
         }
     }

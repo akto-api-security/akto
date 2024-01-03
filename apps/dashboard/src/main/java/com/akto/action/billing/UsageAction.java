@@ -147,7 +147,7 @@ public class UsageAction extends UserAction {
 
                 try {
                     loggerMaker.infoAndAddToDb("Flushing usage pipeline", LogDb.DASHBOARD);
-                    UsageMetricUtils.flushUsagePipelineForOrg(organization.getId());
+                    OrganizationUtils.flushUsagePipelineForOrg(organization.getId());
                     loggerMaker.infoAndAddToDb("Usage pipeline flushed", LogDb.DASHBOARD);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);
