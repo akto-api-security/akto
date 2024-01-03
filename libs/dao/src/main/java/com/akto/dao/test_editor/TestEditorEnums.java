@@ -197,7 +197,8 @@ public class TestEditorEnums {
         FOLLOW_REDIRECT,
         REMOVE_AUTH_HEADER,
         REPLACE_AUTH_HEADER,
-        REPLACE_BODY
+        REPLACE_BODY,
+        JWT_REPLACE_BODY
     }
 
     public enum NonTerminalExecutorDataOperands {
