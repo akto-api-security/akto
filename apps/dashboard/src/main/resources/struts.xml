@@ -30,6 +30,9 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="detailedMetrics" class="com.akto.action.InfraMetricsAction" method="detailedMetrics">
+        </action>
+
         <action name="mongo-error" class="com.akto.action.HomeAction" method="error">
             <result name="SUCCESS">/pages/mongo-error.jsp</result>
         </action>
