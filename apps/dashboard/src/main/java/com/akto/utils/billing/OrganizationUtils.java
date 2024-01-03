@@ -67,9 +67,7 @@ public class OrganizationUtils {
 
                 if (StringUtils.isNumeric(usageLimitObj.toString())) {
                     int usageLimit = Integer.parseInt(usageLimitObj.toString());
-                    int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
-                    int usageFromDb = usageMetrics.getOrDefault(featureLabel, 0);
-                    usage = Math.max(usage, usageFromDb);
+                    int usage = usageMetrics.getOrDefault(featureLabel, 0);
 
                     if (usage > usageLimit) {
                         result.put(featureLabel, new FeatureAccess(isGranted, now));
@@ -173,6 +171,10 @@ public class OrganizationUtils {
                 response.close();
             }
         }
+    }
+
+    public static void flushUsagePipelineForOrg(String organizationId) {
+        fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
     }
 
     public static BasicDBObject fetchOrgDetails(String orgId) {

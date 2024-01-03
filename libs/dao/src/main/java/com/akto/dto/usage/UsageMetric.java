@@ -26,6 +26,7 @@ public class UsageMetric {
     private boolean syncedWithAkto;
     public static final String SYNCED_WITH_AKTO = "syncedWithAkto";
     private String ipAddress;
+    public static final String SYNC_EPOCH = "syncEpoch";
     private int syncEpoch;
     private int measureEpoch;
     private int aktoSaveEpoch;

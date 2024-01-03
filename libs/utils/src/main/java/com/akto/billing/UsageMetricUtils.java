@@ -26,6 +26,8 @@ import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndReplaceOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 
 import okhttp3.MediaType;
@@ -84,39 +86,6 @@ public class UsageMetricUtils {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to execute usage metric. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
-    }
-
-    public static void flushUsagePipelineForOrg(String organizationId) throws Exception{
-        Gson gson = new Gson();
-        Map<String, String> wrapper = new HashMap<>();
-        wrapper.put("organizationId", organizationId);
-        String json = gson.toJson(wrapper);
-
-        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-        RequestBody body = RequestBody.create(json, JSON);
-
-        Request request = new Request.Builder()
-                .url(UsageUtils.getUsageServiceUrl() + "/api/flushUsageDataForOrg")
-                .post(body)
-                .build();
-
-        OkHttpClient client = new OkHttpClient();
-        Response response = null;
-
-        try {
-            response = client.newCall(request).execute();
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected code " + response);
-            }
-        } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Failed to sync usage metric with Akto. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-            throw e;
-        } finally {
-            if (response != null) {
-                response.close(); // Manually close the response body
-            }
-        }
-
     }
 
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
@@ -264,7 +233,18 @@ public class UsageMetricUtils {
                 // calculate usage for metric
                 UsageMetricCalculator.calculateUsageMetric(usageMetric);
 
-                UsageMetricsDao.instance.insertOne(usageMetric);
+                /*
+                 * Save a single usage metric per sync cycle, 
+                 * until it is synced with akto.
+                 */
+                usageMetric = UsageMetricsDao.instance.getMCollection().findOneAndReplace(
+                        Filters.and(
+                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                                Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false),
+                                Filters.eq(UsageMetric.SYNC_EPOCH, syncEpoch)),
+                        usageMetric, new FindOneAndReplaceOptions().upsert(true)
+                                .returnDocument(ReturnDocument.AFTER));
+
                 loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
                 usageMetrics.add(usageMetric);
             }
