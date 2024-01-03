@@ -615,7 +615,10 @@ public class TestExecutor {
         filterGraphQlPayload(rawApi, apiInfoKey);
 
         FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
-        FilterNode validatorNode = testConfig.getValidation().getNode();
+        FilterNode validatorNode = null;
+        if (testConfig.getValidation() != null) {
+            validatorNode = testConfig.getValidation().getNode();
+        }
         ExecutorNode executorNode = testConfig.getExecute().getNode();
         Auth auth = testConfig.getAuth();
         Map<String, List<String>> wordListsMap = testConfig.getWordlists();

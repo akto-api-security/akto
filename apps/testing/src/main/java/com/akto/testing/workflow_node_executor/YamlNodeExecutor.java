@@ -72,12 +72,13 @@ public class YamlNodeExecutor extends NodeExecutor {
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         String logId = "";
         List<TestResult> result = new ArrayList<>();
-        boolean vulnerable = true;
+        boolean vulnerable = false;
 
         OriginalHttpResponse testResponse;
         List<String> message = new ArrayList<>();
         //String message = null;
         String savedResponses = null;
+        int statusCode = 0;
 
         for (RawApi testReq: testRawApis) {
             try {
@@ -96,6 +97,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
                 // save response in a list
                 savedResponses = testResponse.getBody();
+                statusCode = testResponse.getStatusCode();
 
             } catch (Exception e) {
                 // TODO: handle exception
@@ -104,6 +106,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         if (savedResponses != null) {
             varMap.put(node.getId() + ".response", savedResponses);
+            varMap.put(node.getId() + ".status_code", statusCode);
         }
 
         // call executor's build request, which returns all rawapi by taking a rawapi argument

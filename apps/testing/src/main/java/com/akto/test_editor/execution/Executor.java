@@ -21,12 +21,15 @@ import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
+import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.util.modifier.JWTPayloadModifier;
+import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -497,6 +500,41 @@ public class Executor {
                 return new ExecutorSingleOperationResp(true, "");
             case "test_name":
                 return new ExecutorSingleOperationResp(true, "");
+            case "jwt_replace_body":
+                JWTPayloadModifier jwtPayloadModifier = new JWTPayloadModifier(value.toString());
+                for (String k: rawApi.getRequest().getHeaders().keySet()) {
+                    List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
+                    if (hList.size() == 0){
+                        continue;
+                    }
+                    String hVal = hList.get(0);
+                    String[] splitValue = hVal.toString().split(" ");
+                    List<String> finalValue = new ArrayList<>();
+
+                    boolean isJwt = false;
+
+                    for (String val: splitValue) {
+                        if (!KeyTypes.isJWT(val)) {
+                            finalValue.add(val);
+                            continue;
+                        }
+                        isJwt = true;
+                        String modifiedHeaderVal = null;
+
+                        try {
+                            modifiedHeaderVal = jwtPayloadModifier.jwtModify("", val);
+                        } catch(Exception e) {
+                            return null;
+                        }
+                        finalValue.add(modifiedHeaderVal);
+                    }
+
+                    if (!isJwt) {
+                        continue;
+                    }
+
+                    return Operations.modifyHeader(rawApi, k, String.join( " ", finalValue));
+                }
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
 
