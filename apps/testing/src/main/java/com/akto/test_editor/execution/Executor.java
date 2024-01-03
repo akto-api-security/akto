@@ -394,6 +394,19 @@ public class Executor {
                 value = VariableResolver.resolveExpression(varMap, value.toString());
             }
 
+            if (value instanceof List) {
+                try {
+                    int index = 0;
+                    List<String> valList = (List<String>) value;
+                    for (String v: valList) {
+                        v = VariableResolver.resolveExpression(varMap, v);
+                        valList.set(index, v);
+                        index++;
+                    }
+                } catch (Exception e) {
+                }
+            }
+
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes);
             return resp;
         } catch(Exception e) {
