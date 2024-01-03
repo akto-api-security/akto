@@ -30,6 +30,11 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
     private String orgId;
     @Override
     public String execute() throws Exception {
+        InfraMetricsListener.registry.scrape(servletResponse.getWriter());
+        return null;
+    }
+
+    public String detailedMetrics() throws Exception {
         PrintWriter out = servletResponse.getWriter();
         InfraMetricsListener.registry.scrape(out);
         Organization organization = OrganizationsDao.instance.findOne(new BasicDBObject());
