@@ -1381,14 +1381,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static User getAdminOrFirstUser(int accountId){
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
-        if (rbac == null) {
-            return UsersDao.instance.getFirstUser(accountId);
-        }
-        return UsersDao.instance.findOne(User.ID, rbac.getUserId());
-    }
-
     private static void createOrg(int accountId) {
         Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
         Organization organization = OrganizationsDao.instance.findOne(filterQ);
@@ -1399,9 +1391,18 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        User user = getAdminOrFirstUser(accountId);
+        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+
+        if (rbac == null) {
+            loggerMaker.errorAndAddToDb("Account "+ accountId +" has no admin! Unable to make org.", LogDb.DASHBOARD);
+            return;
+        }
+
+        int userId = rbac.getUserId();
+
+        User user = UsersDao.instance.findOne(User.ID, userId);
         if (user == null) {
-            loggerMaker.errorAndAddToDb("No users present, unable to make org.", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("User "+ userId +" is absent! Unable to make org.", LogDb.DASHBOARD);
             return;
         }
 
