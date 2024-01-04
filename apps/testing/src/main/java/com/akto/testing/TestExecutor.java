@@ -95,7 +95,7 @@ public class TestExecutor {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         try {
             Map<String, Object> valuesMap = new HashMap<>();
-            WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId, valuesMap);
+            WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId, valuesMap, false);
             WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
@@ -186,7 +186,7 @@ public class TestExecutor {
                 continue;
             }
             Map<String, Object> wordListsMap = (Map) testConfig.getWordlists();
-            VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), true);
+            //VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), ap);
         }
         for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
@@ -631,7 +631,7 @@ public class TestExecutor {
 
         Map<ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(apiInfoKey, messages);
-        VariableResolver.resolveWordList(varMap, sampleDataMap, false);
+        VariableResolver.resolveWordList(varMap, sampleDataMap, apiInfoKey);
 
         String testExecutionLogId = UUID.randomUUID().toString();
         

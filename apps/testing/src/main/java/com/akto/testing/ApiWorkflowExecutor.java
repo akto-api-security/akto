@@ -63,7 +63,7 @@ public class ApiWorkflowExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiWorkflowExecutor.class);
     private static final Gson gson = new Gson();
 
-    public WorkflowTestResult init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId, Map<String, Object> valuesMap) {
+    public WorkflowTestResult init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId, Map<String, Object> valuesMap, boolean skipIfNotVulnerable) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -86,6 +86,10 @@ public class ApiWorkflowExecutor {
             testResultMap.put(node.getId(), nodeResult);
 
             if (nodeResult.getErrors().size() > 0) break;
+
+            if (skipIfNotVulnerable && !nodeResult.isVulnerable()) {
+                break;
+            }
         }
 
         return workflowTestResult;

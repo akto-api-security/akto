@@ -11,6 +11,7 @@ import com.akto.dto.OriginalHttpResponse;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
@@ -931,11 +932,27 @@ public final class FilterAction {
 
     public DataOperandsFilterResponse evaluatePrivateVariables(FilterActionRequest filterActionRequest) {
 
+        List<BasicDBObject> privateValues = new ArrayList<>();
+        if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX.toString())) {
+            if (filterActionRequest.getContextEntities() == null) {
+                return new DataOperandsFilterResponse(false, null, filterActionRequest.getContextEntities());
+            } else {
+                for (BasicDBObject obj: filterActionRequest.getContextEntities()) {
+                    DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(obj.get("value"), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+                    Boolean res = invokeFilter(dataOperandFilterRequest);
+                    if (res) {
+                        privateValues.add(obj);
+                    }
+                }
+                return new DataOperandsFilterResponse(privateValues.size() > 0, null, privateValues);
+            }
+        }
+
         OriginalHttpRequest request = filterActionRequest.getRawApi().getRequest();
         BasicDBObject resp = getPrivateResourceCount(request, filterActionRequest.getApiInfoKey());
 
         int privateCount = (int) resp.get("privateCount");
-        List<BasicDBObject> privateValues = (List<BasicDBObject>) resp.get("values");
+        privateValues = (List<BasicDBObject>) resp.get("values");
         return new DataOperandsFilterResponse(privateCount > 0, null, privateValues);
 
     }
