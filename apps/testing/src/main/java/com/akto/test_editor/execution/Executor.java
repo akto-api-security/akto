@@ -126,7 +126,7 @@ public class Executor {
         WorkflowTest workflowTest = convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, null, null, varMap);
+        WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, null, null, varMap, true);
         
         for (Map.Entry<String, NodeResult> entry : workflowTestResult.getNodeResultMap().entrySet()) {
             NodeResult nodeResult = entry.getValue();

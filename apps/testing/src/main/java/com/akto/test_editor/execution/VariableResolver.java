@@ -288,10 +288,10 @@ public class VariableResolver {
         return result;
     }
 
-    public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>>  sampleDataMap, boolean allApisContext) {
+    public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>>  sampleDataMap, ApiInfo.ApiInfoKey apiInfoKey) {
 
         for (String k: varMap.keySet()) {
-            if (!allApisContext && !k.contains("wordList_")) {
+            if (!k.contains("wordList_")) {
                 continue;
             }
             Map<String, String> m = new HashMap<>();
@@ -322,22 +322,33 @@ public class VariableResolver {
                 allApis = Objects.equals(m.get("all_apis"), true);
             }
 
-            if (sampleDataMap.size() > 1 && !allApis) {
-                continue;
+            Map<ApiInfoKey, List<String>> modifiedSampleDataMap = new HashMap<>();
+            if (allApis) {
+                for (ApiInfoKey infoKey: sampleDataMap.keySet()) {
+                    if (infoKey.getApiCollectionId() != apiInfoKey.getApiCollectionId()) {
+                        continue;
+                    }
+                    modifiedSampleDataMap.put(apiInfoKey, sampleDataMap.get(apiInfoKey));
+                }
+            } else {
+                modifiedSampleDataMap.put(apiInfoKey, sampleDataMap.get(apiInfoKey));
             }
 
             Set<String> wordListSet = new HashSet<>();
             List<String> wordListVal = new ArrayList<>();
 
-            for (ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
-                List<String> samples = sampleDataMap.get(apiInfoKey);
+            for (ApiInfoKey infoKey: sampleDataMap.keySet()) {
+                List<String> samples = sampleDataMap.get(infoKey);
                 wordListSet.addAll(extractValuesFromSampleData(varMap, samples, key, location, isRegex));
 
             }
 
-
             for (String s : wordListSet) {
                 wordListVal.add(s);
+            }
+
+            if (wordListSet.size() >= 100) {
+                break;
             }
 
             varMap.put(k, wordListVal);
