@@ -31,6 +31,8 @@ public class CustomDataType {
     Conditions.Operator operator;
     public static final String IGNORE_DATA = "ignoreData";
     private IgnoreData ignoreData;
+    public static final String TOKEN_CONDITIONS = "tokenConditions";
+    Conditions tokenConditions;
 
     public CustomDataType() { }
 
@@ -87,6 +89,18 @@ public class CustomDataType {
             }
         }
 
+    }
+
+    public boolean validateTokenData (Object token){
+        if(this.tokenConditions == null){
+            return false;
+        }
+        try {
+            return this.tokenConditions.validate(token);
+        } catch (Exception e) {
+            return false;
+        }
+        
     }
 
 
@@ -176,6 +190,14 @@ public class CustomDataType {
 
     public void setIgnoreData(IgnoreData ignoreData) {
         this.ignoreData = ignoreData;
+    }
+
+    public Conditions getTokenConditions() {
+        return tokenConditions;
+    }
+
+    public void setTokenConditions(Conditions tokenConditions) {
+        this.tokenConditions = tokenConditions;
     }
 
     @Override

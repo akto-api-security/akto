@@ -248,6 +248,24 @@ function DataTypes() {
     </LegacyCard>
   )
 
+  const urlConditionsCard = (
+    <LegacyCard key="url-condition" title={
+      <Text variant='headingMd'>
+        URL token conditions
+      </Text>}
+    >
+      <ConditionsPicker 
+          id={"token"}
+          title="Token conditions" 
+          param = "param_token" 
+          conditions={currState.tokenConditions.predicates}
+          selectOptions={selectOptions}
+          operator={currState.tokenConditions.operator}
+          dispatch={(val) => { handleDispatch(val, "tokenConditions") }}
+        />
+    </LegacyCard>
+  )
+
   const compareFunc = () => {
     return !change
   }
@@ -270,7 +288,9 @@ function DataTypes() {
     </VerticalStack>
   )
 
-  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard, requestCard]
+  console.log(currState)
+
+  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard, urlConditionsCard,requestCard]
 
   return (
     <DetailsPage

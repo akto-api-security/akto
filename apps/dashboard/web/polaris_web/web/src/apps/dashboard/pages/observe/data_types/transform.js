@@ -5,9 +5,10 @@ const func = {
         name: "",
         valueConditions: { predicates: [], operator: "OR" },
         keyConditions: { predicates: [], operator: "OR" },
+        tokenConditions: {predicates: [], operator: "OR"},
         sensitiveState: '4',
         operator: "OR",
-        dataType: "Custom"
+        dataType: "Custom",
       },
 
     convertToSensitiveData: function(state) {
@@ -62,28 +63,26 @@ const func = {
         if(dataObj.valueConditions){
           initialObj.valueConditions = dataObj.valueConditions
         }
+        if(dataObj.tokenConditions){
+            initialObj.tokenConditions = dataObj.tokenConditions
+          }
         return initialObj;
+    },
+
+    convertMapFunction :(element)=> {
+        return{
+            type: element.type,
+            valueMap:{
+                value: element.value
+            }
+        }
     },
 
     convertDataForCustomPayload : function(state){
 
-        const keyArr = state.keyConditions.predicates.map((element)=> {
-            return{
-                type: element.type,
-                valueMap:{
-                    value: element.value
-                }
-            }
-        })
-
-        const valueArr = state.valueConditions.predicates.map((element)=> {
-            return{
-                type: element.type,
-                valueMap:{
-                    value: element.value
-                }
-            }
-        })
+        const keyArr = state.keyConditions.predicates.map(this.convertMapFunction)
+        const valueArr = state.valueConditions.predicates.map(this.convertMapFunction)
+        const tokenArr = state.tokenConditions.predicates.map(this.convertMapFunction)
 
         let sensitiveObj = this.convertToSensitiveData(state.sensitiveState)
 
@@ -99,6 +98,8 @@ const func = {
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
+            tokenConditionFromUsers: tokenArr,
+            tokenOperator: state.tokenConditions.operator,
         }
 
         return finalObj

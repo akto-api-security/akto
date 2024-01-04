@@ -1,19 +1,20 @@
 package com.akto.runtime;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
 
+import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dao.context.Context;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.URLTemplate;
-import com.mongodb.BasicDBObject;
+import com.akto.dto.type.SingleTypeInfo.SubType;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
@@ -29,11 +30,38 @@ public class URLAggregator {
 
     ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls;
 
+    private static SingleTypeInfo.SuperType getTokenSupertype(String tempToken, Pattern pattern, Boolean isCustom){
+        String numToken = tempToken;
+        SingleTypeInfo.SuperType defaultResult = isCustom ? SingleTypeInfo.SuperType.STRING : null;
+        if (tempToken.charAt(0) == '+') {
+            numToken = tempToken.substring(1);
+        }
+
+        if (NumberUtils.isParsable(numToken)) {
+           return SingleTypeInfo.SuperType.INTEGER;
+            
+        } else if(pattern.matcher(tempToken).matches()){
+            return SingleTypeInfo.SuperType.STRING;
+        } else if (isAlphanumericString(tempToken)) {
+            return SingleTypeInfo.SuperType.STRING;
+        }
+        return defaultResult;
+    }
+
+    private static SubType getTokenSubType(Object token){
+        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
+            if (!customDataType.isActive()) continue;
+            boolean result = customDataType.validateTokenData(token);
+            if (result) return customDataType.toSubType();
+        }
+        return KeyTypes.findSubType(token, "", null);
+    }
+
     public static URLStatic getBaseURL(String url, String method) {
+
         if (url == null) {
             return null;
         }
-
 
         String urlStr = url.split("\\?")[0];
 
@@ -50,19 +78,20 @@ public class URLAggregator {
                 continue;
             }
 
-            String numToken = tempToken;
-            if (tempToken.charAt(0) == '+') {
-                numToken = tempToken.substring(1);
+            SubType subType = getTokenSubType(tempToken);
+ 
+            if(!(subType == SingleTypeInfo.GENERIC || subType == SingleTypeInfo.OTHER)){
+                SingleTypeInfo.SuperType superType = subType.getSuperType();;
+                if(superType == SingleTypeInfo.SuperType.CUSTOM){
+                    superType = getTokenSupertype(tempToken,pattern, true);
+                }
+                newTypes[i] = superType;
+                urlTokens[i] = null;
+                continue;
             }
-
-            if (NumberUtils.isParsable(numToken)) {
-                newTypes[i] = SingleTypeInfo.SuperType.INTEGER;
-                urlTokens[i] = null;
-            } else if(pattern.matcher(tempToken).matches()){
-                newTypes[i] = SingleTypeInfo.SuperType.STRING;
-                urlTokens[i] = null;
-            } else if (isAlphanumericString(tempToken)) {
-                newTypes[i] = SingleTypeInfo.SuperType.STRING;
+            
+            if(getTokenSupertype(tempToken, pattern, false) != null){
+                newTypes[i] = getTokenSupertype(tempToken, pattern, false);
                 urlTokens[i] = null;
             }
         }
