@@ -497,10 +497,11 @@ const transform = {
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {
+      const date = new Date(obj.startTimestamp * 1000)
       return{
         ...obj,
         prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues),
-        startTime: func.prettifyEpoch(obj.startTimestamp),
+        startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
         id: obj.hexId
       }
     })
