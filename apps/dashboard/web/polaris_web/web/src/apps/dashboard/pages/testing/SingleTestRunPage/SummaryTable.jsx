@@ -10,8 +10,8 @@ function SummaryTable({testingRunResultSummaries}) {
 
     const headers = [
         {
-            title: 'Total apis tested',
-            value: 'totalApis',
+            title: 'Test started',
+            value: 'startTime',
         },
         {
             title: 'Results count',
@@ -23,8 +23,8 @@ function SummaryTable({testingRunResultSummaries}) {
             isCustom: true
         },
         {
-            title: 'Test started',
-            value: 'startTime',
+            title: 'Total apis tested',
+            value: 'totalApis',
         },
     ]
 
