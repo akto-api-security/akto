@@ -1394,8 +1394,20 @@ public class InitializerListener implements ServletContextListener {
         RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
 
         if (rbac == null) {
-            loggerMaker.errorAndAddToDb("Account "+ accountId +" has no admin! Unable to make org.", LogDb.DASHBOARD);
-            return;
+            loggerMaker.infoAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
+            RBACDao.instance.updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId));
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+            if(rbac == null){
+                loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
+                User firstUser = UsersDao.instance.getFirstUser(accountId);
+                if(firstUser != null){
+                    rbac = new RBAC(firstUser.getId(), Role.ADMIN, accountId);
+                    RBACDao.instance.insertOne(rbac);
+                } else {
+                    loggerMaker.errorAndAddToDb("First user is also missing in DB, unable to make org.", LogDb.DASHBOARD);
+                    return;
+                }
+            }
         }
 
         int userId = rbac.getUserId();
