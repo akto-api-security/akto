@@ -10,13 +10,15 @@ import {
   Tooltip,
   LegacyCard,
   Card,
-  Tag
+  Tag,
+  Avatar
 } from '@shopify/polaris';
 import {
   CircleTickMinor,
   ArchiveMinor,
   LinkMinor,
-  ReplayMinor
+  ReplayMinor,
+  CircleInformationMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -407,6 +409,34 @@ const promotedBulkActions = (selectedDataHexIds) => {
     window.open('/dashboard/testing/summary/' + summaryId, '_blank');
   }
 
+  const EmptyData = () => {
+    return(
+      <div style={{margin: 'auto', marginTop: '20vh'}}>
+        <Box width="300px" padding={4}>
+          <VerticalStack gap={5}>
+            <HorizontalStack align="center">
+              <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
+                <Icon source={CircleInformationMajor} />
+              </div>
+            </HorizontalStack>
+            <VerticalStack gap={2}>
+            <HorizontalStack align="center">
+                <Text variant="bodyLg" fontWeight="semibold">
+                  No test run data found
+                </Text>
+              </HorizontalStack>
+              <Text variant="bodyMd">
+                The next summary will be ready with the upcoming test.
+              </Text>
+            </VerticalStack>
+          </VerticalStack>
+        </Box>
+      </div>
+    )
+  }
+
+  const useComponents = (!workflowTest && testRunResults.all.length === 0) ? [<EmptyData key="empty"/>] : components
+
   return (
     <PageWithMultipleCards
     title={
@@ -448,7 +478,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       func.downloadAsCSV((showVulnerableTests ? testRunResults.vulnerable : testRunResults.all), selectedTestRun)
       }>Export</Button> : undefined}
       secondaryActions={!workflowTest ? <Button monochrome removeUnderline plain onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
-      components={components}
+      components={useComponents}
     />
   );
 }
