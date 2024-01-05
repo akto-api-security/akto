@@ -63,7 +63,7 @@ function Integrations() {
       id: 'jira',
       name:'Jira',
       source: '/public/logo_jira.svg'
-  }
+    }
 
     let oktaSsoObj={
       id: 'okta_sso',
@@ -75,23 +75,29 @@ function Integrations() {
       name: 'Azure AD SSO',
       source: '/public/azure_logo.svg'
     }
+    let githubAppObj = {
+      id: 'github_app',
+      name: 'Github App',
+      source: '/public/github_icon.svg'
+    }
 
-    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj,azureAdSsoObj, oktaSsoObj, jiraObj]
+    let currObjs = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj,azureAdSsoObj, oktaSsoObj, jiraObj, githubAppObj]
+    
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>11</Badge></span>,
+            content: <span>All <Badge status='new'>12</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'traffic',
-            content: <span>Traffic Source <Badge status='new'>1</Badge></span>,
+            content: <span>Traffic Source <Badge status='new'>2</Badge></span>,
             component: <TabsList />
         },
         {
-            id: 'manage',
-            content: <span>Api Management <Badge status='new'>1</Badge></span>,
+            id: 'reporting',
+            content: <span>Reporting<Badge status='new'>1</Badge></span>,
             component: <TabsList />
         },
         {
@@ -119,12 +125,12 @@ function Integrations() {
     const handleCurrTab = (tab) =>{
         switch (tab.id) {
             case 'traffic':
-              currObjs = [burpSuiteObj]
+              currObjs = [burpSuiteObj, postmanObj]
               setCurrentItems(currObjs)
               break;
 
-            case 'manage':
-              currObjs= [postmanObj]
+            case 'reporting':
+              currObjs= [githubAppObj]
               setCurrentItems(currObjs)
               break;
 

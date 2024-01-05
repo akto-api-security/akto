@@ -122,6 +122,9 @@ public class LoggerMaker  {
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
+        if(Context.accountId.get() != null){
+            err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
+        }
         logger.error(err);
         try{
             insert(err, "error", db);
@@ -137,6 +140,12 @@ public class LoggerMaker  {
     public void debugInfoAddToDb(String info, LogDb db) {
         if (accountSettings == null || !accountSettings.isEnableDebugLogs()) return;
         infoAndAddToDb(info, db);
+    }
+    
+    public void errorAndAddToDb(Exception e, String err, LogDb db) {
+        StackTraceElement stackTraceElement = e.getStackTrace()[0];
+        err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+        errorAndAddToDb(err, db);
     }
 
     public void infoAndAddToDb(String info, LogDb db) {

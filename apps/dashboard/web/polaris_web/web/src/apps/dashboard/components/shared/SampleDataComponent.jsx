@@ -20,9 +20,7 @@ function formatData(data,style){
             Object.keys(data?.json).forEach((element)=> {
                 if(element.includes("query")){
                     if(data.json[element]){
-                        Object.keys(data?.json[element]).forEach((param) => {
-                            localFirstLine = localFirstLine + '?' + param + '=' + encodeURI(data.json[element][param])
-                        })
+                        localFirstLine = localFirstLine + func.convertQueryParamsToUrl(data?.json[element])
                     }
                 }else if(element.includes("Header")){
                     if(data.json[element]){

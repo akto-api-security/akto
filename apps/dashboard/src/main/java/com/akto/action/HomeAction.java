@@ -3,7 +3,7 @@ package com.akto.action;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.Auth0;
 import com.akto.utils.AzureLogin;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.OktaLogin;
 import com.auth0.AuthorizeUrl;

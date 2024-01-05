@@ -25,6 +25,7 @@ import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
+import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -57,7 +58,7 @@ import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
 import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
 
-// if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
+import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
@@ -204,6 +205,10 @@ const router = createBrowserRouter([
             element: <AzureSso />
           },
           {
+            path: "integrations/github_app",
+            element: <GithubAppIntegration />
+          },
+          {
             path: "integrations/slack",
             element: <Slack />,
           },
@@ -240,6 +245,10 @@ const router = createBrowserRouter([
             element: <TagDetails/>
           },
           {
+            path: "test-library",
+            element: <TestLibrary/>
+          },
+          {
             path: "billing",
             element: <Billing/>
           },
@@ -251,6 +260,10 @@ const router = createBrowserRouter([
       },
       {
         path: "test-editor/:testId",
+        element: <TestEditor />
+      },
+      {
+        path: "test-editor",
         element: <TestEditor />
       },
       {
@@ -306,9 +319,7 @@ function App() {
   }, [])
 
   return (
-    <AppProvider>
       <RouterProvider router={router} />
-    </AppProvider>
   );
 }
 

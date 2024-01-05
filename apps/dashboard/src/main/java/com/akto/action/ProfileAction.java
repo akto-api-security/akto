@@ -20,8 +20,8 @@ import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
-import com.akto.utils.DashboardMode;
 import com.akto.utils.Intercom;
+import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
@@ -161,7 +161,7 @@ public class ProfileAction extends UserAction {
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
             }
 
             userDetails.append("organizationId", organizationId);

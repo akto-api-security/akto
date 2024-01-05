@@ -29,7 +29,7 @@ public class InfraMetricsListener implements ServletContextListener {
             new ProcessorMetrics().bindTo(registry); // metrics related to the CPU stats
             new UptimeMetrics().bindTo(registry);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR while setting up InfraMetricsListener", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"ERROR while setting up InfraMetricsListener", LogDb.DASHBOARD);
         }
 
 
