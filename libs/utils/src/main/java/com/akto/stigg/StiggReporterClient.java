@@ -108,6 +108,30 @@ public class StiggReporterClient {
         return (BasicDBList) data.getOrDefault("entitlements", new BasicDBList());
     }
 
+    public BasicDBObject fetchOrgMetaData(String customerId) {
+        BasicDBObject varsObj = new BasicDBObject("input", new BasicDBObject("customerId", customerId));
+
+        String inputVariables = varsObj.toString();
+
+        String queryQ =
+            "query GetCustomerByRefId($input: GetCustomerByRefIdInput!) { getCustomerByRefId(input: $input) { " +
+            "  additionalMetaData\\n " + 
+            "}}";
+
+        BasicDBObject obj = BasicDBObject.parse(executeGraphQL(queryQ, inputVariables));
+
+        loggerMaker.infoAndAddToDb("OrgInfo for customerId: " + customerId + " " + obj.toJson(), LoggerMaker.LogDb.BILLING);
+
+        BasicDBObject data = (BasicDBObject) obj.getOrDefault("data", new BasicDBObject());
+        BasicDBObject customer = (BasicDBObject) data.getOrDefault("getCustomerByRefId", new BasicDBObject());
+        BasicDBObject additionalMetaData = (BasicDBObject) customer.getOrDefault("additionalMetaData",
+                new BasicDBObject());
+        if (additionalMetaData == null) {
+            additionalMetaData = new BasicDBObject();
+        }
+        return additionalMetaData;    
+    }
+
     public String reportUsage(int value, String customerId, String featureId) throws IOException {
 
 //        TimeZone utc = TimeZone.getTimeZone("UTC");

@@ -55,13 +55,13 @@ const transform = {
     getFirstLine(original,current,originalParams,currentParams){
         let ogFirstLine = original
         let firstLine = current
-        originalParams && Object.keys(originalParams).forEach((key) => {
-            ogFirstLine = ogFirstLine + '?' + key + '=' + encodeURI(originalParams[key])
-        })
-        currentParams && Object.keys(currentParams).forEach((key) => {
-            firstLine = firstLine + '?' + key + '=' + encodeURI(currentParams[key])
-        })
-    
+        if(originalParams){
+            ogFirstLine = ogFirstLine + func.convertQueryParamsToUrl(originalParams)
+        }
+        if(currentParams){
+            firstLine = firstLine + func.convertQueryParamsToUrl(currentParams)
+        }
+
         return{
             original: ogFirstLine,
             firstLine: firstLine,

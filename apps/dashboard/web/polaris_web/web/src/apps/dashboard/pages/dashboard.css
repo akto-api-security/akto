@@ -69,11 +69,5 @@
 }
 
 .beamer_defaultBeamerSelector {
-    top: 12px !important;
-    position: fixed !important;
-    right: 4vw !important;
-    width: 32px !important;
-    height: 32px !important;
-    left: unset !important;
-    background-color: #d2d5d7 !important;
+    display: none !important;
 }
