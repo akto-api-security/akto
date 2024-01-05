@@ -85,19 +85,19 @@ function GithubSso() {
         :<LegacyCard.Section 
             title={`Github SSO Settings`}
         >
-            <TextField 
+            <TextField
                 label="Github Client Id"
-                value={githubClientId} 
-                onChange={githubPresent ? () => {} : (githubClientId) => setGithubClientId(githubClientId)} 
+                value={githubClientId}
+                onChange={githubPresent ? () => {} : (githubClientId) => setGithubClientId(githubClientId)}
             />
 
-            <TextField 
+            <TextField
                 label="Github Client Secret"
-                value={githubPresent ? "********************************": githubClientSecret} 
-                onChange={(githubClientSecret) => setGithubClientSecret(githubClientSecret)} 
+                value={githubPresent ? "********************************": githubClientSecret}
+                onChange={(githubClientSecret) => setGithubClientSecret(githubClientSecret)}
             />
         </LegacyCard.Section>
-        
+
     )
 
     let modal = (

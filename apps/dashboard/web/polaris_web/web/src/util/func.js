@@ -196,6 +196,7 @@ prettifyEpoch(epoch) {
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMajor;
       case "COMPLETED": return CircleTickMajor;
+      case "FAILED" :
       case "FAIL": return CircleAlertMajor;
       default: return ClockMinor;
     }
@@ -204,6 +205,7 @@ prettifyEpoch(epoch) {
     switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
+      case "FAILED":
       case "FAIL":
       case "STOPPED": return "critical";
       case "COMPLETED": return "success";
@@ -1078,6 +1080,25 @@ getSizeOfFile(bytes) {
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  },
+  addPlurality(count){
+    if(count == null || count==undefined){
+      return ""
+    }
+    return count === 1 ? "" : "s" 
+  },
+  convertQueryParamsToUrl(queryParams) {
+    let url = ""
+    let first = true;
+    let joiner = "?"
+    Object.keys(queryParams).forEach((key) => {
+      if (!first) {
+        joiner = "&"
+      }
+      url = url + joiner + key + '=' + encodeURI(queryParams[key])
+      first = false
+    })
+    return url;
   }
 }
 

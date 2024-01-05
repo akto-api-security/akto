@@ -27,6 +27,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
@@ -36,13 +37,18 @@ import com.akto.util.EmailAccountName;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -223,17 +229,6 @@ public class Main {
 
                 int start = Context.now();
 
-                int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if ( start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Skipping test run : " + start, LogDb.TESTING);
-                    }
-                    return;
-                }
-
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
                 TestingRun testingRun;
                 ObjectId summaryId = null;
@@ -245,6 +240,25 @@ public class Main {
                 }
 
                 if (testingRun == null) {
+                    return;
+                }
+
+                int accountId = account.getId();
+                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
+                    int lastSent = logSentMap.getOrDefault(accountId, 0);
+                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                        logSentMap.put(accountId, start);
+                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                + " . Failing test run : " + start, LogDb.TESTING);
+                    }
+                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq(Constants.ID, testingRun.getId()),
+                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
+                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq(Constants.ID, summaryId),
+                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
                     return;
                 }
 
@@ -266,16 +280,27 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                                    TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
+                                    GithubUtils.publishGithubComments(runResultSummary);
                                 }
                             } else {
                                 loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                                TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
+                                GithubUtils.publishGithubComments(runResultSummary);
                             }
                         }
 
                         summaryId = createTRRSummaryIfAbsent(testingRun, start);
                     }
                     TestExecutor testExecutor = new TestExecutor();
+                    if (trrs != null && trrs.getState() == State.SCHEDULED) {
+                        if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
+                            //case of github status push
+                            GithubUtils.publishGithubStatus(trrs);
+
+                        }
+                    }
                     testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {

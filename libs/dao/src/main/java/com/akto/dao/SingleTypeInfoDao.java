@@ -49,13 +49,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
+        String[] fieldNames = {SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames = new String[]{"apiCollectionId"};
+        fieldNames = new String[]{SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames = new String[]{"param", "apiCollectionId"};
+        fieldNames = new String[]{SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
@@ -64,11 +64,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames = new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames =  new String[]{"responseCode", "subType", "timestamp",};
+        fieldNames =  new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+        fieldNames =  new String[] { SingleTypeInfo._COLLECTION_IDS };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         // needed for usage metric calculation
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),

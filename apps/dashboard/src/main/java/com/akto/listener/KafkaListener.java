@@ -4,7 +4,7 @@ package com.akto.listener;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 
 
 import javax.servlet.ServletContextListener;
@@ -25,7 +25,7 @@ public class KafkaListener implements ServletContextListener {
             try {
                 kafka = new Kafka(brokerIP,  1000, BATCH_SIZE_CONFIG);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("ERROR while setting up KafkaListener", LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "ERROR while setting up KafkaListener", LogDb.DASHBOARD);
             }
         }
 

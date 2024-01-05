@@ -300,6 +300,30 @@ const settingRequests = {
         })
     },
 
+    addGithubAppSecretKey(githubAppSecretKey, githubAppId) {
+        return request({
+            url: '/api/addGithubAppSecretKey',
+            method: 'post',
+            data: {githubAppSecretKey, githubAppId}
+        })
+    },
+
+    deleteGithubAppSettings() {
+        return request({
+            url: '/api/deleteGithubAppSecretKey',
+            method: 'post',
+            data: {},
+        })
+    },
+
+    fetchGithubAppId() {
+        return request({
+            url: '/api/fetchGithubAppId',
+            method: 'post',
+            data: {}
+        })
+    },
+
     toggleRedactFeature(redactPayload) {
         return request({
             url: '/api/toggleRedactFeature',
@@ -309,7 +333,6 @@ const settingRequests = {
             }
         })
     },
-
     toggleNewMergingEnabled(newMergingEnabled) {
         return request({
             url: '/api/toggleNewMergingEnabled',
@@ -319,7 +342,6 @@ const settingRequests = {
             }
         });
     },
-
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',
@@ -329,14 +351,13 @@ const settingRequests = {
             }
         })
     },
-
     updateTrafficAlertThresholdSeconds(trafficAlertThresholdSeconds) {
         return request({
             url: '/api/updateTrafficAlertThresholdSeconds',
             method: 'post',
             data: {trafficAlertThresholdSeconds}
         })
-    },
+    }
 }
 
 export default settingRequests

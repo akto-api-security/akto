@@ -132,7 +132,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const steps = quickStartFunc.getDesiredSteps(urlFargate)
     const formattedJson = func.convertPolicyLines(policyLines)
 
-    const copyRequest = () => { 
+    const copyRequest = () => {
         func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
     

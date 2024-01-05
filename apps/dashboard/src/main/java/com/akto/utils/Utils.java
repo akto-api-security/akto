@@ -134,7 +134,7 @@ public class Utils {
                         statusCode =  res.getStatusCode()+"";
                         status =  "";
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
+                        loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
                         return null;
                     }
                 } else {
@@ -166,7 +166,7 @@ public class Utils {
 
             return result;
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
             return null;
         }
     }

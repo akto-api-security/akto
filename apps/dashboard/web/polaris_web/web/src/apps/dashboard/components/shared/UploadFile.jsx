@@ -3,7 +3,7 @@ import { UploadMajor } from '@shopify/polaris-icons';
 import { useRef } from "react"
 
 
-function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary}) {
+function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plain}) {
 
     const fileUploadRef = useRef("")
 
@@ -27,7 +27,8 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary}) {
             <Button 
                 // icon={UploadMajor} 
                 primary={primary !== undefined ? primary : true}
-                plain monochrome removeUnderline
+                plain={plain === undefined ? true: plain}
+                monochrome removeUnderline
                 onClick={onPickFile}>
                 {label}
                 <input

@@ -1,4 +1,4 @@
-package com.akto.utils;
+package com.akto.util;
 
 import org.apache.commons.lang3.StringUtils;
 

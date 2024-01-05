@@ -59,7 +59,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             akto_health.put("mongo", mongoHealth);
         } catch (Exception e) {
             akto_health.put("mongo", "Error getting health metrics from mongo. Check logs.");
-            loggerMaker.errorAndAddToDb("ERROR health metrics from mongo " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"ERROR health metrics from mongo " + e, LogDb.DASHBOARD);
         }
 
         try {
@@ -67,7 +67,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             akto_health.put("runtime", kafkaHealthMetrics);
         } catch (Exception e) {
             akto_health.put("runtime", "Error getting health metrics from runtime. Check logs.");
-            loggerMaker.errorAndAddToDb("ERROR health metrics from runtime " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"ERROR health metrics from runtime " + e, LogDb.DASHBOARD);
         }
         return SUCCESS.toUpperCase();
     }

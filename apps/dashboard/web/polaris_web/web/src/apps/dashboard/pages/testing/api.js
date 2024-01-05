@@ -228,4 +228,24 @@ export default {
             data: {roleName, index}
         })
     },
+    deleteTestRuns(testRunIds){
+        return request({
+            url: '/api/deleteTestRuns',
+            method: 'post',
+            data: {
+               testRunIds
+            }
+        })
+    },
+
+    deleteTestRunsFromSummaries(latestSummaryIds){
+        return request({
+            url: '/api/deleteTestRunsFromSummaries',
+            method: 'post',
+            data: {
+                latestSummaryIds
+            }
+        })
+    },
+    
 }

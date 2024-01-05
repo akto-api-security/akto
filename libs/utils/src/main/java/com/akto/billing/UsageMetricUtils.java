@@ -17,6 +17,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
@@ -126,6 +127,11 @@ public class UsageMetricUtils {
     public static boolean checkMeteredOverage(int accountId, String featureLabel) {
 
         try {
+
+            if (!DashboardMode.isMetered()) {
+                return false;
+            }
+
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, accountId));
 
