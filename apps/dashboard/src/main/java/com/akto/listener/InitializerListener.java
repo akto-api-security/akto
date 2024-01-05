@@ -1543,6 +1543,7 @@ public class InitializerListener implements ServletContextListener {
                 setUpDailyScheduler();
                 setUpWebhookScheduler();
                 setUpTestEditorTemplatesScheduler();
+                crons.deleteTestRunsScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
