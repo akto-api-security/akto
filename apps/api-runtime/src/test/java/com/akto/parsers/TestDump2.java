@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
 import com.akto.dto.type.*;
 import com.akto.dto.type.SingleTypeInfo.SubType;
@@ -27,7 +28,7 @@ import com.mongodb.BasicDBObject;
 
 import org.junit.Test;
 
-public class TestDump2 {
+public class TestDump2 extends MongoBasedTest {
     private final int ACCOUNT_ID = 1_000_000;
 
     public void testInitializer(){
