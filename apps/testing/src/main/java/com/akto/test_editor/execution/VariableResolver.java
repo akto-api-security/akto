@@ -328,7 +328,7 @@ public class VariableResolver {
                     if (infoKey.getApiCollectionId() != apiInfoKey.getApiCollectionId()) {
                         continue;
                     }
-                    modifiedSampleDataMap.put(apiInfoKey, sampleDataMap.get(apiInfoKey));
+                    modifiedSampleDataMap.put(infoKey, sampleDataMap.get(infoKey));
                 }
             } else {
                 modifiedSampleDataMap.put(apiInfoKey, sampleDataMap.get(apiInfoKey));
@@ -337,8 +337,8 @@ public class VariableResolver {
             Set<String> wordListSet = new HashSet<>();
             List<String> wordListVal = new ArrayList<>();
 
-            for (ApiInfoKey infoKey: sampleDataMap.keySet()) {
-                List<String> samples = sampleDataMap.get(infoKey);
+            for (ApiInfoKey infoKey: modifiedSampleDataMap.keySet()) {
+                List<String> samples = modifiedSampleDataMap.get(infoKey);
                 wordListSet.addAll(extractValuesFromSampleData(varMap, samples, key, location, isRegex));
 
             }

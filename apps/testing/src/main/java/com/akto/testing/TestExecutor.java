@@ -629,9 +629,7 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
-        Map<ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
-        sampleDataMap.put(apiInfoKey, messages);
-        VariableResolver.resolveWordList(varMap, sampleDataMap, apiInfoKey);
+        VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
 
         String testExecutionLogId = UUID.randomUUID().toString();
         
