@@ -5,7 +5,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.stigg.StiggReporterClient;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;

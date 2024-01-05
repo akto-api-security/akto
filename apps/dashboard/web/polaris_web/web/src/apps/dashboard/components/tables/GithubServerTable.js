@@ -205,6 +205,7 @@ function GithubServerTable(props) {
           onRowClick={props.onRowClick}
           selectedIndex={selectedIndex}
           setSelectedIndex={setSelectedIndex}
+          useSummaryRow={props.useSummaryRow}
         />
       ),
     );
@@ -256,7 +257,7 @@ function GithubServerTable(props) {
                 // condensed
                 selectable={props.selectable || false}
                 onSelectionChange={handleSelectionChange}
-                headings={[
+                headings={props?.headings ? props.headings : [
                   {
                     id: "data",
                     hidden: true,
@@ -265,6 +266,7 @@ function GithubServerTable(props) {
                 ]}
                 bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
                 promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+                hasZebraStriping={props.hasZebraStriping || false}
               >
                 {rowMarkup}
               </IndexTable>

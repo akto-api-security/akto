@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 const PageWithMultipleCards = (props) => {
 
-    const {backUrl, isFirstPage, title, primaryAction, secondaryActions, divider, components} = props
+    const {backUrl, isFirstPage, title, primaryAction, secondaryActions, divider, components, fullWidth} = props
 
     const location = useLocation();
     const navigate = useNavigate()
@@ -21,7 +21,7 @@ const PageWithMultipleCards = (props) => {
     }
 
     return (
-        <Page fullWidth
+        <Page fullWidth={fullWidth === undefined ? true: fullWidth}
             title={title}
             backAction={getBackAction()}
             primaryAction={primaryAction}

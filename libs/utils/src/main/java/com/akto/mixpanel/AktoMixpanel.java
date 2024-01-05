@@ -2,6 +2,8 @@ package com.akto.mixpanel;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mixpanel.mixpanelapi.ClientDelivery;
 import com.mixpanel.mixpanelapi.MessageBuilder;
 import com.mixpanel.mixpanelapi.MixpanelAPI;
@@ -13,6 +15,8 @@ import java.io.IOException;
 
 public class AktoMixpanel {
     private static final Logger logger = LoggerFactory.getLogger(AktoMixpanel.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoMixpanel.class);
+
     private Config.MixpanelConfig mixpanelConfig = null;
     public AktoMixpanel() {
         if (mixpanelConfig == null) {
@@ -40,7 +44,8 @@ public class AktoMixpanel {
     public void sendEvent(String distinctId, String eventName, JSONObject props) {
 
         if (mixpanelConfig == null) {
-            throw new IllegalStateException("Mixpanel config is not initialised");
+            loggerMaker.errorAndAddToDb("Mixpanel config is not initialized", LogDb.DASHBOARD);
+            return;
         }
         try {
             String projectToken = mixpanelConfig.getProjectToken();

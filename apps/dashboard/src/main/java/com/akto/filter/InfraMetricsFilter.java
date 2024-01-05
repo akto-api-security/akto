@@ -54,7 +54,7 @@ public class InfraMetricsFilter implements Filter {
                     .register(InfraMetricsListener.registry)
                     .increment();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Inframetrics filter Error: %s", e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Inframetrics filter Error: %s", e.toString()), LogDb.DASHBOARD);
         }
 
     }
