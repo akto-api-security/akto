@@ -106,7 +106,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         if (savedResponses != null) {
             varMap.put(node.getId() + ".response", savedResponses);
-            varMap.put(node.getId() + ".status_code", String.valueOf(statusCode));
+            varMap.put(node.getId() + ".response_code", String.valueOf(statusCode));
         }
 
         // call executor's build request, which returns all rawapi by taking a rawapi argument
