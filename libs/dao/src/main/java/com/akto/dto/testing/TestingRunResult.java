@@ -41,11 +41,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
+    private WorkflowTest workflowTest;
+
     public TestingRunResult() { }
 
     public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,
                             List<GenericTestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
-                            int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId) {
+                            int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId, 
+                            WorkflowTest workflowTest) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
         this.testSuperType = testSuperType;
@@ -57,6 +60,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.testRunResultSummaryId = testRunResultSummaryId;
+        this.workflowTest = workflowTest;
     }
 
     public ObjectId getId() {
@@ -163,6 +167,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setConfidencePercentage(int confidencePercentage) {
         this.confidencePercentage = confidencePercentage;
+    }
+
+    public WorkflowTest getWorkflowTest() {
+        return workflowTest;
+    }
+
+    public void setWorkflowTest(WorkflowTest workflowTest) {
+        this.workflowTest = workflowTest;
     }
 
     @Override

@@ -9,6 +9,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.testing.TestResult.TestError;
 
 import java.util.Collections;
@@ -48,26 +49,27 @@ public abstract class SecurityTestTemplate {
 
     public abstract boolean checkAuthBeforeExecution();
 
-    public abstract List<GenericTestResult>  executor();
+    public abstract YamlTestResult  executor();
 
-    public List<GenericTestResult> run() {
+    public YamlTestResult run() {
 
         boolean valid = filter();
         if (!valid) {
             List<GenericTestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed to satisfy api_selection_filters block, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
-            return testResults;
+            return new YamlTestResult(testResults, null);
         }
         valid = checkAuthBeforeExecution();
         if (!valid) {
             List<GenericTestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed authentication check, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
-            return testResults;
+            return new YamlTestResult(testResults, null);
         }
-        List<GenericTestResult> attempts = executor();
-        if(attempts == null || attempts.isEmpty()){
-            attempts = new ArrayList<>();
-            attempts.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.EXECUTION_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+        YamlTestResult attempts = executor();
+        if(attempts == null || attempts.getTestResults().isEmpty()){
+            List<GenericTestResult> res = new ArrayList<>();
+            res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.EXECUTION_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+            attempts.setTestResults(res);
         }
         return attempts;
     }

@@ -46,7 +46,7 @@ public class TestExecutorTest extends MongoBasedTest {
         testResultList.add(generateTestResult(false));
         TestingRunResult testingRunResult = new TestingRunResult(
                 new ObjectId(), new ApiInfo.ApiInfoKey(0, "url", URLMethods.Method.GET), "BOLA",
-                "REPLACE_AUTH_TOKEN", testResultList ,true, new ArrayList<>(), 90, 0, 100, new ObjectId()
+                "REPLACE_AUTH_TOKEN", testResultList ,true, new ArrayList<>(), 90, 0, 100, new ObjectId(), null
         );
         TestExecutor.trim(testingRunResult);
         assertEquals(5, testingRunResult.getTestResults().size());

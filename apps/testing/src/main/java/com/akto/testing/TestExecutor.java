@@ -603,7 +603,7 @@ public class TestExecutor {
             return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
                 false,new ArrayList<>(),100,Context.now(),
-                Context.now(), testRunResultSummaryId
+                Context.now(), testRunResultSummaryId, null
             );
         }
 
@@ -641,15 +641,16 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes);
-        List<GenericTestResult> testResults = yamlTestTemplate.run();
-        if (testResults == null || testResults.isEmpty()) {
-            testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+        YamlTestResult testResults = yamlTestTemplate.run();
+        if (testResults == null || testResults.getTestResults().isEmpty()) {
+            List<GenericTestResult> res = new ArrayList<>();
+            res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+            testResults.setTestResults(res);
         }
         int endTime = Context.now();
 
         boolean vulnerable = false;
-        for (GenericTestResult testResult: testResults) {
+        for (GenericTestResult testResult: testResults.getTestResults()) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
             try {
@@ -664,9 +665,9 @@ public class TestExecutor {
         int confidencePercentage = 100;
 
         return new TestingRunResult(
-                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
-                endTime, testRunResultSummaryId
+                endTime, testRunResultSummaryId, testResults.getWorkflowTest()
         );
     }
 

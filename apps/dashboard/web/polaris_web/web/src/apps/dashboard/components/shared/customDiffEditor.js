@@ -87,81 +87,9 @@ const transform = {
     },
 
     getPayloadData(original,current){
-        let changedKeys = []
-        let insertedKeys = []
-        let deletedKeys = []
-        let finalUnflatObj = {}
 
-        let ogFlat = func.flattenObject(original)
-        let currFlat = func.flattenObject(current)
-
-        for(const key in ogFlat){
-            let mainKey = '"' + key.split(".")?.pop() + '": ' 
-            if(!currFlat?.hasOwnProperty(key)){
-                let searchKey = "";
-                if(typeof(ogFlat[key]) === "string"){
-                    searchKey =  mainKey + '"' + ogFlat[key] + '"'
-                } else if(typeof(ogFlat[key]) === 'object'){
-                    searchKey = mainKey 
-                } else{
-                    searchKey = mainKey + ogFlat[key]
-                }
-                deletedKeys.push({header: searchKey, className: 'deleted-content'})
-                finalUnflatObj[key] = ogFlat[key]
-            }else if(!func.deepComparison(ogFlat[key],currFlat[key])){
-                let searchKey = typeof(ogFlat[key]) === "string" ? mainKey + '"' + currFlat[key] + '"' : mainKey + currFlat[key]
-                changedKeys.push({header:searchKey, className: 'updated-content', data: ogFlat[key] + "->" + currFlat[key], keyLength: key.split(".")?.pop().length + 2})
-                finalUnflatObj[key] = currFlat[key]
-            }else{
-                finalUnflatObj[key] = ogFlat[key]
-            }
-        }
-
-        for(const key in currFlat){
-            let mainKey = '"' + key.split(".")?.pop() + '": ' 
-            if(!ogFlat.hasOwnProperty(key)){
-                insertedKeys.push({header: mainKey + '"' + currFlat[key] + '"', className: 'added-content'})
-                finalUnflatObj[key] = currFlat[key]
-            }
-        }
-
-        const mergedObject = [...deletedKeys, ...insertedKeys, ...changedKeys].reduce((result, item) => {
-            result[item.header] = {className:item.className, data: item?.data, keyLength: item.keyLength};
-            return result;
-        }, {});
-
-        let ret = {};
-        ret.headersMap = mergedObject
-        ret.json = "";
-
-        let ogArr = typeof(original)==='string' ? original.split("\n") : []
-        let curArr = typeof(current)==='string' ? current.split("\n") : [] 
-
-        let retArr = []
-        for(let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))){
-            if(ogArr[i] && curArr[i]){
-                if(ogArr[i]!==curArr[i]){
-                    ret.headersMap[curArr[i]] = {className: 'updated-content', data: ogArr[i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + "->" + curArr[i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'), keyLength: -2}
-                }
-                retArr.push(curArr[i]);
-            } else if(ogArr[i]) {
-                ret.headersMap[curArr[i]] = {className:'deleted-content'};
-                retArr.push(ogArr[i]);
-            } else if(curArr[i]){
-                ret.headersMap[curArr[i]] = {className:'added-content'};
-                retArr.push(curArr[i]);
-            }
-        }
-
-        if(typeof(current)!=='string' && typeof(original)!=='string'){
-            ret.json = this.formatJson(func.unflattenObject(finalUnflatObj));
-        } else if(typeof(current)==='string' && typeof(original)==='string'){
-            ret.json = retArr.join("\n")
-        } else if(typeof(current)==='string'){
-            ret.json = retArr.join("\n") + "\n" + this.formatJson(original);
-        } else {
-            ret.json = this.formatJson(current) + "\n" + retArr.join("\n");
-        }
+        let ret = {}
+        ret.json = "ORIGINAL: \n\n " + this.formatJson(original) + "\n\nCURRENT: \n\n " + this.formatJson(current);
 
         return ret;
     },
