@@ -210,8 +210,9 @@ public class InventoryAction extends UserAction {
             } 
         }
 
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
 
-        response.put("data", new BasicDBObject("endpoints", list).append("apiInfoList", apiInfoList));
+        response.put("data", new BasicDBObject("endpoints", list).append("apiInfoList", apiInfoList).append("redacted", apiCollection.getRedact()));
     }
 
     public static String retrievePath(String url) {

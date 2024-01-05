@@ -91,12 +91,16 @@ public class SingleTypeInfo {
         Map<String, CustomDataType> newMap = new HashMap<>();
         List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
         List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
+        Set<String> redactedDataTypes = new HashSet<>();
         for (CustomDataType customDataType: customDataTypes) {
             newMap.put(customDataType.getName(), customDataType);
             if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
                 sensitiveCustomDataType.add(customDataType);
             } else {
                 nonSensitiveCustomDataType.add(customDataType);
+            }
+            if (customDataType.isRedacted()) {
+                redactedDataTypes.add(customDataType.getName());
             }
         }
 
@@ -114,9 +118,21 @@ public class SingleTypeInfo {
                 newAktoMap.put(aktoDataType.getName(), aktoDataType);
                 subTypeMap.get(aktoDataType.getName()).setSensitiveAlways(aktoDataType.getSensitiveAlways());
                 subTypeMap.get(aktoDataType.getName()).setSensitivePosition(aktoDataType.getSensitivePosition());
+                if(aktoDataType.isRedacted()){
+                    redactedDataTypes.add(aktoDataType.getName());
+                }
             }
         }
         info.setAktoDataTypeMap(newAktoMap);
+        info.setRedactedDataTypes(redactedDataTypes);
+    }
+
+    public static boolean isRedacted(String dataTypeName){
+        if (accountToDataTypesInfo.containsKey(Context.accountId.get())) {
+            return accountToDataTypesInfo.get(Context.accountId.get()).getRedactedDataTypes().contains(dataTypeName);
+        } else {
+            return false;
+        }
     }
 
     public static void fetchCustomAuthTypes(int accountId) {

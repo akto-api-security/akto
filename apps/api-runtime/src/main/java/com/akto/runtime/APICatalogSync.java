@@ -3,7 +3,6 @@ package com.akto.runtime;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
-import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -13,7 +12,6 @@ import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
@@ -47,6 +45,8 @@ public class APICatalogSync {
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = false;
 
+    public Map<Integer, Boolean> apiCollectionToRedactPayload;
+
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
@@ -60,6 +60,11 @@ public class APICatalogSync {
             }
         } catch (Exception e) {
 
+        }
+        apiCollectionToRedactPayload = new HashMap<>();
+        List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for(ApiCollection apiCollection: all) {
+            apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
         }
 
     }
@@ -902,7 +907,7 @@ public class APICatalogSync {
         return ret;
     }
 
-    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog ,boolean redactSampleData, boolean forceUpdate ) {
+    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
         List<SampleData> sampleData = new ArrayList<>();
         Map<URLStatic, RequestTemplate> deltaStrictURLToMethods = currentDelta.getStrictURLToMethods();
         Map<URLStatic, RequestTemplate> dbStrictURLToMethods = dbCatalog.getStrictURLToMethods();
@@ -931,25 +936,9 @@ public class APICatalogSync {
             }
             List<String> finalSamples = new ArrayList<>();
             for (String s: sample.getSamples()) {
-                boolean finalRedact = redactSampleData;
-                if (finalRedact) {
-                    try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                        Source source = httpResponseParams.getSource();
-                        if (source.equals(Source.HAR) || source.equals(Source.PCAP)) finalRedact = false;
-                    } catch (Exception e1) {
-                        e1.printStackTrace();
-                        continue;
-                    }
-                }
-
                 try {
-                    if (finalRedact) {
-                        String redact = RedactSampleData.redact(s);
-                        finalSamples.add(redact);
-                    } else {
-                        finalSamples.add(s);
-                    }
+                    String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
+                    finalSamples.add(redactedSample);
                 } catch (Exception e) {
                     ;
                 }
@@ -998,7 +987,7 @@ public class APICatalogSync {
         return bulkUpdates;
     }
 
-    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData) {
+    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
         Map<String, SingleTypeInfo> dbInfoMap = convertToMap(currentState.getAllTypeInfo());
         Map<String, SingleTypeInfo> deltaInfoMap = convertToMap(currentDelta.getAllTypeInfo());
 
@@ -1066,7 +1055,7 @@ public class APICatalogSync {
                 if (values != null) {
                     Set<String> elements = new HashSet<>();
                     for (String el: values.getElements()) {
-                        if (redactSampleData) {
+                        if (redactSampleData || collectionLevelRedact) {
                             elements.add(el.hashCode()+"");
                         } else {
                             elements.add(el);
@@ -1079,7 +1068,18 @@ public class APICatalogSync {
             }
 
 
-            if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+            if (!(redactSampleData || collectionLevelRedact) && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+                Set<Object> updatedSampleData = new HashSet<>();
+                for (Object example : deltaInfo.getExamples()) {
+                    try{
+                        String exampleStr = (String) example;
+                        String s = RedactSampleData.redactMarkedDataTypes(exampleStr);
+                        updatedSampleData.add(s);
+                    } catch (Exception e) {
+                        ;
+                    }
+                }
+                deltaInfo.setExamples(updatedSampleData);
                 Bson bson = Updates.combine(
                     Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap)),
                     Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()))
@@ -1379,7 +1379,8 @@ public class APICatalogSync {
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
-            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact);
+            boolean redactCollectionLevel = this.apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
+            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
@@ -1387,7 +1388,7 @@ public class APICatalogSync {
             deltaCatalog.setDeletedInfo(new ArrayList<>());
 
             boolean forceUpdate = syncImmediately || counter % 10 == 0;
-            writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, redact, forceUpdate));
+            writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, forceUpdate, redact, redactCollectionLevel));
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);

@@ -725,7 +725,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(Collections.singletonList(httpResponseParams),false, true);
         APICatalogSync apiCatalogSync = parser.apiCatalogSync;
         return apiCatalogSync.getDBUpdatesForParams(
-                apiCatalogSync.getDelta(collectionId), apiCatalogSync.getDbState(collectionId), false
+                apiCatalogSync.getDelta(collectionId), apiCatalogSync.getDbState(collectionId), false, false
         );
 
     }

@@ -2,6 +2,8 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
+import com.akto.action.ApiCollectionsAction;
+import com.akto.action.CustomDataTypeAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationUsageDao;
@@ -973,6 +975,8 @@ public class InitializerListener implements ServletContextListener {
         if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
             AdminSettingsAction.dropCollections(Context.accountId.get());
         }
+        ApiCollectionsAction.dropSampleDataForApiCollection();
+        CustomDataTypeAction.handleDataTypeRedaction();
 
     }
 

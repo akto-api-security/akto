@@ -1,9 +1,8 @@
 package com.akto.utils;
 
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.*;
+import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -15,7 +14,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.mongodb.BasicDBObject;
 
-import java.io.IOException;
 import java.util.*;
 
 public class RedactSampleData {
@@ -24,9 +22,83 @@ public class RedactSampleData {
 
     public static final String redactValue = "****";
 
+    public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
+        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+        HttpResponseParams.Source source = httpResponseParams.getSource();
+        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
+        if(accountLevelRedact || apiCollectionLevelRedact) return redact(httpResponseParams);
+        return redactMarkedDataTypes(httpResponseParams);
+    }
+
     public static String redact(String sample) throws Exception {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
         return redact(httpResponseParams);
+    }
+
+    public static String redactMarkedDataTypes(String sample) throws Exception {
+        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+        return redactMarkedDataTypes(httpResponseParams);
+    }
+
+    public static String redactMarkedDataTypes(HttpResponseParams httpResponseParams) throws Exception{
+
+        Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
+        if (responseHeaders == null) responseHeaders = new HashMap<>();
+        handleHeaders(responseHeaders);
+
+        String responsePayload = httpResponseParams.getPayload();
+        if (responsePayload == null) responsePayload = "{}";
+        try {
+            JsonParser jp = factory.createParser(responsePayload);
+            JsonNode node = mapper.readTree(jp);
+            changeRedactedDataType(node, redactValue);
+            if (node != null) {
+                responsePayload = node.toString();
+            } else {
+                responsePayload = "{}";
+            }
+        } catch (Exception e) {
+            responsePayload = "{}";
+        }
+        httpResponseParams.setPayload(responsePayload);
+
+        Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
+        if (requestHeaders == null) requestHeaders = new HashMap<>();
+        handleHeaders(requestHeaders);
+
+        String requestPayload = httpResponseParams.requestParams.getPayload();
+        if (requestPayload == null) requestPayload = "{}";
+        try {
+            JsonParser jp = factory.createParser(requestPayload);
+            JsonNode node = mapper.readTree(jp);
+            changeRedactedDataType(node, redactValue);
+            if (node != null) {
+                requestPayload= node.toString();
+            } else {
+                requestPayload = "{}";
+            }
+        } catch (Exception e) {
+            requestPayload = "{}";
+        }
+
+        httpResponseParams.requestParams.setPayload(requestPayload);
+
+        //TODO confirm if this is required or not
+        httpResponseParams.setSourceIP(redactValue);
+
+        return convertHttpRespToOriginalString(httpResponseParams);
+    }
+
+    private static void handleHeaders(Map<String, List<String>> responseHeaders) {
+        Set<Map.Entry<String, List<String>>> entries = responseHeaders.entrySet();
+        for(Map.Entry<String, List<String>> entry : entries){
+            String key = entry.getKey();
+            List<String> values = entry.getValue();
+            SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), values.get(0), null);
+            if(SingleTypeInfo.isRedacted(subType.getName())){
+                responseHeaders.put(key, Collections.singletonList(redactValue));
+            }
+        }
     }
 
     // never use this function directly. This alters the httpResponseParams
@@ -106,6 +178,41 @@ public class RedactSampleData {
                     ((ObjectNode) parent).put(f, newValue);
                 } else {
                     change(fieldValue, newValue);
+                }
+            }
+        }
+
+    }
+
+    public static void changeRedactedDataType(JsonNode parent, String newValue) {
+        if (parent == null) return;
+
+        if (parent.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) parent;
+            for(int i = 0; i < arrayNode.size(); i++) {
+                JsonNode arrayElement = arrayNode.get(i);
+                if (arrayElement.isValueNode()) {
+                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), arrayElement.asText(), null);
+                    if(SingleTypeInfo.isRedacted(subType.getName())){
+                        arrayNode.set(i, new TextNode(newValue));
+                    }
+                } else {
+                    changeRedactedDataType(arrayElement, newValue);
+                }
+            }
+        } else {
+            Iterator<String> fieldNames = parent.fieldNames();
+            while(fieldNames.hasNext()) {
+                String f = fieldNames.next();
+                JsonNode fieldValue = parent.get(f);
+                if (fieldValue.isValueNode()) {
+                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), fieldValue.asText(), null);
+                    if(SingleTypeInfo.isRedacted(subType.getName())){
+                        ((ObjectNode) parent).put(f, newValue);
+                    }
+
+                } else {
+                    changeRedactedDataType(fieldValue, newValue);
                 }
             }
         }

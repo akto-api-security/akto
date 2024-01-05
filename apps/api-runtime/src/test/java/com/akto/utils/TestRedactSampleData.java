@@ -1,5 +1,7 @@
 package com.akto.utils;
 
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.parsers.HttpCallParser;

@@ -128,10 +128,10 @@ public class TestDump2 {
 
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false, 0);
-        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false);
+        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false);
         assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
         assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
-        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),false,true).size());
+        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),true, false, false).size());
     }
 
 
@@ -157,7 +157,7 @@ public class TestDump2 {
             RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
             assertEquals(1, respTemplate.getUserIds().size());
             assertEquals(3, respTemplate.getParameters().size());
-            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false);
+            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false, false);
             assertEquals(24, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
             assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());        
         }        
@@ -170,9 +170,9 @@ public class TestDump2 {
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
         simpleTestForSingleCollection(2, sync);
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0),false).bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false).bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0),false, false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false, false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false, false).bulkUpdatesForSingleTypeInfo.size());
     }
 
     @Test
@@ -311,7 +311,7 @@ public class TestDump2 {
 
         respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
 
-        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false).bulkUpdatesForSingleTypeInfo;
+        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false).bulkUpdatesForSingleTypeInfo;
     }
 
     @Test
