@@ -2,7 +2,6 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
-import com.akto.action.ApiCollectionsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
@@ -55,9 +54,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
-import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicyNew;
+import com.akto.task.Cluster;
+import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
@@ -75,7 +73,6 @@ import com.akto.utils.Auth0;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.RedactSampleData;
-import com.akto.utils.Utils;
 import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -92,7 +89,6 @@ import com.mongodb.client.model.*;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -117,6 +113,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
+import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -130,6 +127,8 @@ public class InitializerListener implements ServletContextListener {
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     public static String aktoVersion;
+    private final ScheduledExecutorService telemetryExecutorService = Executors.newSingleThreadScheduledExecutor();
+
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
@@ -1386,7 +1385,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void createOrg(int accountId) {
+    public static void createOrg(int accountId) {
         Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
         Organization organization = OrganizationsDao.instance.findOne(filterQ);
         boolean alreadyExists = organization != null;
@@ -1400,7 +1399,7 @@ public class InitializerListener implements ServletContextListener {
 
         if (rbac == null) {
             loggerMaker.infoAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
-            RBACDao.instance.updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId));
+            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
             rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
             if(rbac == null){
                 loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
@@ -1493,7 +1492,7 @@ public class InitializerListener implements ServletContextListener {
         return !isKubernetes();
     }
 
-    
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         setSubdomain();
@@ -1523,7 +1522,6 @@ public class InitializerListener implements ServletContextListener {
                         } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
-                createOrg(1_000_000);
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
@@ -1624,7 +1622,7 @@ public class InitializerListener implements ServletContextListener {
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
-        
+
         try {
             int gracePeriod = organization.getGracePeriod();
             String organizationId = organization.getId();
@@ -1666,7 +1664,7 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
                     LogDb.DASHBOARD);
         }
-        
+
         return organization;
     }
 
@@ -1761,6 +1759,19 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
+
+        if(DashboardMode.isOnPremDeployment()) {
+            telemetryExecutorService.scheduleAtFixedRate(() -> {
+                boolean dibs = callDibs(Cluster.TELEMETRY_CRON, 60, 60);
+                if (!dibs) {
+                    loggerMaker.infoAndAddToDb("Telemetry cron dibs not acquired, skipping telemetry cron", LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
+                TelemetryJob job = new TelemetryJob();
+                OrganizationTask.instance.executeTask(job::run, "telemetry-cron");
+            }, 0, 1, TimeUnit.MINUTES);
+            loggerMaker.infoAndAddToDb("Registered telemetry cron", LogDb.DASHBOARD);
+        }
     }
 
 
@@ -2188,6 +2199,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
-  
+
 }
 

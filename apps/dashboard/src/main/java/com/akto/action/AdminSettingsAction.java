@@ -13,6 +13,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
+import com.opensymphony.xwork2.Action;
 import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 
@@ -37,6 +38,8 @@ public class AdminSettingsAction extends UserAction {
 
     public AccountSettings.SetupType setupType;
     public Boolean newMergingEnabled;
+
+    public Boolean enableTelemetry;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -63,6 +66,22 @@ public class AdminSettingsAction extends UserAction {
                 new UpdateOptions().upsert(true)
         );
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleTelemetry() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can add change this setting");
+            return Action.ERROR.toUpperCase();
+        }
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENABLE_TELEMETRY, this.enableTelemetry),
+                new UpdateOptions().upsert(true)
+        );
         return SUCCESS.toUpperCase();
     }
 
@@ -258,6 +277,15 @@ public class AdminSettingsAction extends UserAction {
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
+    }
+
+
+    public Boolean getEnableTelemetry() {
+        return enableTelemetry;
+    }
+
+    public void setEnableTelemetry(Boolean enableTelemetry) {
+        this.enableTelemetry = enableTelemetry;
     }
 
     public Organization getOrganization() {

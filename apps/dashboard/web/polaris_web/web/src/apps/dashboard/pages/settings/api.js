@@ -357,6 +357,15 @@ const settingRequests = {
             method: 'post',
             data: {trafficAlertThresholdSeconds}
         })
+    },
+    toggleTelemetry(enableTelemetry) {
+        return request({
+            url: '/api/toggleTelemetry',
+            method: 'post',
+            data: {
+                enableTelemetry
+            }
+        });
     }
 }
 
