@@ -135,7 +135,14 @@ public class ProfileAction extends UserAction {
         if (DashboardMode.isMetered() &&  utility == null) {
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, sessionAccId)
-            ); 
+            );
+            if(organization == null){
+                loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
+                InitializerListener.createOrg(sessionAccId);
+                organization = OrganizationsDao.instance.findOne(
+                        Filters.in(Organization.ACCOUNTS, sessionAccId)
+                );
+            }
             String organizationId = organization.getId();
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();

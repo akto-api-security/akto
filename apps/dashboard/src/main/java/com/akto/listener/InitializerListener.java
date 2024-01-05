@@ -1375,7 +1375,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void createOrg(int accountId) {
+    public static void createOrg(int accountId) {
         Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
         Organization organization = OrganizationsDao.instance.findOne(filterQ);
         boolean alreadyExists = organization != null;
@@ -1389,7 +1389,7 @@ public class InitializerListener implements ServletContextListener {
 
         if (rbac == null) {
             loggerMaker.infoAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
-            RBACDao.instance.updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId));
+            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
             rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
             if(rbac == null){
                 loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
@@ -1512,7 +1512,6 @@ public class InitializerListener implements ServletContextListener {
                         } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
-                createOrg(1_000_000);
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
