@@ -411,9 +411,9 @@ public class Executor {
             if (value instanceof List) {
                 try {
                     int index = 0;
-                    List<String> valList = (List<String>) value;
-                    for (String v: valList) {
-                        v = VariableResolver.resolveExpression(varMap, v);
+                    List<Object> valList = (List<Object>) value;
+                    for (Object v: valList) {
+                        v = VariableResolver.resolveExpression(varMap, v.toString());
                         valList.set(index, v);
                         index++;
                     }
