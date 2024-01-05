@@ -6,10 +6,6 @@ import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
@@ -20,7 +16,10 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -34,6 +33,7 @@ import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -469,6 +469,43 @@ public class StartTestAction extends UserAction {
     public String fetchTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         this.testingRunResult = TestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        List<GenericTestResult> runResults = new ArrayList<>();
+
+        for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
+            if (testResult instanceof TestResult) {
+                runResults.add(testResult);
+            } else {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) testResult;
+                Map<String, NodeResult> nodeResultMap = multiTestRes.getNodeResultMap();
+                TestResult res;
+                for (String k: nodeResultMap.keySet()) {
+                    NodeResult nodeRes = nodeResultMap.get(k);
+                    String confidence = "HIGH";
+                    List<String> errors = nodeRes.getErrors();
+                    List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
+                    boolean vulnerable = nodeRes.isVulnerable();
+                    double percentageMatch = 0;
+                    // pick from workflow
+                    Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = this.testingRunResult.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
+                    YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(k).getNodeDetails();
+                    String originalMessage = workflowNodeDetails.getOriginalMessage();
+                    for (int i = 1; i<messageList.size(); i++) {
+                        String message = "{\"request\": " + messageList.get(i);
+                        if (i != messageList.size() - 1) {
+                            message = message.substring(0, message.length() - 3);
+                        } else {
+                            message = message.substring(0, message.length() - 2);
+                            message = message + "}";
+                        }
+                        res = new TestResult(message, originalMessage, errors, percentageMatch, vulnerable, Confidence.HIGH, null);
+                        runResults.add(res);
+                    }
+                }
+                
+            }
+        }
+
+        this.testingRunResult.setTestResults(runResults);
         return SUCCESS.toUpperCase();
     }
 

@@ -1,14 +1,14 @@
 package com.akto.dto.testing.NodeDetails;
 
 import java.util.List;
-import java.util.Map;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.AuthMechanism;
 
 public class YamlNodeDetails extends NodeDetails {
@@ -19,27 +19,28 @@ public class YamlNodeDetails extends NodeDetails {
 
     ExecutorNode executorNode;
 
-    Map<String, Object> varMap;
-
     List<CustomAuthType> customAuthTypes;
 
     AuthMechanism authMechanism;
     
+    @BsonIgnore
     RawApi rawApi;
 
     ApiInfoKey apiInfoKey;
 
-    public YamlNodeDetails(String testId, FilterNode validatorNode, ExecutorNode executorNode,
-            Map<String, Object> varMap, List<CustomAuthType> customAuthTypes, AuthMechanism authMechanism, 
-            RawApi rawApi, ApiInfoKey apiInfoKey) {
+    String originalMessage;
+
+    public YamlNodeDetails(String testId, FilterNode validatorNode, ExecutorNode executorNode, 
+            List<CustomAuthType> customAuthTypes, AuthMechanism authMechanism, 
+            RawApi rawApi, ApiInfoKey apiInfoKey, String originalMessage) {
         this.testId = testId;
         this.validatorNode = validatorNode;
         this.executorNode = executorNode;
-        this.varMap = varMap;
         this.customAuthTypes = customAuthTypes;
         this.authMechanism = authMechanism;
         this.rawApi = rawApi;
         this.apiInfoKey = apiInfoKey;
+        this.originalMessage = originalMessage;
     }
 
     public YamlNodeDetails() {
@@ -67,14 +68,6 @@ public class YamlNodeDetails extends NodeDetails {
 
     public void setExecutorNode(ExecutorNode executorNode) {
         this.executorNode = executorNode;
-    }
-
-    public Map<String, Object> getVarMap() {
-        return varMap;
-    }
-
-    public void setVarMap(Map<String, Object> varMap) {
-        this.varMap = varMap;
     }
 
     public List<CustomAuthType> getCustomAuthTypes() {
@@ -111,6 +104,14 @@ public class YamlNodeDetails extends NodeDetails {
 
     public String validate() {
         return null;        
+    }
+
+    public String getOriginalMessage() {
+        return originalMessage;
+    }
+
+    public void setOriginalMessage(String originalMessage) {
+        this.originalMessage = originalMessage;
     }
     
 }

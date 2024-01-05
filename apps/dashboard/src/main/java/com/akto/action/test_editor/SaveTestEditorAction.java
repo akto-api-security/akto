@@ -238,7 +238,7 @@ public class SaveTestEditorAction extends UserAction {
                     Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
-                    Context.now(), new ObjectId()
+                    Context.now(), new ObjectId(), null
             );
         }
         testingRunResult.setId(new ObjectId());

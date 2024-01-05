@@ -17,6 +17,8 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.NodeDetails.NodeDetails;
+import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.dto.testing.info.TestInfo;
@@ -113,6 +115,8 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<TestResult> testResultClassModel = ClassModel.builder(TestResult.class).enableDiscriminator(true)
                 .build();
+        ClassModel<MultiExecTestResult> multiExecTestResultClassModel = ClassModel.builder(MultiExecTestResult.class).enableDiscriminator(true)
+                .build();
         ClassModel<GenericTestResult> genericTestResultClassModel = ClassModel.builder(GenericTestResult.class).enableDiscriminator(true)
                 .build();
         ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class)
@@ -161,6 +165,10 @@ public class DaoInit {
                 .builder(NotBelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<BelongsToPredicate> belongsToPredicateClassModel = ClassModel
                 .builder(BelongsToPredicate.class).enableDiscriminator(true).build();
+        ClassModel<NodeDetails> nodeDetails = ClassModel
+                .builder(NodeDetails.class).enableDiscriminator(true).build();
+        ClassModel<YamlNodeDetails> yamlNodeDetails = ClassModel
+                .builder(YamlNodeDetails.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -208,7 +216,8 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,
-                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
+                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
+                nodeDetails, yamlNodeDetails, multiExecTestResultClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

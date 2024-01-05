@@ -20,6 +20,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
@@ -45,16 +46,18 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
-    public List<GenericTestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
+    public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
         List<GenericTestResult> result = new ArrayList<>();
         
         TestResult invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.INVALID_EXECUTION_BLOCK.getMessage()), 0, false, TestResult.Confidence.HIGH, null);
-
+        YamlTestResult yamlTestResult;
+        WorkflowTest workflowTest = null;
         if (node.getChildNodes().size() < 2) {
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             result.add(invalidExecutionResult);
-            return result;
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
@@ -62,7 +65,8 @@ public class Executor {
         ExecutorSingleRequest singleReq = null;
         if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
             result.add(invalidExecutionResult);
-            return result;
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
         }
 
         boolean requestSent = false;
@@ -71,8 +75,11 @@ public class Executor {
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple")) {
-            result.add(triggerMultiExecution(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode));
-            return result;
+            workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode));
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            
+            return yamlTestResult;
         }
 
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
@@ -118,12 +125,19 @@ public class Executor {
             result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
-        return result;
+        yamlTestResult = new YamlTestResult(result, workflowTest);
+
+        return yamlTestResult;
     }
 
-    public MultiExecTestResult triggerMultiExecution(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+    public WorkflowTest buildWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
         List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
-        WorkflowTest workflowTest = convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+
+            return convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+        }
+
+    public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, null, null, varMap, true);
@@ -186,13 +200,13 @@ public class Executor {
                 // WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), rawApi.getRequest().getQueryParams(),
                 //     rawApi.getRequest().getHeaders().toString(), rawApi.getRequest().getBody(), rawApi.getRequest().getUrl());
 
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, null, customAuthTypes, authMechanism, rawApi, apiInfoKey);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage());
                 WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
                 mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
             } else {
                 // DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, rawApi.getRequest().getUrl(),
                 //     URLMethods.Method.fromString(rawApi.getRequest().getMethod()), null, null, true, 0, 0, 0, null, null);
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, varMap, customAuthTypes, authMechanism, rawApi, apiInfoKey);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage());
                 WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
                 mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
             }
