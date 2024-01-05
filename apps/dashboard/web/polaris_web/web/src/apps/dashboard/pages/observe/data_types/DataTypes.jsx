@@ -156,7 +156,7 @@ function DataTypes() {
     if (currState.dataType === 'Akto') {
       let obj = {
         name: currState.name,
-        ...transform.convertToSensitiveData(currState.sensitiveState)
+        ...transform.convertToSensitiveData(currState)
       }
       api.saveAktoDataType(obj).then((response) => {
         func.setToast(true, false, "Data type updated successfully");
@@ -264,13 +264,25 @@ function DataTypes() {
           </HorizontalGrid >
         </LegacyCard.Section>
       </LegacyCard>
-      <div className='footer-save'>
-        <Button id={"save-button"} primary onClick={saveAction} {...compareFunc() ? {disabled: true} : {}}> Save </Button>
-      </div>
     </VerticalStack>
   )
 
-  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard, requestCard]
+  const redactCard = (
+    <VerticalStack gap="5" key="redact">
+      <LegacyCard title= "Redact" >
+        <LegacyCard.Section>
+          <p>Redact this data type</p>
+          <br/>
+          <HorizontalGrid columns="4">
+            <Dropdown id={"redact-position"} menuItems = {statusItems} initial={currState.redacted} 
+            selected={(val) => { handleChange({ redacted: val }) }}/>
+          </HorizontalGrid >
+        </LegacyCard.Section>
+      </LegacyCard>
+    </VerticalStack>
+  )
+
+  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard]
 
   return (
     <DetailsPage

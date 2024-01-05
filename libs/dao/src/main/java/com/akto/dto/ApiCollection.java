@@ -21,6 +21,13 @@ public class ApiCollection {
     public static final String HOST_NAME = "hostName";
     int vxlanId;
 
+    boolean redact;
+    public static final String REDACT = "redact";
+
+    boolean sampleCollectionsDropped;
+
+    public static final String SAMPLE_COLLECTIONS_DROPPED = "sampleCollectionsDropped";
+
     @BsonIgnore
     int urlsCount;
     public static final String VXLAN_ID = "vxlanId";
@@ -35,6 +42,19 @@ public class ApiCollection {
         this.urls = urls;
         this.hostName = hostName;
         this.vxlanId = vxlanId;
+        this.redact = false;
+        this.sampleCollectionsDropped = true;
+    }
+
+    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped) {
+        this.id = id;
+        this.name = name;
+        this.startTs = startTs;
+        this.urls = urls;
+        this.hostName = hostName;
+        this.vxlanId = vxlanId;
+        this.redact = redact;
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
     public static boolean useHost = Objects.equals(System.getenv("USE_HOSTNAME"), "true");
@@ -127,4 +147,19 @@ public class ApiCollection {
         return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
     }
 
+    public boolean getRedact() {
+        return redact;
+    }
+
+    public void setRedact(boolean redact) {
+        this.redact = redact;
+    }
+
+    public boolean isSampleCollectionsDropped() {
+        return sampleCollectionsDropped;
+    }
+
+    public void setSampleCollectionsDropped(boolean sampleCollectionsDropped) {
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
+    }
 }

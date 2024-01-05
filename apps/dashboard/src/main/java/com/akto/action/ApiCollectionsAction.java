@@ -5,21 +5,26 @@ import java.util.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import com.akto.dao.APISpecDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
+
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
 public class ApiCollectionsAction extends UserAction {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
+
     List<ApiCollection> apiCollections = new ArrayList<>();
     int apiCollectionId;
+
+    boolean redacted;
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
@@ -110,6 +115,39 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public static void dropSampleDataForApiCollection() {
+        loggerMaker.infoAndAddToDb("Dropping sample data for all api collections", LoggerMaker.LogDb.DASHBOARD);
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, false));
+        for (ApiCollection apiCollection: apiCollections) {
+            int apiCollectionId = apiCollection.getId();
+            loggerMaker.infoAndAddToDb("Dropping sti data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
+            SingleTypeInfoDao.instance.deleteAll(Filters.eq("_id", Collections.singletonList(apiCollectionId)));
+            loggerMaker.infoAndAddToDb("Dropping sample data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
+            SampleDataDao.instance.deleteAll(Filters.eq("_id.apiCollectionId", apiCollectionId));
+            loggerMaker.infoAndAddToDb("Dropping sensitive sample data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
+            SensitiveSampleDataDao.instance.deleteAll(Filters.eq("_id.apiCollectionId", apiCollectionId));
+            ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true));
+        }
+    }
+
+    public String redactCollection() {
+        List<Bson> updates = Arrays.asList(
+            Updates.set(ApiCollection.REDACT, redacted),
+            Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, !redacted)
+        );
+        ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.combine(updates));
+        if(redacted){
+            int accountId = Context.accountId.get();
+            Runnable r = () -> {
+                Context.accountId.set(accountId);
+                loggerMaker.infoAndAddToDb("Triggered job to delete sample data", LoggerMaker.LogDb.DASHBOARD);
+                dropSampleDataForApiCollection();
+            };
+            new Thread(r).start();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -128,6 +166,13 @@ public class ApiCollectionsAction extends UserAction {
   
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
-    } 
+    }
 
+    public boolean isRedacted() {
+        return redacted;
+    }
+
+    public void setRedacted(boolean redacted) {
+        this.redacted = redacted;
+    }
 }

@@ -287,6 +287,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         List<Bson> pipeline = new ArrayList<>();
+        ;
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
@@ -303,6 +304,48 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+        MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            BasicDBObject v = endpointsCursor.next();
+            try {
+                BasicDBObject vv = (BasicDBObject) v.get("_id");
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
+                        (int) vv.get("apiCollectionId"),
+                        (String) vv.get("url"),
+                        URLMethods.Method.fromString((String) vv.get("method"))
+                );
+                endpoints.add(apiInfoKey);
+            } catch (Exception e) {
+                ;
+
+            }
+        }
+
+        return endpoints;
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection2(SingleTypeInfo.SubType subType, int skip, int limit) {
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId =
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                        .append("url", "$url")
+                        .append("method", "$method");
+
+
+        pipeline.add(Aggregates.match(Filters.eq("subType", subType.getName())));
+
+        Bson projections = Projections.fields(
+                Projections.include("timestamp", "apiCollectionId", "url", "method")
+        );
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.sort(Sorts.descending("timestamp")));
+        pipeline.add(Aggregates.limit(limit));
+        pipeline.add(Aggregates.skip(skip));
 
         MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 

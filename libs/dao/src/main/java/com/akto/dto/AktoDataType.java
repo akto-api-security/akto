@@ -6,10 +6,15 @@ import com.akto.dto.type.SingleTypeInfo;
 
 public class AktoDataType {
     private String name;
+
+    public static final String NAME = "name";
     private boolean sensitiveAlways;
     private List<SingleTypeInfo.Position> sensitivePosition;
     private int timestamp;
     private IgnoreData ignoreData;
+    private boolean redacted;
+    public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
+    private boolean sampleDataFixed;
 
     public AktoDataType() {
     }
@@ -18,6 +23,17 @@ public class AktoDataType {
         this.sensitiveAlways = sensitiveAlways;
         this.sensitivePosition = sensitivePosition;
         this.ignoreData = ignoreData;
+        this.redacted = false;
+        this.sampleDataFixed = true;
+    }
+
+    public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
+        this.name = name;
+        this.sensitiveAlways = sensitiveAlways;
+        this.sensitivePosition = sensitivePosition;
+        this.ignoreData = ignoreData;
+        this.redacted = redacted;
+        this.sampleDataFixed = sampleDataFixed;
     }
     public String getName() {
         return name;
@@ -51,5 +67,20 @@ public class AktoDataType {
     }
     public void setIgnoreData(IgnoreData ignoreData) {
         this.ignoreData = ignoreData;
+    }
+
+    public boolean isRedacted() {
+        return redacted;
+    }
+    public void setRedacted(boolean redacted) {
+        this.redacted = redacted;
+    }
+
+    public boolean isSampleDataFixed() {
+        return sampleDataFixed;
+    }
+
+    public void setSampleDataFixed(boolean sampleDataFixed) {
+        this.sampleDataFixed = sampleDataFixed;
     }
 }

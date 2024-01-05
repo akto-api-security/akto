@@ -130,10 +130,13 @@ function ApiEndpoints() {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
+    const [redacted, setIsRedacted] = useState(false)
 
     async function fetchData() {
         setLoading(true)
         let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
+        console.log("data", apiCollectionData)
+        setIsRedacted(apiCollectionData.data.redacted)
         let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiCollectionData.data.apiInfoList
         let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
@@ -263,6 +266,14 @@ function ApiEndpoints() {
         func.setToast(true, false, "Endpoints refreshed")
     }
 
+    function redactCollection(){
+        var updatedRedacted = !redacted;
+        api.redactCollection(apiCollectionId, updatedRedacted).then(resp => {
+            setIsRedacted(updatedRedacted)
+            func.setToast(true, false, updatedRedacted ? "Collection redacted" : "Collection unredacted")
+        })
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -390,6 +401,11 @@ function ApiEndpoints() {
                     <Box paddingInlineEnd="3" paddingInlineStart="3">
                         <Button onClick={handleRefresh} plain monochrome removeUnderline>
                             <Text fontWeight="medium" variant="bodyMd">Refresh</Text>
+                        </Button>
+                    </Box>
+                    <Box paddingInlineEnd="3" paddingInlineStart="3">
+                        <Button onClick={redactCollection} plain monochrome removeUnderline>
+                            <Text fontWeight="medium" variant="bodyMd">{redacted ? "Redacted": "Redact"}</Text>
                         </Button>
                     </Box>
                     <Popover
