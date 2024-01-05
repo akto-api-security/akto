@@ -1072,6 +1072,12 @@ getSizeOfFile(bytes) {
       funcToCall();
     }
   },
+  addPlurality(count){
+    if(count == null || count==undefined){
+      return ""
+    }
+    return count === 1 ? "" : "s" 
+  },
   convertQueryParamsToUrl(queryParams) {
     let url = ""
     let first = true;

@@ -38,6 +38,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -58,6 +59,7 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
 import com.akto.util.DashboardMode;
@@ -65,6 +67,7 @@ import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.billing.OrganizationUtils;
+import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.akto.utils.usage.UsageMetricCalculator;
 import com.akto.billing.UsageMetricUtils;
@@ -80,6 +83,7 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,6 +122,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
+    Crons crons = new Crons();
 
     public static String getDomain() {
         if (domain == null) {
@@ -1078,7 +1083,7 @@ public class InitializerListener implements ServletContextListener {
                         baos.write(buffer, 0, bytesRead);
                     }
 
-                    processTemplateFilesZip(baos.toByteArray());
+                    processTemplateFilesZip(baos.toByteArray(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 }
             } catch (Exception ex) {
                 loggerMaker.errorAndAddToDb(ex, String.format("Error while loading templates files from directory. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
@@ -1353,6 +1358,8 @@ public class InitializerListener implements ServletContextListener {
                             setupUsageSyncScheduler();
                         }
 
+                        crons.deleteTestRunsScheduler();
+
 
                         if(isSaas){
                             try {
@@ -1601,6 +1608,8 @@ public class InitializerListener implements ServletContextListener {
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 
+    public final static String _AKTO = "AKTO";
+
     public void setUpTestEditorTemplatesScheduler() {
         GithubSync githubSync = new GithubSync();
         byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
@@ -1616,7 +1625,7 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.infoAndAddToDb(
                                         String.format("Updating Akto test templates for account: %d", accountId),
                                         LogDb.DASHBOARD);
-                                processTemplateFilesZip(repoZip);
+                                processTemplateFilesZip(repoZip, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e,
                                         String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -1632,7 +1641,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public static void processTemplateFilesZip(byte[] zipFile) {
+    public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
                     ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
@@ -1652,6 +1661,9 @@ public class InitializerListener implements ServletContextListener {
                         String entryName = entry.getName();
 
                         if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a YAML template file, skipping", entryName),
+                                    LogDb.DASHBOARD);
                             continue;
                         }
 
@@ -1692,7 +1704,6 @@ public class InitializerListener implements ServletContextListener {
                             String id = testConfig.getId();
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
-                            String author = "AKTO";
 
                             List<Bson> updates = new ArrayList<>(
                                     Arrays.asList(
@@ -1713,9 +1724,30 @@ public class InitializerListener implements ServletContextListener {
                             } catch (Exception e) {
                             }
 
-                            YamlTemplateDao.instance.updateOne(
-                                    Filters.eq(Constants.ID, id),
-                                    Updates.combine(updates));
+                            if (_AKTO.equals(author)) {
+                                YamlTemplateDao.instance.updateOne(
+                                        Filters.eq(Constants.ID, id),
+                                        Updates.combine(updates));
+                            } else {
+                                updates.add(
+                                        Updates.setOnInsert(YamlTemplate.SOURCE, source)
+                                );
+                                updates.add(
+                                        Updates.setOnInsert(YamlTemplate.REPOSITORY_URL, repositoryUrl)
+                                );
+
+                                try {
+                                    YamlTemplateDao.instance.getMCollection().findOneAndUpdate(
+                                        Filters.and(Filters.eq(Constants.ID, id),
+                                                Filters.ne(YamlTemplate.AUTHOR, _AKTO)),
+                                        Updates.combine(updates),
+                                        new FindOneAndUpdateOptions().upsert(true));
+                                } catch (Exception e){
+                                    loggerMaker.errorAndAddToDb(
+                                            String.format("Error while inserting Test template %s Error: %s", id, e.getMessage()),
+                                            LogDb.DASHBOARD);
+                                }
+                            }
 
                         }
                     }
@@ -1942,5 +1974,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
+  
 }
 
