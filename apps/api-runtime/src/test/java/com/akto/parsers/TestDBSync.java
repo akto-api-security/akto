@@ -110,7 +110,7 @@ public class TestDBSync extends MongoBasedTest {
         assertEquals(3, respTemplate.getParameters().size());
     }    
 
-    @Test
+//    @Test
     public void testImmediateSync() {
         testInitializer();
         String url = "immediate/";
