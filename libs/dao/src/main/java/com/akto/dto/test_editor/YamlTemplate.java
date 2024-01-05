@@ -21,6 +21,8 @@ public class YamlTemplate {
     public static final String INFO = "info";
     private boolean inactive;
     public static final String INACTIVE = "inactive";
+    private String repositoryUrl;
+    public static final String REPOSITORY_URL = "repositoryUrl";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
         this.id = id;
@@ -101,6 +103,14 @@ public class YamlTemplate {
 
     public void setSource(GlobalEnums.YamlTemplateSource source) {
         this.source = source;
+    }
+    
+    public String getRepositoryUrl() {
+        return repositoryUrl;
+    }
+
+    public void setRepositoryUrl(String repositoryUrl) {
+        this.repositoryUrl = repositoryUrl;
     }
 
     public int getHash() {
