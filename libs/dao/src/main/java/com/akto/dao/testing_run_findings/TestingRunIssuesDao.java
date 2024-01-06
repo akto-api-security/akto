@@ -49,6 +49,8 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
 
         fieldNames = new String[] {TestingRunIssues.TEST_RUN_ISSUES_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+        fieldNames = new String[] {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     
     }
 
@@ -139,23 +141,5 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
     @Override
     public Class<TestingRunIssues> getClassT() {
         return TestingRunIssues.class;
-    }
-
-    public void createIndicesIfAbsent() {
-
-        boolean exists = false;
-        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
-            if (getCollName().equalsIgnoreCase(col)){
-                exists = true;
-                break;
-            }
-        };
-
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
-        }
-
-        String[] fieldNames = {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 }

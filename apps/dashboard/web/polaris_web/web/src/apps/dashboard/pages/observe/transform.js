@@ -507,7 +507,7 @@ const transform = {
         let tempRiskScoreObj = lastFetchedResp
         let tempSeverityObj = lastFetchedSeverityResp
         await api.lastUpdatedInfo().then(async(resp) => {
-            if(resp.lastSyncedCron > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
+            if(resp.lastUpdatedSeverity > lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap > lastFetchedInfo.lastSensitiveInfo){
                 await api.getRiskScoreInfo().then((res) =>{
                     const newObj = {
                         criticalUrls: res.criticalEndpointsCount,
@@ -517,14 +517,14 @@ const transform = {
                     setLastFetchedResp(newObj);
                 })
             }
-            if(resp.lastSyncedCron > lastFetchedInfo.lastRiskScoreInfo){
+            if(resp.lastUpdatedSeverity > lastFetchedInfo.lastRiskScoreInfo){
                 await api.getSeverityInfoForCollections().then((resp) => {
                     tempSeverityObj = JSON.parse(JSON.stringify(resp))
                     setLastFetchedSeverityResp(resp)
                 })
             }
             setLastFetchedInfo({
-                lastRiskScoreInfo: func.timeNow() > resp.lastSyncedCron ? func.timeNow() : resp.lastSyncedCron,
+                lastRiskScoreInfo: func.timeNow() > resp.lastUpdatedSeverity ? func.timeNow() : resp.lastUpdatedSeverity,
                 lastSensitiveInfo: func.timeNow() > resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
             })
         })
