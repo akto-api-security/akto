@@ -11,6 +11,7 @@ import DateRangePicker from "../../../components/layouts/DateRangePicker"
 import func from '@/util/func';
 import { produce } from "immer"
 import "./style.css"
+import SummaryTable from "./SummaryTable";
 
 function TrendChart(props) {
 
@@ -308,6 +309,9 @@ function TrendChart(props) {
                     graphPointClick={graphPointClick}
                     tooltip={tooltip}
                 />
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <SummaryTable testingRunResultSummaries={testingRunResultSummaries} />
             </LegacyCard.Section>
         </LegacyCard>
     )
