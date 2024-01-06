@@ -18,6 +18,7 @@ import func from '@/util/func';
 import { produce } from "immer"
 import "./style.css"
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import SummaryTable from "./SummaryTable";
 
 function TrendChart(props) {
 
@@ -337,6 +338,9 @@ function TrendChart(props) {
                         />
                     </LegacyCard.Section>
                 </Collapsible>
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <SummaryTable testingRunResultSummaries={testingRunResultSummaries} />
             </LegacyCard.Section>
         </LegacyCard>
     )
