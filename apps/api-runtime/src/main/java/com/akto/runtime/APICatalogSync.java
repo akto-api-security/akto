@@ -45,7 +45,6 @@ public class APICatalogSync {
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = false;
 
-    public Map<Integer, Boolean> apiCollectionToRedactPayload;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -60,11 +59,6 @@ public class APICatalogSync {
             }
         } catch (Exception e) {
 
-        }
-        apiCollectionToRedactPayload = new HashMap<>();
-        List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        for(ApiCollection apiCollection: all) {
-            apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
         }
 
     }
@@ -1368,6 +1362,11 @@ public class APICatalogSync {
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
         List<WriteModel<SampleData>> writesForSampleData = new ArrayList<>();
         List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo = new ArrayList<>();
+        Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
+        List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for(ApiCollection apiCollection: all) {
+            apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
+        }
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
@@ -1380,7 +1379,7 @@ public class APICatalogSync {
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
-            boolean redactCollectionLevel = this.apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
+            boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
             DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
