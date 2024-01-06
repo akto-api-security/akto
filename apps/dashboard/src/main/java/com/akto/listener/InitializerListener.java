@@ -105,6 +105,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
+import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -602,21 +603,14 @@ public class InitializerListener implements ServletContextListener {
 
                                                 for (String sample : samples) {
                                                     HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-                                                    String host = new URL(httpResponseParams.getRequestParams().getURL()).getHost();
-                                                    if (!dp.getId().equalsIgnoreCase(host)) {
-                                                        allMatchDefault = false;
-                                                        break;
-                                                    }
-
-                                                    String response = httpResponseParams.getPayload();
-
-                                                    if (!dp.getRegexPattern().matcher(response.replaceAll("\n", "")).matches()) {
+                                                    if (!matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
                                                         allMatchDefault = false;
                                                         break;
                                                     }
                                                 }
 
                                                 if (allMatchDefault) {
+                                                    loggerMaker.errorAndAddToDb("Deleting API that matches default payload: " + toBeDeleted, LogDb.DASHBOARD);
                                                     toBeDeleted.add(sampleData.getId());
                                                 }
                                             } catch (Exception e) {

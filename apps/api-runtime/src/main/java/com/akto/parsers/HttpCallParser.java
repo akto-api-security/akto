@@ -21,6 +21,8 @@ import org.bson.conversions.Bson;
 import java.net.URL;
 import java.util.*;
 
+import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+
 public class HttpCallParser {
     
     private final int sync_threshold_count;
@@ -183,29 +185,7 @@ public class HttpCallParser {
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
         List<HttpResponseParams> ret = new ArrayList<>();
         for(HttpResponseParams httpResponseParams: filteredResponseParams) {
-            try {
-                Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
-                List<String> host = reqHeaders.getOrDefault("host", new ArrayList<>());
-
-                String testHost = "";
-                if (host != null && !host.isEmpty() && host.get(0) != null) {
-                    testHost = host.get(0);
-                } else {
-                    String urlStr = httpResponseParams.getRequestParams().getURL();
-                    URL url = new URL(urlStr);
-                    testHost = url.getHost();
-                }
-
-                testHost = Base64.getEncoder().encodeToString(testHost.getBytes());
-
-                DefaultPayload defaultPayload = defaultPayloadMap.get(testHost);
-                if (defaultPayload != null && defaultPayload.getRegexPattern().matcher(httpResponseParams.getPayload().replaceAll("\n", "")).matches()) {
-                    continue;
-                }
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while filtering default payloads: " + e.getMessage(), LogDb.RUNTIME);
-            }
+            if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) continue;
 
             ret.add(httpResponseParams);
         }
