@@ -25,7 +25,7 @@ public class RedactSampleData {
     public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
         HttpResponseParams.Source source = httpResponseParams.getSource();
-        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
+//        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
         if(accountLevelRedact || apiCollectionLevelRedact) return redact(httpResponseParams);
         return redactMarkedDataTypes(httpResponseParams);
     }
@@ -51,7 +51,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            changeRedactedDataType(node, redactValue);
+            changeRedactedDataType(null, node, redactValue);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -71,7 +71,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            changeRedactedDataType(node, redactValue);
+            changeRedactedDataType(null, node, redactValue);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -94,7 +94,7 @@ public class RedactSampleData {
         for(Map.Entry<String, List<String>> entry : entries){
             String key = entry.getKey();
             List<String> values = entry.getValue();
-            SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), values.get(0), null);
+            SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
             if(SingleTypeInfo.isRedacted(subType.getName())){
                 responseHeaders.put(key, Collections.singletonList(redactValue));
             }
@@ -184,7 +184,7 @@ public class RedactSampleData {
 
     }
 
-    public static void changeRedactedDataType(JsonNode parent, String newValue) {
+    public static void changeRedactedDataType(String parentName, JsonNode parent, String newValue) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -192,12 +192,12 @@ public class RedactSampleData {
             for(int i = 0; i < arrayNode.size(); i++) {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
-                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), arrayElement.asText(), null);
+                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
                     if(SingleTypeInfo.isRedacted(subType.getName())){
                         arrayNode.set(i, new TextNode(newValue));
                     }
                 } else {
-                    changeRedactedDataType(arrayElement, newValue);
+                    changeRedactedDataType(parentName, arrayElement, newValue);
                 }
             }
         } else {
@@ -206,13 +206,13 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), fieldValue.asText(), null);
+                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), f, null);
                     if(SingleTypeInfo.isRedacted(subType.getName())){
                         ((ObjectNode) parent).put(f, newValue);
                     }
 
                 } else {
-                    changeRedactedDataType(fieldValue, newValue);
+                    changeRedactedDataType(f, fieldValue, newValue);
                 }
             }
         }

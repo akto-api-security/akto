@@ -50,6 +50,7 @@ public class CustomDataType {
         this.operator = operator;
         this.ignoreData = ignoreData;
         this.redacted = false;
+        this.sampleDataFixed = true;
     }
 
     public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {

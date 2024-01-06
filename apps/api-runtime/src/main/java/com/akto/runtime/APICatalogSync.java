@@ -940,6 +940,7 @@ public class APICatalogSync {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" , LogDb.RUNTIME)
                     ;
                 }
             }
