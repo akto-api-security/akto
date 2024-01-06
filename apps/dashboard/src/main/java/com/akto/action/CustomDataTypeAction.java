@@ -310,9 +310,9 @@ public class CustomDataTypeAction extends UserAction{
                 break;
             }
             List<Bson> query = apiInfoKeys.stream().map(key -> Filters.and(
-                    Filters.eq("apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq("url", key.getUrl()),
-                    Filters.eq("method", key.getMethod())
+                    Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
+                    Filters.eq("_id.url", key.getUrl()),
+                    Filters.eq("_id.method", key.getMethod())
             )).collect(Collectors.toList());
 
             SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.unset("samples"));

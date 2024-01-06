@@ -119,8 +119,12 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public static void dropSampleDataForApiCollection() {
-        loggerMaker.infoAndAddToDb("Dropping sample data for all api collections", LoggerMaker.LogDb.DASHBOARD);
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, false));
+        if(apiCollections.isEmpty()) {
+            loggerMaker.infoAndAddToDb("No api collections to drop sample data for", LoggerMaker.LogDb.DASHBOARD);
+            return;
+        }
+        loggerMaker.infoAndAddToDb(String.format("Dropping sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             loggerMaker.infoAndAddToDb("Dropping sti data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
@@ -131,6 +135,7 @@ public class ApiCollectionsAction extends UserAction {
             SensitiveSampleDataDao.instance.deleteAll(Filters.eq("_id.apiCollectionId", apiCollectionId));
             ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true));
         }
+        loggerMaker.infoAndAddToDb(String.format("Dropped sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
     }
 
     public String redactCollection() {
