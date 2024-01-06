@@ -270,6 +270,7 @@ function GithubServerTable(props) {
                 ]}
                 bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
                 promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+                hasZebraStriping={props.hasZebraStriping || false}
               >
                 {rowMarkup}
               </IndexTable>

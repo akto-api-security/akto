@@ -5,7 +5,6 @@ import tableFunc from "./transform";
 function GithubSimpleTable(props) {
 
     const [filters, setFilters] = useState([])
-
     return <GithubServerTable
         key={JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
         pageLimit={props.pageLimit}
@@ -34,6 +33,7 @@ function GithubSimpleTable(props) {
         condensedHeight={props?.condensedHeight}
         tableTabs={props?.tableTabs}
         notHighlightOnselected={props.notHighlightOnselected}
+        hasZebraStriping={props.hasZebraStriping}
     />
 
 }

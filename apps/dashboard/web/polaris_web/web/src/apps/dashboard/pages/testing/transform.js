@@ -8,75 +8,75 @@ import TooltipText from "../../components/shared/TooltipText";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
-function getStatus(state){
-  return state._name ? state._name : ( state.name ? state.name : state )
+function getStatus(state) {
+  return state._name ? state._name : (state.name ? state.name : state)
 }
 
-function getOrderPriority(state){
+function getOrderPriority(state) {
   let status = getStatus(state);
-    switch(status){
-        case "RUNNING": return 1;
-        case "SCHEDULED": return 2;
-        case "STOPPED": return 4;
-        case "FAILED":
-        case "FAIL": return 5;
-        default: return 3;
-    }
-}
-
-function getTestingRunType(testingRun, testingRunResultSummary, cicd){
-    if(testingRunResultSummary.metadata!=null || cicd){
-        return 'CI/CD';
-    }
-    if(testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400){
-      return 'Recurring';
-    }
-    return 'One-time'
-}
-
-function getTotalSeverity(countIssues){
-    let ts = 0;
-    if(countIssues==null){
-        return 0;
-    }
-    ts = MAX_SEVERITY_THRESHOLD*(countIssues['High']*MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
-    return ts;
-}
-
-function getTotalSeverityTestRunResult(severity){
-  if(severity==null || severity.length==0){
-      return 0;
+  switch (status) {
+    case "RUNNING": return 1;
+    case "SCHEDULED": return 2;
+    case "STOPPED": return 4;
+    case "FAILED":
+    case "FAIL": return 5;
+    default: return 3;
   }
-  let ts = MAX_SEVERITY_THRESHOLD*((severity[0].includes("High"))*MAX_SEVERITY_THRESHOLD + (severity[0].includes('Medium'))) + (severity[0].includes('Low'))
+}
+
+function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
+  if (testingRunResultSummary.metadata != null || cicd) {
+    return 'CI/CD';
+  }
+  if (testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400) {
+    return 'Recurring';
+  }
+  return 'One-time'
+}
+
+function getTotalSeverity(countIssues) {
+  let ts = 0;
+  if (countIssues == null) {
+    return 0;
+  }
+  ts = MAX_SEVERITY_THRESHOLD * (countIssues['High'] * MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
   return ts;
 }
 
-function getRuntime(scheduleTimestamp ,endTimestamp, state){
-  let status = getStatus(state);
-    if(status==='RUNNING'){
-        return "Currently running";
-    }
-    const currTime = Date.now();
-    if(endTimestamp <= 0 ){
-     if(currTime > scheduleTimestamp){
-        return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
-    } else {
-        return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
-    }
-}
-return 'Last run ' + func.prettifyEpoch(endTimestamp);
+function getTotalSeverityTestRunResult(severity) {
+  if (severity == null || severity.length == 0) {
+    return 0;
+  }
+  let ts = MAX_SEVERITY_THRESHOLD * ((severity[0].includes("High")) * MAX_SEVERITY_THRESHOLD + (severity[0].includes('Medium'))) + (severity[0].includes('Low'))
+  return ts;
 }
 
-function getAlternateTestsInfo(state){
+function getRuntime(scheduleTimestamp, endTimestamp, state) {
   let status = getStatus(state);
-    switch(status){
-        case "RUNNING": return "Tests are still running";
-        case "SCHEDULED": return "Tests have been scheduled";
-        case "STOPPED": return "Tests have been stopped";
-        case "FAILED":
-        case "FAIL": return "Test execution has failed during run";
-        default: return "Information unavailable";
+  if (status === 'RUNNING') {
+    return "Currently running";
+  }
+  const currTime = Date.now();
+  if (endTimestamp <= 0) {
+    if (currTime > scheduleTimestamp) {
+      return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+    } else {
+      return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
     }
+  }
+  return 'Last run ' + func.prettifyEpoch(endTimestamp);
+}
+
+function getAlternateTestsInfo(state) {
+  let status = getStatus(state);
+  switch (status) {
+    case "RUNNING": return "Tests are still running";
+    case "SCHEDULED": return "Tests have been scheduled";
+    case "STOPPED": return "Tests have been stopped";
+    case "FAILED":
+    case "FAIL": return "Test execution has failed during run";
+    default: return "Information unavailable";
+  }
 }
 
 function getTestsInfo(testResultsCount, state){
@@ -93,30 +93,30 @@ function minimizeTagList(items){
   return items;
 }
 
-function checkTestFailure(summaryState, testRunState){
-  if(testRunState=='COMPLETED' && summaryState!='COMPLETED'){
+function checkTestFailure(summaryState, testRunState) {
+  if (testRunState == 'COMPLETED' && summaryState != 'COMPLETED') {
     return true;
   }
   return false;
 }
 
-function getCweLink(item){
+function getCweLink(item) {
   let linkUrl = ""
   let cwe = item.split("-")
-  if(cwe[1]){
-      linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
+  if (cwe[1]) {
+    linkUrl = `https://cwe.mitre.org/data/definitions/${cwe[1]}.html`
   }
   return linkUrl;
 }
 
-function getCveLink(item){
+function getCveLink(item) {
   return `https://nvd.nist.gov/vuln/detail/${item}`
 }
 
 const transform = {
-    tagList : (list, linkType) => {
+  tagList: (list, linkType) => {
 
-      let ret = list?.map((tag, index) => {
+    let ret = list?.map((tag, index) => {
 
         let linkUrl = ""
         switch(linkType){
@@ -197,19 +197,20 @@ const transform = {
     
       return result;
     },
-    prepareTestRun : (data, testingRunResultSummary, cicd, prettified) => {
-      let obj={};
-      if(testingRunResultSummary==null){
-        testingRunResultSummary = {};
-      }
-      if(testingRunResultSummary.countIssues!=null){
-          testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
-      }
+  
+  prepareTestRun: (data, testingRunResultSummary, cicd,prettified) => {
+    let obj = {};
+    if (testingRunResultSummary == null) {
+      testingRunResultSummary = {};
+    }
+    if (testingRunResultSummary.countIssues != null) {
+      testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
+    }
 
-      let state = data.state;
-      if(checkTestFailure(testingRunResultSummary.state, state)){
-        state = 'FAIL'
-      }
+    let state = data.state;
+    if (checkTestFailure(testingRunResultSummary.state, state)) {
+      state = 'FAIL'
+    }
 
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
@@ -343,9 +344,9 @@ const transform = {
       switch (section.title) {
         case "Description":
 
-        if(category?.issueDetails == null || category?.issueDetails == undefined){
-          return;
-        }
+          if (category?.issueDetails == null || category?.issueDetails == undefined) {
+            return;
+          }
 
           sectionLocal.content = (
             <Text color='subdued'>
@@ -354,8 +355,8 @@ const transform = {
           )
           break;
         case "Impact":
-          
-          if(category?.issueImpact == null || category?.issueImpact == undefined){
+
+          if (category?.issueImpact == null || category?.issueImpact == undefined) {
             return;
           }
 
@@ -463,82 +464,94 @@ const transform = {
     filteredCondition['operator'] = operator
     filteredCondition['predicates'] = []
     conditions.forEach(element => {
-        if (element.value && element.operator === operator) {
-            if (element.type === 'CONTAINS') {
-                filteredCondition['predicates'].push({ type: element.type, value: element.value })
-                found = true
-            } else if (element.type === 'BELONGS_TO' || element.type === 'NOT_BELONGS_TO') {
-                let collectionMap = element.value
-                let collectionId = Object.keys(collectionMap)[0]
+      if (element.value && element.operator === operator) {
+        if (element.type === 'CONTAINS') {
+          filteredCondition['predicates'].push({ type: element.type, value: element.value })
+          found = true
+        } else if (element.type === 'BELONGS_TO' || element.type === 'NOT_BELONGS_TO') {
+          let collectionMap = element.value
+          let collectionId = Object.keys(collectionMap)[0]
 
-                if (collectionMap[collectionId]) {
-                    let apiKeyInfoList = []
-                    collectionMap[collectionId].forEach(apiKeyInfo => {
-                        apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(collectionId) })
-                        found = true
-                    })
-                    if (apiKeyInfoList.length > 0) {
-                        filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
-                    }
-                }
+          if (collectionMap[collectionId]) {
+            let apiKeyInfoList = []
+            collectionMap[collectionId].forEach(apiKeyInfo => {
+              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(collectionId) })
+              found = true
+            })
+            if (apiKeyInfoList.length > 0) {
+              filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
             }
+          }
         }
+      }
     });
     if (found) {
-        return filteredCondition;
+      return filteredCondition;
     }
-},
+  },
 
-fillConditions(conditions, predicates, operator) {
+  fillConditions(conditions, predicates, operator) {
     predicates.forEach(async (e, i) => {
-        let valueFromPredicate = e.value
-        if (Array.isArray(valueFromPredicate) && valueFromPredicate.length > 0) {
-            let valueForCondition = {}
-            let collectionId = valueFromPredicate[0]['apiCollectionId']
-            let apiInfoKeyList = []
-            for (var index = 0; index < valueFromPredicate.length; index++) {
-                let apiEndpoint = {
-                    method: valueFromPredicate[index]['method'],
-                    url: valueFromPredicate[index]['url']
-                }
-                apiInfoKeyList.push({
-                        method: apiEndpoint.method,
-                        url: apiEndpoint.url
-                })
-            }
-            valueForCondition[collectionId] = apiInfoKeyList
-            conditions.push({ operator: operator, type: e.type, value: valueForCondition })
-        } else {
-            conditions.push({ operator: operator, type: e.type, value: valueFromPredicate })
+      let valueFromPredicate = e.value
+      if (Array.isArray(valueFromPredicate) && valueFromPredicate.length > 0) {
+        let valueForCondition = {}
+        let collectionId = valueFromPredicate[0]['apiCollectionId']
+        let apiInfoKeyList = []
+        for (var index = 0; index < valueFromPredicate.length; index++) {
+          let apiEndpoint = {
+            method: valueFromPredicate[index]['method'],
+            url: valueFromPredicate[index]['url']
+          }
+          apiInfoKeyList.push({
+            method: apiEndpoint.method,
+            url: apiEndpoint.url
+          })
         }
+        valueForCondition[collectionId] = apiInfoKeyList
+        conditions.push({ operator: operator, type: e.type, value: valueForCondition })
+      } else {
+        conditions.push({ operator: operator, type: e.type, value: valueFromPredicate })
+      }
     })
-},
+  },
 
-createConditions(data){
+  createConditions(data) {
     let testingEndpoint = data
-        let conditions = []
-        if (testingEndpoint?.andConditions) {
-            transform.fillConditions(conditions, testingEndpoint.andConditions.predicates, 'AND')
-        }
-        if (testingEndpoint?.orConditions) {
-            transform.fillConditions(conditions, testingEndpoint.orConditions.predicates, 'OR')
-        }
-        return conditions;
-},
-setTestMetadata () {
-  api.fetchAllSubCategories().then((resp) => {
-    let subCategoryMap = {}
-    resp.subCategories.forEach((x) => {
-      subCategoryMap[x.name] = x
+    let conditions = []
+    if (testingEndpoint?.andConditions) {
+      transform.fillConditions(conditions, testingEndpoint.andConditions.predicates, 'AND')
+    }
+    if (testingEndpoint?.orConditions) {
+      transform.fillConditions(conditions, testingEndpoint.orConditions.predicates, 'OR')
+    }
+    return conditions;
+  },
+  setTestMetadata() {
+    api.fetchAllSubCategories().then((resp) => {
+      let subCategoryMap = {}
+      resp.subCategories.forEach((x) => {
+        subCategoryMap[x.name] = x
+      })
+      let subCategoryFromSourceConfigMap = {}
+      resp.testSourceConfigs.forEach((x) => {
+        subCategoryFromSourceConfigMap[x.id] = x
+      })
+      PersistStore.getState().setSubCategoryMap(subCategoryMap)
+      PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
     })
-    let subCategoryFromSourceConfigMap = {}
-    resp.testSourceConfigs.forEach((x) => {
-      subCategoryFromSourceConfigMap[x.id] = x
+  },
+  prettifySummaryTable(summaries) {
+    summaries = summaries.map((obj) => {
+      const date = new Date(obj.startTimestamp * 1000)
+      return{
+        ...obj,
+        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues),
+        startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
+        id: obj.hexId
+      }
     })
-    PersistStore.getState().setSubCategoryMap(subCategoryMap)
-    PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
-})
-},
+    return summaries;
+  },
 convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
@@ -675,7 +688,6 @@ getPrettifiedTestRunResults(testRunResults){
   })
   return prettifiedResults
 }
-
 }
 
 export default transform

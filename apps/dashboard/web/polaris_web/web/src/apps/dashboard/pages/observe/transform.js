@@ -294,7 +294,6 @@ const transform = {
         const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
         return finalArr
     },
-
     getColor(key){
         switch(key.toUpperCase()){
             case "HIGH" : return "critical";

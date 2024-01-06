@@ -9,11 +9,13 @@ import {
   Box,
   Tooltip,
   LegacyCard,
-  Card,
-  Tag,
   IndexFiltersMode,
 } from '@shopify/polaris';
-import { RefreshMinor } from '@shopify/polaris-icons';
+
+import {
+  CircleInformationMajor,
+  RefreshMinor
+} from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
@@ -408,6 +410,34 @@ const promotedBulkActions = (selectedDataHexIds) => {
     let summaryId = selectedTestRun.testingRunResultSummaryHexId
     window.open('/dashboard/testing/summary/' + summaryId, '_blank');
   }
+
+  const EmptyData = () => {
+    return(
+      <div style={{margin: 'auto', marginTop: '20vh'}}>
+        <Box width="300px" padding={4}>
+          <VerticalStack gap={5}>
+            <HorizontalStack align="center">
+              <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
+                <Icon source={CircleInformationMajor} />
+              </div>
+            </HorizontalStack>
+            <VerticalStack gap={2}>
+            <HorizontalStack align="center">
+                <Text variant="bodyLg" fontWeight="semibold">
+                  No test run data found
+                </Text>
+              </HorizontalStack>
+              <Text variant="bodyMd">
+                The next summary will be ready with the upcoming test.
+              </Text>
+            </VerticalStack>
+          </VerticalStack>
+        </Box>
+      </div>
+    )
+  }
+
+  const useComponents = (!workflowTest && testRunResults.all.length === 0) ? [<EmptyData key="empty"/>] : components
 
   return (
     <PageWithMultipleCards

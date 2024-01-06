@@ -4,8 +4,8 @@ import {
     Badge,
     VerticalStack,
     HorizontalStack,
-    Button, 
-    Popover, 
+    Button,
+    Popover,
     ActionList,
     Link,
     Box,
@@ -15,7 +15,7 @@ import {
     HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useCallback, useEffect} from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
@@ -37,9 +37,9 @@ function GithubRow(props) {
 
     const togglePopoverActive = (index) => useCallback(
         () => setPopoverActive((prev) => {
-            if(prev==index){
+            if (prev == index) {
                 return -1;
-            } 
+            }
             return index;
         }),
         [],
@@ -70,11 +70,10 @@ function GithubRow(props) {
 
     useEffect(() => {
         setData((prev) => {
-            if(func.deepComparison(prev,dataObj))
-            {
+            if (func.deepComparison(prev, dataObj)) {
                 return prev;
             }
-            return {...dataObj};
+            return { ...dataObj };
         })
     }, [dataObj,collapsibleActive])
 

@@ -377,6 +377,17 @@ const SummaryCardComponent = () =>{
     </LegacyCard>
   )
 }
+  const promotedBulkActions = (selectedTestRuns) => { 
+    return [
+    {
+      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      onAction: async() => {
+        await api.deleteTestRuns(selectedTestRuns);
+        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        window.location.reload();
+      },
+    },
+  ]};
 
 const coreTable = (
 <GithubServerTable
@@ -402,6 +413,8 @@ const coreTable = (
     headings={headers}
     useNewRow={true}
     condensedHeight={true}
+    promotedBulkActions={promotedBulkActions}
+    selectable= {true}
   />   
 )
 

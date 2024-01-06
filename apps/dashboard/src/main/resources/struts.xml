@@ -1723,6 +1723,28 @@
             </result>
         </action>
 
+        <action name="api/deleteTestRuns" class="com.akto.action.testing.StartTestAction" method="deleteTestRunsAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteTestRunsFromSummaries" class="com.akto.action.testing.StartTestAction" method="deleteTestDataFromSummaryId">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchCustomWebhooks" class="com.akto.action.WebhookAction" method="fetchCustomWebhooks">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
