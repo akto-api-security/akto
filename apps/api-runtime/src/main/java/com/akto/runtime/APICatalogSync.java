@@ -1195,7 +1195,7 @@ public class APICatalogSync {
                         Updates.set(SingleTypeInfo._DOMAIN, Domain.RANGE.name())
                 )
         );
-        loggerMaker.infoAndAddToDb("RangeUpdateResult: " + rangeUpdateResult, LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("RangeUpdateResult for clearValuesInDb function = " + "match count: " + rangeUpdateResult.getMatchedCount() + ", modify count: " + rangeUpdateResult.getModifiedCount(), LogDb.RUNTIME);
 
         // any update
         UpdateResult anyUpdateResult = SingleTypeInfoDao.instance.updateMany(
@@ -1209,7 +1209,7 @@ public class APICatalogSync {
                 )
         );
 
-        loggerMaker.infoAndAddToDb("AnyUpdateResult: " + anyUpdateResult, LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("AnyUpdateResult for clearValuesInDb function = " + "match count: " + anyUpdateResult.getMatchedCount() + ", modify count: " + anyUpdateResult.getModifiedCount(), LogDb.RUNTIME);
     }
 
     private int lastMergeAsyncOutsideTs = 0;
