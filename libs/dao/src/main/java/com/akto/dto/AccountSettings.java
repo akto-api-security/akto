@@ -1,6 +1,9 @@
 package com.akto.dto;
 
+import com.akto.dto.settings.DefaultPayload;
+
 import java.util.List;
+import java.util.Map;
 
 public class AccountSettings {
     private int id;
@@ -41,6 +44,9 @@ public class AccountSettings {
     private int trafficAlertThresholdSeconds = defaultTrafficAlertThresholdSeconds;
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
+
+    public static final String DEFAULT_PAYLOADS = "defaultPayloads";
+    private Map<String, DefaultPayload> defaultPayloads;
 
     public AccountSettings() {
     }
@@ -177,5 +183,13 @@ public class AccountSettings {
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
+    }
+
+    public Map<String, DefaultPayload> getDefaultPayloads() {
+        return defaultPayloads;
+    }
+
+    public void setDefaultPayloads(Map<String, DefaultPayload> defaultPayloads) {
+        this.defaultPayloads = defaultPayloads;
     }
 }

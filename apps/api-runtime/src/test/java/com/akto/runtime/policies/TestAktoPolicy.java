@@ -87,7 +87,7 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("user", 1, 1,1, true);
         AktoPolicyNew aktoPolicy = new AktoPolicyNew(true);
-        httpCallParser.syncFunction(responseParams, false, true);
+        httpCallParser.syncFunction(responseParams, false, true, null);
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
         aktoPolicy.main(responseParams, httpCallParser.apiCatalogSync != null, true);
 
@@ -103,7 +103,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(5,apiInfoList.size());
 
-        httpCallParser1.syncFunction(responseParams.subList(0,1), false, true);
+        httpCallParser1.syncFunction(responseParams.subList(0,1), false, true, null);
         httpCallParser1.apiCatalogSync.syncWithDB(false, true);
         aktoPolicy1.main(responseParams.subList(0,1), httpCallParser1.apiCatalogSync != null, true);
 

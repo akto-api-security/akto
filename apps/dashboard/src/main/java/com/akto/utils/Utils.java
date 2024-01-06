@@ -1,7 +1,9 @@
 package com.akto.utils;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -366,7 +368,8 @@ public class Utils {
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-            info.getHttpCallParser().syncFunction(responses, true, false);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
             info.getPolicy().main(responses, true, false);
         }
     }

@@ -4,6 +4,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
@@ -17,6 +18,7 @@ import com.mongodb.client.model.*;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
+import java.net.URL;
 import java.util.*;
 
 public class HttpCallParser {
@@ -150,9 +152,13 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI)  {
+    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
-        List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
+        List<HttpResponseParams> filteredResponseParams = responseParams;
+        if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
+            filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
+        }
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -172,6 +178,39 @@ public class HttpCallParser {
         }
 
         return null;
+    }
+
+    private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
+        List<HttpResponseParams> ret = new ArrayList<>();
+        for(HttpResponseParams httpResponseParams: filteredResponseParams) {
+            try {
+                Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
+                List<String> host = reqHeaders.getOrDefault("host", new ArrayList<>());
+
+                String testHost = "";
+                if (host != null && !host.isEmpty() && host.get(0) != null) {
+                    testHost = host.get(0);
+                } else {
+                    String urlStr = httpResponseParams.getRequestParams().getURL();
+                    URL url = new URL(urlStr);
+                    testHost = url.getHost();
+                }
+
+                testHost = Base64.getEncoder().encodeToString(testHost.getBytes());
+
+                DefaultPayload defaultPayload = defaultPayloadMap.get(testHost);
+                if (defaultPayload != null && defaultPayload.getRegexPattern().matcher(httpResponseParams.getPayload().replaceAll("\n", "")).matches()) {
+                    continue;
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while filtering default payloads: " + e.getMessage(), LogDb.RUNTIME);
+            }
+
+            ret.add(httpResponseParams);
+        }
+
+        return ret;
     }
 
     public void syncTrafficMetricsWithDB() {

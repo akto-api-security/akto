@@ -136,14 +136,26 @@ public class Main {
         long estimatedCount;
         int lastEstimatedCountTime;
 
+        AccountSettings accountSettings;
+
         public AccountInfo() {
             this.estimatedCount = 0;
             this.lastEstimatedCountTime = 0;
+            this.accountSettings = null;
         }
 
-        public AccountInfo(long estimatedCount, int lastEstimatedCountTime) {
+        public AccountInfo(long estimatedCount, int lastEstimatedCountTime, AccountSettings accountSettings) {
             this.estimatedCount = estimatedCount;
             this.lastEstimatedCountTime = lastEstimatedCountTime;
+            this.accountSettings = accountSettings;
+        }
+
+        public AccountSettings getAccountSettings() {
+            return accountSettings;
+        }
+
+        public void setAccountSettings(AccountSettings accountSettings) {
+            this.accountSettings = accountSettings;
         }
     }
 
@@ -274,6 +286,7 @@ public class Main {
                     if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
                         accountInfo.lastEstimatedCountTime = Context.now();
                         accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                        accountInfo.setAccountSettings(AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
                         loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
                     }
 
@@ -322,7 +335,7 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
+                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.getAccountSettings());
 
                         // send to central kafka
                         if (kafkaProducer != null) {

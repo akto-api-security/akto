@@ -1,46 +1,62 @@
 package com.akto.action.settings;
 
 import com.akto.action.UserAction;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.settings.DefaultPayloadsDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.settings.DefaultPayload;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class DefaultPayloadAction extends UserAction {
 
+    private static final ExecutorService es = Executors.newFixedThreadPool(1);
     private String domain;
     private String pattern;
     private DefaultPayload defaultPayload;
 
+    private Map<String, DefaultPayload> createDefaultPayloadsMap() {
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        Map<String, DefaultPayload> defaultPayloadMap = accountSettings.getDefaultPayloads();
+
+        if (defaultPayloadMap == null) {
+            defaultPayloadMap = new HashMap<>();
+        }
+
+        return defaultPayloadMap;
+    }
+
     public String fetchDefaultPayload() {
-        this.defaultPayload = DefaultPayloadsDao.instance.findOne(DefaultPayload.ID, domain);
+        this.defaultPayload = createDefaultPayloadsMap().get(Base64.getEncoder().encodeToString(domain.getBytes()));
         return SUCCESS.toUpperCase();
     }
 
     private List<DefaultPayload> domains;
     public String fetchAllDefaultPayloads() {
-        this.domains = DefaultPayloadsDao.instance.findAll(Filters.empty(), Projections.exclude(DefaultPayload.PATTERN));
+        this.domains = new ArrayList<>();
+        this.domains.addAll(createDefaultPayloadsMap().values());
         return SUCCESS.toUpperCase();
     }
 
     public String saveDefaultPayload() {
         fetchDefaultPayload();
+        int now = Context.now();
         if (defaultPayload == null) {
-            defaultPayload = new DefaultPayload(domain, pattern, getSUser().getLogin(), Context.now(), Context.now());
-            DefaultPayloadsDao.instance.insertOne(defaultPayload);
-        } else {
-            Bson updates = Updates.combine(
-                    Updates.set(DefaultPayload.PATTERN, pattern),
-                    Updates.set(DefaultPayload.UPDATED_TS, Context.now())
-            );
-            DefaultPayloadsDao.instance.updateOne(DefaultPayload.ID, domain, updates);
-            fetchDefaultPayload();
+            defaultPayload = new DefaultPayload(domain, pattern, getSUser().getLogin(), now, now, false);
         }
+
+        String domainBase64 = Base64.getEncoder().encodeToString(domain.getBytes());
+        defaultPayload.setUpdatedTs(now);
+        defaultPayload.setPattern(pattern);
+        Bson updates = Updates.set(AccountSettings.DEFAULT_PAYLOADS + "." + domainBase64, defaultPayload);
+        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updates);
+
+        fetchDefaultPayload();
+
         return SUCCESS.toUpperCase();
     }
 

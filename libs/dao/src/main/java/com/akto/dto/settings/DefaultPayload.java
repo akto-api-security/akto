@@ -1,26 +1,37 @@
 package com.akto.dto.settings;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
+import java.util.regex.Pattern;
+
 public class DefaultPayload {
 
     public static final String ID = "_id";
-    public String id;
+    private String id;
 
     public static final String PATTERN = "pattern";
-    public String pattern;
+    private String pattern;
 
     public String author;
-    public int createdTs;
+    private int createdTs;
 
     public static final String UPDATED_TS = "updatedTs";
-    public int updatedTs;
+    private int updatedTs;
 
+    public static final String SCANNED_EXISTING_DATA = "scannedExistingData";
+    private boolean scannedExistingData;
+
+    @BsonIgnore
+    private Pattern regexPattern;
     public DefaultPayload() {}
-    public DefaultPayload(String id, String pattern, String author, int createdTs, int updatedTs) {
+    public DefaultPayload(String id, String pattern, String author, int createdTs, int updatedTs, boolean scannedExistingData) {
         this.id = id;
         this.pattern = pattern;
         this.author = author;
         this.createdTs = createdTs;
         this.updatedTs = updatedTs;
+        this.regexPattern = Pattern.compile(pattern);
+        this.scannedExistingData = scannedExistingData;
     }
 
     public String getId() {
@@ -37,6 +48,7 @@ public class DefaultPayload {
 
     public void setPattern(String pattern) {
         this.pattern = pattern;
+        this.regexPattern = Pattern.compile(pattern);
     }
 
     public String getAuthor() {
@@ -63,6 +75,18 @@ public class DefaultPayload {
         this.updatedTs = updatedTs;
     }
 
+    public Pattern getRegexPattern() {
+        return regexPattern;
+    }
+
+    public boolean getScannedExistingData() {
+        return scannedExistingData;
+    }
+
+    public void setScannedExistingData(boolean scannedExistingData) {
+        this.scannedExistingData = scannedExistingData;
+    }
+
     @Override
     public String toString() {
         return "DefaultPayload{" +
@@ -71,6 +95,7 @@ public class DefaultPayload {
                 ", author='" + author + '\'' +
                 ", createdTs=" + createdTs +
                 ", updatedTs=" + updatedTs +
+                ", scannedExistingData=" + scannedExistingData +
                 '}';
     }
 }
