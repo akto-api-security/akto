@@ -204,7 +204,7 @@ public class CustomDataTypeAction extends UserAction{
             int accountId = Context.accountId.get();
             Runnable r = () ->{
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered a job to fix existing data for " + aktoDataType.getName(), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("Triggered a job to fix existing custom data types", LogDb.DASHBOARD);
                 handleDataTypeRedaction();
             };
             new Thread(r).start();
