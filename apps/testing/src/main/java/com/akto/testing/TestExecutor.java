@@ -464,9 +464,10 @@ public class TestExecutor {
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
 
-        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
-
         Context.accountId.set(accountId);
+        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
+
+        
         int now = Context.now();
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
