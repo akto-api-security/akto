@@ -18,6 +18,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
@@ -163,29 +165,19 @@ public class ApiCollectionsAction extends UserAction {
         int criticalCount = 0 ;
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
+        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.group(groupId, 
+            Accumulators.max("riskScore", "$riskScore"), 
+            Accumulators.sum("criticalCounts", new BasicDBObject("$cond", Arrays.asList(new BasicDBObject("$gte", Arrays.asList("$riskScore", 2)), 1, 0)))
+        ));
 
-        MongoCursor<BasicDBObject> apiCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        while(apiCursor.hasNext()){
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(cursor.hasNext()){
             try {
-                BasicDBObject basicDBObject = apiCursor.next();
-                double riskScore = basicDBObject.getDouble("riskScore");
-                BasicDBObject bd = (BasicDBObject) basicDBObject.get("_id");
-                int collectionId = bd.getInt("apiCollectionId");
-
-                // store count of total critical endpoints present in ApiInfo
-                if(riskScore >= 4){
-                    criticalCount++;
-                }
-
-                // as for collections, risk score is max of apis in it, here we take max for collection id
-                if(riskScoreMap.isEmpty() || !riskScoreMap.containsKey(collectionId)){
-                    riskScoreMap.put(collectionId, riskScore);
-                }else{
-                    double prev = riskScoreMap.get(collectionId);
-                    riskScore = Math.max(riskScore, prev);
-                    riskScoreMap.put(collectionId, riskScore);
-                }
-
+                BasicDBObject basicDBObject = cursor.next();
+                criticalCount += basicDBObject.getInt("criticalCounts");
+                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                riskScoreMap.put(id.getInt("apiCollectionId"), basicDBObject.getDouble("riskScore"));
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
                 e.printStackTrace();
