@@ -476,32 +476,7 @@ public class StartTestAction extends UserAction {
                 runResults.add(testResult);
             } else {
                 MultiExecTestResult multiTestRes = (MultiExecTestResult) testResult;
-                Map<String, NodeResult> nodeResultMap = multiTestRes.getNodeResultMap();
-                TestResult res;
-                for (String k: nodeResultMap.keySet()) {
-                    NodeResult nodeRes = nodeResultMap.get(k);
-                    String confidence = "HIGH";
-                    List<String> errors = nodeRes.getErrors();
-                    List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
-                    boolean vulnerable = nodeRes.isVulnerable();
-                    double percentageMatch = 0;
-                    // pick from workflow
-                    Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = this.testingRunResult.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
-                    YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(k).getNodeDetails();
-                    String originalMessage = workflowNodeDetails.getOriginalMessage();
-                    for (int i = 1; i<messageList.size(); i++) {
-                        String message = "{\"request\": " + messageList.get(i);
-                        if (i != messageList.size() - 1) {
-                            message = message.substring(0, message.length() - 3);
-                        } else {
-                            message = message.substring(0, message.length() - 2);
-                            message = message + "}";
-                        }
-                        res = new TestResult(message, originalMessage, errors, percentageMatch, vulnerable, Confidence.HIGH, null);
-                        runResults.add(res);
-                    }
-                }
-                
+                runResults.addAll(multiTestRes.convertToExistingTestResult(this.testingRunResult));
             }
         }
 

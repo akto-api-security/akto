@@ -281,8 +281,8 @@ public class VariableResolver {
         }
 
         List<String> result = new ArrayList<>();
-        for (String word: wordList) {
-            result.add(expression.replace(wordListKey, word));
+        for (Object word: wordList) {
+            result.add(expression.replace(wordListKey, word.toString()));
         }
 
         return result;
@@ -325,29 +325,22 @@ public class VariableResolver {
             Map<ApiInfoKey, List<String>> modifiedSampleDataMap = new HashMap<>();
             if (allApis) {
                 for (ApiInfoKey infoKey: sampleDataMap.keySet()) {
+                    List<String> sample = sampleDataMap.get(infoKey);
                     if (infoKey.getApiCollectionId() != apiInfoKey.getApiCollectionId()) {
                         continue;
                     }
-                    modifiedSampleDataMap.put(infoKey, sampleDataMap.get(infoKey));
+                    if (infoKey.equals(apiInfoKey)) {
+                        sample.remove(0);
+                    }
+                    modifiedSampleDataMap.put(infoKey, sample);
                 }
             } else {
                 modifiedSampleDataMap.put(apiInfoKey, sampleDataMap.get(apiInfoKey));
             }
 
-            Set<String> wordListSet = new HashSet<>();
-            List<String> wordListVal = new ArrayList<>();
+            List<String> wordListVal = fetchWordList(modifiedSampleDataMap, key, location, isRegex);
 
-            for (ApiInfoKey infoKey: modifiedSampleDataMap.keySet()) {
-                List<String> samples = modifiedSampleDataMap.get(infoKey);
-                wordListSet.addAll(extractValuesFromSampleData(varMap, samples, key, location, isRegex));
-
-            }
-
-            for (String s : wordListSet) {
-                wordListVal.add(s);
-            }
-
-            if (wordListSet.size() >= 100) {
+            if (wordListVal.size() >= 100) {
                 break;
             }
 
@@ -356,7 +349,23 @@ public class VariableResolver {
 
     }
 
-    public static Set<String> extractValuesFromSampleData(Map<String, Object> varMap, List<String> samples, String key, String location, boolean isRegex) {
+    public static List<String> fetchWordList(Map<ApiInfoKey, List<String>> modifiedSampleDataMap, String key, String location, boolean isRegex) {
+        Set<String> wordListSet = new HashSet<>();
+        List<String> wordListVal = new ArrayList<>();
+        for (ApiInfoKey infoKey: modifiedSampleDataMap.keySet()) {
+            List<String> samples = modifiedSampleDataMap.get(infoKey);
+            wordListSet.addAll(extractValuesFromSampleData(samples, key, location, isRegex));
+        }
+        for (String s : wordListSet) {
+            wordListVal.add(s);
+            if (wordListVal.size() >= 100) {
+                break;
+            }
+        }
+        return wordListVal;
+    }
+
+    public static Set<String> extractValuesFromSampleData(List<String> samples, String key, String location, boolean isRegex) {
 
         Set<String> worklistVal = new HashSet<>();
         for (String sample: samples) {

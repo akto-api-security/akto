@@ -10,20 +10,24 @@ import java.util.Set;
 import com.akto.dto.OriginalHttpResponse;
 import org.bson.conversions.Bson;
 
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
+import com.akto.parsers.HttpCallParser;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AuthPolicy;
@@ -942,6 +946,7 @@ public final class FilterAction {
                     Boolean res = invokeFilter(dataOperandFilterRequest);
                     if (res) {
                         privateValues.add(obj);
+                        break;
                     }
                 }
                 return new DataOperandsFilterResponse(privateValues.size() > 0, null, privateValues);
@@ -1047,18 +1052,49 @@ public final class FilterAction {
                 if (tokens[i] == null) {
                     SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);
                     BasicDBObject obj = new BasicDBObject();
+                    singleTypeInfo = new SingleTypeInfo();
                     if (singleTypeInfo != null && singleTypeInfo.getIsPrivate()) {
                         privateCnt++;
                     }
-                    if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate() || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+                    if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate()) {
                         continue;
                     }
-                    Set<String> valSet = singleTypeInfo.getValues().getElements();
-                    String val = valSet.iterator().next();
-                    obj.put("key", i+"");
-                    obj.put("value", val);
-                    if (privateValues.size() < 5) {
-                        privateValues.add(obj);
+                    if (singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+                        Bson filterQSampleData = Filters.and(
+                            Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
+                            Filters.eq("_id.method", apiInfoKey.getMethod()),
+                            Filters.eq("_id.url", apiInfoKey.getUrl())
+                        );
+                        SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
+                        if (sd.getSamples() == null) {
+                            continue;
+                        }
+                        for (String sample: sd.getSamples()) {
+                            try {
+                                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                String sUrl = httpResponseParams.getRequestParams().getURL();
+                                String[] sUrlTokens = sUrl.split("/");
+                                String[] origUrlTokens = urlWithParams.split("/");
+                                if (!origUrlTokens[i].equals(sUrlTokens[i])) {
+                                    obj.put("key", i+"");
+                                    obj.put("value", sUrlTokens[i]);
+                                    if (privateValues.size() < 5) {
+                                        privateValues.add(obj);
+                                    }
+                                    break;
+                                }
+                            } catch (Exception e) {
+                                // TODO: handle exception
+                            }
+                        }
+                    } else {
+                        Set<String> valSet = singleTypeInfo.getValues().getElements();
+                        String val = valSet.iterator().next();
+                        obj.put("key", i+"");
+                        obj.put("value", val);
+                        if (privateValues.size() < 5) {
+                            privateValues.add(obj);
+                        }
                     }
                 }
             }
@@ -1073,16 +1109,50 @@ public final class FilterAction {
             if (singleTypeInfo != null && singleTypeInfo.getIsPrivate()) {
                 privateCnt++;
             }
-            if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate() || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+            if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate()) {
                 continue;
             }
-            Set<String> valSet = singleTypeInfo.getValues().getElements();
-            String val = valSet.iterator().next();
-            String key = SingleTypeInfo.findLastKeyFromParam(param);
-            obj.put("key", key);
-            obj.put("value", val);
-            if (privateValues.size() < 5) {
-                privateValues.add(obj);
+
+            if (singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+                Bson filterQSampleData = Filters.and(
+                    Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", apiInfoKey.getMethod()),
+                    Filters.eq("_id.url", apiInfoKey.getUrl())
+                );
+                SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
+                if (sd.getSamples() == null) {
+                    continue;
+                }
+                for (String sample: sd.getSamples()) {
+                    String key = SingleTypeInfo.findLastKeyFromParam(param);
+                    BasicDBObject payloadObj = new BasicDBObject();
+                    try {
+                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                        payloadObj = RequestTemplate.parseRequestPayload(httpResponseParams.getRequestParams().getPayload(), null);
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                    
+                    Object paramVal = payloadObj.get(param);
+                    Object origVal = payload.get(param);
+                    if (paramVal != null && !paramVal.equals(origVal)) {
+                        obj.put("key", key);
+                        obj.put("value", paramVal.toString());
+                        if (privateValues.size() < 5) {
+                            privateValues.add(obj);
+                        }
+                        break;
+                    }
+                }
+            } else {
+                Set<String> valSet = singleTypeInfo.getValues().getElements();
+                String val = valSet.iterator().next();
+                String key = SingleTypeInfo.findLastKeyFromParam(param);
+                obj.put("key", key);
+                obj.put("value", val);
+                if (privateValues.size() < 5) {
+                    privateValues.add(obj);
+                }
             }
         }
 
