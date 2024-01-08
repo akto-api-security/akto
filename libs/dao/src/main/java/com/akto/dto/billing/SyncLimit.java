@@ -10,7 +10,9 @@ public class SyncLimit {
     }
 
     public synchronized boolean updateUsageLeftAndCheckSkip() {
-        usageLeft--;
+        if(usageLeft >= 0){
+            usageLeft--;
+        }
         return checkLimit && usageLeft < 0;
     }
 }

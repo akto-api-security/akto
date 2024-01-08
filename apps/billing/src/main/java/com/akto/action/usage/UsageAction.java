@@ -3,7 +3,6 @@ package com.akto.action.usage;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
 
-import com.akto.util.UsageCalculator;
 import com.akto.util.UsageUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
@@ -14,6 +13,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
+import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.gson.Gson;
@@ -96,21 +96,15 @@ public class UsageAction extends ActionSupport implements ServletRequestAware {
                 loggerMaker.errorAndAddToDb(message, LogDb.BILLING);
                 return Action.ERROR.toUpperCase();
             }
-            if (usageLowerBound == 0 || usageUpperBound == 0) {
-                loggerMaker.infoAndAddToDb("Usage bounds not provided. Using default bounds", LogDb.BILLING);
-                int now = Context.now();
-                /*
-                 * since we just recorded and sent the data from dashboard, 
-                 * we need to set the limits to check for the current epoch, 
-                 * even though it would be a non-standard epoch.
-                 */
-                usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL;
-                usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
-            }
-            loggerMaker.infoAndAddToDb(String.format("Aggregating usage for organization %s between %d and %d", organizationId, usageLowerBound, usageUpperBound), LogDb.BILLING);
-            UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
-            loggerMaker.infoAndAddToDb(String.format("Sending usage data to sinks for organization %s", organizationId), LogDb.BILLING);
-            UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
+            int now = Context.now();
+            /*
+             * since we just recorded and sent the data from dashboard,
+             * we need to set the limits to check for the current epoch,
+             * even though it would be a non-standard epoch.
+             */
+            usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL;
+            usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
+            InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);
             loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {

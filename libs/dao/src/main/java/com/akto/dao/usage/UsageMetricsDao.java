@@ -64,11 +64,11 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
 
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(Filters.eq(UsageMetric.ORGANIZATION_ID, organizationId)),
-                Aggregates.sort(Sorts.descending(Constants.ID)),
+                Aggregates.sort(Sorts.descending(UsageMetric.RECORDED_AT)),
                 Aggregates.group(groupedId, Accumulators.first(LATEST_DOCUMENT, MCollection.ROOT_ELEMENT)),
                 Aggregates.replaceRoot(Util.prefixDollar(LATEST_DOCUMENT)),
                 Aggregates.group(Util.prefixDollar(UsageMetric.METRIC_TYPE),
-                        Accumulators.sum(TOTAL_USAGE, Util.prefixDollar(UsageMetric.USAGE_STRING))));
+                        Accumulators.sum(TOTAL_USAGE, Util.prefixDollar(UsageMetric._USAGE))));
 
         MongoCursor<BasicDBObject> cursor = UsageMetricsDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();

@@ -152,8 +152,7 @@ public class AktoPolicyNew {
             * delete all data related to endpoints after the 
             * specified limit for the current measureEpoch.
             */
-            EndpointUtil endpointUtil = new EndpointUtil();
-            endpointUtil.deleteEndpoints(limit, measureEpoch);
+            EndpointUtil.deleteEndpoints(limit, measureEpoch);
         }
     }
 
