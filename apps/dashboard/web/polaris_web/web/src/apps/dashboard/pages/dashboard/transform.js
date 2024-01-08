@@ -106,7 +106,7 @@ const transform = {
         })
         return {
             totalUrls: urlsCount,
-            coverage: Math.ceil((coverageCount * 100) / urlsCount) + '%'
+            coverage: urlsCount === 0 ? "0%" : Math.ceil((coverageCount * 100) / urlsCount) + '%'
         }
     },
 
