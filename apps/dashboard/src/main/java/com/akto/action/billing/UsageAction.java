@@ -3,7 +3,7 @@ package com.akto.action.billing;
 import com.akto.action.UserAction;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.billing.UsageMetricUtils;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
@@ -139,7 +139,8 @@ public class UsageAction extends UserAction {
                     loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(),
                             LogDb.DASHBOARD);
                     Context.accountId.set(account.getId());
-                    UsageMetricUtils.calcAndSyncUsageMetrics(MetricTypes.values());
+                    int accountId = account.getId();
+                    UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
                 });
 
                 Organization organization = OrganizationsDao.instance.findOne(

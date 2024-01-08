@@ -1,7 +1,7 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
-import com.akto.billing.UsageMetricUtils;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
@@ -11,6 +11,8 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
@@ -209,7 +211,9 @@ public class Main {
                 }
 
                 int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
+                FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
+
+                if (featureAccess.checkOverageAfterGrace()) {
                     int lastSent = logSentMap.getOrDefault(accountId, 0);
                     if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
                         logSentMap.put(accountId, start);
@@ -226,6 +230,9 @@ public class Main {
 
                     return;
                 }
+
+                SyncLimit syncLimit = new SyncLimit(!featureAccess.checkUnlimited(),
+                        featureAccess.getUsageLimit() - featureAccess.getUsage());
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -266,7 +273,7 @@ public class Main {
 
                         }
                     }
-                    testExecutor.init(testingRun, summaryId);
+                    testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
@@ -290,7 +297,6 @@ public class Main {
 
                 if(summaryId != null && testingRun.getTestIdConfig() != 1){
                     TestExecutor.updateTestSummary(summaryId);
-                    UsageMetricUtils.calcAndSaveUsageMetrics(new MetricTypes[] { MetricTypes.TEST_RUNS });
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);

@@ -5,12 +5,15 @@ import java.util.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
@@ -107,6 +110,7 @@ public class ApiCollectionsAction extends UserAction {
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));                    
 
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         return SUCCESS.toUpperCase();
     }
 

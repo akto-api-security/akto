@@ -67,6 +67,7 @@ import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.notifications.TrafficUpdates;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -1847,7 +1848,8 @@ public class InitializerListener implements ServletContextListener {
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account a) {
-                UsageMetricUtils.calcAndSyncUsageMetrics(MetricTypes.values());
+                int accountId = a.getId();
+                UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
             }
         }, "usage-scheduler");
 

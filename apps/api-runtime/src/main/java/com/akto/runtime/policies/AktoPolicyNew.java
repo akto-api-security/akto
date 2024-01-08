@@ -1,9 +1,10 @@
 package com.akto.runtime.policies;
 
-import com.akto.billing.UsageMetricUtils;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
@@ -12,14 +13,10 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.APICatalogSync;
+import com.akto.utils.EndpointUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
 import java.util.*;
 
 import static com.akto.runtime.APICatalogSync.createUrlTemplate;
@@ -140,7 +137,23 @@ public class AktoPolicyNew {
 
         if (syncNow) {
             syncWithDb(false, fetchAllSTI);
-            UsageMetricUtils.calcAndSaveUsageMetrics(new MetricTypes[] { MetricTypes.ACTIVE_ENDPOINTS });
+        }
+
+        // check if overage happened and delete over the limit data
+        int accountId = Context.accountId.get();
+        FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, accountId);
+        
+        if (featureAccess.checkOverageAfterGrace()) {
+
+            int limit = featureAccess.getUsageLimit();
+            int measureEpoch = featureAccess.getMeasureEpoch();
+
+            /*
+            * delete all data related to endpoints after the 
+            * specified limit for the current measureEpoch.
+            */
+            EndpointUtil endpointUtil = new EndpointUtil();
+            endpointUtil.deleteEndpoints(limit, measureEpoch);
         }
     }
 

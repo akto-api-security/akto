@@ -1,7 +1,6 @@
 package com.akto.action;
 
 
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
@@ -14,6 +13,7 @@ import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
@@ -24,12 +24,6 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-
-import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
@@ -151,8 +145,10 @@ public class ProfileAction extends UserAction {
                         .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace(gracePeriod)));
             }
 
-            boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
-            boolean testRunsPaused = UsageMetricUtils.checkTestRunsOverage(sessionAccId);
+            boolean dataIngestionPaused = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.toString(),
+                    FeatureAccess.noAccess).checkOverageAfterGrace(gracePeriod);
+            boolean testRunsPaused = featureWiseAllowed.getOrDefault(MetricTypes.TEST_RUNS.toString(),
+                    FeatureAccess.noAccess).checkOverageAfterGrace(gracePeriod);
             userDetails.append("usagePaused", new BasicDBObject()
                     .append("dataIngestion", dataIngestionPaused)
                     .append("testRuns", testRunsPaused));

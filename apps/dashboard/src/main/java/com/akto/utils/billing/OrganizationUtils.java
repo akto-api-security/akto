@@ -50,7 +50,7 @@ public class OrganizationUtils {
                     if (metaData != null) {
                         featureLabel = metaData.getString("key", "");
                     }
-                    result.put(featureLabel, new FeatureAccess(isGranted, -1));
+                    result.put(featureLabel, new FeatureAccess(isGranted));
                 } else {
                     loggerMaker.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -69,10 +69,9 @@ public class OrganizationUtils {
                     int usageLimit = Integer.parseInt(usageLimitObj.toString());
                     int usage = usageMetrics.getOrDefault(featureLabel, 0);
 
-                    if (usage > usageLimit) {
-                        result.put(featureLabel, new FeatureAccess(isGranted, now));
-                    }
-
+                    int overageFirstDetected = (usage >= usageLimit) ? now : -1;
+                    // change this to use usage metric data for first detected.
+                    result.put(featureLabel, new FeatureAccess(isGranted, overageFirstDetected, usageLimit, usage));
                 }
             } catch (Exception e) {
                 loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
