@@ -58,6 +58,7 @@ import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
 import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
 
+import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 
@@ -72,6 +73,10 @@ const router = createBrowserRouter([
         path: "",
         element: <HomePage />,
         children: [
+          {
+            path: "home",
+            element: <HomeDashboard />,
+          },
           {
             path: "testing",
             element: <PageTesting />,

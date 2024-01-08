@@ -17,8 +17,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicyNew;
+import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -328,14 +327,15 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-                info.setPolicy(new AktoPolicyNew(false));
                 info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             info.getHttpCallParser().syncFunction(responses, true, false);
-            info.getPolicy().main(responses, true, false);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false);
+            info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+            APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
                 info.getResourceAnalyser().analyse(responseParams);
@@ -393,6 +393,27 @@ public class Utils {
         }
 
         return payload;
+    }
+
+    public static float calculateRiskValueForSeverity(String severity){
+        float riskScore = 0 ;
+        switch (severity) {
+            case "HIGH":
+                riskScore += 100;
+                break;
+
+            case "MEDIUM":
+                riskScore += 10;
+                break;
+
+            case "LOW":
+                riskScore += 1;
+        
+            default:
+                break;
+        }
+
+        return riskScore;
     }
 
 }

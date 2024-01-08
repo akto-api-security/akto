@@ -47,7 +47,6 @@ public class TestHarAction extends MongoBasedTest{
 
         AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
         info.setHttpCallParser(new HttpCallParser("", 0, 0,0, false));
-        info.setPolicy(new AktoPolicyNew(false));
         info.setResourceAnalyser(new ResourceAnalyser(3000, 0.01, 1000, 0.01));
         RuntimeListener.accountHTTPParserMap.put(1_000_000, info);
 

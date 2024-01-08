@@ -5,10 +5,13 @@ import com.akto.action.UserAction;
 import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
@@ -165,10 +168,6 @@ public class InventoryAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
-
-
-
-
 
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
@@ -694,14 +693,12 @@ public class InventoryAction extends UserAction {
             info = new AccountHTTPCallParserAktoPolicyInfo();
             HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
             info.setHttpCallParser(callParser);
-            info.setPolicy(new AktoPolicyNew(false));
             info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
             RuntimeListener.accountHTTPParserMap.put(accountId, info);
         }
 
         // because changes were made to db and apiCatalogSync doesn't have latest data
         info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
-        info.getPolicy().buildFromDb(false);
 
         try {
             URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.GET);
@@ -726,14 +723,6 @@ public class InventoryAction extends UserAction {
             addActionError("Error in httpCallParser : " + e.getMessage());
             return ERROR.toUpperCase();
         }
-
-        try {
-            info.getPolicy().main(responses, true, false);
-        } catch (Exception e) {
-            addActionError("Error in aktoPolicy : " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
-
 
         return SUCCESS.toUpperCase();
     }

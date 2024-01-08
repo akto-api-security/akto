@@ -3,6 +3,7 @@ package com.akto.listener;
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
+import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -60,6 +61,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
+import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
@@ -74,6 +76,8 @@ import com.akto.util.DashboardMode;
 import com.akto.utils.GithubSync;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.scripts.FixMultiSTIs;
+import com.akto.utils.crons.SyncCron;
+import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
@@ -96,6 +100,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -130,6 +135,9 @@ public class InitializerListener implements ServletContextListener {
     private final ScheduledExecutorService telemetryExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
+    
+    SyncCron syncCronInfo = new SyncCron();
+    UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -1226,7 +1234,6 @@ public class InitializerListener implements ServletContextListener {
             );
         }
     }
-
     public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
             String resourceName = "/tests-library-master.zip";
@@ -1470,6 +1477,51 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getComputeIntegratedConnections() == 0){
+            Map<String,ConnectionInfo> infoMap = new HashMap<>();
+            
+            // check if mirroring is enabled for getting traffic.
+            if(DashboardMode.isOnPremDeployment()) {
+                infoMap.put(ConnectionInfo.AUTOMATED_TRAFFIC, new ConnectionInfo(0,true));
+            }
+
+            // check if slack alerts are activated
+            int countWebhooks = (int) SlackWebhooksDao.instance.getMCollection().countDocuments();
+            if (countWebhooks > 0) {
+                infoMap.put(ConnectionInfo.SLACK_ALERTS, new ConnectionInfo(0,true));
+            }
+
+            //check for github SSO,
+            if (ConfigsDao.instance.findOne("_id", "GITHUB-ankush") != null) {
+                infoMap.put(ConnectionInfo.GITHUB_SSO, new ConnectionInfo(0,true));
+            }
+
+            //check for team members
+            if(UsersDao.instance.getMCollection().countDocuments() > 1){
+                infoMap.put(ConnectionInfo.INVITE_MEMBERS, new ConnectionInfo(0,true));
+            }
+
+            //check for CI/CD pipeline
+            StartTestAction testAction = new StartTestAction();
+            int cicdRunsCount = (int) TestingRunDao.instance.getMCollection().countDocuments(Filters.in(Constants.ID, testAction.getCicdTests()));
+            if(cicdRunsCount > 0){
+                infoMap.put(ConnectionInfo.CI_CD_INTEGRATIONS, new ConnectionInfo(0,true));
+            }
+
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.CONNECTION_INTEGRATIONS_INFO, infoMap),
+                new UpdateOptions().upsert(true)
+            );
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.COMPUTE_INTEGRATED_CONNECTIONS, Context.now())
+            );
+        }
+    }
+
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
@@ -1544,6 +1596,8 @@ public class InitializerListener implements ServletContextListener {
                 setUpWebhookScheduler();
                 setUpTestEditorTemplatesScheduler();
                 crons.deleteTestRunsScheduler();
+                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                syncCronInfo.setUpUpdateCronScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -1697,6 +1751,7 @@ public class InitializerListener implements ServletContextListener {
         initializeOrganizationAccountBelongsTo(backwardCompatibility);
         setOrganizationsInBilling(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
+        fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);
@@ -1730,6 +1785,8 @@ public class InitializerListener implements ServletContextListener {
 
     public void runInitializerFunctions() {
         DaoInit.createIndices();
+        
+        fillCollectionIdArray();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
