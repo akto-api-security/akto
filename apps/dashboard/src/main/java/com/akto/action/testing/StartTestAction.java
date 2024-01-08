@@ -3,6 +3,7 @@ package com.akto.action.testing;
 import com.akto.DaoInit;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -18,6 +19,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -587,6 +589,7 @@ public class StartTestAction extends UserAction {
         Runnable r = () -> {
             Context.accountId.set(accountId);
             DeleteTestRunsDao.instance.deleteTestRunsFromDb(DeleteTestRuns);
+            UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
         };
         executorService.submit(r);
     }

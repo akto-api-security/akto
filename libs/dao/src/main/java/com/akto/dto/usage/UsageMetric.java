@@ -17,7 +17,8 @@ public class UsageMetric {
     private MetricTypes metricType;
     public static final String METRIC_TYPE = "metricType";
     private int recordedAt;
-    public static final String USAGE_STRING = "usage";
+    public static final String RECORDED_AT = "recordedAt";
+    public static final String _USAGE = "usage";
     private int usage;
     private String dashboardMode;
     private String dashboardVersion;

@@ -24,7 +24,7 @@ import com.mongodb.client.model.Updates;
 
 public class EndpointUtil {
 
-    public void deleteEndpoints(int skip, int timestamp) {
+    public static void deleteEndpoints(int skip, int timestamp) {
 
         Bson filters = Filters.and(
                 Filters.gt(SingleTypeInfo._TIMESTAMP, timestamp),
@@ -44,6 +44,7 @@ public class EndpointUtil {
                 deleteInManyCollections(collections.getValue(), createFilters(collections.getKey(), apis));
             }
 
+            // we need to update the api collection with the new list of urls
             Map<Integer, List<String>> urls = new HashMap<>();
 
             for (ApiInfoKey api : apis) {
@@ -67,13 +68,13 @@ public class EndpointUtil {
         } while (hasMore);
     }
 
-    public void deleteInManyCollections(MCollection<?>[] collections, Bson filter) {
+    private static void deleteInManyCollections(MCollection<?>[] collections, Bson filter) {
         for (MCollection<?> collection : collections) {
             collection.deleteAll(filter);
         }
     }
 
-    private String getFilterPrefix(CollectionType type) {
+    private static String getFilterPrefix(CollectionType type) {
         String prefix = "";
         switch (type) {
             case Id_ApiCollectionId:
@@ -91,7 +92,7 @@ public class EndpointUtil {
         return prefix;
     }
 
-    private Bson createApiFilters(CollectionType type, ApiInfoKey api) {
+    private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
 
         String prefix = getFilterPrefix(type);
 
@@ -102,7 +103,7 @@ public class EndpointUtil {
 
     }
 
-    private Bson createFilters(CollectionType type, List<ApiInfoKey> apiList) {
+    private static Bson createFilters(CollectionType type, List<ApiInfoKey> apiList) {
         Set<ApiInfoKey> apiSet = new HashSet<>(apiList);
         List<Bson> apiFilters = new ArrayList<>();
         if (apiSet != null && !apiSet.isEmpty()) {

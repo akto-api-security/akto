@@ -1424,6 +1424,8 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
+    private final static int REFRESH_INTERVAL = 60 * 5; // 5 minutes
+
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
@@ -1435,6 +1437,17 @@ public class InitializerListener implements ServletContextListener {
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
             if (initialFeatureWiseAllowed == null) {
                 initialFeatureWiseAllowed = new HashMap<>();
+            }
+
+            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
+
+            /*
+             * This ensures, we don't fetch feature wise allowed too often, 
+             * as it is a time-consuming operation.
+             * This helps the dashboard to be more responsive.
+             */
+            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
+                return organization;
             }
 
             BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId,
@@ -1463,11 +1476,15 @@ public class InitializerListener implements ServletContextListener {
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
 
+            lastFeatureMapUpdate = Context.now();
+            organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
+
             OrganizationsDao.instance.updateOne(
                     Filters.eq(Constants.ID, organizationId),
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
-                            Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
+                            Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
                     LogDb.DASHBOARD);

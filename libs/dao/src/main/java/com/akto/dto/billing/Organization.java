@@ -22,6 +22,7 @@ public class Organization {
     public static final String FEATURE_WISE_ALLOWED = "featureWiseAllowed";
 
     int lastFeatureMapUpdate;
+    public static final String LAST_FEATURE_MAP_UPDATE = "lastFeatureMapUpdate";
 
     public static final String ON_PREM = "onPrem";
     private boolean onPrem;
@@ -102,5 +103,13 @@ public class Organization {
 
     public void setGracePeriod(int gracePeriod) {
         this.gracePeriod = gracePeriod;
+    }
+
+    public int getLastFeatureMapUpdate() {
+        return lastFeatureMapUpdate;
+    }
+
+    public void setLastFeatureMapUpdate(int lastFeatureMapUpdate) {
+        this.lastFeatureMapUpdate = lastFeatureMapUpdate;
     }
 }

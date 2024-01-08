@@ -9,7 +9,6 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.akto.util.Constants;
 import com.akto.util.Util;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -261,27 +260,44 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
     }
 
-
-    // to get results irrespective of collections use negative value for apiCollectionId
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+    private List<Bson> getPipelineForEndpoints(Bson filters) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
-                new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                        .append("url", "$url")
-                        .append("method", "$method");
-
-        if (apiCollectionId != -1) {
-            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
-        }
+                new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, Util.prefixDollar(SingleTypeInfo._API_COLLECTION_ID))
+                        .append(SingleTypeInfo._URL, Util.prefixDollar(SingleTypeInfo._URL))
+                        .append(SingleTypeInfo._METHOD, Util.prefixDollar(SingleTypeInfo._METHOD));
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "apiCollectionId", "url", "method")
+                Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo.LAST_SEEN, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD)
         );
 
         pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.group(groupedId));
-        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
 
+        if (filters != null) {
+            pipeline.add(Aggregates.match(filters));
+        }
+        pipeline.add(Aggregates.group(groupedId, Accumulators.min(_START_TS, Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
+        /*
+         * we are sorting in ascending order so that
+         * we can skip the first usageLimit number of endpoints
+         */
+        pipeline.add(Aggregates.sort(Sorts.ascending(_START_TS)));
+        return pipeline;
+    }
+
+    // to get results irrespective of collections use negative value for apiCollectionId
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+
+        Bson filter = null;
+        if (apiCollectionId != -1) {
+            filter = Filters.eq("apiCollectionId", apiCollectionId);
+        }
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+
+        return processPipelineForEndpoint(pipeline);
+    }
+
+    private List<ApiInfoKey> processPipelineForEndpoint(List<Bson> pipeline){
         MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
@@ -376,24 +392,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return countMap;
     }
 
-    public static final int LARGE_LIMIT = 10_000;
-    public static final int ENDPOINT_LIMIT = 100;
-
-    public List<Bson> getPipelineForEndpoints(Bson filters){
-        List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                .append("url", "$url")
-                .append("method", "$method");
-
-        Bson projections = Projections.fields(
-                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method"));
-
-        pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.match(filters));
-        pipeline.add(Aggregates.group(groupedId, Accumulators.min(SingleTypeInfo._TIMESTAMP, Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
-        pipeline.add(Aggregates.sort(Sorts.ascending(SingleTypeInfo._TIMESTAMP)));
-        return pipeline;
-    }
+    static final int COUNT_LIMIT = 10_000;
+    static final int ENDPOINT_LIMIT = 100;
+    static final String _START_TS = "startTs";
+    static final String _COUNT = "count";
 
     public List<ApiInfoKey> getEndpointsAfterOverage(Bson filters, int usageLimit) {
 
@@ -401,43 +403,25 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.skip(usageLimit));
         pipeline.add(Aggregates.limit(ENDPOINT_LIMIT));
 
-        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-
-        List<ApiInfoKey> endpoints = new ArrayList<>();
-        while (endpointsCursor.hasNext()) {
-            try {
-                BasicDBObject v = endpointsCursor.next();
-                BasicDBObject vv = (BasicDBObject) v.get(Constants.ID);
-                endpoints.add(
-                        new ApiInfoKey(
-                                (int) vv.get(ApiInfoKey.API_COLLECTION_ID),
-                                (String) vv.get(ApiInfoKey.URL),
-                                URLMethods.Method.fromString((String) vv.get(ApiInfoKey.METHOD))));
-            } catch (Exception e) {
-            }
-        }
-
-        return endpoints;
+        return processPipelineForEndpoint(pipeline);
     }
 
     public int countEndpoints(Bson filters) {
         int ret = 0;
 
         List<Bson> pipeline = getPipelineForEndpoints(filters);
-        pipeline.add(Aggregates.limit(LARGE_LIMIT));
+        pipeline.add(Aggregates.limit(COUNT_LIMIT));
         pipeline.add(Aggregates.count());
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
 
         while (endpointsCursor.hasNext()) {
-            ret = endpointsCursor.next().getInt("count");
+            ret = endpointsCursor.next().getInt(_COUNT);
             break;
         }
 
         return ret;
     }
-
 
 }
