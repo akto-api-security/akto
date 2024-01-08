@@ -136,7 +136,7 @@ function ApiEndpoints() {
         setLoading(true)
         let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
         console.log("data", apiCollectionData)
-        setIsRedacted(apiCollectionData.data.redacted)
+        setIsRedacted(apiCollectionData.redacted)
         let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiCollectionData.data.apiInfoList
         let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
