@@ -445,6 +445,7 @@ public class PostmanAction extends UserAction {
         int accountId = Context.accountId.get();
         List<String> msgs = new ArrayList<>();
         Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
+        Map<String, String> authMap = Utils.getAuthMap(collectionDetailsObj.get("auth"), variablesMap);
         ArrayList<JsonNode> jsonNodes = new ArrayList<>();
         Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
         if(jsonNodes.size() == 0) {
@@ -455,7 +456,7 @@ public class PostmanAction extends UserAction {
         for(JsonNode item: jsonNodes){
             String apiName = item.get("name").asText();
             loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName), LogDb.DASHBOARD);
-            Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay);
+            Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap);
             if(apiInAktoFormat != null){
                 try{
                     apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));

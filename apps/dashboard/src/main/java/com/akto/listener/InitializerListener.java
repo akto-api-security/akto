@@ -38,6 +38,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -66,6 +67,7 @@ import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.billing.OrganizationUtils;
+import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.akto.billing.UsageMetricHandler;
 import com.akto.billing.UsageMetricUtils;
@@ -81,6 +83,7 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,6 +122,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
+    Crons crons = new Crons();
 
     public static String getDomain() {
         if (domain == null) {
@@ -1354,6 +1358,8 @@ public class InitializerListener implements ServletContextListener {
                             setupUsageSyncScheduler();
                         }
 
+                        crons.deleteTestRunsScheduler();
+
 
                         if(isSaas){
                             try {
@@ -1902,5 +1908,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
+  
 }
 
