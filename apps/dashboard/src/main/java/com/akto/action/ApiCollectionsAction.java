@@ -9,8 +9,13 @@ import java.util.List;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
+import com.akto.utils.RedactSampleData;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -127,12 +132,45 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb(String.format("Dropping sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
-            loggerMaker.infoAndAddToDb("Dropping sti data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            SingleTypeInfoDao.instance.deleteAll(Filters.eq("_id", Collections.singletonList(apiCollectionId)));
-            loggerMaker.infoAndAddToDb("Dropping sample data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            SampleDataDao.instance.deleteAll(Filters.eq("_id.apiCollectionId", apiCollectionId));
-            loggerMaker.infoAndAddToDb("Dropping sensitive sample data for api collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            SensitiveSampleDataDao.instance.deleteAll(Filters.eq("_id.apiCollectionId", apiCollectionId));
+            List<SampleData> sampleDataList = SampleDataDao.instance.findAll(Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId), Filters.exists("samples", true)));
+            for(SampleData sampleData: sampleDataList){
+                if(sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()){
+                    boolean errorWhileRedacting = false;
+                    List<String> modifiedSamples = new ArrayList<>();
+                    for (String sample : sampleData.getSamples()) {
+                        try{
+                            sample = RedactSampleData.redactIfRequired(sample, false, true);
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb("Error while redacting sample data", LoggerMaker.LogDb.DASHBOARD);
+                            errorWhileRedacting = true;
+                            break;
+                        }
+                        modifiedSamples.add(sample);
+                    }
+                    SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id", sampleData.getId()), Updates.set("samples", errorWhileRedacting ? Collections.emptyList(): modifiedSamples));
+                }
+            }
+
+            List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId), Filters.exists("sampleData", true)));
+
+            for(SensitiveSampleData sensitiveSampleData: sensitiveSampleDataList){
+                if(sensitiveSampleData.getSampleData() != null && !sensitiveSampleData.getSampleData().isEmpty()){
+                    List<String> modifiedSamples = new ArrayList<>();
+                    boolean errorWhileRedacting = false;
+                    for (String sample : sensitiveSampleData.getSampleData()) {
+
+                        try{
+                            sample = RedactSampleData.redactIfRequired(sample, false, true);
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb("Error while redacting sample data", LoggerMaker.LogDb.DASHBOARD);
+                            errorWhileRedacting = true;
+                            break;
+                        }
+                        modifiedSamples.add(sample);
+                    }
+                    SensitiveSampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id", sensitiveSampleData.getId()), Updates.set("sampleData", errorWhileRedacting ? Collections.emptyList(): modifiedSamples));
+                }
+            }
             ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true));
         }
         loggerMaker.infoAndAddToDb(String.format("Dropped sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);

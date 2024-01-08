@@ -15,7 +15,7 @@ const func = {
         let sensitiveAlways = false;
         let sensitivePosition = [] ;
 
-        switch (obj.state){
+        switch (obj.sensitiveState){
             case '1':
                 sensitivePosition = ["REQUEST_PAYLOAD", "REQUEST_HEADER"];
                 break;

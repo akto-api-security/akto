@@ -14,6 +14,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
 import com.akto.utils.AktoCustomException;
+import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,6 +25,7 @@ import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
+import io.swagger.models.auth.In;
 import org.apache.commons.lang3.EnumUtils;
 import org.bson.conversions.Bson;
 
@@ -31,6 +33,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.akto.dto.type.SingleTypeInfo.fetchCustomDataTypes;
 import static com.akto.dto.type.SingleTypeInfo.subTypeMap;
 import static com.akto.utils.Utils.extractJsonResponse;
 
@@ -268,6 +271,7 @@ public class CustomDataTypeAction extends UserAction{
 
     public static void handleDataTypeRedaction(){
         try{
+            fetchCustomDataTypes(Context.accountId.get());
             loggerMaker.infoAndAddToDb("Dropping redacted data types for custom data types", LogDb.DASHBOARD);
             List<CustomDataType> customDataTypesToBeFixed = CustomDataTypeDao.instance.findAll(Filters.eq(AktoDataType.SAMPLE_DATA_FIXED, false));
             loggerMaker.infoAndAddToDb("Found " + customDataTypesToBeFixed.size() + " custom data types to be fixed", LogDb.DASHBOARD);
@@ -302,25 +306,69 @@ public class CustomDataTypeAction extends UserAction{
         loggerMaker.infoAndAddToDb("Dropping redacted data types for subType:" + subType.getName(), LogDb.DASHBOARD);
         int skip = 0;
         int limit = 100;
-        int itr = 1;
+        Set<ApiInfo.ApiInfoKey> keys = new HashSet<>();
         while (true) {
             List<ApiInfo.ApiInfoKey> apiInfoKeys = SingleTypeInfoDao.instance.fetchEndpointsInCollection2(subType, skip, limit);
-            loggerMaker.infoAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName() + ", itr: " +itr, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
             if(apiInfoKeys.isEmpty()){
                 break;
             }
-            List<Bson> query = apiInfoKeys.stream().map(key -> Filters.and(
-                    Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq("_id.url", key.getUrl()),
-                    Filters.eq("_id.method", key.getMethod())
-            )).collect(Collectors.toList());
-
-            SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.unset("samples"));
-            SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.unset("sampleData"));
-            loggerMaker.infoAndAddToDb("Dropped redacted data types for subType:" + subType.getName() + " for " + apiInfoKeys.size() + " apiInfoKeys, itr:" + itr, LogDb.DASHBOARD);
-            itr++;
+            keys.addAll(apiInfoKeys);
             skip += limit;
         }
+        loggerMaker.infoAndAddToDb("Found " + keys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
+        List<Bson> query = keys.stream().map(key -> Filters.and(
+                Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
+                Filters.eq("_id.url", key.getUrl()),
+                Filters.eq("_id.method", key.getMethod())
+        )).collect(Collectors.toList());
+
+        List<Integer> collectionIds = keys.stream().map(ApiInfo.ApiInfoKey::getApiCollectionId).collect(Collectors.toList());
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in("_id", collectionIds));
+        Map<Integer, Boolean> apiCollectionsMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getRedact));
+
+        for(Bson q: query){
+            loggerMaker.infoAndAddToDb("Handling query:" + q.toString(), LogDb.DASHBOARD);
+            SampleData sampleData = SampleDataDao.instance.findOne(q);
+            if(sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()){
+                List<String> modifiedSampleData = new ArrayList<>();
+                boolean errorWhileProcessing = false;
+                for (String sample : sampleData.getSamples()) {
+                    try {
+                        sample =  RedactSampleData.redactIfRequired(sample, false, apiCollectionsMap.get(sampleData.getId().getApiCollectionId()));
+                    } catch (Exception e) {
+                        errorWhileProcessing = true;
+                        loggerMaker.errorAndAddToDb("Failed to redact sample data for subType:" + subType.getName() + ", sample:" + sample, LogDb.DASHBOARD);
+                    }
+                    modifiedSampleData.add(sample);
+                }
+                SampleDataDao.instance.updateOneNoUpsert(q, Updates.set("samples", errorWhileProcessing ? Collections.emptyList(): modifiedSampleData));
+                loggerMaker.infoAndAddToDb("Updated sample data for subType:" + subType.getName() + ", query:" + q.toString(), LogDb.DASHBOARD);
+            }
+
+            List<SensitiveSampleData> all = SensitiveSampleDataDao.instance.findAll(q);
+            for (SensitiveSampleData sensitiveSampleData : all) {
+                if(sensitiveSampleData.getSampleData() != null && !sensitiveSampleData.getSampleData().isEmpty()){
+                    List<String> modifiedSampleData = new ArrayList<>();
+                    boolean errorWhileProcessing = false;
+                    for (String sample : sensitiveSampleData.getSampleData()) {
+                        try {
+                            sample =  RedactSampleData.redactIfRequired(sample, false, apiCollectionsMap.get(sampleData.getId().getApiCollectionId()));
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Failed to redact sample data for subType:" + subType.getName() + ", sample:" + sample, LogDb.DASHBOARD);
+                            errorWhileProcessing = true;
+                        }
+                        modifiedSampleData.add(sample);
+                    }
+                    SensitiveSampleDataDao.instance.updateOneNoUpsert(q, Updates.set("sampleData", errorWhileProcessing ? Collections.emptyList(): modifiedSampleData));
+                    loggerMaker.infoAndAddToDb("Updated sensitive sample data for subType:" + subType.getName() + ", query:" + q.toString(), LogDb.DASHBOARD);
+                }
+            }
+
+        }
+
+        SingleTypeInfoDao.instance.updateMany(Filters.and(Filters.eq("subType", subType.getName()), Filters.exists("values.elements", true)), Updates.set("values.elements", Collections.emptyList()));
+        loggerMaker.infoAndAddToDb("Redacted values in sti for subType:" + subType.getName(), LogDb.DASHBOARD);
     }
 
     public List<SingleTypeInfo.Position> generatePositions(List<String> sensitivePosition){
