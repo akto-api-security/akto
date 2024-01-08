@@ -26,7 +26,6 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
-import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;

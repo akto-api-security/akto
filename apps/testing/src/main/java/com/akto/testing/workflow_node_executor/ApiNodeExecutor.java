@@ -11,7 +11,6 @@ import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
-import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -29,10 +28,9 @@ public class ApiNodeExecutor extends NodeExecutor {
         List<String> testErrors = new ArrayList<>();
         String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-        DefaultNodeDetails defaultNodeDetails = (DefaultNodeDetails) workflowNodeDetails.getNodeDetails();
-        WorkflowUpdatedSampleData updatedSampleData = defaultNodeDetails.getUpdatedSampleData();
+        WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
         WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
-        boolean followRedirects = !defaultNodeDetails.getOverrideRedirect();
+        boolean followRedirects = !workflowNodeDetails.getOverrideRedirect();
 
         OriginalHttpRequest request;
         try {
@@ -50,10 +48,10 @@ public class ApiNodeExecutor extends NodeExecutor {
                 true, request.getQueryParams());
 
         OriginalHttpResponse response = null;
-        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? defaultNodeDetails.getMaxPollRetries() : 1;
+        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? workflowNodeDetails.getMaxPollRetries() : 1;
 
         try {
-            int waitInSeconds = Math.min(defaultNodeDetails.getWaitInSeconds(),60);
+            int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
             if (waitInSeconds > 0) {
                 loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
                 Thread.sleep(waitInSeconds*1000);
@@ -66,7 +64,7 @@ public class ApiNodeExecutor extends NodeExecutor {
         for (int i = 0; i < maxRetries; i++) {
             try {
                 if (i > 0) {
-                    int sleep = defaultNodeDetails.getPollRetryDuration();
+                    int sleep = workflowNodeDetails.getPollRetryDuration();
                     loggerMaker.infoAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......", LogDb.TESTING);
                     Thread.sleep(sleep);
                 }
@@ -97,7 +95,7 @@ public class ApiNodeExecutor extends NodeExecutor {
             ;
         }
 
-        boolean vulnerable = Utils.validateTest(defaultNodeDetails.getTestValidatorCode(), valuesMap);
+        boolean vulnerable = Utils.validateTest(workflowNodeDetails.getTestValidatorCode(), valuesMap);
         return new WorkflowTestResult.NodeResult(message,vulnerable, testErrors);
 
     }

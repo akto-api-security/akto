@@ -44,7 +44,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes) {
         List<String> testErrors = new ArrayList<>();
 
-        YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails().getNodeDetails();
+        YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
 
         if (yamlNodeDetails.getTestId() != null && yamlNodeDetails.getTestId().length() > 0) {
             return processYamlNode(node, varMap, allowAllStatusCodes, yamlNodeDetails);

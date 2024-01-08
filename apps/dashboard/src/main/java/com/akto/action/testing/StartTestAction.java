@@ -19,7 +19,6 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
-import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;

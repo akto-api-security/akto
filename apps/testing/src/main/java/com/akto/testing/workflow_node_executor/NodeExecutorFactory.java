@@ -1,18 +1,16 @@
 package com.akto.testing.workflow_node_executor;
 
 import com.akto.dto.api_workflow.Node;
-import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
-import com.akto.dto.testing.NodeDetails.NodeDetails;
+import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 
 public class NodeExecutorFactory {
     
     public NodeExecutor getExecutor(Node node) {
     
-        NodeDetails nodeDetails = node.getWorkflowNodeDetails().getNodeDetails();
-        if (nodeDetails instanceof DefaultNodeDetails) {
-            return new ApiNodeExecutor();
+        if (node.getWorkflowNodeDetails() instanceof YamlNodeDetails) {
+            return new YamlNodeExecutor();
         }
-        return new YamlNodeExecutor();
+        return new ApiNodeExecutor();
 
     }
 

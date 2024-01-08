@@ -10,8 +10,9 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.WorkflowNodeDetails;
 
-public class YamlNodeDetails extends NodeDetails {
+public class YamlNodeDetails extends WorkflowNodeDetails {
     
     String testId;
 
@@ -33,6 +34,7 @@ public class YamlNodeDetails extends NodeDetails {
     public YamlNodeDetails(String testId, FilterNode validatorNode, ExecutorNode executorNode, 
             List<CustomAuthType> customAuthTypes, AuthMechanism authMechanism, 
             RawApi rawApi, ApiInfoKey apiInfoKey, String originalMessage) {
+        super(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), "", null, WorkflowNodeDetails.Type.API, false, 0, 0, 0, "", "");
         this.testId = testId;
         this.validatorNode = validatorNode;
         this.executorNode = executorNode;

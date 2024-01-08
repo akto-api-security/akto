@@ -55,7 +55,7 @@ public class WorkflowTestAction extends UserAction {
         }
 
         for (WorkflowNodeDetails workflowNodeDetails: mapNodeIdToWorkflowNodeDetails.values()) {
-            NodeDetails nodeDetails = workflowNodeDetails.getNodeDetails();
+            WorkflowNodeDetails nodeDetails = workflowNodeDetails;
             String err = nodeDetails.validate();
             if (err != null) {
                 addActionError(err);
