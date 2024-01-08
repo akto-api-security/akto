@@ -454,7 +454,18 @@ public class Executor {
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":
-                return Operations.replaceBody(rawApi, key);
+                String newPayload = rawApi.getRequest().getBody();
+                if (key instanceof Map) {
+                    Map<String, Map<String, String>> regexReplace = (Map) key;
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else {
+                    newPayload = key.toString();
+                }
+                return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":

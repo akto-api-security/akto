@@ -5,6 +5,8 @@ import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -17,21 +19,31 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
@@ -227,7 +239,86 @@ public class SaveTestEditorAction extends UserAction {
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
+        Bson filters = Filters.and(
+            Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
+            Filters.eq("_id.method", infoKey.getMethod()),
+            Filters.in("_id.url", infoKey.getUrl())
+        );
+        SampleData sd = SampleDataDao.instance.findOne(filters);
+        if (sd != null && sd.getSamples().size() > 0) {
+            sd.getSamples().remove(0);
+            newSampleDataMap.put(infoKey, sd.getSamples());
+        }
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
+        Map<String, List<String>> wordListsMap = testConfig.getWordlists();
+        if (wordListsMap == null) {
+            wordListsMap = new HashMap<String, List<String>>();
+        }
+        for (String k: wordListsMap.keySet()) {
+            Map<String, String> m = new HashMap<>();
+            Object keyObj;
+            String key, location;
+            boolean isRegex = false;
+            try {
+                List<String> wordList = (List<String>) wordListsMap.get(k);
+                continue;
+            } catch (Exception e) {
+                try {
+                    m = (Map) wordListsMap.get(k);
+                } catch (Exception er) {
+                    continue;
+                }
+            }
+
+            keyObj = m.get("key");
+            location = m.get("location");
+            if (keyObj instanceof Map) {
+                Map<String, String> kMap = (Map) keyObj;
+                key = (String) kMap.get("regex");
+                isRegex = true;
+            } else {
+                key = (String) m.get("key");
+            }
+
+            boolean allApis = false;
+            if (m.containsKey("all_apis")) {
+                allApis = Objects.equals(m.get("all_apis"), true);
+            }
+            if (!allApis) {
+                continue;
+            }
+
+            filters = Filters.and(
+                Filters.eq("apiCollectionId", infoKey.getApiCollectionId()),
+                Filters.or(
+                    Filters.regex("param", key),
+                    Filters.regex("param", key.toLowerCase())
+                    )
+            );
+
+            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
+
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
+                if (infKey.equals(infoKey)) {
+                    continue;
+                }
+                Bson sdfilters = Filters.and(
+                    Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", singleTypeInfo.getMethod()),
+                    Filters.in("_id.url", singleTypeInfo.getUrl())
+                );
+
+                sd = SampleDataDao.instance.findOne(sdfilters);
+                newSampleDataMap.put(infKey, sd.getSamples());
+
+            }
+            List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key, location, isRegex);
+            wordListsMap.put(k, wordListVal);
+        }
+
+
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
@@ -249,6 +340,20 @@ public class SaveTestEditorAction extends UserAction {
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();
         subCategoryMap.put(testConfig.getId(), infoObj);
+
+        List<GenericTestResult> runResults = new ArrayList<>();
+
+        for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
+            if (testResult instanceof TestResult) {
+                runResults.add(testResult);
+            } else {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) testResult;
+                runResults.addAll(multiTestRes.convertToExistingTestResult(this.testingRunResult));
+            }
+        }
+
+        this.testingRunResult.setTestResults(runResults);
+
         return SUCCESS.toUpperCase();
     }
 
