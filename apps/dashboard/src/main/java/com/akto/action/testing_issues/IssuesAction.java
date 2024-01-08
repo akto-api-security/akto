@@ -237,7 +237,7 @@ public class IssuesAction extends UserAction {
                 }
             } catch (Exception e) {
                 String err = "Error while fetching subcategories for " + entry.getKey();
-                loggerMaker.errorAndAddToDb(err, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,err, LogDb.DASHBOARD);
             }
         }
 

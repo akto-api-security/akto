@@ -64,8 +64,6 @@ function GithubSimpleTable(props) {
 
         return {value:tempData,total:tempData.length}
     }
-    
-
     return <GithubServerTable
         key={JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
         pageLimit={props.pageLimit}
@@ -88,6 +86,9 @@ function GithubSimpleTable(props) {
         onSelect={props.onSelect}
         onRowClick={props.onRowClick}
         increasedHeight = {props.increasedHeight}
+        hasZebraStriping={props.hasZebraStriping}
+        headings={props.headings}
+        useSummaryRow={props.useSummaryRow}
     />
 
 }

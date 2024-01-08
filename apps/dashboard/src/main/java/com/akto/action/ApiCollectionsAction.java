@@ -5,10 +5,8 @@ import java.util.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import com.akto.dao.APISpecDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
+
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.util.Constants;
@@ -105,7 +103,10 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
         SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));                    
+        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
+        SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
 
         return SUCCESS.toUpperCase();
     }
