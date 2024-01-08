@@ -24,7 +24,6 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -201,8 +200,8 @@ public class ApiWorkflowExecutor {
         String message;
 
         OtpTestData otpTestData = fetchOtpTestData(node, 4);
-        DefaultNodeDetails defaultNodeDetails = (DefaultNodeDetails) node.getWorkflowNodeDetails().getNodeDetails();
-        String uuid = defaultNodeDetails.getOtpRefUuid();
+        WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
+        String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
             message = "otp data not received for uuid " + uuid;
@@ -213,7 +212,7 @@ public class ApiWorkflowExecutor {
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         try {
-            String otp = extractOtpCode(otpTestData.getOtpText(), defaultNodeDetails.getOtpRegex());
+            String otp = extractOtpCode(otpTestData.getOtpText(), workflowNodeDetails.getOtpRegex());
             if (otp == null) {
                 data.put("error", "unable to extract otp for provided regex");
                 testErrors.add("unable to extract otp for provided regex");
@@ -237,10 +236,10 @@ public class ApiWorkflowExecutor {
 
     private OtpTestData fetchOtpTestData(Node node, int retries) {
         OtpTestData otpTestData = null;
-        DefaultNodeDetails defaultNodeDetails = (DefaultNodeDetails) node.getWorkflowNodeDetails().getNodeDetails();
+        WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         for (int i=0; i<retries; i++) {
             try {
-                int waitInSeconds = Math.min(defaultNodeDetails.getWaitInSeconds(), 60);
+                int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
                     loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
                     Thread.sleep(waitInSeconds*1000);
@@ -249,7 +248,7 @@ public class ApiWorkflowExecutor {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            String uuid = defaultNodeDetails.getOtpRefUuid();
+            String uuid = workflowNodeDetails.getOtpRefUuid();
             int curTime = Context.now() - 5 * 60;
             Bson filters = Filters.and(
                 Filters.eq("uuid", uuid),

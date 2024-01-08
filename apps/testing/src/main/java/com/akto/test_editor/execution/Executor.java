@@ -197,18 +197,11 @@ public class Executor {
                 json.put("requestHeaders", rawApi.getRequest().getHeaders().toString());
                 json.put("type", "");
                 
-                // WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), rawApi.getRequest().getQueryParams(),
-                //     rawApi.getRequest().getHeaders().toString(), rawApi.getRequest().getBody(), rawApi.getRequest().getUrl());
-
                 YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage());
-                WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
-                mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
+                mapNodeIdToWorkflowNodeDetails.put(target, yamlNodeDetails);
             } else {
-                // DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, rawApi.getRequest().getUrl(),
-                //     URLMethods.Method.fromString(rawApi.getRequest().getMethod()), null, null, true, 0, 0, 0, null, null);
                 YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage());
-                WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(WorkflowNodeDetails.Type.API, yamlNodeDetails);
-                mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
+                mapNodeIdToWorkflowNodeDetails.put(target, yamlNodeDetails);
             }
 
             edgeObj = new LoginWorkflowGraphEdge(source, target, target);

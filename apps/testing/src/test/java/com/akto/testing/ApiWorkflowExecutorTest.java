@@ -10,7 +10,6 @@ import com.akto.dto.testing.LoginFlowParams;
 import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
-import com.akto.dto.testing.NodeDetails.DefaultNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
@@ -229,9 +228,8 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
     @Test
     public void testProcessOtpNodeOtpDataMissing() {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, "", null, "", null, false,
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
         0, 0, 0, "(/d+){1,6}", "123");
-        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(null, defaultNodeDetails);
         Map<String, Object> valuemap = new HashMap<>();
         Node node = new Node("x1", nodeDetails);
         NodeResult result = apiWorkflowExecutor.processOtpNode(node, valuemap);
@@ -241,9 +239,8 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
     @Test
     public void testProcessOtpNodeDataStaleData() {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, "", null, "", null, false,
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
         0, 0, 0, "(/d+){1,6}", "123");
-        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(null, defaultNodeDetails);
         Map<String, Object> valuemap = new HashMap<>();
         Node node = new Node("x1", nodeDetails);
 
@@ -262,9 +259,8 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
     @Test
     public void testProcessOtpNodeDataInvalidRegex() {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, "", null, "", null, false,
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
         0, 0, 0, "(/d+){1,6}", "124");
-        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(null, defaultNodeDetails);
         Map<String, Object> valuemap = new HashMap<>();
         Node node = new Node("x1", nodeDetails);
 
@@ -283,9 +279,8 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
     @Test
     public void testProcessOtpNodeData() {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        DefaultNodeDetails defaultNodeDetails = new DefaultNodeDetails(0, "", null, "", null, false,
-        0, 0, 0, "(/d+){1,6}", "125");
-        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(null, defaultNodeDetails);
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
+        0, 0, 0, "(\\d+){1,6}", "125");
         Map<String, Object> valuemap = new HashMap<>();
         Node node = new Node("x1", nodeDetails);
 

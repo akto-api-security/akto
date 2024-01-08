@@ -43,7 +43,7 @@ public class MultiExecTestResult extends GenericTestResult {
             double percentageMatch = 0;
             // pick from workflow
             Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = testingRunResult.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
-            YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(k).getNodeDetails();
+            YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(k);
             String originalMessage = workflowNodeDetails.getOriginalMessage();
             for (int i = 1; i<messageList.size(); i++) {
                 String message = "{\"request\": " + messageList.get(i);
