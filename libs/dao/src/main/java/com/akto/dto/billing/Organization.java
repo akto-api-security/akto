@@ -21,6 +21,7 @@ public class Organization {
     HashMap<String, FeatureAccess> featureWiseAllowed;
     public static final String FEATURE_WISE_ALLOWED = "featureWiseAllowed";
 
+    int lastFeatureMapUpdate;
 
     public static final String ON_PREM = "onPrem";
     private boolean onPrem;

@@ -8,6 +8,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
@@ -39,7 +40,6 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
@@ -59,9 +59,9 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-    public void init(TestingRun testingRun, ObjectId summaryId) {
+    public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId);
+            apiWiseInit(testingRun, summaryId, syncLimit);
         } else {
             workflowInit(testingRun, summaryId);
         }
@@ -108,7 +108,7 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
@@ -205,7 +205,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap));
+                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, syncLimit));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -457,7 +457,7 @@ public class TestExecutor {
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
-            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, SyncLimit syncLimit) {
 
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
 
@@ -467,7 +467,7 @@ public class TestExecutor {
             try {
                 // todo: commented out older one
 //                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap);
+                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, syncLimit);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
@@ -527,7 +527,7 @@ public class TestExecutor {
     public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
-                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
+                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, SyncLimit syncLimit) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
@@ -540,6 +540,11 @@ public class TestExecutor {
             if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
                 continue;
             }
+
+            if(syncLimit.updateUsageLeftAndCheckSkip()){
+                continue;
+            }
+
             try {
                 testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
             } catch (Exception e) {

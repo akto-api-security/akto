@@ -1,33 +1,23 @@
 package com.akto.billing;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import org.json.JSONObject;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndReplaceOptions;
-import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 
 import okhttp3.MediaType;
@@ -127,149 +117,6 @@ public class UsageMetricUtils {
             aktoMixpanel.sendEvent(distinct_id, eventName, props);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-        }
-    }
-
-    public static boolean checkMeteredOverage(int accountId, String featureLabel) {
-
-        try {
-
-            if (!DashboardMode.isMetered()) {
-                return false;
-            }
-
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, accountId));
-
-            if (organization == null) {
-                throw new Exception("Organization not found");
-            }
-
-            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-
-            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                throw new Exception("feature map not found or empty for organization " + organization.getId());
-            }
-
-            FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(featureLabel, null);
-
-            int gracePeriod = organization.getGracePeriod();
-
-            // stop access if feature is not found or overage
-            return featureAccess == null || !featureAccess.getIsGranted()
-                    || featureAccess.checkOverageAfterGrace(gracePeriod);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to check metered overage. Error - " + e.getMessage(),
-                    LogDb.DASHBOARD);
-        }
-
-        // allow access by default and in case of errors.
-        return false;
-    }
-
-    public static boolean checkActiveEndpointOverage(int accountId){
-        return checkMeteredOverage(accountId, MetricTypes.ACTIVE_ENDPOINTS.name());
-    }
-
-    public static boolean checkTestRunsOverage(int accountId){
-        return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS.name());
-    }
-
-    public static List<UsageMetric> calcAndSaveUsageMetrics(MetricTypes[] metricTypes){
-        int accountId = Context.accountId.get();
-
-        List<UsageMetric> usageMetrics = new ArrayList<>();
-
-        try {
-
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                    AccountSettingsDao.generateFilter());
-
-            // Get organization to which account belongs to
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, accountId));
-
-            if (organization == null) {
-                throw new Exception("Organization not found for account: " + accountId);
-            }
-
-            loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId),
-                    LogDb.DASHBOARD);
-
-            String organizationId = organization.getId();
-
-            for (MetricTypes metricType : metricTypes) {
-                UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType));
-
-                if (usageMetricInfo == null) {
-                    usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-                    UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-                }
-
-                int syncEpoch = usageMetricInfo.getSyncEpoch();
-                int measureEpoch = usageMetricInfo.getMeasureEpoch();
-
-                // Reset measureEpoch every month
-                if (Context.now() - measureEpoch > 2629746) {
-                    if (syncEpoch > Context.now() - 86400) {
-                        measureEpoch = Context.now();
-
-                        UsageMetricInfoDao.instance.updateOne(
-                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                                Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch));
-                    }
-
-                }
-
-                String dashboardMode = DashboardMode.getDashboardMode().toString();
-                String dashboardVersion = accountSettings.getDashboardVersion();
-
-                UsageMetric usageMetric = new UsageMetric(
-                        organizationId, accountId, metricType, syncEpoch, measureEpoch,
-                        dashboardMode, dashboardVersion);
-
-                // calculate usage for metric
-                UsageMetricCalculator.calculateUsageMetric(usageMetric);
-
-                /*
-                 * Save a single usage metric per sync cycle, 
-                 * until it is synced with akto.
-                 */
-                usageMetric = UsageMetricsDao.instance.getMCollection().findOneAndReplace(
-                        Filters.and(
-                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                                Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false),
-                                Filters.eq(UsageMetric.SYNC_EPOCH, syncEpoch)),
-                        usageMetric, new FindOneAndReplaceOptions().upsert(true)
-                                .returnDocument(ReturnDocument.AFTER));
-
-                loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
-                usageMetrics.add(usageMetric);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,
-                    String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()),
-                    LogDb.DASHBOARD);
-        }
-        return usageMetrics;
-    }
-
-    public static void calcAndSyncUsageMetrics(MetricTypes[] metricTypes) {
-
-        List<UsageMetric> usageMetrics = calcAndSaveUsageMetrics(metricTypes);
-
-        for (UsageMetric usageMetric : usageMetrics) {
-            try {
-                UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
-                UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
-                loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
-                        usageMetric.getId().toString(), usageMetric.getOrganizationId(),
-                        usageMetric.getAccountId(), usageMetric.getMetricType().toString()), LogDb.DASHBOARD);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while syncing usage metric", LogDb.DASHBOARD);
-            }
         }
     }
 

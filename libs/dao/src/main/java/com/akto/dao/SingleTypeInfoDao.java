@@ -2,21 +2,19 @@ package com.akto.dao;
 
 import java.util.*;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.traffic.SampleData;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
+import com.akto.util.Util;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -379,10 +377,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
     public static final int LARGE_LIMIT = 10_000;
+    public static final int ENDPOINT_LIMIT = 100;
 
-    public int countEndpoints(Bson filters) {
-        int ret = 0;
-
+    public List<Bson> getPipelineForEndpoints(Bson filters){
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")
@@ -393,7 +390,41 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.match(filters));
-        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.group(groupedId, Accumulators.min(SingleTypeInfo._TIMESTAMP, Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
+        pipeline.add(Aggregates.sort(Sorts.ascending(SingleTypeInfo._TIMESTAMP)));
+        return pipeline;
+    }
+
+    public List<ApiInfoKey> getEndpointsAfterOverage(Bson filters, int usageLimit) {
+
+        List<Bson> pipeline = getPipelineForEndpoints(filters);
+        pipeline.add(Aggregates.skip(usageLimit));
+        pipeline.add(Aggregates.limit(ENDPOINT_LIMIT));
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<ApiInfoKey> endpoints = new ArrayList<>();
+        while (endpointsCursor.hasNext()) {
+            try {
+                BasicDBObject v = endpointsCursor.next();
+                BasicDBObject vv = (BasicDBObject) v.get(Constants.ID);
+                endpoints.add(
+                        new ApiInfoKey(
+                                (int) vv.get(ApiInfoKey.API_COLLECTION_ID),
+                                (String) vv.get(ApiInfoKey.URL),
+                                URLMethods.Method.fromString((String) vv.get(ApiInfoKey.METHOD))));
+            } catch (Exception e) {
+            }
+        }
+
+        return endpoints;
+    }
+
+    public int countEndpoints(Bson filters) {
+        int ret = 0;
+
+        List<Bson> pipeline = getPipelineForEndpoints(filters);
         pipeline.add(Aggregates.limit(LARGE_LIMIT));
         pipeline.add(Aggregates.count());
 
