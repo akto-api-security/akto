@@ -312,14 +312,6 @@ public class AktoPolicyNew {
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
-            // last tested
-            subUpdates.add(Updates.set(ApiInfo.LAST_TESTED, apiInfo.getLastTested())) ;
-
-            // isSensitive
-            subUpdates.add(Updates.set(ApiInfo.IS_SENSITIVE, apiInfo.getIsSensitive()));
-
-            // severityScore
-            subUpdates.add(Updates.set(ApiInfo.SEVERITY_SCORE, apiInfo.getSeverityScore()));
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
             updates.add(
