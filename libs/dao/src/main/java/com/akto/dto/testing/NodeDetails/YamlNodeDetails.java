@@ -2,6 +2,7 @@ package com.akto.dto.testing.NodeDetails;
 
 import java.util.List;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dto.CustomAuthType;
@@ -12,6 +13,7 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.WorkflowNodeDetails;
 
+@BsonDiscriminator
 public class YamlNodeDetails extends WorkflowNodeDetails {
     
     String testId;

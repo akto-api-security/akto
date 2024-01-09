@@ -268,7 +268,7 @@ public class TestExecutor {
                                     Filters.eq(TestingRunResult.VULNERABLE, true)),
                             limit,
                             skip,
-                            Projections.include("testResults.confidence"));
+                            Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
 
             loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
                     LogDb.TESTING);
