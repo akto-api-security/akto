@@ -53,7 +53,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         RawApi rawApi = yamlNodeDetails.getRawApi();
         RawApi sampleRawApi = rawApi.copy();
         List<RawApi> rawApis = new ArrayList<>();
-        rawApis.add(rawApi);
+        rawApis.add(rawApi.copy());
 
         Executor executor = new Executor();
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
