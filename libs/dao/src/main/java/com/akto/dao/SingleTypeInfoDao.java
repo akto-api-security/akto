@@ -2,6 +2,8 @@ package com.akto.dao;
 
 import java.util.*;
 
+import javax.print.attribute.HashAttributeSet;
+
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
@@ -66,10 +68,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames = new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames =  new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo.LAST_SEEN, SingleTypeInfo._API_COLLECTION_ID }, false);
 
-        fieldNames =  new String[] { SingleTypeInfo._COLLECTION_IDS };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+            
+        fieldNames =  new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
     }
@@ -399,5 +404,52 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         return countMap;
+    }
+
+    private List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly){
+        int codeValue = inResponseOnly ? 0 : -1 ;
+        List<Bson> pipeline = new ArrayList<>();
+        Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);
+        Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse);
+        pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
+        pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
+        return pipeline;
+    }
+
+    public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollection(List<String> sensitiveParameters){
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId");
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false);
+        MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        Map<Integer,List<String>> result = new HashMap<>();
+        while(collectionsCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = collectionsCursor.next();
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
+                result.put(apiCollectionId, subtypes);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result ;
+    }
+
+    public Integer getSensitiveApisCount(List<String> sensitiveParameters){
+       
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                                        .append(SingleTypeInfo._URL, "$url")
+                                        .append(SingleTypeInfo._METHOD, "$method");
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, true);
+        pipeline.add(Aggregates.count("totalSensitiveApis"));
+
+        MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        if(cursor.hasNext()){
+            BasicDBObject basicDBObject = cursor.next();
+            return basicDBObject.getInt("totalSensitiveApis");
+        }else{
+            return 0;
+        }
+        
     }
 }

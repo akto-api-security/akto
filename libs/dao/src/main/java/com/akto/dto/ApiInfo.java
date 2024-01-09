@@ -30,7 +30,13 @@ public class ApiInfo {
     public static final String VIOLATIONS = "violations";
     private Map<String, Integer> violations;
     public static final String LAST_SEEN = "lastSeen";
+    public static final String LAST_TESTED = "lastTested";
     private int lastSeen;
+    private int lastTested;
+    public static final String IS_SENSITIVE = "isSensitive";
+    private boolean isSensitive;
+    public static final String SEVERITY_SCORE = "severityScore";
+    private float severityScore;
     private List<Integer> collectionIds;
 
     public enum AuthType {
@@ -107,11 +113,12 @@ public class ApiInfo {
         }
 
         public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
-            return new ApiInfo.ApiInfoKey(
-                    httpResponseParams.getRequestParams().getApiCollectionId(),
-                    httpResponseParams.getRequestParams().getURL(),
-                    URLMethods.Method.fromString(httpResponseParams.getRequestParams().getMethod())
-            );
+            int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
+            String url = httpResponseParams.getRequestParams().getURL();
+            url = url.split("\\?")[0];
+            String methodStr = httpResponseParams.getRequestParams().getMethod();
+            URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+            return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
         }
 
     }
@@ -129,6 +136,9 @@ public class ApiInfo {
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
+        this.lastTested = 0 ;
+        this.isSensitive = false;
+        this.severityScore = 0;
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
@@ -157,6 +167,12 @@ public class ApiInfo {
         if (that.lastSeen > this.lastSeen) {
             this.lastSeen = that.lastSeen;
         }
+
+        if((that.lastTested != 0) && that.lastTested > this.lastTested){
+            this.lastTested = that.lastTested ;
+        }
+        this.isSensitive = that.isSensitive || this.isSensitive;
+        this.severityScore = this.severityScore + that.severityScore;
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -218,8 +234,11 @@ public class ApiInfo {
                 " id='" + getId() + "'" +
                 ", allAuthTypesFound='" + getAllAuthTypesFound() + "'" +
                 ", lastSeen='" + getLastSeen() + "'" +
+                ", lastTested='" + getLastTested() + "'" +
                 ", violations='" + getViolations() + "'" +
                 ", accessTypes='" + getApiAccessTypes() + "'" +
+                ", isSensitive='" + getIsSensitive() + "'" +
+                ", severityScore='" + getSeverityScore() + "'" +
                 "}";
     }
 
@@ -267,6 +286,29 @@ public class ApiInfo {
         this.lastSeen = lastSeen;
     }
 
+     public int getLastTested() {
+        return lastTested;
+    }
+
+    public void setLastTested(int lastTested) {
+        this.lastTested = lastTested;
+    }
+
+    public boolean getIsSensitive() {
+        return isSensitive;
+    }
+
+    public void setIsSensitive(boolean isSensitive) {
+        this.isSensitive = isSensitive;
+    }
+
+    public float getSeverityScore() {
+        return severityScore;
+    }
+
+    public void setSeverityScore(float severityScore) {
+        this.severityScore = severityScore;
+    }
     public List<Integer> getCollectionIds() {
         return collectionIds;
     }

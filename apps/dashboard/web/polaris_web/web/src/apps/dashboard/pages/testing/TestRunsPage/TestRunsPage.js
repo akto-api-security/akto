@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
+import ChartypeComponent from "./ChartypeComponent";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 
 /*
@@ -121,6 +122,7 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
+  
 
 const getActionsList = (hexId) => {
   return [
@@ -177,10 +179,24 @@ function getActions(item){
   return arr
 }
 
+const now = func.timeNow()
+
 const [loading, setLoading] = useState(true);
 const [currentTab, setCurrentTab] = useState("oneTime");
 const [updateTable, setUpdateTable] = useState(false);
-const [selected, setSelected] = useState(0);
+const [countMap, setCountMap] = useState({});
+const [selected, setSelected] = useState(1);
+const [timeStamp, setTimestamp] = useState({
+  startTimestamp: now - func.recencyPeriod,
+  endTimestamp: now
+})
+const [severityCountMap, setSeverityCountMap] = useState({
+  HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
+  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
+  LOW: {text : 0, color: func.getColorForCharts("LOW")},
+})
+const [subCategoryInfo, setSubCategoryInfo] = useState({})
+const [collapsible, setCollapsible] = useState(true)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -210,7 +226,6 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     setLoading(true);
     let ret = [];
     let total = 0;
-    let now = func.timeNow()
     let dateRange = filters['dateRange'] || false;
     delete filters['dateRange']
     let startTimestamp = 0;
@@ -218,6 +233,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     if (dateRange) {
       startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
       endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000);
+      setTimestamp({startTimestamp: startTimestamp, endTimestamp: endTimestamp})
       filters.endTimestamp = [startTimestamp, endTimestamp]
     }
 
@@ -225,7 +241,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
       case "cicd":
         await api.fetchTestingDetails(
-          0, 0, true, sortKey, sortOrder, skip, limit, filters
+          0, 0, true, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -233,7 +249,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          0, 0, false, sortKey, sortOrder, skip, limit, filters
+          0, 0, false, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -241,13 +257,19 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "oneTime":
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, sortKey, sortOrder, skip, limit, filters
+          now - func.recencyPeriod, now, false, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
       default:
+        await api.fetchTestingDetails(
+          now - func.recencyPeriod, now, false, true, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
         break;
     }
 
@@ -266,26 +288,60 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   }
 
+  const fetchCountsMap = async() => {
+    await api.getCountsMap().then((resp)=>{
+      setCountMap(resp)
+    })
+  }
+
+  const fetchSummaryInfo = async()=>{
+    await api.getSummaryInfo(timeStamp.startTimestamp, timeStamp.endTimestamp).then((resp)=>{
+      const severityObj = transform.convertSubIntoSubcategory(resp)
+      setSubCategoryInfo(severityObj.subCategoryMap)
+      const severityMap = severityObj.countMap;
+      let tempMap = JSON.parse(JSON.stringify(severityCountMap))
+      Object.keys(tempMap).forEach((key) => {
+        tempMap[key].text = severityMap[key]
+      })
+      setSeverityCountMap(tempMap)
+    })
+  }
+
   const tableTabs = [
+    {
+        content: 'All',
+        index: 0,
+        badge: countMap['allTestRuns']?.toString(),
+        onAction: ()=> {setCurrentTab('All')},
+        id: 'All',
+    },
     {
       content: 'One time',
       index: 0,
+      badge: countMap['oneTime']?.toString(),
       onAction: ()=> {setCurrentTab('oneTime')},
       id: 'oneTime',
     },
     {
+      content: 'Recurring',
+      index: 0,
+      badge: countMap['scheduled']?.toString(),
+      onAction: ()=> {setCurrentTab('scheduled')},
+      id: 'scheduled',
+    },
+    {
       content: 'CI/CD',
       index: 0,
+      badge: countMap['cicd']?.toString(),
       onAction: ()=> {setCurrentTab('cicd')},
       id: 'cicd',
     },
-    {
-      content: 'Recurring',
-      index: 0,
-      onAction: ()=> {setCurrentTab('scheduled')},
-      id: 'scheduled',
-    }
-  ]
+ ]
+
+  useEffect(()=>{
+    fetchCountsMap()
+    fetchSummaryInfo()
+  },[timeStamp])
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -294,6 +350,44 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         setLoading(false)
     },200)
 }
+
+const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+const SummaryCardComponent = () =>{
+  let totalVulnerabilites = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  return(
+    <LegacyCard>
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+        <HorizontalStack align="space-between">
+          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
+          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+        </HorizontalStack>
+        {totalVulnerabilites > 0 ? 
+        <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
+          <LegacyCard.Subsection>
+            <Box paddingBlockStart={3}><Divider/></Box>
+            <HorizontalGrid columns={2} gap={6}>
+              <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+            </HorizontalGrid>
+
+          </LegacyCard.Subsection>
+        </Collapsible>
+        : null }
+      </LegacyCard.Section>
+    </LegacyCard>
+  )
+}
+  const promotedBulkActions = (selectedTestRuns) => { 
+    return [
+    {
+      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      onAction: async() => {
+        await api.deleteTestRuns(selectedTestRuns);
+        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        window.location.reload();
+      },
+    },
+  ]};
 
 const coreTable = (
 <GithubServerTable
@@ -319,10 +413,12 @@ const coreTable = (
     headings={headers}
     useNewRow={true}
     condensedHeight={true}
+    promotedBulkActions={promotedBulkActions}
+    selectable= {true}
   />   
 )
 
-const components = [coreTable]
+const components = [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}

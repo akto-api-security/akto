@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Card, VerticalStack, Box, HorizontalGrid } from "@shopify/polaris"
+import { Text, Button, Modal, TextField, IndexFiltersMode, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useCallback, useRef } from "react"
 import func from "@/util/func"
@@ -11,6 +11,8 @@ import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
+import TooltipText from "../../../components/shared/TooltipText"
+import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
 
 const headers = [
     {
@@ -25,17 +27,39 @@ const headers = [
         title: "Total endpoints",
         text: "Total endpoints",
         value: "endpoints",
-        type: CellType.TEXT,
+        isText: CellType.TEXT,
     },
     {
-        title: "Discovered",
-        text: "Discovered",
-        value: "detected",
-        type: CellType.TEXT,
+        title: 'Risk score',
+        value: 'riskScoreComp',
+    },
+    {   
+        title: 'Test coverage',
+        text: 'Test coverage', 
+        value: 'coverage',
+        isText: CellType.TEXT,
+    },
+    {
+        title: 'Issues', 
+        text: 'Issues', 
+        value: 'issuesArr',
+    },
+    {   
+        title: 'Sensitive data' , 
+        text: 'Sensitive data' , 
+        value: 'sensitiveSubTypes',
+    },
+    {   
+        title: 'Last traffic seen', 
+        text: 'Last traffic seen', 
+        value: 'lastTraffic',
+        isText: CellType.TEXT,
     }
 ]
 
 const sortOptions = [
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'Risky first', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Stable first', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
     { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
@@ -58,11 +82,17 @@ function convertToCollectionData(c) {
     }    
 }
 
-const convertToNewData = (collectionsArr) => {
+const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
         return{
-            ...c
+            ...c,
+            displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
+            testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
+            sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
+            severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
+            detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
         }
     })
 
@@ -77,6 +107,8 @@ function ApiCollections() {
     const [loading, setLoading] = useState(false)
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
+    const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
+    
     
     const tableTabs = [
         {
@@ -109,6 +141,7 @@ function ApiCollections() {
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
+
     const resetFunc = () => {
         setInventoryFlyout(false)
         setFilteredItems([])
@@ -127,18 +160,31 @@ function ApiCollections() {
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
-            api.getAllCollections()
+            api.getAllCollections(),
+            api.getCoverageInfoForCollections(),
+            api.getLastTrafficSeen()
         ];
         
         let results = await Promise.allSettled(apiPromises);
 
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
+        let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
+        let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
+        const issuesObj = await transform.fetchRiskScoreInfo();
+        const severityObj = issuesObj.severityObj;
+        const riskScoreObj = issuesObj.riskScoreObj;
+        const sensitiveInfo = await transform.fetchSensitiveInfo();
         setLoading(false)
 
-        const dataObj = convertToNewData(tmp);
+        const dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
+
+        const summary = transform.getSummaryData(dataObj.normal)
+        summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
+        summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
+        setSummaryData(summary)
 
         setAllCollections(apiCollectionsResp.apiCollections || [])
         setCollectionsMap(func.mapCollectionIdToName(tmp))
@@ -187,6 +233,26 @@ function ApiCollections() {
         fetchData={fetchData}
     />
 
+      const summaryItems = [
+        {
+            title: "Total APIs",
+            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
+        },
+        {
+            title: "Critical APIs",
+            data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints),
+        },
+        {
+            title: "Tested APIs (Coverage)",
+            data: Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+        },
+        {
+            title: "Sensitive in response APIs",
+            data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints),
+        }
+    ]
+
+
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
     }
@@ -213,7 +279,7 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [modalComponent, tableComponent]
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, tableComponent]
 
     return(
         <PageWithMultipleCards
