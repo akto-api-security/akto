@@ -370,6 +370,7 @@ public class Utils {
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
+            EndpointUtil.calcAndDeleteEndpoints();
         }
     }
 

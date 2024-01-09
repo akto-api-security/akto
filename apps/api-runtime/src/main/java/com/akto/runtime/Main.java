@@ -7,7 +7,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
@@ -20,6 +19,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.util.AccountTask;
+import com.akto.utils.EndpointUtil;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -297,6 +297,7 @@ public class Main {
                                 }
                             }
                         }
+                        EndpointUtil.calcAndDeleteEndpoints();
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
