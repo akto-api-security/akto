@@ -296,6 +296,7 @@ public class SaveTestEditorAction extends UserAction {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
+        
         Bson filters = Filters.and(
             Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
             Filters.eq("_id.method", infoKey.getMethod()),
@@ -311,69 +312,8 @@ public class SaveTestEditorAction extends UserAction {
         if (wordListsMap == null) {
             wordListsMap = new HashMap<String, List<String>>();
         }
-        for (String k: wordListsMap.keySet()) {
-            Map<String, String> m = new HashMap<>();
-            Object keyObj;
-            String key, location;
-            boolean isRegex = false;
-            try {
-                List<String> wordList = (List<String>) wordListsMap.get(k);
-                continue;
-            } catch (Exception e) {
-                try {
-                    m = (Map) wordListsMap.get(k);
-                } catch (Exception er) {
-                    continue;
-                }
-            }
-
-            keyObj = m.get("key");
-            location = m.get("location");
-            if (keyObj instanceof Map) {
-                Map<String, String> kMap = (Map) keyObj;
-                key = (String) kMap.get("regex");
-                isRegex = true;
-            } else {
-                key = (String) m.get("key");
-            }
-
-            boolean allApis = false;
-            if (m.containsKey("all_apis")) {
-                allApis = Objects.equals(m.get("all_apis"), true);
-            }
-            if (!allApis) {
-                continue;
-            }
-
-            filters = Filters.and(
-                Filters.eq("apiCollectionId", infoKey.getApiCollectionId()),
-                Filters.or(
-                    Filters.regex("param", key),
-                    Filters.regex("param", key.toLowerCase())
-                    )
-            );
-
-            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
-
-            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
-                ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
-                if (infKey.equals(infoKey)) {
-                    continue;
-                }
-                Bson sdfilters = Filters.and(
-                    Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
-                    Filters.eq("_id.method", singleTypeInfo.getMethod()),
-                    Filters.in("_id.url", singleTypeInfo.getUrl())
-                );
-
-                sd = SampleDataDao.instance.findOne(sdfilters);
-                newSampleDataMap.put(infKey, sd.getSamples());
-
-            }
-            List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key, location, isRegex);
-            wordListsMap.put(k, wordListVal);
-        }
-
+        
+        wordListsMap = VariableResolver.resolveWordList(wordListsMap, infoKey, newSampleDataMap);
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
