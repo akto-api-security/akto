@@ -10,7 +10,6 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.Log;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.NodeDetails.NodeDetails;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.core.JsonProcessingException;
