@@ -1425,6 +1425,7 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
+                        fillCollectionIdArray();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1633,9 +1634,6 @@ public class InitializerListener implements ServletContextListener {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
-
-
-        fillCollectionIdArray();
     }
 
 
