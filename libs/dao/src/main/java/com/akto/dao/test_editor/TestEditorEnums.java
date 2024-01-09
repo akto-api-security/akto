@@ -268,41 +268,41 @@ public class TestEditorEnums {
 
         for (ExecutorParentOperands operand: ExecutorParentOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "parent";
+                return ExecutorOperandTypes.Parent.toString().toLowerCase();
             }
         }
 
         for (RequestParentOperand operand: RequestParentOperand.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "req";
+                return ExecutorOperandTypes.Req.toString().toLowerCase();
             }
         }
 
         for (TerminalExecutorDataOperands operand: TerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "terminal";
+                return ExecutorOperandTypes.Terminal.toString().toLowerCase();
             }
         }
 
         for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "nonterminal";
+                return ExecutorOperandTypes.NonTerminal.toString().toLowerCase();
             }
         }
 
         for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "terminaltest";
+                return ExecutorOperandTypes.TerminalTest.toString().toLowerCase();
             }
         }
 
         for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "validate";
+                return ExecutorOperandTypes.Validate.toString().toLowerCase();
             }
         }
 
-        return "data";
+        return ExecutorOperandTypes.Data.toString().toLowerCase();
     }
 
 }
