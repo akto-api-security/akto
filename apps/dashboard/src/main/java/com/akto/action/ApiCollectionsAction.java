@@ -52,7 +52,6 @@ public class ApiCollectionsAction extends UserAction {
     LastCronRunInfo timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
 
     boolean redacted;
@@ -281,7 +280,6 @@ public class ApiCollectionsAction extends UserAction {
 
     public int getSensitiveUrlsInResponse() {
         return sensitiveUrlsInResponse;
-    }
     }
 
     public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
