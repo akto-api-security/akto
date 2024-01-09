@@ -4,12 +4,14 @@ import com.akto.DaoInit;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.billing.UsageMetricHandler;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -23,12 +25,14 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.LastCronRunInfo;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -65,6 +69,10 @@ public class StartTestAction extends UserAction {
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private boolean fetchAllTestRuns;
+
+    private Map<String,Long> allTestsCountMap = new HashMap<>();
+    private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters) {
         Bson projections = Projections.fields(
@@ -75,7 +83,7 @@ public class StartTestAction extends UserAction {
                 .collect(Collectors.toList());
     }
 
-    private static List<ObjectId> getCicdTests() {
+    public List<ObjectId> getCicdTests(){
         return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
     }
 
@@ -331,14 +339,20 @@ public class StartTestAction extends UserAction {
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
 
-        if (fetchCicd) {
+        if(fetchCicd){
+            // filters for test runs to be only CI/CD pipeline
             testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
+        } else if(fetchAllTestRuns){
+            // get All test runs which are not run by test editor
+            testingRunFilters.add(Filters.ne("triggeredBy", "test_editor"));
         } else {
-            Collections.addAll(testingRunFilters,
-                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
-                    Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
-                    Filters.nin(Constants.ID, getCicdTests()),
-                    Filters.ne("triggeredBy", "test_editor"));
+            // the left test are the scheduled one
+            Collections.addAll(testingRunFilters, 
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
+                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
+                Filters.nin(Constants.ID,getCicdTests()),
+                Filters.ne("triggeredBy", "test_editor")
+            );
         }
 
         testingRunFilters.addAll(prepareFilters());
@@ -351,7 +365,7 @@ public class StartTestAction extends UserAction {
 
         List<ObjectId> testingRunHexIds = new ArrayList<>();
         testingRuns.forEach(
-                localTestingRun -> {
+                localTestingRun->  {
                     testingRunHexIds.add(localTestingRun.getId());
                 });
 
@@ -578,6 +592,53 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // this gives the count for test runs types{ All, CI/CD, One-time, Scheduled}
+    // needed for new ui as the table was server table.
+    public String computeAllTestsCountMap(){
+        Map<String,Long> result = new HashMap<>();
+
+        long totalCount = TestingRunDao.instance.getMCollection().countDocuments();
+        List<Bson> filtersForCiCd = new ArrayList<>();
+        filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
+        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
+
+        int startTime = Context.now();
+        int endTime = Context.now() + 86400;
+        List<Bson> filtersForSchedule = new ArrayList<>();
+        Collections.addAll(filtersForSchedule,
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTime),
+                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTime),
+                Filters.nin(Constants.ID,getCicdTests())
+        );
+        long scheduleCount =  TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForSchedule));
+
+        long oneTimeCount = totalCount - cicdCount - scheduleCount;
+        result.put("allTestRuns", totalCount);
+        result.put("oneTime", oneTimeCount);
+        result.put("scheduled", scheduleCount);
+        result.put("cicd", cicdCount);
+
+        this.allTestsCountMap = result;
+        return SUCCESS.toUpperCase();
+    }
+
+    // this gives the count of total vulnerabilites and map of count of subcategories for which issues are generated.
+    public String getIssueSummaryInfo(){
+
+        if(this.endTimestamp == 0){
+            this.endTimestamp = Context.now();
+        }
+        // issues default for 2 months
+        if(this.startTimestamp == 0){
+            this.startTimestamp = Context.now() - (2 * Constants.ONE_MONTH_TIMESTAMP);
+        }
+
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp);
+        this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
+
+        return SUCCESS.toUpperCase();
+    }
+
     private List<String> testRunIds;
     private List<String> latestSummaryIds;
 
@@ -609,6 +670,12 @@ public class StartTestAction extends UserAction {
                     testConfigIds, latestSummaryIds);
             executeDelete(DeleteTestRuns);
 
+            // set timestamp for last calculated severity score as 0. then severity score of apiinfo will get updated automatically
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                                AccountSettingsDao.generateFilter(),
+                                Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SEVERITY), 0),
+                                new UpdateOptions().upsert(true)
+                            );
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -888,6 +955,22 @@ public class StartTestAction extends UserAction {
 
     public Map<String, Set<String>> getMetadataFilters() {
         return metadataFilters;
+    }
+
+    public boolean isFetchAllTestRuns() {
+        return fetchAllTestRuns;
+    }
+
+    public void setFetchAllTestRuns(boolean fetchAllTestRuns) {
+        this.fetchAllTestRuns = fetchAllTestRuns;
+    }
+    
+    public Map<String, Integer> getIssuesSummaryInfoMap() {
+        return issuesSummaryInfoMap;
+    }
+
+    public Map<String, Long> getAllTestsCountMap() {
+        return allTestsCountMap;
     }
 
     public List<String> getTestRunIds() {
