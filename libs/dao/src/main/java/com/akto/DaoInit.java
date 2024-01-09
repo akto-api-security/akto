@@ -138,10 +138,14 @@ public class DaoInit {
                 .builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult> workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class)
                 .enableDiscriminator(true).build();
+        ClassModel<WorkflowTest> workflowTestClassModel = ClassModel.builder(WorkflowTest.class)
+                .enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true)
                 .build();
         ClassModel<CustomWebhook> CustomWebhookClassModel = ClassModel.builder(CustomWebhook.class)
                 .enableDiscriminator(true).build();
+        ClassModel<WorkflowNodeDetails> WorkflowNodeDetailsClassModel = ClassModel.builder(WorkflowNodeDetails.class)
+                .enableDiscriminator(true).build();                
         ClassModel<CustomWebhookResult> CustomWebhookResultClassModel = ClassModel.builder(CustomWebhookResult.class)
                 .enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult.NodeResult> nodeResultClassModel = ClassModel
@@ -211,7 +215,7 @@ public class DaoInit {
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
-                cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
+                cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
@@ -219,7 +223,7 @@ public class DaoInit {
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, testLibraryClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
-                nodeDetails, yamlNodeDetails, multiExecTestResultClassModel).automatic(true).build());
+                nodeDetails, yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
