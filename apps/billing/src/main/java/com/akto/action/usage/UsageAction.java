@@ -1,6 +1,10 @@
 package com.akto.action.usage;
 
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import javax.servlet.http.HttpServletRequest;
 
 import com.akto.util.UsageUtils;
@@ -25,6 +29,8 @@ import com.opensymphony.xwork2.ActionSupport;
 public class UsageAction extends ActionSupport implements ServletRequestAware {
     private UsageMetric usageMetric;
     private HttpServletRequest request;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
     private int usageLowerBound;
@@ -104,8 +110,12 @@ public class UsageAction extends ActionSupport implements ServletRequestAware {
              */
             usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL;
             usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
-            InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);
-            loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
+            executorService.schedule(new Runnable() {
+                public void run() {
+                    InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);
+                    loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
+                }
+            }, 0, TimeUnit.SECONDS);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             String commonMessage = "Error while flushing usage data for organization";

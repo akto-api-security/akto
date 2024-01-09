@@ -293,7 +293,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         Bson filter = null;
         if (apiCollectionId != -1) {
-            filter = Filters.eq("apiCollectionId", apiCollectionId);
+            filter = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
         }
         List<Bson> pipeline = getPipelineForEndpoints(filter);
 
