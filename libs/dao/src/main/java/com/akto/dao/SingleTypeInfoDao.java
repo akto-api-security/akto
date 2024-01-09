@@ -434,7 +434,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.count("totalSensitiveApis"));
 
         MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        BasicDBObject basicDBObject = cursor.next();
-        return basicDBObject.getInt("totalSensitiveApis");
+
+        if(cursor.hasNext()){
+            BasicDBObject basicDBObject = cursor.next();
+            return basicDBObject.getInt("totalSensitiveApis");
+        }else{
+            return 0;
+        }
+        
     }
 }
