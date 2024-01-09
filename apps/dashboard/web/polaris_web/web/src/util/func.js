@@ -54,7 +54,7 @@ const func = {
   },
 prettifyEpoch(epoch) {
     if(epoch === 0){
-      return "-" ;
+      return "Never" ;
     }
     let diffSeconds = (+Date.now()) / 1000 - epoch
     let sign = 1

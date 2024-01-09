@@ -81,7 +81,7 @@ public class ApiCollectionsAction extends UserAction {
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 count = Utils.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 apiCollection.setUrlsCount(count);
-            }else {
+            } else {
                 apiCollection.setUrlsCount(fallbackCount);
             }
             apiCollection.setUrls(new HashSet<>());
