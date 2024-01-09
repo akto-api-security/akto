@@ -150,12 +150,12 @@ public class Main {
 
         if (trrs != null && trrs.getTestIdConfig() > 1) {
             configFromTrrs = TestingRunConfigDao.instance.findOne(Constants.ID, trrs.getTestIdConfig());
-            loggerMaker.infoAndAddToDb("Found testing run config with id :" + configFromTrrs.getId(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Found testing run trrs config with id :" + configFromTrrs.getId(), LogDb.TESTING);
         }
 
         if (testingRun.getTestIdConfig() > 1) {
             baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            loggerMaker.infoAndAddToDb("Found testing run config with id :" + baseConfig.getId(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
         }
 
         if (configFromTrrs == null) {
@@ -164,6 +164,8 @@ public class Main {
             configFromTrrs.rebaseOn(baseConfig);
             testingRun.setTestingRunConfig(configFromTrrs);
         }
+
+        System.out.println(testingRun.getTestingRunConfig());
     }
 
     public static void main(String[] args) throws InterruptedException {

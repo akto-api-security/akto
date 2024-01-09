@@ -18,12 +18,15 @@ function Dashboard() {
 
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
     const allCollections = PersistStore(state => state.allCollections)
 
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+        const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
+        setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
         setAllCollections(apiCollections)
     }

@@ -1,5 +1,7 @@
 package com.akto.testing;
 
+import com.akto.dao.ActivitiesDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -286,6 +288,9 @@ public class TestExecutor {
         GithubUtils.publishGithubComments(testingRunResultSummary);
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
+        if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
+            ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
+        }
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
@@ -459,9 +464,10 @@ public class TestExecutor {
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, SyncLimit syncLimit) {
 
-        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
-
         Context.accountId.set(accountId);
+        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
+
+        
         int now = Context.now();
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
@@ -531,6 +537,7 @@ public class TestExecutor {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
+        int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
             List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -551,9 +558,15 @@ public class TestExecutor {
                 loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
                 e.printStackTrace();
             }
-            if (testingRunResult != null) testingRunResults.add(testingRunResult);
+            if (testingRunResult != null) {
+                testingRunResults.add(testingRunResult);
+                countSuccessfulTests++;
+            }
 
             insertResultsAndMakeIssues(testingRunResults);
+        }
+        if(countSuccessfulTests > 0){
+            ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
         }
 
     }
