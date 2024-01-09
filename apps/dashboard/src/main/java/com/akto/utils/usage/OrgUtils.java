@@ -6,6 +6,7 @@ import com.akto.dto.Account;
 import com.akto.dto.billing.Organization;
 import com.mongodb.client.model.Filters;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class OrgUtils {
@@ -18,6 +19,7 @@ public class OrgUtils {
                 )
         );
 
+        if(organization == null) return new ArrayList<>();
 
         return AccountsDao.instance.findAll(
                 Filters.and(

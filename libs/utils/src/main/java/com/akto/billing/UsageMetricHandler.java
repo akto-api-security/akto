@@ -128,38 +128,42 @@ public class UsageMetricHandler {
 
     }
 
-    private static void updateOrgMeteredUsage(Organization organization) {
+    public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, String organizationId){
 
-        String organizationId = organization.getId();
-
-        // since an org can have multiple accounts, we need to consolidate the usage.
-        Map<String, Integer> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(organizationId);
-        
-        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-        
         if (featureWiseAllowed == null) {
             featureWiseAllowed = new HashMap<>();
         }
 
-        for (Map.Entry<String, Integer> entry : consolidatedOrgUsage.entrySet()) {
+        // since an org can have multiple accounts, we need to consolidate the usage.
+        Map<String, FeatureAccess> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(organizationId);
 
+        for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
             String featureLabel = entry.getKey();
-            int usage = entry.getValue();
+            FeatureAccess featureAccess = entry.getValue();
 
-            FeatureAccess featureAccess = featureWiseAllowed.get(featureLabel);
+            if (consolidatedOrgUsage.containsKey(featureLabel)) {
+                FeatureAccess orgUsage = consolidatedOrgUsage.get(featureLabel);
+                featureAccess.setUsage(orgUsage.getUsage());
 
-            if (featureAccess != null) {
-                featureAccess.setUsage(usage);
-                if (featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
-                    if (featureAccess.getOverageFirstDetected() == -1) {
-                        featureAccess.setOverageFirstDetected(Context.now());
+                if(!featureAccess.checkUnlimited() && featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
+                    if(featureAccess.getOverageFirstDetected() == -1){
+                        featureAccess.setOverageFirstDetected(orgUsage.getOverageFirstDetected());
                     }
                 } else {
                     featureAccess.setOverageFirstDetected(-1);
                 }
+                featureWiseAllowed.put(featureLabel, featureAccess);
             }
-            featureWiseAllowed.put(featureLabel, featureAccess);
         }
+        return featureWiseAllowed;
+    }
+
+    private static void updateOrgMeteredUsage(Organization organization) {
+
+        String organizationId = organization.getId();
+
+        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+        featureWiseAllowed = updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, organizationId);
         organization.setFeatureWiseAllowed(featureWiseAllowed);
 
         OrganizationsDao.instance.updateOne(

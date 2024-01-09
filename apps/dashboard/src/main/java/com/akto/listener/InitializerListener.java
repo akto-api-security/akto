@@ -1442,8 +1442,7 @@ public class InitializerListener implements ServletContextListener {
             int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
 
             /*
-             * This ensures, we don't fetch feature wise allowed too often, 
-             * as it is a time-consuming operation.
+             * This ensures, we don't fetch feature wise allowed from akto too often.
              * This helps the dashboard to be more responsive.
              */
             if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
@@ -1453,9 +1452,8 @@ public class InitializerListener implements ServletContextListener {
             BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId,
                     organization.getAdminEmail());
 
-            Map<String, Integer> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(organizationId);
-
-            featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements, consolidatedOrgUsage);
+            featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
+            featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, organizationId);
 
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 String label = entry.getKey();
