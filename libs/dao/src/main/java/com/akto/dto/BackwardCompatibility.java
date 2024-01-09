@@ -53,13 +53,17 @@ public class BackwardCompatibility {
 
     public static final String ORGS_IN_BILLING = "orgsInBilling";
     private int orgsInBilling;
+    
+    public static final String DELETE_LAST_CRON_RUN_INFO= "deleteLastCronRunInfo";
+    private int deleteLastCronRunInfo;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging, int enableMergeAsyncOutside,
                                  int loadTemplateFilesFromDirectory, int aktoDefaultNewUI,
-                                 int initializeOrganizationAccountBelongsTo, int orgsInBilling, int computeIntegratedConnections) {
+                                 int initializeOrganizationAccountBelongsTo, int orgsInBilling, int computeIntegratedConnections, 
+                                 int deleteLastCronRunInfo) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -78,6 +82,7 @@ public class BackwardCompatibility {
         this.computeIntegratedConnections = computeIntegratedConnections;
         this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
         this.orgsInBilling = orgsInBilling;
+        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
     }
 
     public BackwardCompatibility() {
@@ -232,5 +237,13 @@ public class BackwardCompatibility {
 
     public void setOrgsInBilling(int orgsInBilling) {
         this.orgsInBilling = orgsInBilling;
+    }
+
+    public int getDeleteLastCronRunInfo() {
+        return deleteLastCronRunInfo;
+    }
+
+    public void setDeleteLastCronRunInfo(int deleteLastCronRunInfo) {
+        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
     }
 }
