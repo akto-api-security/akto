@@ -54,7 +54,7 @@ function highlightHeaders(data, ref, getLineNumbers){
   let changesArr = []
   headerKeysMap && Object.keys(headerKeysMap).forEach((key) => {
     const header = key
-    let matchRanges = ref.getModel().findMatches(header, false, true, true, null, true, 1)
+    let matchRanges = ref.getModel().findMatches(header, false, false, true, null, true, 1)
     changesArr = [ ...changesArr, ...matchRanges]
     matchRanges.forEach((obj) => {
       let matchRange = obj.range

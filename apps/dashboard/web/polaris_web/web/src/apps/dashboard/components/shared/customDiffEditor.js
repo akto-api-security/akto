@@ -149,14 +149,14 @@ const transform = {
             for (let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))) {
                 if (ogArr[i] && curArr[i]) {
                     if (ogArr[i] !== curArr[i]) {
-                        res.headersMap[curArr[i]] = { className: 'updated-content', data: ogArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + "->" + curArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), keyLength: -2 }
+                        res.headersMap[this.escapeRegex(curArr[i])] = { className: 'updated-content', data: ogArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + "->" + curArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), keyLength: -2 }
                     }
                     retArr.push(curArr[i]);
                 } else if (ogArr[i]) {
-                    res.headersMap[curArr[i]] = { className: 'deleted-content' };
+                    res.headersMap[this.escapeRegex(curArr[i])] = { className: 'deleted-content' };
                     retArr.push(ogArr[i]);
                 } else if (curArr[i]) {
-                    res.headersMap[curArr[i]] = { className: 'added-content' };
+                    res.headersMap[this.escapeRegex(curArr[i])] = { className: 'added-content' };
                     retArr.push(curArr[i]);
                 }
             }
@@ -167,23 +167,34 @@ const transform = {
 
             let og = this.standardDiff(original)
             let cur = this.standardDiff(current)
-            res.json = og + "\n" + cur
-            og.split("\n").forEach((line) => {
-                res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
-            })
-            cur.split("\n").forEach((line) => {
-                res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
-            })
+            if(og === cur){
+                res.json = cur
+            }
+            else {
+                res.json = og + "\n" + cur
+                og.split("\n").forEach((line) => {
+                    res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+                })
+                cur.split("\n").forEach((line) => {
+                    res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+                })
+            }
+            
         }
 
         return res;
     },
 
     standardDiff(data) {
+
+        if(data == null || data == undefined){
+            return "";
+        }    
+
         let type = typeof (data)
 
         if (type === 'string' || type === 'number' || type === 'boolean') {
-            return data;
+            return data.toString();
         } else if (type === 'object') {
             if (Array.isArray(data)) {
                 return this.processArrayJson(this.formatJson(data))
@@ -191,12 +202,12 @@ const transform = {
                 return this.formatJson(data)
             }
         } else {
-            return data;
+            return data.toString();
         }
     },
 
     escapeRegex(string) {
-        return "^" + string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$";
+        return string;
     },
 
     getSearchKey(mainKey, value) {
