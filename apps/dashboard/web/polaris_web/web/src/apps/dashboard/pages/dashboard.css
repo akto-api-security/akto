@@ -43,6 +43,7 @@
     --p-color-bg-primary-hover: #5400CB !important;
     --p-color-bg-primary-active: #4700AE !important;
     --p-color-bg-primary-subdued-hover: #ECEBFF !important;
+    --p-color-bg-info-subdued-hover: #F2F7FE !important;
 
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
@@ -76,7 +77,6 @@
 .Polaris-Tabs .Polaris-Badge--statusSuccess{
     background: rgba(221, 224, 228, 1) !important;
 }
-
 .Polaris-TopBar-UserMenu__Details{
     margin-right: 0px !important;
 }

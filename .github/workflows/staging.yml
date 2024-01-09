@@ -147,7 +147,10 @@ jobs:
             --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
             --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
             --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
-
+          kubectl delete deployment/${IMAGE_TAG}-akto-runtime  -n dev
+          kubectl delete deployment/${IMAGE_TAG}-akto-keel  -n dev
+          kubectl delete deployment/${IMAGE_TAG}-akto-testing  -n dev
+          
           echo "initiating patch..." >> $GITHUB_STEP_SUMMARY
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
 
@@ -188,9 +191,9 @@ jobs:
 
       - uses: akto-api-security/run-scan@v1.0.12
         with:
-          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 65590b1ce9fca33d79d45440
+          AKTO_DASHBOARD_URL: https://ironman.demo.akto.io
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY_IRONMAN}}
+          AKTO_TEST_ID: 65966575b939653ca9e8bb5b
           GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
           START_TIME_DELAY: 2
           OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
@@ -225,7 +228,6 @@ jobs:
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
         cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
-
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:

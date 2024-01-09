@@ -35,7 +35,9 @@ import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.UsageSync;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
+import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
+import com.akto.util.LastCronRunInfo;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
@@ -188,6 +190,10 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class)
                 .enableDiscriminator(true).build();
+        ClassModel<LastCronRunInfo> cronTimersClassModel = ClassModel.builder(LastCronRunInfo.class)
+                .enableDiscriminator(true).build();
+        ClassModel<ConnectionInfo> connectionInfoClassModel = ClassModel.builder(ConnectionInfo.class)
+                .enableDiscriminator(true).build();
         ClassModel<TestLibrary> testLibraryClassModel = ClassModel.builder(TestLibrary.class).enableDiscriminator(true).build();
 
         ClassModel<UsageMetric> UsageMetricClassModel = ClassModel.builder(UsageMetric.class).enableDiscriminator(true).build();
@@ -216,7 +222,7 @@ public class DaoInit {
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, testLibraryClassModel,
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel,testLibraryClassModel,
                 collectionConditionClassModel, apiListConditionClassModel, methodConditionClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
 

@@ -4,8 +4,8 @@ import {
     Badge,
     VerticalStack,
     HorizontalStack,
-    Button, 
-    Popover, 
+    Button,
+    Popover,
     ActionList,
     Link,
     Box,
@@ -15,7 +15,7 @@ import {
     HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useCallback, useEffect} from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
@@ -36,9 +36,9 @@ function GithubRow(props) {
 
     const togglePopoverActive = (index) => useCallback(
         () => setPopoverActive((prev) => {
-            if(prev==index){
+            if (prev == index) {
                 return -1;
-            } 
+            }
             return index;
         }),
         [],
@@ -69,11 +69,10 @@ function GithubRow(props) {
 
     useEffect(() => {
         setData((prev) => {
-            if(func.deepComparison(prev,dataObj))
-            {
+            if (func.deepComparison(prev, dataObj)) {
                 return prev;
             }
-            return {...dataObj};
+            return { ...dataObj };
         })
     }, [dataObj,collapsibleActive])
 
@@ -161,7 +160,7 @@ function GithubRow(props) {
 
     function TextCell(header) {
         return (
-            <Box maxWidth={header.maxWidth ? header.maxWidth : ''}>
+            <Box maxWidth={header.maxWidth ? header.maxWidth : ''} key={header.value}>
                 <TooltipText text={data[header.value]} tooltip={data[header.value]} />
             </Box>
         )
@@ -207,13 +206,13 @@ function GithubRow(props) {
         switch(type){
 
             case CellType.ACTION : 
-                return hasRowActions ? ActionCell() : <></>;
+                return hasRowActions ? ActionCell() : null;
             case CellType.COLLAPSIBLE :
                 return CollapsibleCell();
             case CellType.TEXT :
-                return header.value ? LinkCell(TextCell(header), header) : <></>;
+                return header.value ? LinkCell(TextCell(header), header) : null;
             default :
-                return header.value ? LinkCell(data[header.value], header) : <></>;
+                return header.value ? LinkCell(data[header.value], header) : null;
         }
     }
 

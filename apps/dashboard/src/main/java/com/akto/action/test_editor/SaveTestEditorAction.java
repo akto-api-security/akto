@@ -9,11 +9,14 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -32,6 +35,7 @@ import com.akto.store.TestingUtil;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -91,6 +95,29 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String getInfoKeyMissing(Info info){
+        if (info.getName() == null){
+            return "name";
+        }
+        if(info.getDescription() == null){
+            return "description";
+        }
+        if(info.getDetails() == null){
+            return "details";
+        }
+        if(info.getCategory() == null){
+            return "category";
+        }
+        if(info.getSeverity() == null){
+            return "severity";
+        }
+        if(info.getSubCategory() == null){
+            return "subcategory";
+        }
+
+        return "";
+    }
+
     public String saveTestEditorFile() {
         TestConfig testConfig;
         try {
@@ -103,6 +130,21 @@ public class SaveTestEditorAction extends UserAction {
             Object info = config.get("info");
             if (info == null) {
                 addActionError("Error in template: info key absent");
+                return ERROR.toUpperCase();
+            }
+
+            // adding all necessary fields check for info in editor
+            InfoParser parser = new InfoParser();
+            Info convertedInfo = parser.parse(info);
+            
+            String keyMissingInInfo = getInfoKeyMissing(convertedInfo);
+            if(keyMissingInInfo.length() > 0){
+                addActionError("Error in template: " + keyMissingInInfo + " key absent");
+                return ERROR.toUpperCase();
+            }
+
+            Category category = convertedInfo.getCategory();
+            if (category.getName() == null || category.getDisplayName() == null || category.getShortName() == null) {
                 return ERROR.toUpperCase();
             }
 
