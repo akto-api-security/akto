@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import com.akto.dto.testing.TestResult.TestError;
 
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
@@ -45,6 +46,12 @@ public class MultiExecTestResult extends GenericTestResult {
             Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = testingRunResult.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
             YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(k);
             String originalMessage = workflowNodeDetails.getOriginalMessage();
+            if (messageList.size() <= 1) {
+                List<String> error_messages = new ArrayList<>();
+                error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                runResults.add(new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null));
+            }
+
             for (int i = 1; i<messageList.size(); i++) {
                 String message = "{\"request\": " + messageList.get(i);
                 if (i != messageList.size() - 1) {
