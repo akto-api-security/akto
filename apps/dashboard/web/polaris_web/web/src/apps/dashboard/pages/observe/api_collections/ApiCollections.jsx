@@ -193,7 +193,7 @@ function ApiCollections() {
         
         tmp = {}
         tmp.All = dataObj.prettify
-        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null)
+        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
         tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
         tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
 

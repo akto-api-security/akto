@@ -71,11 +71,9 @@ public class ApiCollectionUsers {
             return 0;
         }
 
-        Bson StiFilters = getFilters(conditions, CollectionType.ApiCollectionId);
-        Bson HostFilters = SingleTypeInfoDao.filterForHostHeader(0, false);
-        Bson filter = Filters.and(HostFilters, StiFilters);
+        Bson apiInfoFilters = getFilters(conditions, CollectionType.Id_ApiCollectionId);
 
-        return (int) SingleTypeInfoDao.instance.count(filter);
+        return (int) ApiInfoDao.instance.count(apiInfoFilters);
     }
 
     public static void updateApiCollection(List<CollectionCondition> conditions, int id) {

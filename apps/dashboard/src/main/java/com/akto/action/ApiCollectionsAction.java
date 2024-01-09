@@ -20,6 +20,7 @@ import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -75,10 +76,12 @@ public class ApiCollectionsAction extends UserAction {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
-            if (count != null && (apiCollection.getHostName() != null ||
-                    ApiCollection.Type.API_GROUP.equals(apiCollection.getType()))) {
+            if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
-            } else {
+            } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
+                count = Utils.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+                apiCollection.setUrlsCount(count);
+            }else {
                 apiCollection.setUrlsCount(fallbackCount);
             }
             apiCollection.setUrls(new HashSet<>());
