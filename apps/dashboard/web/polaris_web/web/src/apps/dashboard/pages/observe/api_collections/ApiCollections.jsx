@@ -18,8 +18,8 @@ const headers = [
     {
         title: "API collection name",
         text: "API collection name",
-        value: "displayName",
-        maxWidth: "45vw",
+        value: "displayNameComp",
+        filterKey:"displayName",
         showFilter:true,
         type: CellType.TEXT
     },
