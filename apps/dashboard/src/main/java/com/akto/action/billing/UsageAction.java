@@ -131,6 +131,14 @@ public class UsageAction extends UserAction {
         User sUser = getSUser();
         int anyAccountId = Integer.parseInt(sUser.findAnyAccountId());
         
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, anyAccountId));
+
+        if(organization == null){
+            addActionError("Organization not found");
+            return ERROR.toUpperCase();
+        }
+
         // calculation may take time, so we do it in a separate thread to avoid timeout.
         executorService.schedule(new Runnable() {
             public void run() {
@@ -143,13 +151,11 @@ public class UsageAction extends UserAction {
                     UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
                 });
 
-                Organization organization = OrganizationsDao.instance.findOne(
-                        Filters.in(Organization.ACCOUNTS, anyAccountId));
-
                 try {
-                    loggerMaker.infoAndAddToDb("Flushing usage pipeline", LogDb.DASHBOARD);
-                    OrganizationUtils.flushUsagePipelineForOrg(organization.getId());
-                    loggerMaker.infoAndAddToDb("Usage pipeline flushed", LogDb.DASHBOARD);
+                    String orgId = organization.getId();
+                    loggerMaker.infoAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
+                    OrganizationUtils.flushUsagePipelineForOrg(orgId);
+                    loggerMaker.infoAndAddToDb("Usage pipeline flushed for " + orgId, LogDb.DASHBOARD);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);
                 }

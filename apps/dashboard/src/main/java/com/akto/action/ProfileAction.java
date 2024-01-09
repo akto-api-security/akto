@@ -116,11 +116,6 @@ public class ProfileAction extends UserAction {
             ); 
             String organizationId = organization.getId();
 
-            HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
-            if(initialFeatureWiseAllowed == null) {
-                initialFeatureWiseAllowed = new HashMap<>();
-            }
-
             boolean isOverage = false;
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
             int gracePeriod = organization.getGracePeriod();

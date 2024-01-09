@@ -145,14 +145,14 @@ public class AktoPolicyNew {
         
         if (featureAccess.checkOverageAfterGrace()) {
 
-            int limit = featureAccess.getUsageLimit();
+            int usageLimit = featureAccess.getUsageLimit();
             int measureEpoch = featureAccess.getMeasureEpoch();
 
             /*
             * delete all data related to endpoints after the 
             * specified limit for the current measureEpoch.
             */
-            EndpointUtil.deleteEndpoints(limit, measureEpoch);
+            EndpointUtil.deleteEndpoints(usageLimit, measureEpoch);
         }
     }
 

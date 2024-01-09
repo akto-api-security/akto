@@ -30,7 +30,7 @@ public class FeatureAccess {
     }
 
     public FeatureAccess(boolean isGranted) {
-        this(isGranted, -1, -1, -1);
+        this(isGranted, -1, -1, 0);
     }
 
     public FeatureAccess() {

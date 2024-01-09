@@ -9,6 +9,7 @@ import java.util.Map;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.BillingContextDao;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
@@ -56,8 +57,9 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
 
     private final String LATEST_DOCUMENT = "latestDocument";
     private final String TOTAL_USAGE = "totalUsage";
+    private final String LAST_MEASURED = "lastMeasured";
 
-    public Map<String, Integer> findLatestUsageMetricsForOrganization(String organizationId) {
+    public Map<String, FeatureAccess> findLatestUsageMetricsForOrganization(String organizationId) {
 
         BasicDBObject groupedId = new BasicDBObject(UsageMetric.METRIC_TYPE, Util.prefixDollar(UsageMetric.METRIC_TYPE))
                 .append(UsageMetric.ACCOUNT_ID, Util.prefixDollar(UsageMetric.ACCOUNT_ID));
@@ -68,17 +70,22 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
                 Aggregates.group(groupedId, Accumulators.first(LATEST_DOCUMENT, MCollection.ROOT_ELEMENT)),
                 Aggregates.replaceRoot(Util.prefixDollar(LATEST_DOCUMENT)),
                 Aggregates.group(Util.prefixDollar(UsageMetric.METRIC_TYPE),
-                        Accumulators.sum(TOTAL_USAGE, Util.prefixDollar(UsageMetric._USAGE))));
+                        Accumulators.sum(TOTAL_USAGE, Util.prefixDollar(UsageMetric._USAGE)),
+                        Accumulators.max(LAST_MEASURED, Util.prefixDollar(UsageMetric.RECORDED_AT))));
 
         MongoCursor<BasicDBObject> cursor = UsageMetricsDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
 
-        Map<String, Integer> consolidatedUsage = new HashMap<>();
+        Map<String, FeatureAccess> consolidatedUsage = new HashMap<>();
 
         while (cursor.hasNext()) {
             BasicDBObject v = cursor.next();
             try {
-                consolidatedUsage.put((String) v.get(Constants.ID), (int) v.get(TOTAL_USAGE));
+                String metricType = (String) v.get(Constants.ID);
+                int usage = (int) v.get(TOTAL_USAGE);
+                int lastMeasured = (int) v.get(LAST_MEASURED);
+                FeatureAccess featureAccess = new FeatureAccess(true, lastMeasured, -1, usage);
+                consolidatedUsage.put(metricType, featureAccess);
             } catch (Exception e) {
             }
         }
