@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -120,6 +120,7 @@ function ApiEndpoints() {
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
     const [redacted, setIsRedacted] = useState(false)
+    const [showRedactModal, setShowRedactModal] = useState(false)
 
     const tableTabs = [
         {
@@ -248,7 +249,17 @@ function ApiEndpoints() {
         func.setToast(true, false, "Endpoints refreshed")
     }
 
+    function redactCheckBoxClicked(){
+        if(!redacted){
+            setShowRedactModal(true)
+        } else {
+            setIsRedacted(false)
+            redactCollection();
+        }
+    }
+
     function redactCollection(){
+        setShowRedactModal(false)
         var updatedRedacted = !redacted;
         api.redactCollection(apiCollectionId, updatedRedacted).then(resp => {
             setIsRedacted(updatedRedacted)
@@ -399,7 +410,7 @@ function ApiEndpoints() {
                     </Popover.Section>
                     <Popover.Section>
                         <VerticalStack gap={2}>
-                            <Text>Export as:</Text>
+                            <Text>Export as</Text>
                                 <VerticalStack gap={1}>
                                 <div onClick={exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
@@ -410,6 +421,18 @@ function ApiEndpoints() {
                                 <div onClick={exportCsv} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
+                            </VerticalStack>
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <Text>Others</Text>
+                                <VerticalStack gap={1}>
+                                <Checkbox
+                                    label='Redact'
+                                    checked={redacted}
+                                    onChange={() => redactCheckBoxClicked()}
+                                />
                             </VerticalStack>
                         </VerticalStack>
                     </Popover.Section>
@@ -434,56 +457,75 @@ function ApiEndpoints() {
         },200)
     }
 
+    let modal = (
+        <Modal
+            open={showRedactModal}
+            onClose={() => setShowRedactModal(false)}
+            title="Note!"
+            primaryAction={{
+                content: 'Enable',
+                onAction: redactCollection
+            }}
+        >
+            <Modal.Section>
+                <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
     return (
-        <PageWithMultipleCards
-            title={
-                <Box maxWidth="35vw">
-                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
-                </Box>
-            }
-            backUrl="/dashboard/observe/inventory"
-            secondaryActions={secondaryActionsComponent}
-            components={
-                loading ? [<SpinnerCentered key="loading" />] :
-                    [
-                        <div className="apiEndpointsTable" key="table">
-                            <GithubSimpleTable
-                                key="table"
-                                pageLimit={50}
-                                data={endpointData[selectedTab]}
-                                sortOptions={sortOptions}
-                                resourceName={resourceName}
-                                filters={[]}
-                                disambiguateLabel={disambiguateLabel}
-                                headers={headers}
+        <>
+            <PageWithMultipleCards
+                title={
+                    <Box maxWidth="35vw">
+                        <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
+                    </Box>
+                }
+                backUrl="/dashboard/observe/inventory"
+                secondaryActions={secondaryActionsComponent}
+                components={
+                    loading ? [<SpinnerCentered key="loading" />] :
+                        [
+                            <div className="apiEndpointsTable" key="table">
+                                <GithubSimpleTable
+                                    key="table"
+                                    pageLimit={50}
+                                    data={endpointData[selectedTab]}
+                                    sortOptions={sortOptions}
+                                    resourceName={resourceName}
+                                    filters={[]}
+                                    disambiguateLabel={disambiguateLabel}
+                                    headers={headers}
+                                    getStatus={() => { return "warning" }}
+                                    selected={selected}
+                                    onRowClick={handleRowClick}
+                                    onSelect={handleSelectedTab}
+                                    getFilteredItems={getFilteredItems}
+                                    mode={IndexFiltersMode.Default}
+                                    headings={headings}
+                                    useNewRow={true}
+                                    condensedHeight={true}
+                                    tableTabs={tableTabs}
+                                />
+                                <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+                                    <Modal.Section flush>
+                                        <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
+                                    </Modal.Section>
+                                </Modal>
+                            </div>,
+                            <ApiDetails
+                                key="details"
+                                showDetails={showDetails}
+                                setShowDetails={setShowDetails}
+                                apiDetail={apiDetail}
+                                headers={transform.getDetailsHeaders()}
                                 getStatus={() => { return "warning" }}
-                                selected={selected}
-                                onRowClick={handleRowClick}
-                                onSelect={handleSelectedTab}
-                                getFilteredItems={getFilteredItems}
-                                mode={IndexFiltersMode.Default}
-                                headings={headings}
-                                useNewRow={true}
-                                condensedHeight={true}
-                                tableTabs={tableTabs}
+                                isGptActive={isGptActive}
                             />
-                            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
-                                <Modal.Section flush>
-                                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
-                                </Modal.Section>
-                            </Modal>
-                        </div>,
-                        <ApiDetails
-                            key="details"
-                            showDetails={showDetails}
-                            setShowDetails={setShowDetails}
-                            apiDetail={apiDetail}
-                            headers={transform.getDetailsHeaders()}
-                            getStatus={() => { return "warning" }}
-                            isGptActive={isGptActive}
-                        />
-                    ]}
-        />
+                        ]}
+            />
+            {modal}
+        </>
     )
 }
 

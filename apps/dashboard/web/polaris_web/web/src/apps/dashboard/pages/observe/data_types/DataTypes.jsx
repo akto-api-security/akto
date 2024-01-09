@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { Button, LegacyCard, HorizontalGrid, TextField, VerticalStack, Text } from '@shopify/polaris'
+import { Button, LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Banner } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -9,6 +9,7 @@ import func from "@/util/func"
 import api from '../api'
 import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
+import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
 
 const statusItems = [
   {
@@ -270,6 +271,10 @@ function DataTypes() {
   const redactCard = (
     <VerticalStack gap="5" key="redact">
       <LegacyCard title= "Redact" >
+        <div className='card-items'>
+          <InformationBannerComponent docsUrl={""} content="When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.">
+          </InformationBannerComponent>
+        </div>
         <LegacyCard.Section>
           <p>Redact this data type</p>
           <br/>
