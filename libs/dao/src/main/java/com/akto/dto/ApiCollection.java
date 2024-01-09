@@ -16,6 +16,7 @@ public class ApiCollection {
     public static final String NAME = "name";
     String name;
     int startTs;
+    public static final String _URLS = "urls";
     Set<String> urls;
     String hostName;
     public static final String HOST_NAME = "hostName";

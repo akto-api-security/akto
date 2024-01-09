@@ -20,7 +20,6 @@ import java.util.HashSet;
 import com.akto.utils.usage.OrgUtils;
 import com.mongodb.client.model.Filters;
 
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +45,6 @@ public class UsageAction extends UserAction {
             "mac.com","centurytel.net","chello.nl","live.ca","aim.com","bigpond.net.au"};
 
     public static final HashSet<String> freeDomainsSet = new HashSet<>(Arrays.asList(freeDomains));
-    public static final ExecutorService ex = Executors.newFixedThreadPool(1);
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
 
@@ -155,7 +153,6 @@ public class UsageAction extends UserAction {
                     String orgId = organization.getId();
                     loggerMaker.infoAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
                     OrganizationUtils.flushUsagePipelineForOrg(orgId);
-                    loggerMaker.infoAndAddToDb("Usage pipeline flushed for " + orgId, LogDb.DASHBOARD);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);
                 }

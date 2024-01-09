@@ -4,6 +4,7 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.Account;
 import com.akto.dto.billing.Organization;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 
 import java.util.ArrayList;
@@ -23,7 +24,7 @@ public class OrgUtils {
 
         return AccountsDao.instance.findAll(
                 Filters.and(
-                        Filters.in("_id", organization.getAccounts())
+                        Filters.in(Constants.ID, organization.getAccounts())
                 ));
     }
 }

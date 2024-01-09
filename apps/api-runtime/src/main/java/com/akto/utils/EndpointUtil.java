@@ -15,6 +15,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -42,7 +43,7 @@ public class EndpointUtil {
              * delete all data related to endpoints after the
              * specified limit for the current measureEpoch.
              */
-            EndpointUtil.deleteEndpoints(usageLimit, measureEpoch);
+            deleteEndpoints(usageLimit, measureEpoch);
         }
     }
 
@@ -60,6 +61,7 @@ public class EndpointUtil {
             // we query up to 100 endpoints at a time
             List<ApiInfoKey> apis = SingleTypeInfoDao.instance.getEndpointsAfterOverage(filters, skip);
 
+            // This contains all collections related to endpoints
             Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
 
             for (Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()) {
@@ -80,7 +82,7 @@ public class EndpointUtil {
 
             for (Map.Entry<Integer, List<String>> entry : urls.entrySet()) {
                 ApiCollectionsDao.instance.updateOne(Filters.eq(Constants.ID, entry.getKey()),
-                        Updates.pullAll("urls", entry.getValue()));
+                        Updates.pullAll(ApiCollection._URLS, entry.getValue()));
             }
 
             if (apis != null && !apis.isEmpty()) {

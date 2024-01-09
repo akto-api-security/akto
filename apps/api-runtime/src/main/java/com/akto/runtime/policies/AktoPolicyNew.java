@@ -1,25 +1,27 @@
 package com.akto.runtime.policies;
 
-import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.utils.EndpointUtil;
+import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 import java.util.*;
 
 import static com.akto.runtime.APICatalogSync.createUrlTemplate;
+
 
 public class AktoPolicyNew {
 
