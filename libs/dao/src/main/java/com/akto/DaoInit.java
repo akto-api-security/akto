@@ -18,8 +18,6 @@ import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.NodeDetails.NodeDetails;
-import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.dto.testing.info.TestInfo;
@@ -172,8 +170,6 @@ public class DaoInit {
                 .builder(NotBelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<BelongsToPredicate> belongsToPredicateClassModel = ClassModel
                 .builder(BelongsToPredicate.class).enableDiscriminator(true).build();
-        ClassModel<NodeDetails> nodeDetails = ClassModel
-                .builder(NodeDetails.class).enableDiscriminator(true).build();
         ClassModel<YamlNodeDetails> yamlNodeDetails = ClassModel
                 .builder(YamlNodeDetails.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
@@ -229,7 +225,7 @@ public class DaoInit {
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
-                nodeDetails, yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel).automatic(true).build());
+                yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
