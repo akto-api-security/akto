@@ -336,7 +336,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
       onAction: ()=> {setCurrentTab('cicd')},
       id: 'cicd',
     },
- ]
+  ]
 
   useEffect(()=>{
     fetchCountsMap()
