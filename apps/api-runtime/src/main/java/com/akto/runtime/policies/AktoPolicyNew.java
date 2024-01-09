@@ -130,22 +130,6 @@ public class AktoPolicyNew {
                 ;
             }
         }
-
-        // check if overage happened and delete over the limit data
-        int accountId = Context.accountId.get();
-        FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, accountId);
-        
-        if (featureAccess.checkOverageAfterGrace()) {
-
-            int usageLimit = featureAccess.getUsageLimit();
-            int measureEpoch = featureAccess.getMeasureEpoch();
-
-            /*
-            * delete all data related to endpoints after the 
-            * specified limit for the current measureEpoch.
-            */
-            EndpointUtil.deleteEndpoints(usageLimit, measureEpoch);
-        }
     }
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
