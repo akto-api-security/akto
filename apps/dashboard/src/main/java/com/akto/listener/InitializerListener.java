@@ -1425,6 +1425,7 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
+                        fillCollectionIdArray();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1553,11 +1554,23 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getDeleteLastCronRunInfo() == 0){
+            AccountSettingsDao.instance.updateOne(Filters.empty(), Updates.unset(AccountSettings.LAST_UPDATED_CRON_INFO));
+
+            BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.DELETE_LAST_CRON_RUN_INFO, Context.now())
+                );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             setOrganizationsInBilling(backwardCompatibility);
         }
         setAktoDefaultNewUI(backwardCompatibility);
+        dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
@@ -1593,7 +1606,6 @@ public class InitializerListener implements ServletContextListener {
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();
         
-        fillCollectionIdArray();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
@@ -1622,7 +1634,6 @@ public class InitializerListener implements ServletContextListener {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
-
     }
 
 
