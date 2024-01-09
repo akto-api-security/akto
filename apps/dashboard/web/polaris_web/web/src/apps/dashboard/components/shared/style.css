@@ -100,3 +100,7 @@
 .editor .margin-view-overlays{
     border-right: 1px solid #d3ded3;
 }
+
+.pie-chart .highcharts-button{
+    display: none !important;
+}
