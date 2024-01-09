@@ -8,7 +8,6 @@ import com.akto.dto.testing.TestResult.TestError;
 
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
-import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
 
 public class MultiExecTestResult extends GenericTestResult {
 

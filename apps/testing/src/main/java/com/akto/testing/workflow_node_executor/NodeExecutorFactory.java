@@ -1,7 +1,7 @@
 package com.akto.testing.workflow_node_executor;
 
 import com.akto.dto.api_workflow.Node;
-import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
+import com.akto.dto.testing.YamlNodeDetails;
 
 public class NodeExecutorFactory {
     
