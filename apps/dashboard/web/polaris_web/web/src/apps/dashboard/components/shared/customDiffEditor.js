@@ -86,16 +86,137 @@ const transform = {
        }
     },
 
-    getPayloadData(original,current){
+    getPayloadData(original, current) {
 
-        let ret = {}
-        ret.json = "ORIGINAL: \n\n " + this.formatJson(original) + "\n\nCURRENT: \n\n " + this.formatJson(current);
+        let res = {
+            headersMap: {},
+            json: ""
+        }
 
-        return ret;
+        let ogType = typeof (original)
+        let curType = typeof (current)
+
+        if (ogType === 'object' && curType === 'object' && !Array.isArray(original) && !Array.isArray(current)) {
+
+            // object diff
+            let final = { ...original, ...current };
+            var diff = require('deep-diff').diff;
+            var differences = diff(original, current);
+            // console.log(original, current, differences)
+            res.json = this.formatJson(final);
+            if (differences != undefined) {
+                for (let diff of differences) {
+                    let kind = diff.kind;
+                    let key = diff.path.pop();
+                    let searchKey = '"' + key + '": ';
+                    switch (kind) {
+                        case 'N':
+                            searchKey = this.getSearchKey(searchKey, diff.rhs);
+                            searchKey.split("\n").forEach((line) => {
+                                res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+                            })
+                            break;
+                        case 'D':
+                            searchKey = this.getSearchKey(searchKey, diff.lhs);
+                            searchKey.split("\n").forEach((line) => {
+                                res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+                            })
+                            break;
+                        case 'A':
+                            let ogTemp = original;
+                            let curTemp = current;
+                            for (let i in diff.path) {
+                                ogTemp = ogTemp[diff.path[i]];
+                                curTemp = curTemp[diff.path[i]];
+                            }
+                            let data = this.formatJson(ogTemp) + "->" + this.formatJson(curTemp);
+                            res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data }
+                            break;
+                        case 'E':
+                            let data2 = this.formatJson(diff.lhs) + "->" + this.formatJson(diff.rhs);
+                            res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data2 }
+                    }
+                }
+            }
+
+        } else if (ogType === 'string' && curType === 'string') {
+
+            // string diff.
+            let ogArr = typeof (original) === 'string' ? original.split("\n") : []
+            let curArr = typeof (current) === 'string' ? current.split("\n") : []
+
+            let retArr = []
+            for (let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))) {
+                if (ogArr[i] && curArr[i]) {
+                    if (ogArr[i] !== curArr[i]) {
+                        res.headersMap[curArr[i]] = { className: 'updated-content', data: ogArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + "->" + curArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), keyLength: -2 }
+                    }
+                    retArr.push(curArr[i]);
+                } else if (ogArr[i]) {
+                    res.headersMap[curArr[i]] = { className: 'deleted-content' };
+                    retArr.push(ogArr[i]);
+                } else if (curArr[i]) {
+                    res.headersMap[curArr[i]] = { className: 'added-content' };
+                    retArr.push(curArr[i]);
+                }
+            }
+            res.json = retArr.join("\n")
+
+        } else {
+            // handle mix match. array, string, object.
+
+            let og = this.standardDiff(original)
+            let cur = this.standardDiff(current)
+            res.json = og + "\n" + cur
+            og.split("\n").forEach((line) => {
+                res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+            })
+            cur.split("\n").forEach((line) => {
+                res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+            })
+        }
+
+        return res;
+    },
+
+    standardDiff(data) {
+        let type = typeof (data)
+
+        if (type === 'string' || type === 'number' || type === 'boolean') {
+            return data;
+        } else if (type === 'object') {
+            if (Array.isArray(data)) {
+                return this.processArrayJson(this.formatJson(data))
+            } else {
+                return this.formatJson(data)
+            }
+        } else {
+            return data;
+        }
+    },
+
+    escapeRegex(string) {
+        return "^" + string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$";
+    },
+
+    getSearchKey(mainKey, value) {
+        let searchKey = "";
+        if (typeof (value) === "string") {
+            searchKey = mainKey + '"' + value + '"'
+        } else if (typeof (value) === 'object') {
+            if (Array.isArray(value)) {
+                searchKey = mainKey + this.processArrayJson(this.formatJson(value))
+            } else {
+                searchKey = mainKey + this.formatJson(value)
+            }
+        } else {
+            searchKey = mainKey + value
+        }
+        return searchKey;
     },
 
     mergeDataObjs(lineObj, jsonObj, payloadObj){
-        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + this.processArrayJson(payloadObj.json)
+        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + payloadObj.json
         return{
             message: finalMessage,
             firstLine: lineObj.original + "->" + lineObj.firstLine,
