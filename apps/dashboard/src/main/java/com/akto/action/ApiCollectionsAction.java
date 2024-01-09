@@ -207,7 +207,7 @@ public class ApiCollectionsAction extends UserAction {
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
         pipeline.add(Aggregates.group(groupId, 
             Accumulators.max("riskScore", "$riskScore"), 
-            Accumulators.sum("criticalCounts", new BasicDBObject("$cond", Arrays.asList(new BasicDBObject("$gte", Arrays.asList("$riskScore", 2)), 1, 0)))
+            Accumulators.sum("criticalCounts", new BasicDBObject("$cond", Arrays.asList(new BasicDBObject("$gte", Arrays.asList("$riskScore", 4)), 1, 0)))
         ));
 
         MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
