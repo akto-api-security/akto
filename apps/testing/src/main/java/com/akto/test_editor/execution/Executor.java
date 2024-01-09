@@ -29,7 +29,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
-import com.akto.util.modifier.JWTPayloadModifier;
+import com.akto.util.modifier.JWTPayloadReplacer;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,6 +65,7 @@ public class Executor {
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
+        RawApi origRawApi = rawApi.copy();
         RawApi sampleRawApi = rawApi.copy();
         ExecutorSingleRequest singleReq = null;
         if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
@@ -90,16 +91,32 @@ public class Executor {
             // make copy of varMap as well
             List<RawApi> sampleRawApis = new ArrayList<>();
             sampleRawApis.add(sampleRawApi);
-
-            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
             List<RawApi> testRawApis = new ArrayList<>();
-            testRawApis = singleReq.getRawApis();
-            if (testRawApis == null) {
-                error_messages.add(singleReq.getErrMsg());
-                continue;
+            boolean modifications = false;
+            if (reqNode.getChildNodes() == null || reqNode.getChildNodes().size() == 0) {
+                testRawApis.add(sampleRawApi.copy());
+                singleReq = new ExecutorSingleRequest(true, "", testRawApis, true);;
+            } else {
+                modifications = true;
+                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
+                testRawApis = singleReq.getRawApis();
+                if (testRawApis == null) {
+                    error_messages.add(singleReq.getErrMsg());
+                    continue;
+                }
+                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
+                testRawApis = singleReq.getRawApis();
+                if (testRawApis == null) {
+                    error_messages.add(singleReq.getErrMsg());
+                    continue;
+                }
             }
+            
             boolean vulnerable = false;
             for (RawApi testReq: testRawApis) {
+                if (modifications && testReq.equals(origRawApi)) {
+                    continue;
+                }
                 if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
                     break;
                 }
@@ -561,7 +578,7 @@ public class Executor {
             case "test_name":
                 return new ExecutorSingleOperationResp(true, "");
             case "jwt_replace_body":
-                JWTPayloadModifier jwtPayloadModifier = new JWTPayloadModifier(key.toString());
+                JWTPayloadReplacer jwtPayloadReplacer = new JWTPayloadReplacer(key.toString());
                 for (String k: rawApi.getRequest().getHeaders().keySet()) {
                     List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
                     if (hList.size() == 0){
@@ -582,7 +599,7 @@ public class Executor {
                         String modifiedHeaderVal = null;
 
                         try {
-                            modifiedHeaderVal = jwtPayloadModifier.jwtModify("", val);
+                            modifiedHeaderVal = jwtPayloadReplacer.jwtModify("", val);
                         } catch(Exception e) {
                             return null;
                         }

@@ -81,6 +81,9 @@ public class YamlNodeExecutor extends NodeExecutor {
         int statusCode = 0;
 
         for (RawApi testReq: testRawApis) {
+            if (testReq.equals(sampleRawApi)) {
+                continue;
+            }
             try {
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);                
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);

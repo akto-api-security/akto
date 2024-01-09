@@ -1,10 +1,10 @@
 package com.akto.util.modifier;
 
-public class JWTPayloadModifier extends JwtModifier {
+public class JWTPayloadReplacer extends JwtModifier {
 
     String newJwtToken = null;
 
-    public JWTPayloadModifier(String newJwtToken) {
+    public JWTPayloadReplacer(String newJwtToken) {
         super();
         this.newJwtToken = newJwtToken;
     }
