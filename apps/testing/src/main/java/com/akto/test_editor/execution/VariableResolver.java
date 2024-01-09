@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpRequestParams;
@@ -20,6 +21,8 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.Utils;
 import com.akto.util.modifier.AddJkuJWTModifier;
@@ -27,6 +30,7 @@ import com.akto.util.modifier.InvalidSignatureJWTModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 public class VariableResolver {
     
@@ -288,6 +292,77 @@ public class VariableResolver {
         return result;
     }
 
+    public static Map<String, List<String>> resolveWordList(Map<String, List<String>> wordListsMap, ApiInfo.ApiInfoKey infoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
+
+        for (String k: wordListsMap.keySet()) {
+            Map<String, String> m = new HashMap<>();
+            Object keyObj;
+            String key, location;
+            boolean isRegex = false;
+            boolean allApis = false;
+            try {
+                List<String> wordList = (List<String>) wordListsMap.get(k);
+                continue;
+            } catch (Exception e) {
+                try {
+                    m = (Map) wordListsMap.get(k);
+                } catch (Exception er) {
+                    continue;
+                }
+            }
+
+            keyObj = m.get("key");
+            location = m.get("location");
+            if (keyObj instanceof Map) {
+                Map<String, String> kMap = (Map) keyObj;
+                key = (String) kMap.get("regex");
+                isRegex = true;
+            } else {
+                key = (String) m.get("key");
+            }
+
+            
+            if (m.containsKey("all_apis")) {
+                allApis = Objects.equals(m.get("all_apis"), true);
+            }
+            if (!allApis) {
+                continue;
+            }
+
+            Bson filters = Filters.and(
+                Filters.eq("apiCollectionId", infoKey.getApiCollectionId()),
+                Filters.or(
+                    Filters.regex("param", key),
+                    Filters.regex("param", key.toLowerCase())
+                    )
+            );
+
+            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
+
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
+                if (infKey.equals(infoKey)) {
+                    continue;
+                }
+                Bson sdfilters = Filters.and(
+                    Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", singleTypeInfo.getMethod()),
+                    Filters.in("_id.url", singleTypeInfo.getUrl())
+                );
+
+                SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                newSampleDataMap.put(infKey, sd.getSamples());
+
+            }
+            List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key, location, isRegex);
+            wordListsMap.put(k, wordListVal);
+        }
+
+        return wordListsMap;
+
+    }
+
+
     public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>>  sampleDataMap, ApiInfo.ApiInfoKey apiInfoKey) {
 
         for (String k: varMap.keySet()) {
@@ -296,7 +371,7 @@ public class VariableResolver {
             }
             Map<String, String> m = new HashMap<>();
             Object keyObj;
-            String key, location, dataType;
+            String key, location;
             boolean isRegex = false;
             boolean allApis = false;
             try {
