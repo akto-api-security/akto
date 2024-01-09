@@ -27,7 +27,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.dto.testing.NodeDetails.YamlNodeDetails;
+import com.akto.dto.testing.YamlNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
