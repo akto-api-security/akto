@@ -47,11 +47,11 @@ public class SyncCron {
                         loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score picked up " + accountSettings.getId(), LogDb.DASHBOARD);
                         try {
                             int endTs = Context.now();
-                            int startTs = 0 ;
-                            if(lastRunTimerInfo == null){
-                                startTs = Context.now() - (60 * 10);
-                            }else{
+                            int startTs = endTs - 600 ;
+                            int startTsSeverity = 0;
+                            if(lastRunTimerInfo != null){
                                 startTs = lastRunTimerInfo.getLastSyncedCron();
+                                startTsSeverity = lastRunTimerInfo.getLastUpdatedSeverity();
                             }
                             
                             // synced new parameters from STI and then inserted into activities
@@ -70,7 +70,7 @@ public class SyncCron {
 
                             // updated {Severity score field in APIinfo}
                             RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
-                            updateRiskScore.updateSeverityScoreInApiInfo(startTs);
+                            updateRiskScore.updateSeverityScoreInApiInfo(startTsSeverity);
 
                             AccountSettingsDao.instance.getMCollection().updateOne(
                                 AccountSettingsDao.generateFilter(),
