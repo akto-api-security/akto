@@ -10,7 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import GithubRow from './rows/GithubRow';
+import {GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useReducer } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
 import "./style.css"
@@ -22,7 +22,7 @@ import DropdownSearch from '../shared/DropdownSearch';
 
 function GithubServerTable(props) {
 
-  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
+  const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length > 0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -31,7 +31,6 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
-  const [selectedIndex, setSelectedIndex] = useState(-1)
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 
@@ -43,8 +42,8 @@ function GithubServerTable(props) {
     })
     async function fetchData() {
       let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, queryValue);
-      setData([...tempData.value])
-      setTotal(tempData.total)
+      tempData ? setData([...tempData.value]) : setData([])
+      tempData ? setTotal(tempData.total) : setTotal(0)
     }
     fetchData();
   }, [sortSelected, appliedFilters, queryValue, page])
@@ -203,9 +202,9 @@ function GithubServerTable(props) {
           page={props.page || 0}
           getNextUrl={props?.getNextUrl}
           onRowClick={props.onRowClick}
-          selectedIndex={selectedIndex}
-          setSelectedIndex={setSelectedIndex}
-          useSummaryRow={props.useSummaryRow}
+          newRow={props?.useNewRow}
+          headings={props?.headings}
+          notHighlightOnselected={props.notHighlightOnselected}
         />
       ),
     );
@@ -218,8 +217,11 @@ function GithubServerTable(props) {
     setPage((page) => (page - 1));
   }
 
+  let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
+  let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
+
   return (
-    <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
+    <div className={tableClass}>
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -238,7 +240,7 @@ function GithubServerTable(props) {
                   disabled: false,
                   loading: false,
                 }}
-                tabs={[]}
+                tabs={props.tableTabs ? props.tableTabs : []}
                 canCreateNewView={false}
                 filters={filters}
                 appliedFilters={appliedFilters}
@@ -246,8 +248,10 @@ function GithubServerTable(props) {
                 mode={mode}
                 setMode={setMode}
                 loading={props.loading || false}
+                selected={props?.selected}
+                onSelect={props?.onSelect}
               />
-              <div className={props.increasedHeight ? "control-row" : ""}>
+              <div className={tableHeightClass}>
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -257,7 +261,7 @@ function GithubServerTable(props) {
                 // condensed
                 selectable={props.selectable || false}
                 onSelectionChange={handleSelectionChange}
-                headings={props?.headings ? props.headings : [
+                headings={props?.headings ? props.headings :[
                   {
                     id: "data",
                     hidden: true,

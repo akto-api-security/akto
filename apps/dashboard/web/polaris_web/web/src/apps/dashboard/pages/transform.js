@@ -1,4 +1,5 @@
 import { DynamicSourceMinor , MagicMinor, PasskeyMinor } from "@shopify/polaris-icons"
+import PersistStore from "../../main/PersistStore"
 
 const dataTypesPrompt = [
     {
