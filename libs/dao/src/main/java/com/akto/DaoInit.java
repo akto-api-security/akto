@@ -48,7 +48,9 @@ import com.akto.dto.usage.UsageSync;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
 import com.akto.util.DbMode;
+import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
+import com.akto.util.LastCronRunInfo;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
@@ -199,6 +201,10 @@ public class DaoInit {
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
         ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
+        ClassModel<LastCronRunInfo> cronTimersClassModel = ClassModel.builder(LastCronRunInfo.class)
+                .enableDiscriminator(true).build();
+        ClassModel<ConnectionInfo> connectionInfoClassModel = ClassModel.builder(ConnectionInfo.class)
+                .enableDiscriminator(true).build();
         ClassModel<TestLibrary> testLibraryClassModel = ClassModel.builder(TestLibrary.class).enableDiscriminator(true).build();
 
         ClassModel<UsageMetric> UsageMetricClassModel = ClassModel.builder(UsageMetric.class).enableDiscriminator(true).build();
@@ -228,6 +234,7 @@ public class DaoInit {
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,                
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,jiraintegrationClassModel, setupClassModel,testLibraryClassModel,
+                cronTimersClassModel, connectionInfoClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -301,6 +308,7 @@ public class DaoInit {
         TestingRunDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ApiCollectionsDao.instance.createIndicesIfAbsent();
+        ActivitiesDao.instance.createIndicesIfAbsent();
     }
 
 }
