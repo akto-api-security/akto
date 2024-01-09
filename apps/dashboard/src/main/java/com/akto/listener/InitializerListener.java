@@ -1555,7 +1555,6 @@ public class InitializerListener implements ServletContextListener {
 
     private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getDeleteLastCronRunInfo() == 0){
-            loggerMaker.infoAndAddToDb("restarting", null);
             AccountSettingsDao.instance.updateOne(Filters.empty(), Updates.unset(AccountSettings.LAST_UPDATED_CRON_INFO));
 
             BackwardCompatibilityDao.instance.updateOne(
