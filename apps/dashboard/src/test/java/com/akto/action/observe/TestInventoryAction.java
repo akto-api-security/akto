@@ -9,7 +9,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBObject;
@@ -80,7 +79,6 @@ public class TestInventoryAction extends MongoBasedTest {
         AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
         HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
         info.setHttpCallParser(callParser);
-        info.setPolicy(new AktoPolicyNew(false));
         int accountId = Context.accountId.get();
         RuntimeListener.accountHTTPParserMap.put(accountId, info);
 

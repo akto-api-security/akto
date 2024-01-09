@@ -3,6 +3,7 @@ import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import transform from '../transform'
 import func from '@/util/func'
 import api from '../api'
+import { IndexFiltersMode } from '@shopify/polaris'
 
 function SummaryTable({testingRunResultSummaries}) {
 
@@ -52,15 +53,17 @@ function SummaryTable({testingRunResultSummaries}) {
     return (
         <GithubSimpleTable
             hasZebraStriping={true}
-            headings={headers}
             headers={headers}
-            useSummaryRow={true}
             pageLimit={10}
             data={data}
             selectable={true}
             resourceName={resourceName}
             filters={[]}
             promotedBulkActions={promotedBulkActions}
+            mode={IndexFiltersMode.Default}
+            headings={headers}
+            useNewRow={true}
+            condensedHeight={true}
         />
     )
 }
