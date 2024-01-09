@@ -176,7 +176,10 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         TestingRunIssuesDao.instance.insertMany(Arrays.asList(issue1, issue2, issue3, issue4, issue5, issue6));
 
         RiskScoreOfCollections riskScoreOfCollections = new RiskScoreOfCollections();
-        riskScoreOfCollections.updateSeverityScoreInApiInfo(0);
+        int ts = 0;
+        riskScoreOfCollections.updateSeverityScoreInApiInfo(ts);
+
+        ts = Context.now();
 
         Bson filter1 = Filters.and(
             Filters.in("_id.url", url1),
@@ -202,6 +205,8 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         ApiInfo apiInfo3 = ApiInfoDao.instance.findOne(filter3);
         assertEquals((double) 20, apiInfo3.getSeverityScore(), 0);
 
+        Thread.sleep(1000);
+
         IssuesAction issuesAction = new IssuesAction();
         issuesAction.setIssueId(issue1.getId());
         issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
@@ -223,7 +228,8 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         String resp3 = issuesAction.updateIssueStatus();
         assertEquals(resp3, "SUCCESS");
-        riskScoreOfCollections.updateSeverityScoreInApiInfo(0);
+        riskScoreOfCollections.updateSeverityScoreInApiInfo(ts);
+        ts = Context.now();
 
         ApiInfo apiInfo4 = ApiInfoDao.instance.findOne(filter1);
         assertEquals((double) 1, apiInfo4.getSeverityScore(), 0);
@@ -233,5 +239,18 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         ApiInfo apiInfo6 = ApiInfoDao.instance.findOne(filter3);
         assertEquals((double) 10, apiInfo6.getSeverityScore(), 0);
+
+
+        Thread.sleep(1000);
+
+        TestingRunIssues issue7 = generateTestResultIssue(url2, "POST", GlobalEnums.Severity.MEDIUM, "CSRF_LOGIN_ATTACK");
+        TestingRunIssuesDao.instance.insertOne(issue7);
+
+        riskScoreOfCollections = new RiskScoreOfCollections();
+        riskScoreOfCollections.updateSeverityScoreInApiInfo(ts);
+
+        ApiInfo apiInfo7 = ApiInfoDao.instance.findOne(filter2);
+        assertEquals((double) 20 , apiInfo7.getSeverityScore(), 0);
+
     }
 }
