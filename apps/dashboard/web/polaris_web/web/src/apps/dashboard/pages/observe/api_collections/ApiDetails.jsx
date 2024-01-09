@@ -120,8 +120,8 @@ function ApiDetails(props) {
     const components = [
             <GithubCell
             key="heading"
-            width="35vw"
-            nameWidth="32vw"
+            width="30vw"
+            nameWidth="27vw"
             data={apiDetail}
             headers={headers}
             getStatus={getStatus}
