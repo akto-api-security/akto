@@ -48,7 +48,6 @@ const func = {
     },
     
     fillInitialState: function({dataObj, type}){
-        console.log("name:" + dataObj.name + ",redacted:" +dataObj.redacted)
         let initialObj = {...func.initialObj};
         initialObj.id = dataObj.id;
         initialObj.name = dataObj.name

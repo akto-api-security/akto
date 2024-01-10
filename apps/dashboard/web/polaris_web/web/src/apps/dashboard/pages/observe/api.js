@@ -223,8 +223,7 @@ export default {
             url: '/api/redactCollection',
             method: 'post',
             data:{
-                apiCollectionId: apiCollectionId,
-                redacted: redacted
+                apiCollectionId,redacted
             }
         })
     },
