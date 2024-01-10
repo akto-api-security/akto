@@ -249,8 +249,8 @@ public class Utils {
     }
 
     public static double structureMatch(RawApi orig, RawApi cur) {
-        String payload = orig.getRequest().getBody().replaceAll("\\s+","");
-        String compareWithPayload = cur.getRequest().getBody().replaceAll("\\s+","");
+        String payload = orig.getResponse().getBody().replaceAll("\\s+","");
+        String compareWithPayload = cur.getResponse().getBody().replaceAll("\\s+","");
         return Utils.calcStructureMatchPercentage(payload, compareWithPayload);
     }
 
