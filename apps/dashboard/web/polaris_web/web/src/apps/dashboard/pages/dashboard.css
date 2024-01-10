@@ -43,6 +43,7 @@
     --p-color-bg-primary-hover: #5400CB !important;
     --p-color-bg-primary-active: #4700AE !important;
     --p-color-bg-primary-subdued-hover: #ECEBFF !important;
+    --p-color-bg-info-subdued-hover: #F2F7FE !important;
 
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
@@ -50,6 +51,10 @@
     
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;
+
+    --p-color-bg-critical-subdued: #FED3D1 !important;
+    --p-color-bg-caution-subdued: #FFD79D !important;
+    --p-color-bg-info-subdued: #A4E8F2 !important;
 }
 
 .Polaris-Page{
@@ -60,6 +65,18 @@
     background: #F6F6F7 !important;
 }
 
+.Polaris-Tabs {
+    padding: 0 !important;
+}
+
+.Polaris-Tabs__Tab--active {
+    background: #EDEEEF !important;
+    color: #202223 !important;
+}
+
+.Polaris-Tabs .Polaris-Badge--statusSuccess{
+    background: rgba(221, 224, 228, 1) !important;
+}
 .Polaris-TopBar-UserMenu__Details{
     margin-right: 0px !important;
 }
@@ -69,11 +86,5 @@
 }
 
 .beamer_defaultBeamerSelector {
-    top: 12px !important;
-    position: fixed !important;
-    right: 4vw !important;
-    width: 32px !important;
-    height: 32px !important;
-    left: unset !important;
-    background-color: #d2d5d7 !important;
+    display: none !important;
 }

@@ -124,7 +124,7 @@ const convertFunc = {
 
     mapVulnerableRequests(vulnerableRequests){
         let mapRequestsToId = {}
-        vulnerableRequests.forEach((x)=>{
+        vulnerableRequests?.length > 0 && vulnerableRequests.forEach((x)=>{
             let methodArr = x.templateIds
             methodArr.forEach((method) => {
                 if (!mapRequestsToId[method]) {

@@ -21,6 +21,9 @@ import java.util.*;
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
 
+    // Load only first 1 MiB of response body into memory.
+    private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    
     private static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         Integer accountId = Context.accountId.get();
@@ -51,7 +54,7 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
-            ResponseBody responseBody = response.body();
+            ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
             if (responseBody == null) {
                 throw new Exception("Couldn't read response body");
             }
@@ -119,8 +122,7 @@ public class ApiExecutor {
         return url;
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig) throws Exception {
-        // don't lowercase url because query params will change and will result in incorrect request
+    public static String prepareUrl(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
         String url = request.getUrl();
         url = url.trim();
 
@@ -128,7 +130,13 @@ public class ApiExecutor {
             url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
         }
 
-        url = replaceHostFromConfig(url, testingRunConfig);
+        return replaceHostFromConfig(url, testingRunConfig);
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig) throws Exception {
+        // don't lowercase url because query params will change and will result in incorrect request
+        
+        String url = prepareUrl(request, testingRunConfig);
 
         loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         request.setUrl(url);

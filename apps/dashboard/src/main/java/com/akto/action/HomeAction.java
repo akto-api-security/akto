@@ -2,7 +2,7 @@ package com.akto.action;
 
 import com.akto.listener.InitializerListener;
 import com.akto.utils.Auth0;
-import com.akto.utils.DashboardMode;
+import com.akto.util.DashboardMode;
 import com.akto.utils.GithubLogin;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
@@ -47,7 +47,7 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
         }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
-            servletRequest.setAttribute("AktoVersionGlobal", "akto-release-version");
+            servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {
             servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
         }

@@ -39,23 +39,29 @@ const TestEditor = () => {
 
         const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
         if (allSubCategoriesResponse) {
-            const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
-            setTestsObj(obj)
-
-            const testName = obj.mapIdtoTest[testId]
-            const selectedTestObj = {
-                label: testName,
-                value: testId,
-                category: obj.mapTestToData[testName].category,
-                inactive: obj.mapTestToData[testName].inactive
+            try {
+                const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
+                setTestsObj(obj)
+    
+                const testName = obj.mapIdtoTest[testId]
+                const selectedTestObj = {
+                    label: testName,
+                    value: testId,
+                    category: obj.mapTestToData[testName].category,
+                    inactive: obj.mapTestToData[testName].inactive
+                }
+                setSelectedTest(selectedTestObj)
+    
+                const requestObj = convertFunc.mapVulnerableRequests(allSubCategoriesResponse.vulnerableRequests)
+                setVulnerableRequestMap(requestObj)
+                const vulnerableRequest = allSubCategoriesResponse?.vulnerableRequests?.length > 0 ? allSubCategoriesResponse?.vulnerableRequests[0]?.id : {}
+                setDefaultRequest(vulnerableRequest)
+    
+                setLoading(false) 
+            } catch (error) {
+                setLoading(false)
             }
-            setSelectedTest(selectedTestObj)
-
-            const requestObj = convertFunc.mapVulnerableRequests(allSubCategoriesResponse.vulnerableRequests)
-            setVulnerableRequestMap(requestObj)
-            setDefaultRequest(allSubCategoriesResponse.vulnerableRequests[0].id)
-
-            setLoading(false)
+            
         }
     }
 
@@ -81,7 +87,14 @@ const TestEditor = () => {
         <TopBar secondaryMenu={headerComp} />
     )
 
+    const defaultId = "REMOVE_TOKENS";
+
     useEffect(() => {
+        const path = window.location.pathname;
+        const pathArr = path.split("test-editor")
+        if(pathArr[1].length < 2){
+            navigate(defaultId)
+        }
         fetchAllTests()
     }, [])
 
