@@ -223,7 +223,7 @@ public class Operations {
                     for (int j = 0; j < replaceWithArr.size(); j++) {
                         String[] tokenCopy = urlTokens.clone();
                         tokenCopy[i] = replaceWithArr.get(j);
-                        newUrls.add(String.join( " ", tokenCopy));
+                        newUrls.add(String.join( "/", tokenCopy));
                     }
                 }
 
