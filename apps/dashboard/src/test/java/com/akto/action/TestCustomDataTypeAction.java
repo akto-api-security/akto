@@ -179,17 +179,17 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
     @Test
     public void testFetchDataTypes() {
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-        CustomDataType customDataType1 = new CustomDataType("name1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND,ignoreData);
+        CustomDataType customDataType1 = new CustomDataType("name1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND,ignoreData, false, true);
         User user1 = new User();
         user1.setId(1);
         user1.setName("user1");
 
-        CustomDataType customDataType2 = new CustomDataType("name2", true, Collections.emptyList(), 2,false, null,null, Conditions.Operator.AND,ignoreData);
+        CustomDataType customDataType2 = new CustomDataType("name2", true, Collections.emptyList(), 2,false, null,null, Conditions.Operator.AND,ignoreData, false, true);
         User user2 = new User();
         user2.setId(2);
         user2.setName("user1");
 
-        CustomDataType customDataType3 = new CustomDataType("name3", true, Collections.emptyList(), 3, true, null,null, Conditions.Operator.AND,ignoreData);
+        CustomDataType customDataType3 = new CustomDataType("name3", true, Collections.emptyList(), 3, true, null,null, Conditions.Operator.AND,ignoreData, false, true);
         User user3 = new User();
         user3.setId(3);
         user3.setName("user1");
@@ -226,7 +226,7 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
         Context.accountId.set(1_000_000);
         CustomDataTypeDao.instance.getMCollection().drop();
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-        CustomDataType customDataType = new CustomDataType("NAME1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND,ignoreData);
+        CustomDataType customDataType = new CustomDataType("NAME1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND,ignoreData, false, true);
         CustomDataTypeDao.instance.insertOne(customDataType);
 
         CustomDataTypeAction customDataTypeAction = new CustomDataTypeAction();
