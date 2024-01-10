@@ -18,15 +18,6 @@ public class AktoDataType {
 
     public AktoDataType() {
     }
-    public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData) {
-        this.name = name;
-        this.sensitiveAlways = sensitiveAlways;
-        this.sensitivePosition = sensitivePosition;
-        this.ignoreData = ignoreData;
-        this.redacted = false;
-        this.sampleDataFixed = true;
-    }
-
     public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
         this.name = name;
         this.sensitiveAlways = sensitiveAlways;
