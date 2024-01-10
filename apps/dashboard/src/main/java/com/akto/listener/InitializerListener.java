@@ -1940,14 +1940,7 @@ public class InitializerListener implements ServletContextListener {
                     String organizationId = organization.getId();
 
                     for (MetricTypes metricType : MetricTypes.values()) {
-                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
-                        );
-
-                        if (usageMetricInfo == null) {
-                            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-                            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-                        }
+                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOneOrInsert(organizationId, accountId, metricType);
 
                         int syncEpoch = usageMetricInfo.getSyncEpoch();
                         int measureEpoch = usageMetricInfo.getMeasureEpoch();

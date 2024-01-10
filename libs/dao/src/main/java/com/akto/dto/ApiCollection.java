@@ -26,6 +26,9 @@ public class ApiCollection {
 
     public static final String VXLAN_ID = "vxlanId";
 
+    public static final String _DEACTIVATED = "deactivated";
+    boolean deactivated;
+
     public ApiCollection() {
     }
 
@@ -105,6 +108,15 @@ public class ApiCollection {
     public void setUrlsCount(int urlsCount) {
         this.urlsCount = urlsCount;
     }
+
+    public boolean isDeactivated() {
+        return deactivated;
+    }
+
+    public void setDeactivated(boolean deactivated) {
+        this.deactivated = deactivated;
+    }
+
     // to be used in front end
     public String getDisplayName() {
         String result;

@@ -232,7 +232,7 @@ function GithubRow(props) {
                 id={data.id}
                 key={data.id}
                 position={index}
-                {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
+                {...props.newRow ? {status: (data?.RowStatus ? data.RowStatus : ((index % 2) ? "subdued" : '') ) } : {} }
                 {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id)}}
             >
                 {props?.newRow ? <NewCell /> :<OldCell/>}   

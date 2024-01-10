@@ -1,7 +1,9 @@
 package com.akto.utils.usage;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.ApiCollectionsDao;
@@ -31,26 +33,40 @@ import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricCalculator.class);
-    public static Bson excludeDemos(String key) {
+    public static List<Integer> getDemos() {
         ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
 
-        ArrayList<Integer> demos = new ArrayList<>();
+        List<Integer> demos = new ArrayList<>();
         demos.add(1111111111);
 
         if (juiceShop != null) {
             demos.add(juiceShop.getId());
         }
 
-        return Filters.nin(key, demos);
+        return demos;
     }
-    public static int calculateActiveEndpoints(UsageMetric usageMetric) {
-        int measureEpoch = usageMetric.getMeasureEpoch();
+
+    private static List<Integer> getDeactivated(){
+        List<ApiCollection> deactivated = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
+        List<Integer> deactivatedIds = deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+
+        return deactivatedIds;
+    }
+    public static Bson excludeDemosAndDeactivated(String key){
+        List<Integer> demos = getDemos();
+        List<Integer> deactivated = getDeactivated();
+        deactivated.addAll(demos);
+
+        return Filters.nin(key, deactivated);
+    }
+
+    public static int calculateActiveEndpoints(int measureEpoch) {
 
         int activeEndpoints = Utils.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
                         Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
-                excludeDemos(SingleTypeInfo._API_COLLECTION_ID)));
+                excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID)));
         
         return activeEndpoints;
     }
@@ -65,7 +81,7 @@ public class UsageMetricCalculator {
     public static int calculateTestRuns(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
 
-        Bson demoCollFilter = excludeDemos(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+        Bson demoCollFilter = excludeDemosAndDeactivated(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
         int testRuns = (int) TestingRunResultDao.instance.count(
             Filters.and(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch), demoCollFilter)
@@ -123,10 +139,12 @@ public class UsageMetricCalculator {
         loggerMaker.infoAndAddToDb("calculating as of measure-epoch: " + usageMetric.getMeasureEpoch() + " " + (now-usageMetric.getMeasureEpoch())/60 + " minutes ago", LoggerMaker.LogDb.DASHBOARD);
         loggerMaker.infoAndAddToDb("calculate "+metricType+" for account: "+ Context.accountId.get() +" org: " + usageMetric.getOrganizationId(), LoggerMaker.LogDb.DASHBOARD);
 
+        int measureEpoch = usageMetric.getMeasureEpoch();
+
         if (metricType != null) {
             switch (metricType) {
                 case ACTIVE_ENDPOINTS:
-                    usage = calculateActiveEndpoints(usageMetric);
+                    usage = calculateActiveEndpoints(measureEpoch);
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);
