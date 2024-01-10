@@ -4,6 +4,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.Key;
@@ -35,7 +36,7 @@ public class TestExecutorTest extends MongoBasedTest {
 
     @Test
     public void testTrim() {
-        List<TestResult> testResultList = new ArrayList<>();
+        List<GenericTestResult> testResultList = new ArrayList<>();
         testResultList.add(generateTestResult(false));
         testResultList.add(generateTestResult(false));
         testResultList.add(generateTestResult(false));
@@ -45,7 +46,7 @@ public class TestExecutorTest extends MongoBasedTest {
         testResultList.add(generateTestResult(false));
         TestingRunResult testingRunResult = new TestingRunResult(
                 new ObjectId(), new ApiInfo.ApiInfoKey(0, "url", URLMethods.Method.GET), "BOLA",
-                "REPLACE_AUTH_TOKEN", testResultList ,true, new ArrayList<>(), 90, 0, 100, new ObjectId()
+                "REPLACE_AUTH_TOKEN", testResultList ,true, new ArrayList<>(), 90, 0, 100, new ObjectId(), null
         );
         TestExecutor.trim(testingRunResult);
         assertEquals(5, testingRunResult.getTestResults().size());
