@@ -26,70 +26,18 @@ public class RedactSampleData {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
         HttpResponseParams.Source source = httpResponseParams.getSource();
 //        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
-        if(accountLevelRedact || apiCollectionLevelRedact) return redact(httpResponseParams);
-        return redactMarkedDataTypes(httpResponseParams);
+        return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
     }
 
-    public static String redact(String sample) throws Exception {
-        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-        return redact(httpResponseParams);
+    public static String redactDataTypes(String sample) throws Exception{
+        return redact(HttpCallParser.parseKafkaMessage(sample), false);
     }
 
-    public static String redactMarkedDataTypes(String sample) throws Exception {
-        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-        return redactMarkedDataTypes(httpResponseParams);
-    }
-
-    public static String redactMarkedDataTypes(HttpResponseParams httpResponseParams) throws Exception{
-
-        Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
-        if (responseHeaders == null) responseHeaders = new HashMap<>();
-        handleHeaders(responseHeaders);
-
-        String responsePayload = httpResponseParams.getPayload();
-        if (responsePayload == null) responsePayload = "{}";
-        try {
-            JsonParser jp = factory.createParser(responsePayload);
-            JsonNode node = mapper.readTree(jp);
-            changeRedactedDataType(null, node, redactValue);
-            if (node != null) {
-                responsePayload = node.toString();
-            } else {
-                responsePayload = "{}";
-            }
-        } catch (Exception e) {
-            responsePayload = "{}";
+    private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
+        if(redactAll){
+            responseHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
+            return;
         }
-        httpResponseParams.setPayload(responsePayload);
-
-        Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
-        if (requestHeaders == null) requestHeaders = new HashMap<>();
-        handleHeaders(requestHeaders);
-
-        String requestPayload = httpResponseParams.requestParams.getPayload();
-        if (requestPayload == null) requestPayload = "{}";
-        try {
-            JsonParser jp = factory.createParser(requestPayload);
-            JsonNode node = mapper.readTree(jp);
-            changeRedactedDataType(null, node, redactValue);
-            if (node != null) {
-                requestPayload= node.toString();
-            } else {
-                requestPayload = "{}";
-            }
-        } catch (Exception e) {
-            requestPayload = "{}";
-        }
-
-        httpResponseParams.requestParams.setPayload(requestPayload);
-
-        //TODO confirm if this is required or not
-        httpResponseParams.setSourceIP(redactValue);
-
-        return convertHttpRespToOriginalString(httpResponseParams);
-    }
-
-    private static void handleHeaders(Map<String, List<String>> responseHeaders) {
         Set<Map.Entry<String, List<String>>> entries = responseHeaders.entrySet();
         for(Map.Entry<String, List<String>> entry : entries){
             String key = entry.getKey();
@@ -102,11 +50,11 @@ public class RedactSampleData {
     }
 
     // never use this function directly. This alters the httpResponseParams
-    public static String redact(HttpResponseParams httpResponseParams) throws Exception {
+    public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
         // response headers
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
-        responseHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
+        handleHeaders(responseHeaders, redactAll);
 
         // response payload
         String responsePayload = httpResponseParams.getPayload();
@@ -114,7 +62,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            change(node, redactValue);
+            change(null, node, redactValue, redactAll);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -129,7 +77,7 @@ public class RedactSampleData {
         // request headers
         Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
         if (requestHeaders == null) requestHeaders = new HashMap<>();
-        requestHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
+        handleHeaders(requestHeaders, redactAll);
 
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
@@ -137,7 +85,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            change(node, redactValue);
+            change(null, node, redactValue, redactAll);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -150,13 +98,15 @@ public class RedactSampleData {
         httpResponseParams.requestParams.setPayload(requestPayload);
 
         // ip
-        httpResponseParams.setSourceIP(redactValue);
+        if(redactAll) {
+            httpResponseParams.setSourceIP(redactValue);
+        }
 
         return convertHttpRespToOriginalString(httpResponseParams);
 
     }
 
-    public static void change(JsonNode parent, String newValue) {
+    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -164,40 +114,16 @@ public class RedactSampleData {
             for(int i = 0; i < arrayNode.size(); i++) {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
-                    arrayNode.set(i, new TextNode(newValue));
-                } else {
-                    change(arrayElement, newValue);
-                }
-            }
-        } else {
-            Iterator<String> fieldNames = parent.fieldNames();
-            while(fieldNames.hasNext()) {
-                String f = fieldNames.next();
-                JsonNode fieldValue = parent.get(f);
-                if (fieldValue.isValueNode()) {
-                    ((ObjectNode) parent).put(f, newValue);
-                } else {
-                    change(fieldValue, newValue);
-                }
-            }
-        }
-
-    }
-
-    public static void changeRedactedDataType(String parentName, JsonNode parent, String newValue) {
-        if (parent == null) return;
-
-        if (parent.isArray()) {
-            ArrayNode arrayNode = (ArrayNode) parent;
-            for(int i = 0; i < arrayNode.size(); i++) {
-                JsonNode arrayElement = arrayNode.get(i);
-                if (arrayElement.isValueNode()) {
-                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
-                    if(SingleTypeInfo.isRedacted(subType.getName())){
-                        arrayNode.set(i, new TextNode(newValue));
+                    if(redactAll){
+                        arrayNode.set(i, new TextNode(redactValue));
+                    } else{
+                        SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
+                        if(SingleTypeInfo.isRedacted(subType.getName())){
+                            arrayNode.set(i, new TextNode(newValue));
+                        }
                     }
                 } else {
-                    changeRedactedDataType(parentName, arrayElement, newValue);
+                    change(parentName, arrayElement, newValue, redactAll);
                 }
             }
         } else {
@@ -206,13 +132,18 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), f, null);
-                    if(SingleTypeInfo.isRedacted(subType.getName())){
+                    if(redactAll){
                         ((ObjectNode) parent).put(f, newValue);
                     }
+                    else {
+                        SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), f, null);
+                        if (SingleTypeInfo.isRedacted(subType.getName())) {
+                            ((ObjectNode) parent).put(f, newValue);
+                        }
+                    }
 
                 } else {
-                    changeRedactedDataType(f, fieldValue, newValue);
+                    change(f, fieldValue, newValue, redactAll);
                 }
             }
         }

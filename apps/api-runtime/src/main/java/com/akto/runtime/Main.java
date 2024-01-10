@@ -347,7 +347,7 @@ public class Main {
             for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
                 urls.add(singleTypeInfo.getUrl());
             }
-            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0));
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0, false, true));
         }
     }
 
