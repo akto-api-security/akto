@@ -14,7 +14,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
 import com.akto.utils.AktoCustomException;
-import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,12 +25,13 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
-import io.swagger.models.auth.In;
 import org.apache.commons.lang3.EnumUtils;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static com.akto.dto.type.SingleTypeInfo.fetchCustomDataTypes;
@@ -40,6 +40,8 @@ import static com.akto.utils.Utils.extractJsonResponse;
 
 public class CustomDataTypeAction extends UserAction{
     private static LoggerMaker loggerMaker = new LoggerMaker(CustomDataTypeAction.class);
+
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
     private boolean createNew;
     private String name;
     private boolean sensitiveAlways;
@@ -206,14 +208,12 @@ public class CustomDataTypeAction extends UserAction{
 
         if(redacted){
             int accountId = Context.accountId.get();
-            Runnable r = () ->{
+            service.submit(() ->{
                 Context.accountId.set(accountId);
                 loggerMaker.infoAndAddToDb("Triggered a job to fix existing custom data types", LogDb.DASHBOARD);
                 handleDataTypeRedaction();
-            };
-            new Thread(r).start();
+            });
         }
-
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -259,12 +259,11 @@ public class CustomDataTypeAction extends UserAction{
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
         if(redacted){
             int accountId = Context.accountId.get();
-            Runnable r = () ->{
+            service.submit(() ->{
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered a job to fix existing data for " + aktoDataType.getName(), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("Triggered a job to fix existing akto data types", LogDb.DASHBOARD);
                 handleDataTypeRedaction();
-            };
-            new Thread(r).start();
+            });
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -277,24 +276,22 @@ public class CustomDataTypeAction extends UserAction{
             List<CustomDataType> customDataTypesToBeFixed = CustomDataTypeDao.instance.findAll(Filters.eq(AktoDataType.SAMPLE_DATA_FIXED, false));
             loggerMaker.infoAndAddToDb("Found " + customDataTypesToBeFixed.size() + " custom data types to be fixed", LogDb.DASHBOARD);
 
-            customDataTypesToBeFixed.forEach(cdt -> {
-                SingleTypeInfo.SubType st = cdt.toSubType();
-                loggerMaker.infoAndAddToDb("Dropping redacted data types for custom data type:" + cdt.getName() + ", subType:" + st.getName(), LogDb.DASHBOARD);
-                handleRedactionForSubType(st);
-                CustomDataTypeDao.instance.updateOneNoUpsert(Filters.eq(CustomDataType.NAME, cdt.getName()), Updates.set(CustomDataType.SAMPLE_DATA_FIXED, true));
-                loggerMaker.infoAndAddToDb("Dropped redacted data types for custom data type:" + cdt.getName() + ", subType:" + st.getName(), LogDb.DASHBOARD);
-            });
-
-            loggerMaker.infoAndAddToDb("Dropping redacted data types for akto data types", LogDb.DASHBOARD);
-
             List<AktoDataType> aktoDataTypesToBeFixed = AktoDataTypeDao.instance.findAll(Filters.eq(AktoDataType.SAMPLE_DATA_FIXED, false));
             loggerMaker.infoAndAddToDb("Found " + aktoDataTypesToBeFixed.size() + " akto data types to be fixed", LogDb.DASHBOARD);
+
+            Set<SingleTypeInfo.SubType> subTypesToBeFixed = new HashSet<>();
+            customDataTypesToBeFixed.forEach(cdt -> {
+                SingleTypeInfo.SubType st = cdt.toSubType();
+                subTypesToBeFixed.add(st);
+            });
             aktoDataTypesToBeFixed.forEach(adt -> {
-                loggerMaker.infoAndAddToDb("Dropping redacted data types for akto data type:" + adt.getName(), LogDb.DASHBOARD);
                 SingleTypeInfo.SubType st = subTypeMap.get(adt.getName());
+                subTypesToBeFixed.add(st);
+            });
+            subTypesToBeFixed.forEach(st -> {
+                loggerMaker.infoAndAddToDb("Dropping redacted data types for subType:" + st.getName(), LogDb.DASHBOARD);
                 handleRedactionForSubType(st);
-                AktoDataTypeDao.instance.updateOneNoUpsert(Filters.eq(AktoDataType.NAME, adt.getName()), Updates.set(AktoDataType.SAMPLE_DATA_FIXED, true));
-                loggerMaker.infoAndAddToDb("Dropped redacted data types for akto data type:" + adt.getName(), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("Dropped redacted data types for subType:" + st.getName(), LogDb.DASHBOARD);
             });
             loggerMaker.infoAndAddToDb("Dropped redacted data types successfully!", LogDb.DASHBOARD);
         } catch (Exception e){
@@ -307,30 +304,31 @@ public class CustomDataTypeAction extends UserAction{
         loggerMaker.infoAndAddToDb("Dropping redacted data types for subType:" + subType.getName(), LogDb.DASHBOARD);
         int skip = 0;
         int limit = 100;
-        Set<ApiInfo.ApiInfoKey> keys = new HashSet<>();
         while (true) {
-            List<ApiInfo.ApiInfoKey> apiInfoKeys = SingleTypeInfoDao.instance.fetchEndpointsInCollection2(subType, skip, limit);
-            loggerMaker.infoAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
+            List<ApiInfo.ApiInfoKey> apiInfoKeys = SingleTypeInfoDao.instance.fetchEndpointsBySubType(subType, skip, limit);
             if(apiInfoKeys.isEmpty()){
+                loggerMaker.infoAndAddToDb("No apiInfoKeys left for subType:" + subType.getName(), LogDb.DASHBOARD);
                 break;
             }
-            keys.addAll(apiInfoKeys);
+
+            loggerMaker.infoAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
+            List<Bson> query = apiInfoKeys.stream().map(key -> Filters.and(
+                    Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
+                    Filters.eq("_id.url", key.getUrl()),
+                    Filters.eq("_id.method", key.getMethod())
+            )).collect(Collectors.toList());
+
+            UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("samples", Collections.emptyList()));
+            loggerMaker.infoAndAddToDb("Redacted samples in sd for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
+
+            updateResult = SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("sampleData", Collections.emptyList()));
+            loggerMaker.infoAndAddToDb("Redacted samples in ssd for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
+
             skip += limit;
         }
-        loggerMaker.infoAndAddToDb("Found " + keys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
-        List<Bson> query = keys.stream().map(key -> Filters.and(
-                Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
-                Filters.eq("_id.url", key.getUrl()),
-                Filters.eq("_id.method", key.getMethod())
-        )).collect(Collectors.toList());
-
-        UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("samples", Collections.emptyList()));
-        loggerMaker.infoAndAddToDb("Redacted samples in sd for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
-
-        updateResult = SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("sampleData", Collections.emptyList()));
-        loggerMaker.infoAndAddToDb("Redacted samples in ssd for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
-        updateResult= SingleTypeInfoDao.instance.updateManyNoUpsert(Filters.and(Filters.eq("subType", subType.getName()), Filters.exists("values.elements", true)), Updates.set("values.elements", Collections.emptyList()));
+        UpdateResult updateResult = SingleTypeInfoDao.instance.updateManyNoUpsert(Filters.and(Filters.eq("subType", subType.getName()), Filters.exists("values.elements", true)), Updates.set("values.elements", Collections.emptyList()));
         loggerMaker.infoAndAddToDb("Redacted values in sti for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
+
     }
 
     public List<SingleTypeInfo.Position> generatePositions(List<String> sensitivePosition){
