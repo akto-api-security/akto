@@ -415,7 +415,7 @@ public class VariableResolver {
 
             List<String> wordListVal = fetchWordList(modifiedSampleDataMap, key, location, isRegex);
 
-            if (wordListVal.size() >= 100) {
+            if (wordListVal.size() >= 10) {
                 break;
             }
 
@@ -433,7 +433,7 @@ public class VariableResolver {
         }
         for (String s : wordListSet) {
             wordListVal.add(s);
-            if (wordListVal.size() >= 100) {
+            if (wordListVal.size() >= 10) {
                 break;
             }
         }
