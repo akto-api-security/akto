@@ -518,6 +518,7 @@ public class Executor {
                 return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
                 String newUrl = null;
+                List<String> nUrls = Operations.buildNewUrl(varMap, key, rawApi.getRequest().getUrl());
                 if (key instanceof Map) {
                     Map<String, Map<String, String>> regexReplace = (Map) key;
                     String url = rawApi.getRequest().getUrl();
