@@ -3,6 +3,7 @@ package com.akto.dao.billing;
 import com.akto.dao.BillingContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dto.billing.Organization;
+import com.mongodb.client.model.Filters;
 
 public class OrganizationsDao extends BillingContextDao<Organization>{
 
@@ -33,5 +34,10 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
         return Organization.class;
     }
 
+
+    public Organization findOneByAccountId(int accountId) {
+        return OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, accountId));
+    }
 
 }

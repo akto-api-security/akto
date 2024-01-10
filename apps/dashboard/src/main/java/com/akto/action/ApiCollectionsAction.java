@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 import com.akto.dao.APISpecDao;
@@ -15,17 +16,25 @@ import java.util.HashSet;
 import java.util.List;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.utils.usage.UsageMetricCalculator;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 
@@ -44,9 +53,7 @@ public class ApiCollectionsAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
 
-    public String fetchAllCollections() {
-        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-
+    private static List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
 
         for (ApiCollection apiCollection: apiCollections) {
@@ -59,6 +66,14 @@ public class ApiCollectionsAction extends UserAction {
             }
             apiCollection.setUrls(new HashSet<>());
         }
+        return apiCollections;
+    }
+
+    public String fetchAllCollections() {
+
+        
+        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -129,6 +144,11 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
+        deleteApiEndpointData(apiCollectionIds);
+        return SUCCESS.toUpperCase();
+    }
+
+    private static void deleteApiEndpointData(List<Integer> apiCollectionIds){
         SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
@@ -136,7 +156,6 @@ public class ApiCollectionsAction extends UserAction {
         TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
 
-        return SUCCESS.toUpperCase();
     }
 
     // required for icons and total sensitive endpoints in collections
@@ -206,6 +225,86 @@ public class ApiCollectionsAction extends UserAction {
             e.printStackTrace();
         }
         return Action.ERROR.toUpperCase();
+    }
+
+    public String deactivateCollections() {
+
+        if (apiCollections == null || apiCollections.isEmpty()) {
+            addActionError("No collections selected");
+            return Action.ERROR.toUpperCase();
+        }
+        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
+                Updates.set(ApiCollection._DEACTIVATED, true));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String activateCollections() {
+
+        if (apiCollections == null) {
+            addActionMessage("No collections selected");
+            return Action.SUCCESS.toUpperCase();
+        }
+        apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
+        if (apiCollections.isEmpty()) {
+            addActionMessage("No deactivated collections selected");
+            return Action.SUCCESS.toUpperCase();
+        }
+        apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        int accountId = Context.accountId.get();
+        Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+        if (organization == null) {
+            addActionError("Organization not found");
+            return Action.ERROR.toUpperCase();
+        }
+        String organizationId = organization.getId();
+        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+        if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+            featureWiseAllowed = new HashMap<>();
+            featureWiseAllowed.put(MetricTypes.ACTIVE_ENDPOINTS.toString(), FeatureAccess.fullAccess);
+        }
+
+        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOneOrInsert(organizationId, accountId, MetricTypes.ACTIVE_ENDPOINTS);
+        int measureEpoch = usageMetricInfo.getMeasureEpoch();
+
+        int usageBefore = UsageMetricCalculator.calculateActiveEndpoints(measureEpoch);
+        int count = apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
+
+        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.toString(), FeatureAccess.noAccess);
+        int usageLimit = featureAccess.getUsageLimit();
+
+        if (featureAccess.checkUnlimited() || (usageBefore + count <= usageLimit)) {
+            List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+            ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds), Updates.unset(ApiCollection._DEACTIVATED));
+        } else {
+            addActionError("API endpoints in collections exceeded usage limit. Unable to activate collections. Please upgrade your plan.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String forceActivateCollections() {
+        if (apiCollections == null) {
+            addActionMessage("No collections selected");
+            return Action.SUCCESS.toUpperCase();
+        }
+        apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
+        if (apiCollections.isEmpty()) {
+            addActionMessage("No deactivated collections selected");
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        ApiCollectionsDao.instance.updateMany(
+                Filters.and(
+                        Filters.in(Constants.ID, apiCollectionIds),
+                        Filters.eq(ApiCollection._DEACTIVATED, true)),
+                Updates.unset(ApiCollection._DEACTIVATED));
+        deleteApiEndpointData(apiCollectionIds);
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<ApiCollection> getApiCollections() {

@@ -12,6 +12,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import TooltipText from "../../../components/shared/TooltipText"
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import collectionApi from "./api"
 
 const headers = [
     {
@@ -83,6 +84,10 @@ function convertToCollectionData(c) {
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
+        if(c.deactivated){
+            c.rowStatus = 'critical',
+            c.disableClick = true
+        }
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
@@ -188,19 +193,38 @@ function ApiCollections() {
 
     const createCollectionModalActivatorRef = useRef();
 
-    async function handleRemoveCollections(collectionIdList) {
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        const response = await api.deleteMultipleCollections(collectionIdListObj)
+        await apiFunction(collectionIdListObj)
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} ${toastContent} successfully`)
     }
 
     const promotedBulkActions = (selectedResources) => [
         {
-          content: 'Remove collections',
-          onAction: () => handleRemoveCollections(selectedResources)
+            content: 'Remove collections',
+            onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
         },
-      ];
+    ];
+
+    const bulkActions = (selectedResources) => [
+        {
+            content: 'Deactivate collections',
+            onAction: () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deleted")
+        },
+        {
+            content: 'Reactivate collections',
+            onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
+        },
+        {
+            content: 'Force reactivate collections',
+            onAction: () => {
+                let warning = "This will force reactivation of all APIs in the selected collections. Are you sure you want to continue?"
+                func.showConfirmationModal(warning, "Force reactivate",
+                    () => handleCollectionsAction(selectedResources, collectionApi.forceActivateCollections, "activated"))
+            }
+        }
+    ];
 
 
       const summaryItems = [
@@ -268,6 +292,7 @@ function ApiCollections() {
             headers={headers}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
+            bulkActions={bulkActions}
             mode={IndexFiltersMode.Default}
             headings={headers}
             useNewRow={true}
