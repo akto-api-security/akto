@@ -24,6 +24,7 @@ export default function Header() {
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const accounts = Store(state => state.accounts)
     const activeAccount = Store(state => state.activeAccount)
+    const resetAll = PersistStore(state => state.resetAll)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
@@ -44,11 +45,20 @@ export default function Header() {
 
     const handleLogOut = async () => {
         storeAccessToken(null)
-        await api.logout()
-        navigate("/login")
+        resetAll();
+        api.logout().then(res => {
+            if(res.logoutUrl){
+                window.location.href = res.logoutUrl
+            } else {
+                navigate("/login")
+            }
+        }).catch(err => {
+            navigate("/");
+        })
     }
 
     const handleSwitchUI = async () => {
+        resetAll();
         let currPath = window.location.pathname
         await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
         if(currPath.includes("sensitive")){
@@ -87,6 +97,7 @@ export default function Header() {
             onAction: async () => {
                 await api.goToAccount(accountId)
                 func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
+                resetAll();
                 window.location.href = '/dashboard/observe/inventory'
             }
         }
@@ -96,7 +107,7 @@ export default function Header() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
           setNewAccount('')
-
+          resetAll();
           window.location.href="/dashboard/onboarding"
         })
     }
@@ -121,7 +132,7 @@ export default function Header() {
                 },
                 {
                     items: [
-                        (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM") ? {} :
+                        (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
                         { id: "create_account", content: <ContentWithIcon icon={CustomerPlusMajor} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
                         // { id: "manage", content: 'Manage account' },
                         { id: "log-out", content: <ContentWithIcon icon={LogOutMinor} text={"Logout"} /> , onAction: handleLogOut }
@@ -183,6 +194,17 @@ export default function Header() {
         />
     );
 
+    const secondaryMenuMarkup = (
+        <TopBar.Menu
+            activatorContent={
+                <span id="beamer-btn">
+                    <Icon source={NotificationMajor} />
+                </span>
+            }
+            actions={[]}
+        />
+    );
+
     const topBarMarkup = (
         <div className='topbar'>
             <TopBar
@@ -192,6 +214,7 @@ export default function Header() {
                 searchResultsVisible={isSearchActive}
                 searchResults={searchResultsMarkup}
                 onSearchResultsDismiss={handleSearchResultsDismiss}
+                secondaryMenu={secondaryMenuMarkup}
             />
             <Modal
                 open={showCreateAccount}

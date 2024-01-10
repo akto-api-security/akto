@@ -24,6 +24,7 @@ import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
+import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -39,6 +40,8 @@ import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
+import Billing from "../dashboard/pages/settings/billing/Billing";
+import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
@@ -51,6 +54,9 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
+import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
+import { useStiggContext } from '@stigg/react-sdk';
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -63,6 +69,10 @@ const router = createBrowserRouter([
         path: "",
         element: <HomePage />,
         children: [
+          {
+            path: "home",
+            element: <HomeDashboard />,
+          },
           {
             path: "testing",
             element: <PageTesting />,
@@ -184,6 +194,10 @@ const router = createBrowserRouter([
             element: <GithubSso />
           },
           {
+            path: "integrations/github_app",
+            element: <GithubAppIntegration />
+          },
+          {
             path: "integrations/slack",
             element: <Slack />,
           },
@@ -218,11 +232,27 @@ const router = createBrowserRouter([
           {
             path: "tags/details",
             element: <TagDetails/>
+          },
+          {
+            path: "test-library",
+            element: <TestLibrary/>
+          },
+          {
+            path: "billing",
+            element: <Billing/>
+          },
+          {
+            path: "self-hosted",
+            element: <SelfHosted/>
           }
         ]
       },
       {
         path: "test-editor/:testId",
+        element: <TestEditor />
+      },
+      {
+        path: "test-editor",
         element: <TestEditor />
       },
       {
@@ -254,6 +284,12 @@ function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
   setAllRoutes(searchData)
+  const { stigg } = useStiggContext();
+  useEffect(() => {
+    stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
+    
+  })
+
 
   useEffect(() => {
     const script = document.createElement('script')
@@ -272,9 +308,7 @@ function App() {
   }, [])
 
   return (
-    <AppProvider>
       <RouterProvider router={router} />
-    </AppProvider>
   );
 }
 

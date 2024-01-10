@@ -18,15 +18,20 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.utils.RedactSampleData;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+
+    public final String _HOST = "host";
 
     public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
@@ -50,6 +55,8 @@ public class Executor {
 
         boolean requestSent = false;
 
+        List<String> error_messages = new ArrayList<>();
+
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
             List<RawApi> sampleRawApis = new ArrayList<>();
@@ -59,6 +66,7 @@ public class Executor {
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
             if (testRawApis == null) {
+                error_messages.add(singleReq.getErrMsg());
                 continue;
             }
             boolean vulnerable = false;
@@ -67,6 +75,31 @@ public class Executor {
                     break;
                 }
                 try {
+
+                    // change host header in case of override URL ( if not already changed by test template )
+                    try {
+                        List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+                        List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+
+                        if (originalHostHeaders.get(0) != null
+                            && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
+                            && testingRunConfig != null
+                            && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+
+                            String url = ApiExecutor.prepareUrl(testReq.getRequest(), testingRunConfig);
+                            URI uri = new URI(url);
+                            String host = uri.getHost();
+                            if (uri.getPort() != -1) {
+                                host += ":" + uri.getPort();
+                            }
+                            testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
+                        }
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to update host header for overridden test URL",
+                                LogDb.TESTING);
+                    }
+                        
                     // follow redirects = true for now
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
                     requestSent = true;
@@ -77,17 +110,19 @@ public class Executor {
                     }
                     vulnerable = res.getVulnerable();
                 } catch(Exception e) {
-                    loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
             }
         }
 
         if(result.isEmpty()){
             if(requestSent){
-                result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.API_REQUEST_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+                error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
             } else {
-                result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.NO_API_REQUEST.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+                error_messages.add(TestError.NO_API_REQUEST.getMessage());
             }
+            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         return result;

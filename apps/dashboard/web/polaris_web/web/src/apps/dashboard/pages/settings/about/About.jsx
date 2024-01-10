@@ -81,10 +81,10 @@ function About() {
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup segmented>
-                    <Button size="slim" onClick={onToggle} pressed={initial === true}>
+                    <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
                     </Button>
-                    <Button size="slim" onClick={onToggle} pressed={initial === false}>
+                    <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
                         False
                     </Button>
                 </ButtonGroup>

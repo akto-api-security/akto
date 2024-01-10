@@ -16,6 +16,7 @@ import com.akto.runtime.merge.MergeSimilarUrls;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 
+import com.mongodb.client.model.Updates;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -202,4 +203,66 @@ public class TestApiCatalogSync extends MongoBasedTest {
 
 
     }
+
+    @Test
+    public void testClearValuesInDB() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        int stiValueLimit = SingleTypeInfo.VALUES_LIMIT;
+
+        SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId("/api/books", "GET", 200, false, "param1", SingleTypeInfo.GENERIC, 0, false);
+        SingleTypeInfo sti1 = new SingleTypeInfo(paramId1, new HashSet<>(), new HashSet<>(), 0, 0, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+        SingleTypeInfoDao.instance.insertOne(sti1);
+        SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(sti1), Updates.pushEach(SingleTypeInfo._VALUES+".elements", generateRandomValuesSet(stiValueLimit+10)));
+
+
+        SingleTypeInfo.ParamId paramId2 = new SingleTypeInfo.ParamId("/api/cars", "GET", 200, false, "param1", SingleTypeInfo.GENERIC, 0, false);
+        SingleTypeInfo sti2 = new SingleTypeInfo(paramId2, new HashSet<>(), new HashSet<>(), 0, 0, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+        SingleTypeInfoDao.instance.insertOne(sti2);
+        SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(sti2), Updates.pushEach(SingleTypeInfo._VALUES+".elements", generateRandomValuesSet(stiValueLimit-10)));
+
+        SingleTypeInfo.ParamId paramId3 = new SingleTypeInfo.ParamId("/api/toys", "GET", 200, false, "param1", SingleTypeInfo.GENERIC, 0, false);
+        SingleTypeInfo sti3 = new SingleTypeInfo(paramId3, new HashSet<>(), new HashSet<>(), 0, 0, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+        SingleTypeInfoDao.instance.insertOne(sti3);
+        SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(sti3), Updates.pushEach(SingleTypeInfo._VALUES+".elements", generateRandomValuesSet(stiValueLimit)));
+
+        SingleTypeInfo.ParamId paramId4 = new SingleTypeInfo.ParamId("/api/chairs", "GET", 200, false, "param1", SingleTypeInfo.INTEGER_32, 0, false);
+        SingleTypeInfo sti4 = new SingleTypeInfo(paramId4, new HashSet<>(), new HashSet<>(), 0, 0, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+        SingleTypeInfoDao.instance.insertOne(sti4);
+        SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(sti4), Updates.pushEach(SingleTypeInfo._VALUES+".elements", generateRandomValuesSet(stiValueLimit+10)));
+
+        APICatalogSync.clearValuesInDB();
+
+        SingleTypeInfo sti1Db = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(sti1));
+        assertEquals(stiValueLimit, sti1Db.getValues().count());
+        assertEquals(SingleTypeInfo.Domain.ANY, sti1Db.getDomain());
+
+        SingleTypeInfo sti2Db = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(sti2));
+        assertEquals(stiValueLimit-10, sti2Db.getValues().count());
+        assertEquals(SingleTypeInfo.Domain.ENUM, sti2Db.getDomain());
+
+        SingleTypeInfo sti3Db = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(sti3));
+        assertEquals(stiValueLimit, sti3Db.getValues().count());
+        assertEquals(SingleTypeInfo.Domain.ENUM, sti3Db.getDomain());
+
+        SingleTypeInfo sti4Db = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(sti4));
+        assertEquals(stiValueLimit, sti4Db.getValues().count());
+        assertEquals(SingleTypeInfo.Domain.RANGE, sti4Db.getDomain());
+    }
+
+    public List<String> generateRandomValuesSet(int size) {
+        List<String> res = new ArrayList<>();
+
+        Random random = new Random();
+
+        int max = 100_000;
+        int min = -100_000;
+        for (int i = 0; i < size; i++) {
+            int randomInt = random.nextInt(max - min + 1) + min; // Generates a random integer between min and max (inclusive).
+            res.add(randomInt+"");
+        }
+
+        return res;
+    }
+
 }
