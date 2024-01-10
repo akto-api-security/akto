@@ -293,7 +293,7 @@ public class TestDBSync extends MongoBasedTest {
         int vxlanId1 = 1;
         String domain1 = "domain1.com";
 
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(vxlanId1, groupName1, 0, new HashSet<>(), null, 0));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(vxlanId1, groupName1, 0, new HashSet<>(), null, 0, false, true));
 
         HttpResponseParams h1 = new HttpResponseParams();
         h1.requestParams = new HttpRequestParams();
@@ -354,7 +354,7 @@ public class TestDBSync extends MongoBasedTest {
         int vxlanId1 = 1;
         String domain1 = "domain1.com";
 
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(vxlanId1, groupName1, 0, new HashSet<>(), null, 0));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(vxlanId1, groupName1, 0, new HashSet<>(), null, 0, false, true));
 
         HttpResponseParams h1 = new HttpResponseParams();
         h1.requestParams = new HttpRequestParams();
@@ -443,7 +443,7 @@ public class TestDBSync extends MongoBasedTest {
         // before processing inserting apiCollection with same id but different vxlanId and host
         int dupId = domain4.hashCode();
         ApiCollectionsDao.instance.insertOne(
-                new ApiCollection(dupId,"something", 0, new HashSet<>(), "hostRandom", 1234)
+                new ApiCollection(dupId,"something", 0, new HashSet<>(), "hostRandom", 1234, false, true)
         );
         httpCallParser.getHostNameToIdMap().put("hostRandom 1234", dupId);
 
@@ -461,7 +461,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testCollisionHostNameCollection() {
         ApiCollectionsDao.instance.getMCollection().drop();
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "domain", 0, new HashSet<>(), null, 0));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "domain", 0, new HashSet<>(), null, 0, false, true));
         HttpResponseParams h1 = new HttpResponseParams();
         h1.requestParams = new HttpRequestParams();
         h1.requestParams.setHeaders(new HashMap<>());

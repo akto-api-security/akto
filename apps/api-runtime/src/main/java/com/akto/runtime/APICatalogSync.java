@@ -1077,7 +1077,7 @@ public class APICatalogSync {
                 for (Object example : deltaInfo.getExamples()) {
                     try{
                         String exampleStr = (String) example;
-                        String s = RedactSampleData.redactMarkedDataTypes(exampleStr);
+                        String s = RedactSampleData.redactDataTypes(exampleStr);
                         updatedSampleData.add(s);
                     } catch (Exception e) {
                         ;

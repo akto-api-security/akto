@@ -114,7 +114,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         // do not change hostName or vxlanId here
-        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0);
+        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0, false, true);
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
@@ -127,7 +127,7 @@ public class ApiCollectionsAction extends UserAction {
     public String deleteCollection() {
         
         this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0));
+        this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0, false, true));
         return this.deleteMultipleCollections();
     } 
 

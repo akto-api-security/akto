@@ -41,9 +41,9 @@ public class TestInitializerListener extends MongoBasedTest {
 
     @Test
     public void testChangesInfo() {
-        ApiCollection apiCollection1 = new ApiCollection(0, "coll1", Context.now(), new HashSet<>(), "akto.io", 1);
-        ApiCollection apiCollection2 = new ApiCollection(1, "coll2", Context.now(), new HashSet<>(), "app.akto.io", 2);
-        ApiCollection apiCollection3 = new ApiCollection(2, "coll3", Context.now(), new HashSet<>(), null, 3);
+        ApiCollection apiCollection1 = new ApiCollection(0, "coll1", Context.now(), new HashSet<>(), "akto.io", 1, false, true);
+        ApiCollection apiCollection2 = new ApiCollection(1, "coll2", Context.now(), new HashSet<>(), "app.akto.io", 2, false, true);
+        ApiCollection apiCollection3 = new ApiCollection(2, "coll3", Context.now(), new HashSet<>(), null, 3, false, true);
         ApiCollectionsDao.instance.insertMany(Arrays.asList(apiCollection1, apiCollection2, apiCollection3));
 
         SingleTypeInfo sti1 = generateSti("/api/books", 0, false);

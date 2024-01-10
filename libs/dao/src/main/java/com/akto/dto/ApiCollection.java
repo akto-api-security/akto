@@ -36,17 +36,6 @@ public class ApiCollection {
     public ApiCollection() {
     }
 
-    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId) {
-        this.id = id;
-        this.name = name;
-        this.startTs = startTs;
-        this.urls = urls;
-        this.hostName = hostName;
-        this.vxlanId = vxlanId;
-        this.redact = false;
-        this.sampleCollectionsDropped = true;
-    }
-
     public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped) {
         this.id = id;
         this.name = name;
@@ -144,7 +133,7 @@ public class ApiCollection {
 
     // To be called if you are creating a collection that is not from mirroring
     public static ApiCollection createManualCollection(int id, String name){
-        return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
+        return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0, false, true);
     }
 
     public boolean getRedact() {
