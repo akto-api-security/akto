@@ -103,12 +103,6 @@ public class Executor {
                     error_messages.add(singleReq.getErrMsg());
                     continue;
                 }
-                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
-                testRawApis = singleReq.getRawApis();
-                if (testRawApis == null) {
-                    error_messages.add(singleReq.getErrMsg());
-                    continue;
-                }
             }
             
             boolean vulnerable = false;
