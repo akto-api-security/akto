@@ -565,7 +565,9 @@ public class InitializerListener implements ServletContextListener {
                 (piiType.getOnKey() ? conditions : null),
                 (piiType.getOnKey() ? null : conditions),
                 Operator.OR,
-                ignoreData
+                ignoreData,
+                false,
+                true
         );
 
         return ret;

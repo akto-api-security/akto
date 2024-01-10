@@ -53,9 +53,9 @@ public class TestKeyTypes {
         HashMap<String, CustomDataType> customDataTypeMap = new HashMap<>();
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType customDataType1 = new CustomDataType("SHIPPING", true, Collections.emptyList(),
-                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("ship")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData);
+                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("ship")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData,  false, true);
         CustomDataType customDataType2 = new CustomDataType("CAPTAIN", false, Collections.emptyList(),
-                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("captain")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData);
+                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("captain")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData, false, true);
 
         customDataTypeMap.put("SHIPPING", customDataType1);
         customDataTypeMap.put("CAPTAIN", customDataType2);

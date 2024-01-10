@@ -38,21 +38,6 @@ public class CustomDataType {
 
     public CustomDataType() { }
 
-    public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData) {
-        this.name = name;
-        this.sensitiveAlways = sensitiveAlways;
-        this.sensitivePosition = sensitivePosition;
-        this.creatorId = creatorId;
-        this.timestamp = Context.now();
-        this.active = active;
-        this.keyConditions = keyConditions;
-        this.valueConditions = valueConditions;
-        this.operator = operator;
-        this.ignoreData = ignoreData;
-        this.redacted = false;
-        this.sampleDataFixed = true;
-    }
-
     public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
         this.name = name;
         this.sensitiveAlways = sensitiveAlways;
