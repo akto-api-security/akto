@@ -47,7 +47,8 @@ public class TestEditorEnums {
 
     public enum BodyOperator {
         LENGTH,
-        PERCENTAGE_MATCH
+        PERCENTAGE_MATCH,
+        PERCENTAGE_MATCH_SCHEMA
     }
 
     public enum ExtractOperator {
