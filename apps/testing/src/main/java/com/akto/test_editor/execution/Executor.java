@@ -30,7 +30,6 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.modifier.JWTPayloadReplacer;
-import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
