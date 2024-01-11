@@ -1,10 +1,13 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.RequestTemplate;
 import com.mongodb.BasicDBList;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
 public class RawApi {
@@ -12,6 +15,7 @@ public class RawApi {
     private OriginalHttpRequest request;
     private OriginalHttpResponse response;
     private String originalMessage;
+    ObjectMapper om = new ObjectMapper();
 
     public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage) {
         this.request = request;
@@ -106,6 +110,83 @@ public class RawApi {
 
         // recheck
         req.setQueryParams(queryParams);
+    }
+
+    public boolean equals(RawApi compareWithRawApi) {
+        String payload = this.getRequest().getBody().replaceAll("\\s+","");
+        String compareWithPayload = compareWithRawApi.getRequest().getBody().replaceAll("\\s+","");
+        
+        if (!isPayloadEqual(payload, compareWithPayload)) {
+            return false;
+        }
+        
+        // System.out.println(m1);
+        // System.out.println(m2);
+        // System.out.println(m1.equals(m2));
+        // if (!payload.equalsIgnoreCase(compareWithPayload)) {
+        //     return false;
+        // }
+
+        Map<String, List<String>> headers = this.getRequest().getHeaders();
+        Map<String, List<String>> compareWithHeaders = compareWithRawApi.getRequest().getHeaders();
+        if (headers.size() != compareWithHeaders.size()) {
+            return false;
+        }
+
+        for (String k: headers.keySet()) {
+            List<String> val = headers.get(k);
+            List<String> cVal = compareWithHeaders.get(k);
+            if (cVal == null || (cVal.size() != val.size())) {
+                return false;
+            }
+
+            List<String> sourceList = new ArrayList<String>(val);
+            List<String> destinationList = new ArrayList<String>(cVal);
+            sourceList.removeAll(destinationList);
+            if (sourceList.size() > 0) {
+                return false;
+            }
+        }
+
+        String url = this.getRequest().getFullUrlWithParams().trim();
+        String cUrl = compareWithRawApi.getRequest().getFullUrlWithParams().trim();
+        if (!url.equalsIgnoreCase(cUrl)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean isPayloadEqual(String payload, String compareWithPayload) {
+        if (payload.equals("")) {
+            return compareWithPayload.equals("");
+        }
+        if (payload == "") {
+            return compareWithPayload == null;
+        }
+        boolean areBothJson = true;
+        Map<String, Object> m1 = new HashMap<>();
+        Map<String, Object> m2 = new HashMap<>();
+        try {
+            m1 = (Map<String, Object>)(om.readValue(payload, Map.class));
+        } catch (Exception e) {
+            areBothJson = false;
+        }
+
+        try {
+            m2 = (Map<String, Object>)(om.readValue(compareWithPayload, Map.class));
+        } catch (Exception e) {
+            areBothJson = false;
+        }
+       
+        if (!areBothJson) {
+            return false;
+        }
+
+        if (!m1.equals(m2)) {
+            return false;
+        }
+        return true;
     }
 
     public RawApi copy() {
