@@ -92,7 +92,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
         sync.computeDelta(aggr, true, 0);
-        sync.syncWithDB(false, true);
+        sync.syncWithDB(false, true, false);
         APICatalogSync.mergeUrlsAndSave(123, true);
         sync.buildFromDB(false, true);
 
@@ -211,7 +211,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));
         }
         sync.computeDelta(aggr, true, 123);
-        sync.syncWithDB(false, true);
+        sync.syncWithDB(false, true, false);
 
 
         assertEquals(30, sync.getDbState(123).getStrictURLToMethods().size());
@@ -225,7 +225,7 @@ public class TestDBSync extends MongoBasedTest {
         aggr2.addURL(resp2);
         
         sync.computeDelta(aggr2, true, 123);
-        sync.syncWithDB(false, true);
+        sync.syncWithDB(false, true, false);
         APICatalogSync.mergeUrlsAndSave(123, true);
         sync.buildFromDB(false, true);
 

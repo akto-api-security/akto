@@ -47,6 +47,26 @@ public class EndpointUtil {
         }
     }
 
+    public static void calcAndDeleteEndpointsFromList(Set<ApiInfoKey> apiSet) {
+
+        int accountId = Context.accountId.get();
+        FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, accountId);
+
+        if (featureAccess.checkOverageAfterGrace()) {
+
+            int usageLimit = featureAccess.getUsageLimit();
+            int usage = featureAccess.getUsage();
+
+            List<ApiInfoKey> apiList = new ArrayList<>(apiSet);
+
+            int overUse = Math.abs(usage - usageLimit);
+            int size = apiList.size();
+            int subListSize = Math.min(size, overUse);
+            apiList = apiList.subList(0, subListSize);
+            deleteForApis(apiList);
+        }
+    }
+
     final static int delta = 60 * 20; // 20 minutes
 
     private static void deleteEndpoints(int skip, int timestamp) {
@@ -59,45 +79,48 @@ public class EndpointUtil {
 
         do {
             hasMore = false;
-
-            /* 
-                we query up to 100 endpoints at a time
-                Using the delta epoch to bring the latest traffic only.
-            */
-
+            /*
+             * we query up to 100 endpoints at a time
+             * Using the delta epoch to bring the latest traffic only.
+             */
             int now = Context.now();
             int deltaEpoch = now - delta;
             List<ApiInfoKey> apis = SingleTypeInfoDao.instance.getEndpointsAfterOverage(filters, skip, deltaEpoch);
-
-            // This contains all collections related to endpoints
-            Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
-
-            for (Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()) {
-                deleteInManyCollections(collections.getValue(), createFilters(collections.getKey(), apis));
-            }
-
-            // we need to update the api collection with the new list of urls
-            Map<Integer, List<String>> urls = new HashMap<>();
-
-            for (ApiInfoKey api : apis) {
-                List<String> urlList = urls.get(api.getApiCollectionId());
-                if (urlList == null) {
-                    urlList = new ArrayList<>();
-                }
-                urlList.add(api.getUrl() + " " + api.getMethod().toString());
-                urls.put(api.getApiCollectionId(), urlList);
-            }
-
-            for (Map.Entry<Integer, List<String>> entry : urls.entrySet()) {
-                ApiCollectionsDao.instance.updateOne(Filters.eq(Constants.ID, entry.getKey()),
-                        Updates.pullAll(ApiCollection._URLS, entry.getValue()));
-            }
-
-            if (apis != null && !apis.isEmpty()) {
-                hasMore = true;
-            }
+            hasMore = deleteForApis(apis);
 
         } while (hasMore);
+    }
+
+    private static boolean deleteForApis(List<ApiInfoKey> apis) {
+        // This contains all collections related to endpoints
+        Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
+
+        for (Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()) {
+            deleteInManyCollections(collections.getValue(), createFilters(collections.getKey(), apis));
+        }
+
+        // we need to update the api collection with the new list of urls
+        Map<Integer, List<String>> urls = new HashMap<>();
+
+        for (ApiInfoKey api : apis) {
+            List<String> urlList = urls.get(api.getApiCollectionId());
+            if (urlList == null) {
+                urlList = new ArrayList<>();
+            }
+            urlList.add(api.getUrl() + " " + api.getMethod().toString());
+            urls.put(api.getApiCollectionId(), urlList);
+        }
+
+        for (Map.Entry<Integer, List<String>> entry : urls.entrySet()) {
+            ApiCollectionsDao.instance.updateOne(Filters.eq(Constants.ID, entry.getKey()),
+                    Updates.pullAll(ApiCollection._URLS, entry.getValue()));
+        }
+
+        if (apis != null && !apis.isEmpty()) {
+            return true;
+        }
+
+        return false;
     }
 
     private static void deleteInManyCollections(MCollection<?>[] collections, Bson filter) {

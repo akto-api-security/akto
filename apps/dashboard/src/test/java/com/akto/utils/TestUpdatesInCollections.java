@@ -69,7 +69,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         }
 
         httpCallParser.syncFunction(httpResponseParamsList, false, true);
-        httpCallParser.apiCatalogSync.syncWithDB(false, true);
+        httpCallParser.apiCatalogSync.syncWithDB(false, true, false);
     }
 
     public TestingRunIssues generateTestResultIssue(String url, String method, Severity severity, String testSubCategory) throws Exception{

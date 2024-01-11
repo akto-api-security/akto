@@ -3,16 +3,24 @@ package com.akto.runtime.policies;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
+import com.akto.utils.EndpointUtil;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteInsert;
+import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.bulk.BulkWriteUpsert;
 import com.mongodb.client.model.*;
+
+import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,14 +93,51 @@ public class AktoPolicyNew {
 
     }
 
-    public void syncWithDb() {
+    private ApiInfoKey parseApiInfoKey(BsonDocument id) {
+        int apiCollectionId = id.getInt32(ApiInfoKey.API_COLLECTION_ID).getValue();
+        String url = id.getString(ApiInfoKey.URL).getValue();
+        String methodString = id.getString(ApiInfoKey.METHOD).getValue();
+        URLMethods.Method method = URLMethods.Method.valueOf(methodString);
+        return new ApiInfoKey(apiCollectionId, url, method);
+    }
+
+    public void syncWithDb(boolean isHarOrPcap) {
         loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
         UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap);
         List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
         List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
         try {
-            if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+            if (writesForApiInfo.size() > 0) {
+                BulkWriteResult bulkWriteResult = ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+                if (isHarOrPcap) {
+                    List<BulkWriteInsert> inserts = bulkWriteResult.getInserts();
+                    List<BulkWriteUpsert> upserts = bulkWriteResult.getUpserts();
+
+                    Set<ApiInfoKey> apiInfoKeys = new HashSet<>();
+
+                    for (BulkWriteInsert insert : inserts) {
+                        try {
+                            BsonDocument id = (BsonDocument) insert.getId();
+                            ApiInfoKey apiInfoKey = parseApiInfoKey(id);
+                            apiInfoKeys.add(apiInfoKey);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "unable to parse bulk write result", LogDb.RUNTIME);
+                        }
+                    }
+                    for (BulkWriteUpsert upsert : upserts) {
+                        try {
+                            BsonDocument id = (BsonDocument) upsert.getId();
+                            ApiInfoKey apiInfoKey = parseApiInfoKey(id);
+                            apiInfoKeys.add(apiInfoKey);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "unable to parse bulk write result", LogDb.RUNTIME);
+                        }
+                    }
+
+                    EndpointUtil.calcAndDeleteEndpointsFromList(apiInfoKeys);
+                }
+            }
             if (!redact && writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);

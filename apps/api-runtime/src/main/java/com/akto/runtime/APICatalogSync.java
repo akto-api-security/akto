@@ -1405,7 +1405,7 @@ public class APICatalogSync {
 
     int counter = 0;
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, boolean isHarOrPcap) {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
@@ -1454,7 +1454,7 @@ public class APICatalogSync {
             } while (from < writesForParams.size());
         }
 
-        aktoPolicyNew.syncWithDb();
+        aktoPolicyNew.syncWithDb(isHarOrPcap);
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
         if(writesForTraffic.size() > 0) {

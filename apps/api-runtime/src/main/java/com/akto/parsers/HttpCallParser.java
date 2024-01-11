@@ -163,7 +163,7 @@ public class HttpCallParser {
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, isHarOrPcap);
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
