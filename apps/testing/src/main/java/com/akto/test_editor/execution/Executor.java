@@ -17,6 +17,7 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
@@ -512,14 +513,9 @@ public class Executor {
                 return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
                 String newUrl = null;
-                List<String> nUrls = Operations.buildNewUrl(varMap, key, rawApi.getRequest().getUrl());
-                if (key instanceof Map) {
-                    Map<String, Map<String, String>> regexReplace = (Map) key;
-                    String url = rawApi.getRequest().getUrl();
-                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
-                    String regex = regexInfo.get("regex");
-                    String replaceWith = regexInfo.get("replace_with");
-                    newUrl = Utils.applyRegexModifier(url, regex, replaceWith);
+                UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
+                if (urlModifierPayload != null) {
+                    newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
                 } else {
                     newUrl = key.toString();
                 }
