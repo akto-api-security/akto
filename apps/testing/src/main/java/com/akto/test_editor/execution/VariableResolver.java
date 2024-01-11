@@ -269,7 +269,7 @@ public class VariableResolver {
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
-        if (key == null || !(key instanceof String)) {
+        if (key == null) {
             return false;
         }
 
@@ -402,7 +402,7 @@ public class VariableResolver {
     }
 
 
-    public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>>  sampleDataMap, ApiInfo.ApiInfoKey apiInfoKey) {
+    public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>> sampleDataMap, ApiInfo.ApiInfoKey apiInfoKey) {
 
         for (String k: varMap.keySet()) {
             if (!k.contains("wordList_")) {
@@ -443,9 +443,9 @@ public class VariableResolver {
                     if (infoKey.getApiCollectionId() != apiInfoKey.getApiCollectionId()) {
                         continue;
                     }
-                    if (infoKey.equals(apiInfoKey)) {
-                        sample.remove(0);
-                    }
+                    // if (infoKey.equals(apiInfoKey)) {
+                    //     sample.remove(0);
+                    // }
                     modifiedSampleDataMap.put(infoKey, sample);
                 }
             } else {
