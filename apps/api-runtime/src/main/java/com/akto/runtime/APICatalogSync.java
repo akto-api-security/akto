@@ -45,7 +45,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    public static boolean mergeAsyncOutside = false;
+    public static boolean mergeAsyncOutside = true;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -56,7 +56,7 @@ public class APICatalogSync {
         try {
             String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
             if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
-                mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
+                mergeAsyncOutside = true;
             }
         } catch (Exception e) {
 
@@ -564,10 +564,6 @@ public class APICatalogSync {
 
     public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, Boolean urlRegexMatchingEnabled) {
 
-        if (!urlRegexMatchingEnabled) {
-            return false;
-        }
-
         String[] n = tokenize(newUrl.getUrl());
         String[] o = tokenize(deltaUrl.getUrl());
         SuperType[] b = mergedTemplate.getTypes();
@@ -575,7 +571,12 @@ public class APICatalogSync {
             SuperType c = b[idx];
             if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
                 String val = n[idx];
-                if(!isAlphanumericString(val) || !isAlphanumericString(o[idx])) {
+                SubType newSubType = getTokenSubType(n[idx]);
+                SubType oldSubType = getTokenSubType(o[idx]);
+                boolean isAlphaNumeric = isAlphanumericString(val) && isAlphanumericString(o[idx]);
+                boolean isUserRegex = isValidSubtype(oldSubType) && isValidSubtype(newSubType);
+
+                if(!isAlphaNumeric && !isUserRegex) {
                     return false;
                 }
             }
@@ -603,6 +604,19 @@ public class APICatalogSync {
         return (intCount >= 3 && charCount >= 1);
     }
 
+    private static SubType getTokenSubType(Object token){
+        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
+            if (!customDataType.isActive()) continue;
+            boolean result = customDataType.validateTokenData(token);
+            if (result) return customDataType.toSubType();
+        }
+        return KeyTypes.findSubType(token, "", null);
+    }
+
+    private static Boolean isValidSubtype(SubType subType){
+        return !(subType.getName().equals(SingleTypeInfo.GENERIC.getName()) || subType.getName().equals(SingleTypeInfo.OTHER.getName()));
+    }
+
 
     public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
@@ -623,6 +637,9 @@ public class APICatalogSync {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
 
+            SubType dbSubType = getTokenSubType(dbTokens[i]);
+            SubType tempSubType = getTokenSubType(newTokens[i]);
+
             if (tempToken.equalsIgnoreCase(dbToken)) {
                 continue;
             }
@@ -633,7 +650,12 @@ public class APICatalogSync {
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
-            } else {
+            } 
+            else if(isValidSubtype(tempSubType) && isValidSubtype(dbSubType) && (dbSubType.getName().equals(tempSubType.getName()))){
+                newTypes[i] = SuperType.STRING;
+                newTokens[i] = null;
+            }
+            else {
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
                 templatizedStrTokens++;
@@ -683,10 +705,10 @@ public class APICatalogSync {
                     for (int i = 0; i < urlTemplate.getTypes().length; i++) {
                         SuperType superType = urlTemplate.getTypes()[i];
                         if (superType == null) continue;
-
+                        String word = delEndpoint.split("/")[i];
                         SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", SingleTypeInfo.GENERIC, apiCollectionId, true);
-                        SubType subType = KeyTypes.findSubType(i, i+"",stiId);
-                        stiId.setSubType(subType);
+                        SubType tokenSubType = getTokenSubType(word);;
+                        stiId.setSubType(tokenSubType);
                         SingleTypeInfo sti = new SingleTypeInfo(
                             stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
                             SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MIN_VALUE, SingleTypeInfo.ACCEPTED_MAX_VALUE);
@@ -1170,10 +1192,10 @@ public class APICatalogSync {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         if (mergeAsyncOutside) {
-            if (Context.now() - lastMergeAsyncOutsideTs > 600) {
+            if (true) {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
-                boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
+                boolean gotDibs =true;
                 if (gotDibs) {
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                     if (backwardCompatibility.getMergeOnHostInit() == 0) {
