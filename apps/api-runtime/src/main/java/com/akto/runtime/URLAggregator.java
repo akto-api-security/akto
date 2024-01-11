@@ -48,15 +48,6 @@ public class URLAggregator {
         return defaultResult;
     }
 
-    private static SubType getTokenSubType(Object token){
-        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
-            if (!customDataType.isActive()) continue;
-            boolean result = customDataType.validateTokenData(token);
-            if (result) return customDataType.toSubType();
-        }
-        return KeyTypes.findSubType(token, "", null);
-    }
-
     public static URLStatic getBaseURL(String url, String method) {
 
         if (url == null) {
@@ -75,18 +66,6 @@ public class URLAggregator {
             String tempToken = urlTokens[i];
 
             if (tempToken.length() == 0) {
-                continue;
-            }
-
-            SubType subType = getTokenSubType(tempToken);
- 
-            if(!(subType == SingleTypeInfo.GENERIC || subType == SingleTypeInfo.OTHER)){
-                SingleTypeInfo.SuperType superType = subType.getSuperType();;
-                if(superType == SingleTypeInfo.SuperType.CUSTOM){
-                    superType = getTokenSupertype(tempToken,pattern, true);
-                }
-                newTypes[i] = superType;
-                urlTokens[i] = null;
                 continue;
             }
             
