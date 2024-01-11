@@ -630,7 +630,8 @@ public final class FilterAction {
 
         Object val = null;
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
-        String key = querySet.get(0);
+        Object k = querySet.get(0);
+        String key = k.toString();
 
         String queryParams = rawApi.getRequest().getQueryParams();
         String url = filterActionRequest.getApiInfoKey().getUrl();
