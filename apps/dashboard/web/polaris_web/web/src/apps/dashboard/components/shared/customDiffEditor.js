@@ -102,37 +102,40 @@ const transform = {
             let final = { ...original, ...current };
             var diff = require('deep-diff').diff;
             var differences = diff(original, current);
+            // console.log(original, current, differences)
             res.json = this.formatJson(final);
-            for (let diff of differences) {
-                let kind = diff.kind;
-                let key = diff.path.pop();
-                let searchKey = '"' + key + '": ';
-                switch (kind) {
-                    case 'N':
-                        searchKey = this.getSearchKey(searchKey, diff.rhs);
-                        searchKey.split("\n").forEach((line) => {
-                            res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
-                        })
-                        break;
-                    case 'D':
-                        searchKey = this.getSearchKey(searchKey, diff.lhs);
-                        searchKey.split("\n").forEach((line) => {
-                            res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
-                        })
-                        break;
-                    case 'A':
-                        let ogTemp = original;
-                        let curTemp = current;
-                        for (let i in diff.path) {
-                            ogTemp = ogTemp[diff.path[i]];
-                            curTemp = curTemp[diff.path[i]];
-                        }
-                        let data = this.formatJson(ogTemp) + "->" + this.formatJson(curTemp);
-                        res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data }
-                        break;
-                    case 'E':
-                        let data2 = this.formatJson(diff.lhs) + "->" + this.formatJson(diff.rhs);
-                        res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data2 }
+            if (differences != undefined) {
+                for (let diff of differences) {
+                    let kind = diff.kind;
+                    let key = diff.path.pop();
+                    let searchKey = '"' + key + '": ';
+                    switch (kind) {
+                        case 'N':
+                            searchKey = this.getSearchKey(searchKey, diff.rhs);
+                            searchKey.split("\n").forEach((line) => {
+                                res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+                            })
+                            break;
+                        case 'D':
+                            searchKey = this.getSearchKey(searchKey, diff.lhs);
+                            searchKey.split("\n").forEach((line) => {
+                                res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+                            })
+                            break;
+                        case 'A':
+                            let ogTemp = original;
+                            let curTemp = current;
+                            for (let i in diff.path) {
+                                ogTemp = ogTemp[diff.path[i]];
+                                curTemp = curTemp[diff.path[i]];
+                            }
+                            let data = this.formatJson(ogTemp) + "->" + this.formatJson(curTemp);
+                            res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data }
+                            break;
+                        case 'E':
+                            let data2 = this.formatJson(diff.lhs) + "->" + this.formatJson(diff.rhs);
+                            res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data2 }
+                    }
                 }
             }
 
@@ -146,41 +149,52 @@ const transform = {
             for (let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))) {
                 if (ogArr[i] && curArr[i]) {
                     if (ogArr[i] !== curArr[i]) {
-                        ret.headersMap[curArr[i]] = { className: 'updated-content', data: ogArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + "->" + curArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), keyLength: -2 }
+                        res.headersMap[this.escapeRegex(curArr[i])] = { className: 'updated-content', data: ogArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + "->" + curArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), keyLength: -2 }
                     }
                     retArr.push(curArr[i]);
                 } else if (ogArr[i]) {
-                    ret.headersMap[curArr[i]] = { className: 'deleted-content' };
+                    res.headersMap[this.escapeRegex(curArr[i])] = { className: 'deleted-content' };
                     retArr.push(ogArr[i]);
                 } else if (curArr[i]) {
-                    ret.headersMap[curArr[i]] = { className: 'added-content' };
+                    res.headersMap[this.escapeRegex(curArr[i])] = { className: 'added-content' };
                     retArr.push(curArr[i]);
                 }
             }
-            ret.json = retArr.join("\n")
+            res.json = retArr.join("\n")
 
         } else {
             // handle mix match. array, string, object.
 
             let og = this.standardDiff(original)
             let cur = this.standardDiff(current)
-            res.json = og + "\n" + cur
-            og.split("\n").forEach((line) => {
-                res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
-            })
-            cur.split("\n").forEach((line) => {
-                res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
-            })
+            if(og === cur){
+                res.json = cur
+            }
+            else {
+                res.json = og + "\n" + cur
+                og.split("\n").forEach((line) => {
+                    res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+                })
+                cur.split("\n").forEach((line) => {
+                    res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+                })
+            }
+            
         }
 
         return res;
     },
 
     standardDiff(data) {
+
+        if(data == null || data == undefined){
+            return "";
+        }    
+
         let type = typeof (data)
 
         if (type === 'string' || type === 'number' || type === 'boolean') {
-            return data;
+            return data.toString();
         } else if (type === 'object') {
             if (Array.isArray(data)) {
                 return this.processArrayJson(this.formatJson(data))
@@ -188,12 +202,12 @@ const transform = {
                 return this.formatJson(data)
             }
         } else {
-            return data;
+            return data.toString();
         }
     },
 
     escapeRegex(string) {
-        return "^" + string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$";
+        return string;
     },
 
     getSearchKey(mainKey, value) {
