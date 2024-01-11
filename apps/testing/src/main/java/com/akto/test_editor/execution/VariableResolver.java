@@ -230,7 +230,7 @@ public class VariableResolver {
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
-        if (key == null || !(key instanceof String)) {
+        if (key == null) {
             return false;
         }
 
