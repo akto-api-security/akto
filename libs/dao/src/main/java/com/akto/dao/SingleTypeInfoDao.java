@@ -400,10 +400,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     static final String _START_TS = "startTs";
     static final String _COUNT = "count";
 
-    public List<ApiInfoKey> getEndpointsAfterOverage(Bson filters, int usageLimit) {
+    public List<ApiInfoKey> getEndpointsAfterOverage(Bson filters, int usageLimit, int deltaEpoch) {
 
         List<Bson> pipeline = getPipelineForEndpoints(filters);
         pipeline.add(Aggregates.skip(usageLimit));
+        pipeline.add(Aggregates.match(Filters.gt(_START_TS, deltaEpoch)));
         pipeline.add(Aggregates.limit(ENDPOINT_LIMIT));
 
         return processPipelineForEndpoint(pipeline);

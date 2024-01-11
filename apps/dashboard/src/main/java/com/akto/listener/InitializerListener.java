@@ -1481,7 +1481,7 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
-    private final static int REFRESH_INTERVAL = 60 * 5; // 5 minutes
+    private final static int REFRESH_INTERVAL = 60 * 1; // 1 minute
 
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
