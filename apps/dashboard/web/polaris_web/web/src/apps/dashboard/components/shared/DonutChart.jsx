@@ -6,13 +6,16 @@ import { useRef } from "react";
 function DonutChart({data, title, size}) {
     const chartComponentRef = useRef(null)
 
-    const seriesData = Object.keys(data).map((ele)=>{
-        return{
-            name: ele,
-            y: data[ele].text,
-            color: data[ele].color,
-        }
-    })
+    let seriesData = []
+    if(data && Object.keys(data).length > 0){
+        seriesData = Object.keys(data).map((ele)=>{
+            return{
+                name: ele,
+                y: data[ele].text,
+                color: data[ele].color,
+            }
+        })
+    }
 
     const chartOptions = {
         chart:{
