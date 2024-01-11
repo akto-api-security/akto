@@ -47,6 +47,8 @@ public class EndpointUtil {
         }
     }
 
+    final static int delta = 60 * 20; // 20 minutes
+
     private static void deleteEndpoints(int skip, int timestamp) {
 
         Bson filters = Filters.and(
@@ -58,8 +60,14 @@ public class EndpointUtil {
         do {
             hasMore = false;
 
-            // we query up to 100 endpoints at a time
-            List<ApiInfoKey> apis = SingleTypeInfoDao.instance.getEndpointsAfterOverage(filters, skip);
+            /* 
+                we query up to 100 endpoints at a time
+                Using the delta epoch to bring the latest traffic only.
+            */
+
+            int now = Context.now();
+            int deltaEpoch = now - delta;
+            List<ApiInfoKey> apis = SingleTypeInfoDao.instance.getEndpointsAfterOverage(filters, skip, deltaEpoch);
 
             // This contains all collections related to endpoints
             Map<CollectionType, MCollection<?>[]> collectionsMap = ApiCollectionUsers.COLLECTIONS_WITH_API_COLLECTION_ID;
