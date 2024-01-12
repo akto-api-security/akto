@@ -583,6 +583,7 @@ public class Executor {
                 return new ExecutorSingleOperationResp(true, "");
             case "jwt_replace_body":
                 JWTPayloadReplacer jwtPayloadReplacer = new JWTPayloadReplacer(key.toString());
+                boolean modified = false;
                 for (String k: rawApi.getRequest().getHeaders().keySet()) {
                     List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
                     if (hList.size() == 0){
@@ -613,8 +614,12 @@ public class Executor {
                     if (!isJwt) {
                         continue;
                     }
+                    modified = true;
 
                     return Operations.modifyHeader(rawApi, k, String.join( " ", finalValue));
+                }
+                if (!modified) {
+                    return new ExecutorSingleOperationResp(true, "");
                 }
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
