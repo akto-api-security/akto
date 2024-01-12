@@ -41,8 +41,8 @@ function SampleDataComponent(props) {
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
 
         if(isNewDiff){
-            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine,originalRequestJson?.json?.queryParams,requestJson?.json?.queryParams)
-            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine,originalResponseJson?.json?.queryParams,responseJson?.json?.queryParams)
+            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
+            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine)
 
             let requestHeaderObj = transform.compareJsonKeys(originalRequestJson?.json?.requestHeaders,requestJson?.json?.requestHeaders)
             let responseHeaderObj = transform.compareJsonKeys(originalResponseJson?.json?.responseHeaders,responseJson?.json?.responseHeaders)

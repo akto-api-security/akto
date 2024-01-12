@@ -52,20 +52,11 @@ const transform = {
         }
     },
 
-    getFirstLine(original,current,originalParams,currentParams){
-        let ogFirstLine = original
-        let firstLine = current
-        if(originalParams){
-            ogFirstLine = ogFirstLine + func.convertQueryParamsToUrl(originalParams)
-        }
-        if(currentParams){
-            firstLine = firstLine + func.convertQueryParamsToUrl(currentParams)
-        }
-
+    getFirstLine(original,current){
         return{
-            original: ogFirstLine,
-            firstLine: firstLine,
-            isUpdated: firstLine !== ogFirstLine
+            original: original,
+            firstLine: current,
+            isUpdated: original !== current
         }
     },
 
