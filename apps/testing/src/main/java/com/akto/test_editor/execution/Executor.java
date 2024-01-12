@@ -601,7 +601,7 @@ public class Executor {
                     }
 
                     if (!isJwt) {
-                        continue;
+                        return new ExecutorSingleOperationResp(true, "");
                     }
 
                     return Operations.modifyHeader(rawApi, k, String.join( " ", finalValue));
