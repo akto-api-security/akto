@@ -19,6 +19,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
@@ -27,13 +28,15 @@ import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -144,12 +147,12 @@ public class Main {
 
         if (trrs != null && trrs.getTestIdConfig() > 1) {
             configFromTrrs = TestingRunConfigDao.instance.findOne(Constants.ID, trrs.getTestIdConfig());
-            loggerMaker.infoAndAddToDb("Found testing run config with id :" + configFromTrrs.getId(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Found testing run trrs config with id :" + configFromTrrs.getId(), LogDb.TESTING);
         }
 
         if (testingRun.getTestIdConfig() > 1) {
             baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            loggerMaker.infoAndAddToDb("Found testing run config with id :" + baseConfig.getId(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
         }
 
         if (configFromTrrs == null) {
@@ -158,6 +161,8 @@ public class Main {
             configFromTrrs.rebaseOn(baseConfig);
             testingRun.setTestingRunConfig(configFromTrrs);
         }
+
+        System.out.println(testingRun.getTestingRunConfig());
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -241,16 +246,27 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                                    TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
+                                    GithubUtils.publishGithubComments(runResultSummary);
                                 }
                             } else {
                                 loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
+                                TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
+                                GithubUtils.publishGithubComments(runResultSummary);
                             }
                         }
 
                         summaryId = createTRRSummaryIfAbsent(testingRun, start);
                     }
                     TestExecutor testExecutor = new TestExecutor();
+                    if (trrs != null && trrs.getState() == State.SCHEDULED) {
+                        if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
+                            //case of github status push
+                            GithubUtils.publishGithubStatus(trrs);
+
+                        }
+                    }
                     testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
