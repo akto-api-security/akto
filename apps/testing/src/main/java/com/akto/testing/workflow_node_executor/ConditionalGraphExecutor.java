@@ -21,11 +21,6 @@ public class ConditionalGraphExecutor extends GraphExecutor {
             errors.add("invalid graph, node " + node.getId() + "being visited multiple times");
             return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
         }
-        
-        // if (node.getNeighbours().size() > 2) {
-        //     errors.add("invalid graph, node " + node.getId() + "cannot have more than 2 paths to other nodes");
-        //     return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
-        // }
 
         visitedMap.put(node.getId(), true);
 
@@ -35,6 +30,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap());
 
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);
+        graphExecutorRequest.getExecutionOrder().add(node.getId());
 
         if (nodeResult.isVulnerable()) {
             success = true;
@@ -59,9 +55,9 @@ public class ConditionalGraphExecutor extends GraphExecutor {
             if (node.getFailureChildNode() == null || node.getFailureChildNode().equals("")) {
                 return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
             } else {
-                if (node.getSuccessChildNode().equals("vulnerable")) {
+                if (node.getFailureChildNode().equals("vulnerable")) {
                     return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), true, errors);
-                } else if (node.getSuccessChildNode().equals("exit")) {
+                } else if (node.getFailureChildNode().equals("exit")) {
                     return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
                 }
                 childNodeId = node.getFailureChildNode();
@@ -72,9 +68,9 @@ public class ConditionalGraphExecutor extends GraphExecutor {
 
         boolean vulnerable = success;
         if (childNode != null) {
-            GraphExecutorRequest childExecReq = new GraphExecutorRequest(graphExecutorRequest, childNode, graphExecutorRequest.getWorkflowTestResult(), visitedMap);
+            GraphExecutorRequest childExecReq = new GraphExecutorRequest(graphExecutorRequest, childNode, graphExecutorRequest.getWorkflowTestResult(), visitedMap, graphExecutorRequest.getExecutionOrder());
             GraphExecutorResult childExecResult = executeGraph(childExecReq);
-            vulnerable = vulnerable & childExecResult.getVulnerable();
+            vulnerable = childExecResult.getVulnerable();
         }
 
         return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), vulnerable, errors);
