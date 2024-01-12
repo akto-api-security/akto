@@ -185,7 +185,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerId", organizationId);
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
-
+            userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
         }
 
         if (versions.length > 2) {

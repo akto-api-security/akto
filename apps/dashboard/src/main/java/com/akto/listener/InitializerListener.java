@@ -37,12 +37,6 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.rate_limit.ApiRateLimit;
-import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
-import com.akto.dto.testing.rate_limit.RateLimitHandler;
-import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.dto.traffic.Key;
-import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -91,7 +85,6 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1626,6 +1619,7 @@ public class InitializerListener implements ServletContextListener {
 
         try {
             int gracePeriod = organization.getGracePeriod();
+            String hotjarSiteId = organization.getHotjarSiteId();
             String organizationId = organization.getId();
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
@@ -1651,7 +1645,10 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+            BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
+            gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
+            hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            organization.setHotjarSiteId(hotjarSiteId);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -1660,7 +1657,8 @@ public class InitializerListener implements ServletContextListener {
                     Filters.eq(Constants.ID, organizationId),
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
-                            Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
+                            Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
                     LogDb.DASHBOARD);

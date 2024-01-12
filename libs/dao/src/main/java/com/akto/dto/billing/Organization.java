@@ -26,6 +26,10 @@ public class Organization {
     private boolean onPrem;
 
     public static final String GRACE_PERIOD = "gracePeriod";
+
+    public static final String HOTJAR_SITE_ID = "hotjarSiteId";
+
+    public String hotjarSiteId = "hotjarSiteId";
     private int gracePeriod;
 
     public Organization() { }
@@ -101,5 +105,13 @@ public class Organization {
 
     public void setGracePeriod(int gracePeriod) {
         this.gracePeriod = gracePeriod;
+    }
+
+    public  String getHotjarSiteId() {
+        return hotjarSiteId;
+    }
+
+    public  void setHotjarSiteId(String hotjarSiteId) {
+        this.hotjarSiteId = hotjarSiteId;
     }
 }

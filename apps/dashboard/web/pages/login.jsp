@@ -68,6 +68,17 @@
                     window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
+                    window.HOTJAR_SITE_ID='${requestScope.hotjarSiteId}'
+                    if(window.HOTJAR_SITE_ID){
+                           (function(h,o,t,j,a,r){
+                               h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+                               h._hjSettings={hjid:window.HOTJAR_SITE_ID,hjsv:6}; // Replace YOUR_SITE_ID_HERE with your siteId variable
+                               a=o.getElementsByTagName('head')[0];
+                               r=o.createElement('script');r.async=1;
+                               r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+                               a.appendChild(r);
+                           })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+                    }
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
