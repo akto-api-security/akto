@@ -18,11 +18,7 @@ function formatData(data,style){
     if(style === "http" && data && Object.keys(data).length > 0){
         if(data.json){
             Object.keys(data?.json).forEach((element)=> {
-                if(element.includes("query")){
-                    if(data.json[element]){
-                        localFirstLine = localFirstLine + func.convertQueryParamsToUrl(data?.json[element])
-                    }
-                }else if(element.includes("Header")){
+                if(element.includes("Header")){
                     if(data.json[element]){
                         Object.keys(data?.json[element]).forEach((key) => {
                             finalData = finalData + key + ': ' + data.json[element][key] + "\n"
@@ -69,8 +65,8 @@ function SampleDataComponent(props) {
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
 
         if(isNewDiff){
-            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine,originalRequestJson?.json?.queryParams,requestJson?.json?.queryParams)
-            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine,originalResponseJson?.json?.queryParams,responseJson?.json?.queryParams)
+            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
+            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine)
 
             let requestHeaderObj = transform.compareJsonKeys(originalRequestJson?.json?.requestHeaders,requestJson?.json?.requestHeaders)
             let responseHeaderObj = transform.compareJsonKeys(originalResponseJson?.json?.responseHeaders,responseJson?.json?.responseHeaders)
