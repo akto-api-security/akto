@@ -2,12 +2,15 @@ package com.akto.dto.test_editor;
 
 import java.util.List;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
 public class ExecutorNode {
     
     private String nodeType;
     
     private List<ExecutorNode> childNodes;
 
+    @BsonIgnore
     private Object values;
 
     private String operationType;

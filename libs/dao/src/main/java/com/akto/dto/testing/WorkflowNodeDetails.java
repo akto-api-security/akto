@@ -1,7 +1,10 @@
 package com.akto.dto.testing;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import com.akto.dto.type.URLMethods.Method;
 
+@BsonDiscriminator
 public class WorkflowNodeDetails {
     int apiCollectionId;
     String endpoint;
