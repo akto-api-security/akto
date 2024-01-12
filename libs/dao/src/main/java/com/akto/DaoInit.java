@@ -116,6 +116,10 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<TestResult> testResultClassModel = ClassModel.builder(TestResult.class).enableDiscriminator(true)
                 .build();
+        ClassModel<MultiExecTestResult> multiExecTestResultClassModel = ClassModel.builder(MultiExecTestResult.class).enableDiscriminator(true)
+                .build();
+        ClassModel<GenericTestResult> genericTestResultClassModel = ClassModel.builder(GenericTestResult.class).enableDiscriminator(true)
+                .build();
         ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class)
                 .enableDiscriminator(true).build();
         ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true)
@@ -134,10 +138,14 @@ public class DaoInit {
                 .builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult> workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class)
                 .enableDiscriminator(true).build();
+        ClassModel<WorkflowTest> workflowTestClassModel = ClassModel.builder(WorkflowTest.class)
+                .enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true)
                 .build();
         ClassModel<CustomWebhook> CustomWebhookClassModel = ClassModel.builder(CustomWebhook.class)
                 .enableDiscriminator(true).build();
+        ClassModel<WorkflowNodeDetails> WorkflowNodeDetailsClassModel = ClassModel.builder(WorkflowNodeDetails.class)
+                .enableDiscriminator(true).build();                
         ClassModel<CustomWebhookResult> CustomWebhookResultClassModel = ClassModel.builder(CustomWebhookResult.class)
                 .enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult.NodeResult> nodeResultClassModel = ClassModel
@@ -162,6 +170,8 @@ public class DaoInit {
                 .builder(NotBelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<BelongsToPredicate> belongsToPredicateClassModel = ClassModel
                 .builder(BelongsToPredicate.class).enableDiscriminator(true).build();
+        ClassModel<YamlNodeDetails> yamlNodeDetails = ClassModel
+                .builder(YamlNodeDetails.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -203,18 +213,19 @@ public class DaoInit {
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel,
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
-                testingRunResultClassModel, testResultClassModel,
+                testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
-                cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
+                cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel,testLibraryClassModel,
-                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
+                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
+                yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

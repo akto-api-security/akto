@@ -18,7 +18,9 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -36,6 +38,7 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -466,9 +469,11 @@ public class StartTestAction extends UserAction {
                     Filters.eq(TestingRunResult.VULNERABLE, true));
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
-            for (TestingRunResult runResult : testingRunResultList) {
-                List<TestResult> testResults = new ArrayList<>();
-                for (TestResult testResult : runResult.getTestResults()) {
+            for (TestingRunResult runResult: testingRunResultList) {
+                List<GenericTestResult> testResults = new ArrayList<>();
+                // todo: fix
+                for (GenericTestResult tr : runResult.getTestResults()) {
+                    TestResult testResult = (TestResult) tr;
                     if (testResult.isVulnerable()) {
                         testResults.add(testResult);
                         sampleDataVsCurlMap.put(testResult.getMessage(),
@@ -495,6 +500,18 @@ public class StartTestAction extends UserAction {
     public String fetchTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         this.testingRunResult = TestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        List<GenericTestResult> runResults = new ArrayList<>();
+
+        for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
+            if (testResult instanceof TestResult) {
+                runResults.add(testResult);
+            } else {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) testResult;
+                runResults.addAll(multiTestRes.convertToExistingTestResult(this.testingRunResult));
+            }
+        }
+
+        this.testingRunResult.setTestResults(runResults);
         return SUCCESS.toUpperCase();
     }
 
