@@ -1053,6 +1053,60 @@ public final class FilterAction {
         BasicDBObject resp = new BasicDBObject();
         int privateCnt = 0;
         List<BasicDBObject> privateValues = new ArrayList<>();
+        if (APICatalog.isTemplateUrl(url)) {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+            String[] tokens = urlTemplate.getTokens();
+            for (int i = 0;i < tokens.length; i++) {
+                if (tokens[i] == null) {
+                    SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);
+                    BasicDBObject obj = new BasicDBObject();
+                    singleTypeInfo = new SingleTypeInfo();
+                    if (singleTypeInfo != null && singleTypeInfo.getIsPrivate()) {
+                        privateCnt++;
+                    }
+                    if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate()) {
+                        continue;
+                    }
+                    if (singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+                        Bson filterQSampleData = Filters.and(
+                            Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
+                            Filters.eq("_id.method", apiInfoKey.getMethod()),
+                            Filters.eq("_id.url", apiInfoKey.getUrl())
+                        );
+                        SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
+                        if (sd.getSamples() == null) {
+                            continue;
+                        }
+                        for (String sample: sd.getSamples()) {
+                            try {
+                                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                String sUrl = httpResponseParams.getRequestParams().getURL();
+                                String[] sUrlTokens = sUrl.split("/");
+                                String[] origUrlTokens = urlWithParams.split("/");
+                                if (!origUrlTokens[i].equals(sUrlTokens[i])) {
+                                    obj.put("key", i+"");
+                                    obj.put("value", sUrlTokens[i]);
+                                    if (privateValues.size() < 5) {
+                                        privateValues.add(obj);
+                                    }
+                                    break;
+                                }
+                            } catch (Exception e) {
+                                // TODO: handle exception
+                            }
+                        }
+                    } else {
+                        Set<String> valSet = singleTypeInfo.getValues().getElements();
+                        String val = valSet.iterator().next();
+                        obj.put("key", i+"");
+                        obj.put("value", val);
+                        if (privateValues.size() < 5) {
+                            privateValues.add(obj);
+                        }
+                    }
+                }
+            }
+        }
 
         // 2. payload
         BasicDBObject payload = RequestTemplate.parseRequestPayload(originalHttpRequest.getJsonRequestBody(), urlWithParams);
