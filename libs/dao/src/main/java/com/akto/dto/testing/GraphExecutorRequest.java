@@ -1,5 +1,6 @@
 package com.akto.dto.testing;
 
+import java.util.List;
 import java.util.Map;
 
 import org.bson.types.ObjectId;
@@ -19,6 +20,7 @@ public class GraphExecutorRequest {
     String executionType;
     WorkflowTestResult workflowTestResult;
     Map<String, Boolean> visitedMap;
+    List<String> executionOrder;
 
     public GraphExecutorRequest(Graph graph, WorkflowTest workflowTest, ObjectId testingRunId,
             ObjectId testingRunSummaryId, Map<String, Object> valuesMap, boolean skipIfNotVulnerable, 
@@ -34,7 +36,7 @@ public class GraphExecutorRequest {
 
     public GraphExecutorRequest(Graph graph, Node node, WorkflowTest workflowTest, ObjectId testingRunId,
             ObjectId testingRunSummaryId, Map<String, Object> valuesMap, String executionType, 
-            WorkflowTestResult workflowTestResult, Map<String, Boolean> visitedMap) {
+            WorkflowTestResult workflowTestResult, Map<String, Boolean> visitedMap, List<String> executionOrder) {
         this.graph = graph;
         this.node = node;
         this.workflowTest = workflowTest;
@@ -44,9 +46,11 @@ public class GraphExecutorRequest {
         this.executionType = executionType;
         this.workflowTestResult = workflowTestResult;
         this.visitedMap = visitedMap;
+        this.executionOrder = executionOrder;
     }
 
-    public GraphExecutorRequest(GraphExecutorRequest graphExecutorRequest, Node node, WorkflowTestResult workflowTestResult, Map<String, Boolean> visitedMap) {
+    public GraphExecutorRequest(GraphExecutorRequest graphExecutorRequest, Node node, 
+        WorkflowTestResult workflowTestResult, Map<String, Boolean> visitedMap, List<String> executionOrder) {
         this.graph = graphExecutorRequest.getGraph();
         this.node = node;
         this.workflowTest = graphExecutorRequest.getWorkflowTest();
@@ -57,6 +61,7 @@ public class GraphExecutorRequest {
         this.executionType = graphExecutorRequest.getExecutionType();
         this.workflowTestResult = workflowTestResult;
         this.visitedMap = visitedMap;
+        this.executionOrder = executionOrder;
     }
 
 
@@ -140,6 +145,14 @@ public class GraphExecutorRequest {
 
     public void setVisitedMap(Map<String, Boolean> visitedMap) {
         this.visitedMap = visitedMap;
+    }
+
+    public List<String> getExecutionOrder() {
+        return executionOrder;
+    }
+
+    public void setExecutionOrder(List<String> executionOrder) {
+        this.executionOrder = executionOrder;
     }
 
 
