@@ -287,9 +287,7 @@ function DataTypes() {
       </div>
     </VerticalStack>
   )
-
-  console.log(currState)
-
+  
   let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard, urlConditionsCard,requestCard]
 
   return (
