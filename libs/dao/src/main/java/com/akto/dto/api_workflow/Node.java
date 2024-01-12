@@ -10,10 +10,19 @@ public class Node {
     private String id;
     private WorkflowNodeDetails workflowNodeDetails;
     private Set<String> neighbours = new HashSet<>();
+    private String successChildNode;
+    private String failureChildNode;
 
     public Node(String id, WorkflowNodeDetails workflowNodeDetails) {
         this.id = id;
         this.workflowNodeDetails = workflowNodeDetails;
+    }
+
+    public Node(String id, WorkflowNodeDetails workflowNodeDetails, String successChildNode, String failureChildNode) {
+        this.id = id;
+        this.workflowNodeDetails = workflowNodeDetails;
+        this.successChildNode = successChildNode;
+        this.failureChildNode = failureChildNode;
     }
 
     public void addNeighbours(String... ids) {
@@ -43,6 +52,22 @@ public class Node {
 
     public void setNeighbours(Set<String> neighbours) {
         this.neighbours = neighbours;
+    }
+
+    public String getSuccessChildNode() {
+        return successChildNode;
+    }
+
+    public void setSuccessChildNode(String successChildNode) {
+        this.successChildNode = successChildNode;
+    }
+
+    public String getFailureChildNode() {
+        return failureChildNode;
+    }
+
+    public void setFailureChildNode(String failureChildNode) {
+        this.failureChildNode = failureChildNode;
     }
 
     @Override
