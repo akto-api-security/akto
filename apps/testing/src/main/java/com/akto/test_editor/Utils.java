@@ -363,62 +363,77 @@ public class Utils {
             if (urlModifierPayload.getRegex() != null && !urlModifierPayload.getRegex().equals("")) {
                 url = Utils.applyRegexModifier(oldUrl, urlModifierPayload.getRegex(), urlModifierPayload.getReplaceWith());
             } else {
-                URI uri = null;
-                try {
-                    uri = new URI(oldUrl);
-                    oldUrl = uri.getPath();
-                } catch (Exception e) {
-                    // TODO: handle exception
-                }
+                URI uri = fetchUri(oldUrl);
+                oldUrl = fetchUrlPath(uri, oldUrl);
+
                 String[] urlTokens = oldUrl.split("/");
                 Integer position = urlModifierPayload.getPosition();
                 if (position <= 0 || position >= urlTokens.length) {
-                    if (uri != null && uri.getHost() != null) {
-                        return uri.getScheme() + "://" + uri.getHost() + oldUrl;
-                    } else {
-                        return oldUrl;
-                    }
-                    
+                    // position is not valid
+                    return fetchActualUrl(uri, oldUrl);
                 }
-                urlTokens[position] = urlModifierPayload.getReplaceWith();
-                url = String.join( "/", urlTokens);
-                if (uri != null && uri.getHost() != null) {
-                    url = uri.getScheme() + "://" + uri.getHost() + url;
-                }
+                return replaceUrlWithToken(urlTokens, urlModifierPayload, position, uri);
             }
         } else {
-            URI uri = null;
-            try {
-                uri = new URI(oldUrl);
-                oldUrl = uri.getPath();
-            } catch (Exception e) {
-                // TODO: handle exception
-            }
+            URI uri = fetchUri(oldUrl);
+            oldUrl = fetchUrlPath(uri, oldUrl);
+
             String[] urlTokens = oldUrl.split("/");
             Integer position = urlModifierPayload.getPosition();
             if (position <= 0 || position > urlTokens.length) {
-                if (uri != null && uri.getHost() != null) {
-                    return uri.getScheme() + "://" + uri.getHost() + oldUrl;
-                } else {
-                    return oldUrl;
-                }
+                // position is not valid
+                return fetchActualUrl(uri, oldUrl);
             }
 
-            String[] newUrlTokens = new String[urlTokens.length];
-            for (int i = 1; i < position; i++) {
-                newUrlTokens[i-1] = urlTokens[i];
-            }
-            newUrlTokens[position - 1] = urlModifierPayload.getReplaceWith();
-            for (int i = position; i < urlTokens.length; i++) {
-                newUrlTokens[i] = urlTokens[i];
-            }
-            url = String.join( "/", newUrlTokens);
-            url = "/" + url;
-            if (uri != null && uri.getHost() != null) {
-                url = uri.getScheme() + "://" + uri.getHost() + url;
-            }
+            return insertUrlWithToken(urlTokens, urlModifierPayload, position, uri);
+            
         }
         return url;
+    }
+
+    private static URI fetchUri(String url) {
+        URI uri = null;
+        try {
+            uri = new URI(url);
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+        return uri;
+    }
+
+    private static String fetchUrlPath(URI uri, String url) {
+        if (uri != null) {
+            return uri.getPath();
+        }
+        return url;
+    }
+
+    private static String fetchActualUrl(URI uri, String url) {
+        if (uri != null && uri.getHost() != null) {
+            return uri.getScheme() + "://" + uri.getHost() + url;
+        } else {
+            return url;
+        }
+    }
+
+    private static String replaceUrlWithToken(String[] urlTokens, UrlModifierPayload urlModifierPayload, int position, URI uri) {
+        urlTokens[position] = urlModifierPayload.getReplaceWith();
+        String url = String.join( "/", urlTokens);
+        return fetchActualUrl(uri, url);
+    }
+
+    private static String insertUrlWithToken(String[] urlTokens, UrlModifierPayload urlModifierPayload, int position, URI uri) {
+        String[] newUrlTokens = new String[urlTokens.length];
+        for (int i = 1; i < position; i++) {
+            newUrlTokens[i-1] = urlTokens[i];
+        }
+        newUrlTokens[position - 1] = urlModifierPayload.getReplaceWith();
+        for (int i = position; i < urlTokens.length; i++) {
+            newUrlTokens[i] = urlTokens[i];
+        }
+        String url = String.join( "/", newUrlTokens);
+        url = "/" + url;
+        return fetchActualUrl(uri, url);
     }
 
 }
