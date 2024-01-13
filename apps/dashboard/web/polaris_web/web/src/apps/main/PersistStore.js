@@ -21,6 +21,7 @@ const initialState = {
     lastFetchedSeverityResp: {},
     lastCalledSensitiveInfo: 0,
     lastFetchedSensitiveResp: [],
+    selectedSampleApi: {},
 };
 
 let persistStore = (set) => ({
@@ -40,6 +41,7 @@ let persistStore = (set) => ({
     setLastFetchedSeverityResp: (lastFetchedSeverityResp) => set({ lastFetchedSeverityResp }),
     setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => set({ lastCalledSensitiveInfo }),
     setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
+    setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
 
     resetAll: () => set(initialState), // Reset function
 })
