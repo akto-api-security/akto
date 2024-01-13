@@ -9,6 +9,7 @@ public class Node {
     private String url;
     private String method;
     private Map<String, Connection> connections;
+    private int maxDepth;
 
     public Node() {
     }
@@ -18,6 +19,7 @@ public class Node {
         this.url = url;
         this.method = method;
         this.connections = connections;
+        fillMaxDepth();
     }
 
     @Override
@@ -63,5 +65,25 @@ public class Node {
 
     public void setConnections(Map<String, Connection> connections) {
         this.connections = connections;
+    }
+
+    public void fillMaxDepth() {
+        int maxDepth = 0; // todo: change var name
+        for (Connection connection: this.connections.values()) {
+            int minDepth = Integer.MAX_VALUE; // todo
+            for (Edge edge : connection.getEdges()) {
+                minDepth= Math.min(edge.getDepth(),minDepth); // find the minimum value for each edge.. because we want to take the shortest path
+            }
+            maxDepth = Math.max(minDepth, maxDepth); // find the max value for all the connections
+        }
+        this.maxDepth = maxDepth;
+    }
+
+    public int getMaxDepth() {
+        return maxDepth;
+    }
+
+    public void setMaxDepth(int maxDepth) {
+        this.maxDepth = maxDepth;
     }
 }

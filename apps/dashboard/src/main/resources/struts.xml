@@ -2403,7 +2403,7 @@
         <action name="api/fetchApiDependencies" class="com.akto.action.DependencyAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json">
+            <result name="SUCCESS"  type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>

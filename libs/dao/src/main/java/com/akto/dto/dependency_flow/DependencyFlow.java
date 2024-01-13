@@ -14,7 +14,13 @@ public class DependencyFlow {
 
     public void syncWithDb() {
         List<Node> nodes = new ArrayList<>(resultNodes.values());
-        if (nodes.size() > 0) DependencyFlowNodesDao.instance.insertMany(nodes);
+        if (nodes.size() > 0) {
+            for (Node node: nodes) {
+                node.fillMaxDepth();
+            }
+            DependencyFlowNodesDao.instance.getMCollection().drop();
+            DependencyFlowNodesDao.instance.insertMany(nodes);
+        }
     }
 
     public void run() {
@@ -34,6 +40,8 @@ public class DependencyFlow {
             int id = node.hashCode();
             if (resultNodes.containsKey(id)) continue;
             queue.add(0 + "#" + id);
+            Node resultNodeForZeroLevel = new Node(node.getApiCollectionId(), node.getUrl(), node.getMethod(), new HashMap<>());
+            resultNodes.put(id, resultNodeForZeroLevel);
         }
 
         // pop queue until empty
