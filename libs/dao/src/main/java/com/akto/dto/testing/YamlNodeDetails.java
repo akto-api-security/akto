@@ -31,9 +31,13 @@ public class YamlNodeDetails extends WorkflowNodeDetails {
 
     String originalMessage;
 
+    String success;
+
+    String failure;
+
     public YamlNodeDetails(String testId, FilterNode validatorNode, ExecutorNode executorNode, 
             List<CustomAuthType> customAuthTypes, AuthMechanism authMechanism, 
-            RawApi rawApi, ApiInfoKey apiInfoKey, String originalMessage) {
+            RawApi rawApi, ApiInfoKey apiInfoKey, String originalMessage, String success, String failure) {
         super(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), "", null, WorkflowNodeDetails.Type.API, false, 0, 0, 0, "", "");
         this.testId = testId;
         this.validatorNode = validatorNode;
@@ -43,6 +47,8 @@ public class YamlNodeDetails extends WorkflowNodeDetails {
         this.rawApi = rawApi;
         this.apiInfoKey = apiInfoKey;
         this.originalMessage = originalMessage;
+        this.success = success;
+        this.failure = failure;
     }
 
     public YamlNodeDetails() {
@@ -114,6 +120,22 @@ public class YamlNodeDetails extends WorkflowNodeDetails {
 
     public void setOriginalMessage(String originalMessage) {
         this.originalMessage = originalMessage;
+    }
+
+    public String getSuccess() {
+        return success;
+    }
+
+    public void setSuccess(String success) {
+        this.success = success;
+    }
+
+    public String getFailure() {
+        return failure;
+    }
+
+    public void setFailure(String failure) {
+        this.failure = failure;
     }
     
 }
