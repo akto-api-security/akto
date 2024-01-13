@@ -42,8 +42,8 @@ const YamlEditor = ({ fetchAllTests }) => {
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
 
-    const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
-    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
+    const setSelectedSampleApi = TestEditorStore(state => state.setSelectedSampleApi)
 
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
