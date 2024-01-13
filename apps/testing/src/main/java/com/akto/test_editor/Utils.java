@@ -405,8 +405,18 @@ public class Utils {
             String locStr = operationMap.getOrDefault("location", "0").toString();
             Double loc = Double.parseDouble(locStr);
             Integer location = loc.intValue();
+
+            String replaceWith = operationMap.getOrDefault("replace_with", "").toString();
+            try {
+                Double replaceWithDouble = Double.parseDouble(replaceWith);
+                Integer replaceWithInt = replaceWithDouble.intValue();
+                replaceWith = replaceWithInt.toString();
+            } catch (Exception e) {
+                // TODO: handle exception
+            }
+
             urlModifierPayload = new UrlModifierPayload(operationMap.getOrDefault("regex", "").toString(), 
-                location, operationMap.getOrDefault("replace_with", "").toString(), operation);
+                location, replaceWith, operation);
         } catch (Exception e) {
             return urlModifierPayload;
         }
