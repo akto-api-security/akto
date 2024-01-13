@@ -345,6 +345,9 @@ public class Utils {
             } else if (json.containsKey("token_insert")) {
                 operationMap = (Map) json.get("token_insert");
                 operation = "token_insert";
+            } else if (json.containsKey("token_replace")) {
+                operationMap = (Map) json.get("token_replace");
+                operation = "token_replace";
             }
             String locStr = operationMap.getOrDefault("location", "0").toString();
             Double loc = Double.parseDouble(locStr);
@@ -369,7 +372,7 @@ public class Utils {
 
     public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
         String url = "";
-        if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace")) {
+        if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") || urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")) {
             if (urlModifierPayload.getRegex() != null && !urlModifierPayload.getRegex().equals("")) {
                 url = Utils.applyRegexModifier(oldUrl, urlModifierPayload.getRegex(), urlModifierPayload.getReplaceWith());
             } else {
@@ -378,7 +381,7 @@ public class Utils {
 
                 String[] urlTokens = oldUrl.split("/");
                 Integer position = urlModifierPayload.getPosition();
-                if (position <= 0 || position >= urlTokens.length) {
+                if (position <= 0) {
                     // position is not valid
                     return fetchActualUrl(uri, oldUrl);
                 }
@@ -390,7 +393,7 @@ public class Utils {
 
             String[] urlTokens = oldUrl.split("/");
             Integer position = urlModifierPayload.getPosition();
-            if (position <= 0 || position > urlTokens.length) {
+            if (position <= 0) {
                 // position is not valid
                 return fetchActualUrl(uri, oldUrl);
             }
@@ -427,12 +430,66 @@ public class Utils {
     }
 
     private static String replaceUrlWithToken(String[] urlTokens, UrlModifierPayload urlModifierPayload, int position, URI uri) {
+       
+        String[] urlTokensCopy;
+
+        if (position >= urlTokens.length) {
+            urlTokensCopy = new String[position+1];
+            for (int i=0; i < urlTokens.length; i++) {
+                urlTokensCopy[i] = urlTokens[i];
+            }
+            for (int i=urlTokens.length; i <= position; i++) {
+                urlTokensCopy[i] = "/";
+            }
+            urlTokensCopy[position] = urlModifierPayload.getReplaceWith();
+            String url = "/";
+            for (int i=1; i < urlTokensCopy.length; i++) {
+                if (urlTokensCopy[i].equals("/") || i == urlTokensCopy.length - 1) {
+                    url = url + urlTokensCopy[i];
+                } else {
+                    url = url + urlTokensCopy[i] + "/";
+                }
+            }
+            return fetchActualUrl(uri, url);
+        }
         urlTokens[position] = urlModifierPayload.getReplaceWith();
         String url = String.join( "/", urlTokens);
         return fetchActualUrl(uri, url);
     }
 
     private static String insertUrlWithToken(String[] urlTokens, UrlModifierPayload urlModifierPayload, int position, URI uri) {
+        
+        String[] urlTokensCopy;
+
+        if (position > urlTokens.length) {
+            urlTokensCopy = new String[position];
+            for (int i=0; i < urlTokens.length; i++) {
+                urlTokensCopy[i] = urlTokens[i];
+            }
+            for (int i=urlTokens.length; i < position; i++) {
+                urlTokensCopy[i] = "/";
+            }
+            
+            String[] newUrlTokens = new String[urlTokensCopy.length];
+            for (int i = 1; i < position; i++) {
+                newUrlTokens[i-1] = urlTokensCopy[i];
+            }
+            newUrlTokens[position - 1] = urlModifierPayload.getReplaceWith();
+            for (int i = position; i < urlTokensCopy.length - 1; i++) {
+                newUrlTokens[i] = urlTokensCopy[i];
+            }
+            String url = "/";
+            for (int i=0; i < newUrlTokens.length; i++) {
+                if (newUrlTokens[i].equals("/") || i == newUrlTokens.length - 1) {
+                    url = url + newUrlTokens[i];
+                } else {
+                    url = url + newUrlTokens[i] + "/";
+                }
+            }
+            return fetchActualUrl(uri, url);
+
+        }
+
         String[] newUrlTokens = new String[urlTokens.length];
         for (int i = 1; i < position; i++) {
             newUrlTokens[i-1] = urlTokens[i];
