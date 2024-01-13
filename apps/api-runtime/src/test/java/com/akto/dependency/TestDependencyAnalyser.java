@@ -1,10 +1,7 @@
 package com.akto.dependency;
 
 import com.akto.MongoBasedTest;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.DependencyNodeDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.*;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.dependency_flow.Connection;
@@ -13,6 +10,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -32,6 +30,8 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         DependencyFlowNodesDao.instance.getMCollection().drop();
+        DibsDao.instance.getMCollection().drop();
+        AccountSettingsDao.instance.getMCollection().drop();
     }
 
     public static void process(List<String> messages, int expectedNodes) {
@@ -46,7 +46,8 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         }
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
-        httpCallParser.syncFunction(httpResponseParamsList, true, false);
+        httpCallParser.syncFunction(httpResponseParamsList, true,true);
+        APICatalogSync.mergeUrlsAndSave(1000, true);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());
         assertEquals(expectedNodes, nodes.size());

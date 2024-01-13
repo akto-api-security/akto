@@ -34,7 +34,7 @@ public class TreeHelper {
                 )
         );
 
-        if (node == null) return;
+        if (node == null || node.getMaxDepth() == 0) return;
 
         result.put(node.hashCode(), node);
 
