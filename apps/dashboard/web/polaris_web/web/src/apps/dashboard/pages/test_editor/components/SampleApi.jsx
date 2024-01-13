@@ -25,7 +25,6 @@ import testEditorRequests from "../api";
 import func from "@/util/func";
 import TestEditorStore from "../testEditorStore"
 import "../TestEditor.css"
-import { useNavigate } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 import PersistStore from "../../../../main/PersistStore";
 import editorSetup from "./editor_config/editorSetup";
@@ -51,13 +50,14 @@ const SampleApi = () => {
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const vulnerableRequestsObj = TestEditorStore(state => state.vulnerableRequestsMap)
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
+    const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    
 
     const jsonEditorRef = useRef(null)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
-    
-    const navigate = useNavigate()
 
     useEffect(() => {
         const jsonEditorOptions = {
@@ -75,11 +75,9 @@ const SampleApi = () => {
 
     useEffect(()=>{
         let testId = selectedTest.value
-        let selectedUrl = vulnerableRequestsObj?.[testId]
+        let selectedUrl = selectedSampleApi.hasOwnProperty(testId) ? selectedSampleApi[testId] : vulnerableRequestsObj?.[testId]
         setSelectedCollectionId(null)
         setCopyCollectionId(null)
-        setSelectedApiEndpoint(null)
-        setCopySelectedApiEndpoint(null)
         setTestResult(null)
         if(!selectedUrl){
             selectedUrl = defaultRequest
@@ -180,6 +178,16 @@ const SampleApi = () => {
     const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
     const saveFunc = () =>{
         setSelectedApiEndpoint(copySelectedApiEndpoint)
+        let copySampleApiObj = {...selectedSampleApi}
+        const urlObj = func.toMethodUrlObject(copySelectedApiEndpoint)
+        copySampleApiObj[selectedTest.value] = {
+            apiCollectionId :copyCollectionId, 
+            url: urlObj.url,
+            method:{
+                "_name": urlObj.method
+            }
+        }
+        setSelectedSampleApi(copySampleApiObj)
         setSelectedCollectionId(copyCollectionId)
         toggleSelectApiActive()
     }
