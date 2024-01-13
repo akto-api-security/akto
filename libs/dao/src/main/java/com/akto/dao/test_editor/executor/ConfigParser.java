@@ -46,7 +46,7 @@ public class ConfigParser {
 
         if (curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Data.toString()) || 
                 curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Terminal.toString()) || 
-                curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.TerminalTest.toString())) {
+                curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.TerminalNonExecutable.toString())) {
             return new ExecutorConfigParserResult(curNode, true, "");
         }
 

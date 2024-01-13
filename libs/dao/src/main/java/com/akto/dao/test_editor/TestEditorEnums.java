@@ -216,9 +216,12 @@ public class TestEditorEnums {
         MODIFY_GRAPHQL_FIELD
     }
 
-    public enum TerminalTestExecutorDataOperands {
+    public enum TerminalNonExecutableDataOperands {
         TYPE,
-        TEST_NAME
+        TEST_NAME,
+        LABEL,
+        SUCCESS,
+        FAILURE
     }
 
     public enum ValidateExecutorDataOperands {
@@ -231,7 +234,7 @@ public class TestEditorEnums {
         Terminal,
         NonTerminal,
         Data,
-        TerminalTest,
+        TerminalNonExecutable,
         Validate
     }
 
@@ -255,7 +258,7 @@ public class TestEditorEnums {
             }
         }
 
-        for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
+        for (TerminalNonExecutableDataOperands operand: TerminalNonExecutableDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return operand.toString();
             }
@@ -296,9 +299,9 @@ public class TestEditorEnums {
             }
         }
 
-        for (TerminalTestExecutorDataOperands operand: TerminalTestExecutorDataOperands.values()) {
+        for (TerminalNonExecutableDataOperands operand: TerminalNonExecutableDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return ExecutorOperandTypes.TerminalTest.toString().toLowerCase();
+                return ExecutorOperandTypes.TerminalNonExecutable.toString().toLowerCase();
             }
         }
 
