@@ -50,8 +50,8 @@ const SampleApi = () => {
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const vulnerableRequestsObj = TestEditorStore(state => state.vulnerableRequestsMap)
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
-    const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
-    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
+    const setSelectedSampleApi = TestEditorStore(state => state.setSelectedSampleApi)
     
 
     const jsonEditorRef = useRef(null)
