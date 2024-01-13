@@ -12,10 +12,12 @@ import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 public class MultiExecTestResult extends GenericTestResult {
 
     Map<String, NodeResult> nodeResultMap;
+    private List<String> executionOrder;
 
-    public MultiExecTestResult(Map<String, NodeResult> nodeResultMap, boolean vulnerable, Confidence confidence) {
+    public MultiExecTestResult(Map<String, NodeResult> nodeResultMap, boolean vulnerable, Confidence confidence, List<String> executionOrder) {
         super(vulnerable, confidence);
         this.nodeResultMap = nodeResultMap;
+        this.executionOrder = executionOrder;
     }
 
     public MultiExecTestResult() {
@@ -29,12 +31,24 @@ public class MultiExecTestResult extends GenericTestResult {
         this.nodeResultMap = nodeResultMap;
     }
 
+    public List<String> getExecutionOrder() {
+        if (executionOrder == null) {
+            executionOrder = new ArrayList<>();
+        }
+        return executionOrder;
+    }
+
+    public void setExecutionOrder(List<String> executionOrder) {
+        this.executionOrder = executionOrder;
+    }
+
     public List<GenericTestResult> convertToExistingTestResult(TestingRunResult testingRunResult) {
         List<GenericTestResult> runResults = new ArrayList<>();
         
         Map<String, NodeResult> nodeResultMap = this.getNodeResultMap();
         TestResult res;
-        for (String k: nodeResultMap.keySet()) {
+        for (int i=0; i < this.executionOrder.size(); i++) {
+            String k = this.executionOrder.get(i);
             NodeResult nodeRes = nodeResultMap.get(k);
             String confidence = "HIGH";
             List<String> errors = nodeRes.getErrors();
@@ -51,9 +65,9 @@ public class MultiExecTestResult extends GenericTestResult {
                 runResults.add(new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null));
             }
 
-            for (int i = 1; i<messageList.size(); i++) {
-                String message = "{\"request\": " + messageList.get(i);
-                if (i != messageList.size() - 1) {
+            for (int j = 1; j<messageList.size(); j++) {
+                String message = "{\"request\": " + messageList.get(j);
+                if (j != messageList.size() - 1) {
                     message = message.substring(0, message.length() - 3);
                 } else {
                     message = message.substring(0, message.length() - 2);
