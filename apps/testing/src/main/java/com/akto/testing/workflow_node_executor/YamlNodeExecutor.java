@@ -81,6 +81,9 @@ public class YamlNodeExecutor extends NodeExecutor {
         int statusCode = 0;
 
         for (RawApi testReq: testRawApis) {
+            if (vulnerable) {
+                break;
+            }
             if (testReq.equals(sampleRawApi)) {
                 continue;
             }
