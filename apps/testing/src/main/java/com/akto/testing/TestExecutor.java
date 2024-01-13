@@ -15,6 +15,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
@@ -99,8 +100,11 @@ public class TestExecutor {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         try {
             Map<String, Object> valuesMap = new HashMap<>();
-            WorkflowTestResult workflowTestResult = apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId, valuesMap, false);
-            WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
+            Graph graph = new Graph();
+            graph.buildGraph(workflowTest);
+            GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, workflowTest, testingRun.getId(), summaryId, valuesMap, false, "linear");
+            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest);
+            WorkflowTestResultsDao.instance.insertOne(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
         }
@@ -373,7 +377,7 @@ public class TestExecutor {
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
-        loginFlowResp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 

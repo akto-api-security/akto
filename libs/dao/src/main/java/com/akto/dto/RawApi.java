@@ -158,25 +158,35 @@ public class RawApi {
     }
 
     public boolean isPayloadEqual(String payload, String compareWithPayload) {
+
+        if (payload == null) {
+            return compareWithPayload == null;
+        }
+
         if (payload.equals("")) {
             return compareWithPayload.equals("");
         }
-        if (payload == "") {
-            return compareWithPayload == null;
-        }
+
         boolean areBothJson = true;
+        boolean areBothNonJson = true;
         Map<String, Object> m1 = new HashMap<>();
         Map<String, Object> m2 = new HashMap<>();
         try {
             m1 = (Map<String, Object>)(om.readValue(payload, Map.class));
+            areBothNonJson = false;
         } catch (Exception e) {
             areBothJson = false;
         }
 
         try {
             m2 = (Map<String, Object>)(om.readValue(compareWithPayload, Map.class));
+            areBothNonJson = false;
         } catch (Exception e) {
             areBothJson = false;
+        }
+
+        if (areBothNonJson && payload.equals(compareWithPayload)) {
+            return true;
         }
        
         if (!areBothJson) {
