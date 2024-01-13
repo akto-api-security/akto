@@ -52,8 +52,8 @@ jobs:
           release_notes = release_notes+release_notes2
       
           
-          print(f"::set-output name=tag_name::{tag_name}")
-          print(f"::set-output name=release_notes::{release_notes}")
+          print(f"tag_name={tag_name}" >> $GITHUB_OUTPUT)
+          print(f"release_notes={release_notes}" >> $GITHUB_OUTPUT)
           EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -115,8 +115,8 @@ jobs:
               # Remove the last line from the description
               description_lines = description_lines[:-1]
               description = '\n'.join(description_lines) 
-          print(f"::set-output name=tag::{tag}")
-          print(f"::set-output name=description::{json.dumps(description)}")
+          print(f"tag={tag}" >> $GITHUB_OUTPUT)
+          print(f"description={json.dumps(description)}" >> $GITHUB_OUTPUT)
           EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -171,8 +171,8 @@ jobs:
 
           print("slack_message_body", slack_message_body)
           
-          print(f"::set-output name=tag_name::{tag_name}")
-          print(f"::set-output name=slack_message_body::{slack_message_body}")
+          print(f"tag_name={tag_name}" >> $GITHUB_OUTPUT)
+          print(f"slack_message_body={slack_message_body}" >> $GITHUB_OUTPUT)
           EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

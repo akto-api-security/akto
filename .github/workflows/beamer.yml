@@ -53,8 +53,8 @@ jobs:
           release_notes = release_notes+release_notes2
       
           
-          print(f"::set-output name=tag_name::{tag_name}")
-          print(f"::set-output name=release_notes::{release_notes}")
+          print(f"tag_name={tag_name}" >> $GITHUB_OUTPUT)
+          print(f"release_notes={release_notes}" >> $GITHUB_OUTPUT)
           EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
