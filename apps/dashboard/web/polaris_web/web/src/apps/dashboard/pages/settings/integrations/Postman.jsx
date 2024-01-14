@@ -17,7 +17,7 @@ function Postman() {
     }
     
     async function fetchPostmanCred() {
-      await settingFunctions.getPostmanCredentials().then((resp)=> {
+      settingFunctions.getPostmanCredentials().then((resp)=> {
         let postmanCred = resp.postmanCred
         if (postmanCred['api_key'] && postmanCred['workspace_id']) {
           setPostmanKey(postmanCred.api_key);
