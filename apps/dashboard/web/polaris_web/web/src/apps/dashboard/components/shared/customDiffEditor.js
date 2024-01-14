@@ -234,11 +234,7 @@ const transform = {
         if(style === "http" && data && Object.keys(data).length > 0){
             if(data.json){
                 Object.keys(data?.json).forEach((element)=> {
-                    if(element.includes("query")){
-                        if(data.json[element]){
-                            localFirstLine = localFirstLine + func.convertQueryParamsToUrl(data?.json[element])
-                        }
-                    }else if(element.includes("Header")){
+                    if(element.includes("Header")){
                         if(data.json[element]){
                             Object.keys(data?.json[element]).forEach((key) => {
                                 finalData = finalData + key + ': ' + data.json[element][key] + "\n"
