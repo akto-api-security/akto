@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dao.context.Context;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
@@ -17,7 +18,7 @@ public class TestDependencyNode {
         paramInfoList.add(paramInfo1.copy());
 
         DependencyNode dependencyNode = new DependencyNode(
-                "1", "url1", "GET", "2", "url2", "POST", paramInfoList
+                "1", "url1", "GET", "2", "url2", "POST", paramInfoList, Context.now()
         );
 
         dependencyNode.updateOrCreateParamInfo(paramInfo1);
@@ -44,7 +45,7 @@ public class TestDependencyNode {
     public void testGetHexId() {
 
         DependencyNode dependencyNode = new DependencyNode(
-                "1", "url1", "GET", "2", "url2", "POST", new ArrayList<>()
+                "1", "url1", "GET", "2", "url2", "POST", new ArrayList<>(), Context.now()
         );
         String hexString = "6565aca2a945f1ba0d97c5cd";
         dependencyNode.setId(new ObjectId(hexString));

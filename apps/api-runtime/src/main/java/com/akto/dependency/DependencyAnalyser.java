@@ -1,5 +1,6 @@
 package com.akto.dependency;
 
+import com.akto.dao.context.Context;
 import com.akto.dependency.store.HashSetStore;
 import com.akto.dependency.store.Store;
 import com.akto.dao.DependencyNodeDao;
@@ -182,7 +183,7 @@ public class DependencyAnalyser {
         List<DependencyNode.ParamInfo> paramInfos = new ArrayList<>();
         paramInfos.add(paramInfo);
         DependencyNode dependencyNode = new DependencyNode(
-                apiCollectionIdResp, urlResp, methodResp, apiCollectionIdReq, urlReq, methodReq, paramInfos
+                apiCollectionIdResp, urlResp, methodResp, apiCollectionIdReq, urlReq, methodReq, paramInfos, Context.now()
         );
 
         DependencyNode n1 = nodes.get(dependencyNode.hashCode());
@@ -322,7 +323,10 @@ public class DependencyAnalyser {
                         Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam())
                 );
 
-                Bson update3 = Updates.inc(DependencyNode.PARAM_INFOS + ".$." + DependencyNode.ParamInfo.COUNT, paramInfo.getCount());
+                Bson update3 = Updates.combine(
+                        Updates.inc(DependencyNode.PARAM_INFOS + ".$." + DependencyNode.ParamInfo.COUNT, paramInfo.getCount()),
+                        Updates.set(DependencyNode.LAST_UPDATED, dependencyNode.getLastUpdated())
+                );
 
                 // this update runs everytime to update the count
                 UpdateOneModel<DependencyNode> updateOneModel3 = new UpdateOneModel<>(

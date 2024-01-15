@@ -24,6 +24,8 @@ public class DependencyFlow {
     }
 
     public void run() {
+        initialNodes = new HashMap<>();
+        resultNodes = new HashMap<>();
         List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(new BasicDBObject());
 
         for (DependencyNode dependencyNode: dependencyNodeList) {
