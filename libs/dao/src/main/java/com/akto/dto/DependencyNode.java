@@ -3,6 +3,7 @@ package com.akto.dto;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -129,6 +130,26 @@ public class DependencyNode {
 
         if (!matched) {
             this.paramInfos.add(thatParamInfo.copy());
+        }
+    }
+
+    public DependencyNode copy() {
+        List<ParamInfo> paramInfoList = new ArrayList<>();
+        for (ParamInfo paramInfo:this.paramInfos) {
+            paramInfoList.add(paramInfo.copy());
+        }
+
+        return new DependencyNode(
+                this.apiCollectionIdResp, this.urlResp, this.methodResp,
+                this.apiCollectionIdReq, this.urlReq, this.methodReq,
+                paramInfoList
+        );
+    }
+
+    public void merge(DependencyNode that) {
+        if (!this.equals(that)) return;
+        for (DependencyNode.ParamInfo paramInfo: that.paramInfos) {
+            this.updateOrCreateParamInfo(paramInfo);
         }
     }
 
