@@ -52,20 +52,11 @@ const transform = {
         }
     },
 
-    getFirstLine(original,current,originalParams,currentParams){
-        let ogFirstLine = original
-        let firstLine = current
-        if(originalParams){
-            ogFirstLine = ogFirstLine + func.convertQueryParamsToUrl(originalParams)
-        }
-        if(currentParams){
-            firstLine = firstLine + func.convertQueryParamsToUrl(currentParams)
-        }
-
+    getFirstLine(original,current){
         return{
-            original: ogFirstLine,
-            firstLine: firstLine,
-            isUpdated: firstLine !== ogFirstLine
+            original: original,
+            firstLine: current,
+            isUpdated: original !== current
         }
     },
 
@@ -235,7 +226,30 @@ const transform = {
             headersMap: {...jsonObj.headersMap, ...payloadObj.headersMap},
             updatedData: jsonObj.updatedData,
         }
-    },  
+    },
+    formatData(data,style){
+        let localFirstLine = data?.firstLine
+        let finalData = ""
+        let payLoad = null
+        if(style === "http" && data && Object.keys(data).length > 0){
+            if(data.json){
+                Object.keys(data?.json).forEach((element)=> {
+                    if(element.includes("Header")){
+                        if(data.json[element]){
+                            Object.keys(data?.json[element]).forEach((key) => {
+                                finalData = finalData + key + ': ' + data.json[element][key] + "\n"
+                            })
+                        }
+                    }else{
+                        payLoad = data.json[element]
+                    }
+                })
+            }
+            finalData = finalData.split("\n").sort().join("\n");
+            return (localFirstLine + "\n\n" + finalData + "\n\n" + this.formatJson(payLoad))
+        }
+        return (data?.firstLine ? data?.firstLine + "\n\n" : "") + (data?.json ? this.formatJson(data.json) : "");
+      }  
       
 }
 
