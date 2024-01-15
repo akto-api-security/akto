@@ -2,14 +2,17 @@ package com.akto.action;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.DependencyFlowNodesDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.dependency_flow.TreeHelper;
 import com.akto.dto.type.URLMethods;
-import com.mongodb.client.model.Filters;
+import com.mongodb.BasicDBObject;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 public class DependencyAction extends UserAction {
 
@@ -27,16 +30,31 @@ public class DependencyAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    List<Integer> apiCollectionIds;
-    List<ApiInfo> apiInfoList;
-    List<Node> nodes;
+    private List<Integer> apiCollectionIds;
+    private List<BasicDBObject> dependencyTableList;
+    private int skip;
+
+
     public String buildDependencyTable() {
-        this.apiInfoList = ApiInfoDao.instance.findApiInfos(apiCollectionIds);
-        this.nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionIds);
+        List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionIds, true, skip, 50);
+        dependencyTableList = new ArrayList<>();
+
+        List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+        for (Node node: nodes) {
+            apiInfoKeys.add(new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod())));
+        }
+        Map<ApiInfo.ApiInfoKey, List<String>> parametersMap = SingleTypeInfoDao.instance.fetchParameters(apiInfoKeys);
+
+        for (Node node: nodes) {
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod()));
+            List<String> params = parametersMap.get(apiInfoKey);
+            BasicDBObject res = new BasicDBObject("node", node);
+            res.put("params", params);
+            dependencyTableList.add(res);
+        }
+
         return SUCCESS.toUpperCase();
     }
-
-
 
     public Collection<Node> getResult() {
         return result;
@@ -58,11 +76,7 @@ public class DependencyAction extends UserAction {
         this.apiCollectionIds = apiCollectionIds;
     }
 
-    public List<ApiInfo> getApiInfoList() {
-        return apiInfoList;
-    }
-
-    public List<Node> getNodes() {
-        return nodes;
+    public List<BasicDBObject> getDependencyTableList() {
+        return dependencyTableList;
     }
 }

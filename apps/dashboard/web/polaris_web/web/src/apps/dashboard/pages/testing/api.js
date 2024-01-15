@@ -235,4 +235,13 @@ export default {
         })
     },
     
+    buildDependencyTable(apiCollectionIds){
+        return request({
+            url: '/api/buildDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
 }
