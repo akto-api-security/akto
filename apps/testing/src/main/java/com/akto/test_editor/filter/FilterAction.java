@@ -1097,11 +1097,16 @@ public final class FilterAction {
                         }
                     } else {
                         Set<String> valSet = singleTypeInfo.getValues().getElements();
-                        String val = valSet.iterator().next();
-                        obj.put("key", i+"");
-                        obj.put("value", val);
-                        if (privateValues.size() < 5) {
-                            privateValues.add(obj);
+                        String[] origUrlTokens = urlWithParams.split("/");
+                        for (String val: valSet) {
+                            if (val != null && !val.equals(origUrlTokens[i])) {
+                                obj.put("key", i+"");
+                                obj.put("value", val);
+                                if (privateValues.size() < 5) {
+                                    privateValues.add(obj);
+                                }
+                                break;
+                            }
                         }
                     }
                 }
@@ -1154,12 +1159,17 @@ public final class FilterAction {
                 }
             } else {
                 Set<String> valSet = singleTypeInfo.getValues().getElements();
-                String val = valSet.iterator().next();
                 String key = SingleTypeInfo.findLastKeyFromParam(param);
-                obj.put("key", key);
-                obj.put("value", val);
-                if (privateValues.size() < 5) {
-                    privateValues.add(obj);
+                Object origVal = payload.get(param);
+                for (String val: valSet) {
+                    if (val != null && !val.equals(origVal)) {
+                        obj.put("key", key);
+                        obj.put("value", val);
+                        if (privateValues.size() < 5) {
+                            privateValues.add(obj);
+                        }
+                        break;
+                    }
                 }
             }
         }

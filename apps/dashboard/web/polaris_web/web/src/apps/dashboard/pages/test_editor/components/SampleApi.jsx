@@ -194,6 +194,8 @@ const SampleApi = () => {
         await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList).then((resp)=>{
             setTestResult(resp)
             setLoading(false)
+        }).catch((err) => {
+            setLoading(false)
         })
     }
 
