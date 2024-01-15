@@ -31,6 +31,9 @@ public class DependencyNode {
     public List<ParamInfo> paramInfos;
     public static final String PARAM_INFOS = "paramInfos";
 
+    private int lastUpdated;
+    public static final String LAST_UPDATED = "lastUpdated";
+
     public static class ParamInfo {
         private String requestParam;
         public static final String REQUEST_PARAM = "requestParam";
@@ -95,7 +98,7 @@ public class DependencyNode {
     }
 
 
-    public DependencyNode(String apiCollectionIdResp, String urlResp, String methodResp, String apiCollectionIdReq, String urlReq, String methodReq, List<ParamInfo> paramInfos) {
+    public DependencyNode(String apiCollectionIdResp, String urlResp, String methodResp, String apiCollectionIdReq, String urlReq, String methodReq, List<ParamInfo> paramInfos, int lastUpdated) {
         this.apiCollectionIdResp = apiCollectionIdResp;
         this.urlResp = urlResp;
         this.methodResp = methodResp;
@@ -103,6 +106,7 @@ public class DependencyNode {
         this.urlReq = urlReq;
         this.methodReq = methodReq;
         this.paramInfos = paramInfos;
+        this.lastUpdated = lastUpdated;
     }
 
     @Override
@@ -142,7 +146,7 @@ public class DependencyNode {
         return new DependencyNode(
                 this.apiCollectionIdResp, this.urlResp, this.methodResp,
                 this.apiCollectionIdReq, this.urlReq, this.methodReq,
-                paramInfoList
+                paramInfoList, this.lastUpdated
         );
     }
 
@@ -221,5 +225,11 @@ public class DependencyNode {
     }
 
 
+    public int getLastUpdated() {
+        return lastUpdated;
+    }
 
+    public void setLastUpdated(int lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
 }

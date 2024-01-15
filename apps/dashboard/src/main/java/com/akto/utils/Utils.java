@@ -6,6 +6,7 @@ import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -371,6 +372,9 @@ public class Utils {
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
+            DependencyFlow dependencyFlow = new DependencyFlow();
+            dependencyFlow.run();
+            dependencyFlow.syncWithDb();
         }
     }
 
