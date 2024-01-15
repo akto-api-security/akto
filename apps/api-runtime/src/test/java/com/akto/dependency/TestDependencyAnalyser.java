@@ -6,7 +6,10 @@ import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.dependency_flow.Connection;
 import com.akto.dto.dependency_flow.TreeHelper;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.dependency_flow.Node;
@@ -15,10 +18,7 @@ import com.mongodb.BasicDBObject;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -196,4 +196,70 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         Map<String, Connection> connections = result.get(Objects.hash("1000", "api/cars/INTEGER", "POST")).getConnections();
         assertEquals(1, connections.size());
     }
+
+
+    @Test
+    public void testMergeNodes() {
+        Map<Integer, DependencyNode> nodes = new HashMap<>();
+
+        List<DependencyNode.ParamInfo> paramInfos1 = new ArrayList<>();
+        paramInfos1.add(new DependencyNode.ParamInfo("param_req_1", "param_resp_1", 1));
+        DependencyNode dependencyNode1 = new DependencyNode("1000", "/api/books/1", "GET","1000", "/api/cars", "POST", paramInfos1);
+        nodes.put(dependencyNode1.hashCode(), dependencyNode1);
+
+        List<DependencyNode.ParamInfo> paramInfos2 = new ArrayList<>();
+        paramInfos2.add(new DependencyNode.ParamInfo("param_req_1", "param_resp_1", 2));
+        DependencyNode dependencyNode2 = new DependencyNode("1000", "/api/books/2", "GET","1000", "/api/cars", "POST", paramInfos2);
+        nodes.put(dependencyNode2.hashCode(), dependencyNode2);
+
+        List<DependencyNode.ParamInfo> paramInfos3 = new ArrayList<>();
+        paramInfos3.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1));
+        DependencyNode dependencyNode3 = new DependencyNode("1000", "/api/toys/1", "GET","1000", "/api/bus", "POST", paramInfos3);
+        nodes.put(dependencyNode3.hashCode(), dependencyNode3);
+
+        List<DependencyNode.ParamInfo> paramInfos4 = new ArrayList<>();
+        paramInfos4.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1));
+        DependencyNode dependencyNode4 = new DependencyNode("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST", paramInfos4);
+        nodes.put(dependencyNode4.hashCode(), dependencyNode4);
+
+        List<DependencyNode.ParamInfo> paramInfos5 = new ArrayList<>();
+        paramInfos5.add(new DependencyNode.ParamInfo("param_req_3", "param_resp_3", 1));
+        DependencyNode dependencyNode5 = new DependencyNode("1000", "/api/food/1", "GET","1000", "/api/hotel/2", "POST", paramInfos5);
+        nodes.put(dependencyNode5.hashCode(), dependencyNode5);
+
+        List<DependencyNode.ParamInfo> paramInfos6 = new ArrayList<>();
+        paramInfos6.add(new DependencyNode.ParamInfo("param_req_3", "param_resp_3", 3));
+        DependencyNode dependencyNode6 = new DependencyNode("1000", "/api/food/2", "GET","1000", "/api/hotel/1", "POST", paramInfos6);
+        nodes.put(dependencyNode6.hashCode(), dependencyNode6);
+
+        Map<Integer, APICatalog> dbState = new HashMap<>();
+        APICatalog apiCatalog = new APICatalog();
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = new HashMap<>();
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/books/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/toys/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/food/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
+        apiCatalog.setTemplateURLToMethods(templateURLToMethods);
+        dbState.put(1000, apiCatalog);
+        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState);
+        dependencyAnalyser.nodes = nodes;
+
+        assertEquals(6, dependencyAnalyser.nodes.size());
+        dependencyAnalyser.mergeNodes();
+        assertEquals(3, dependencyAnalyser.nodes.size());
+
+
+        DependencyNode dependencyNode1New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/books/INTEGER", "GET","1000", "/api/cars", "POST"));
+        assertEquals(1, dependencyNode1New.getParamInfos().size());
+        assertEquals(3, dependencyNode1New.getParamInfos().get(0).getCount());
+
+        DependencyNode dependencyNode2New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST"));
+        assertEquals(1, dependencyNode2New.getParamInfos().size());
+        assertEquals(2, dependencyNode2New.getParamInfos().get(0).getCount());
+
+        DependencyNode dependencyNode3New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/food/INTEGER", "GET","1000", "api/hotel/INTEGER", "POST"));
+        assertEquals(1, dependencyNode3New.getParamInfos().size());
+        assertEquals(4, dependencyNode3New.getParamInfos().get(0).getCount());
+    }
+
 }

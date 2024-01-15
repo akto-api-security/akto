@@ -50,7 +50,7 @@ public class DependencyAnalyser {
         if (url.endsWith(".js") || url.endsWith(".png") || url.endsWith(".css") || url.endsWith(".jpeg") ||
                 url.endsWith(".svg") || url.endsWith(".webp") || url.endsWith(".woff2")) return;
 
-        // find real url
+        // find real url. Real url is the one that is present in db. For example /api/books/1 is actually api/books/INTEGER
         url = realUrl(apiCollectionId, urlStatic).getUrl();
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
@@ -61,7 +61,6 @@ public class DependencyAnalyser {
 
 
         // Store response params in store
-        //    1. filter values
         String respPayload = responseParams.getPayload();
         if (respPayload == null || respPayload.isEmpty()) respPayload = "{}";
         if (respPayload.startsWith("[")) respPayload = "{\"json\": "+respPayload+"}";
@@ -96,31 +95,47 @@ public class DependencyAnalyser {
         // analyse request payload
         BasicDBObject reqPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams); // using urlWithParams to extract any query parameters
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
-        for (String param: reqFlattened.keySet()) {
-            for (Object val: reqFlattened.get(param) ) {
-                if (!filterValues(val)) continue;
-                if (!valueSeen(val)) continue;
-                for (String x: urlsToResponseParam.keySet())  {
-                    if (x.equals(combinedUrl)) continue; // don't match with same API
-                    if (!urlValSeen(x, val)) continue;
-                    for (String y: urlsToResponseParam.get(x)) {
-                        if (!urlParamValueSeen(x, y, val)) continue;
-                        add(x, y, combinedUrl, param);
-                    }
-                }
+
+        for (String requestParam: reqFlattened.keySet()) {
+            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl);
+        }
+    }
+
+    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl) {
+        for (Object val : reqFlattenedValuesSet) {
+            if (filterValues(val) && valueSeen(val)) {
+                processValueForUrls(requestParam, val, originalCombinedUrl);
             }
         }
+    }
 
+    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl) {
+        for (String url : urlsToResponseParam.keySet()) {
+            if (!url.equals(originalCombinedUrl) && urlValSeen(url, val)) {
+                processUrlForParam(url, requestParam, val, originalCombinedUrl);
+            }
+        }
+    }
+
+    private void processUrlForParam(String url, String requestParam, Object val, String originalCombinedUrl) {
+        for (String responseParam : urlsToResponseParam.get(url)) {
+            if (urlParamValueSeen(url, responseParam, val)) {
+                add(url, responseParam, originalCombinedUrl, requestParam);
+            }
+        }
     }
 
     public URLStatic realUrl(int apiCollectionId, URLStatic urlStatic) {
         APICatalog apiCatalog = this.dbState.get(apiCollectionId);
         if (apiCatalog == null) return urlStatic;
 
-        boolean strictUrlFound = apiCatalog.getStrictURLToMethods().containsKey(urlStatic);
+        Map<URLStatic, RequestTemplate> strictURLToMethods = apiCatalog.getStrictURLToMethods();
+        boolean strictUrlFound = strictURLToMethods != null && strictURLToMethods.containsKey(urlStatic);
         if (strictUrlFound) return urlStatic;
 
-        for (URLTemplate urlTemplate: apiCatalog.getTemplateURLToMethods().keySet()) {
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = apiCatalog.getTemplateURLToMethods();
+        if (templateURLToMethods == null) return urlStatic;
+        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
             boolean match = urlTemplate.match(urlStatic);
             if (match) {
                 return new URLStatic(urlTemplate.getTemplateString(), urlStatic.getMethod());
@@ -180,19 +195,77 @@ public class DependencyAnalyser {
         nodes.put(dependencyNode.hashCode(), n1);
     }
 
+    public void mergeNodes() {
+        List<DependencyNode> toBeDeleted = new ArrayList<>();
+        Map<Integer, DependencyNode> toBeAdded = new HashMap<>();
+
+        for (DependencyNode dependencyNode: nodes.values()) {
+            String urlResp = dependencyNode.getUrlResp();
+            String apiCollectionIdResp = dependencyNode.getApiCollectionIdResp();
+            String methodResp = dependencyNode.getMethodResp();
+            String newUrlResp = urlResp;
+            if (!APICatalog.isTemplateUrl(urlResp)) {
+                 newUrlResp = realUrl(Integer.parseInt(apiCollectionIdResp), new URLStatic(urlResp, URLMethods.Method.valueOf(methodResp))).getUrl();
+            }
+
+            String urlReq = dependencyNode.getUrlReq();
+            String apiCollectionIdReq = dependencyNode.getApiCollectionIdReq();
+            String methodReq = dependencyNode.getMethodReq();
+            String newUrlReq = urlReq;
+            if (!APICatalog.isTemplateUrl(urlReq)) {
+                newUrlReq = realUrl(Integer.parseInt(apiCollectionIdReq), new URLStatic(urlReq, URLMethods.Method.valueOf(methodReq))).getUrl();
+            }
+
+            // we try to check if any kind of merging happened or not
+            // if yes fill the respective update lists
+            if (!newUrlReq.equals(urlReq) || !newUrlResp.equals(urlResp)) {
+                DependencyNode copy = dependencyNode.copy();
+                copy.setUrlReq(newUrlReq);
+                copy.setUrlResp(newUrlResp);
+
+                toBeDeleted.add(dependencyNode);
+
+                DependencyNode toBeAddedNode = toBeAdded.get(copy.hashCode());
+                if (toBeAddedNode == null) {
+                    toBeAddedNode = copy;
+                } else {
+                    toBeAddedNode.merge(copy);
+                }
+
+                toBeAdded.put(copy.hashCode(), toBeAddedNode);
+            }
+        }
+
+        for (DependencyNode toBeDeletedNode: toBeDeleted ) {
+            nodes.remove(toBeDeletedNode.hashCode());
+        }
+
+        for (DependencyNode toBeAddedNode: toBeAdded.values())  {
+            int hashCode = toBeAddedNode.hashCode();
+            DependencyNode node = nodes.get(hashCode);
+            if (node == null) {
+                nodes.put(hashCode,toBeAddedNode );
+            } else {
+                node.merge(toBeAddedNode);
+            }
+        }
+
+    }
+
     public void syncWithDb() {
         ArrayList<WriteModel<DependencyNode>> bulkUpdates = new ArrayList<>();
+
+        mergeNodes();
+
         for (DependencyNode dependencyNode: nodes.values()) {
 
             String urlResp = dependencyNode.getUrlResp();
             String apiCollectionIdResp = dependencyNode.getApiCollectionIdResp();
             String methodResp = dependencyNode.getMethodResp();
-            urlResp = realUrl(Integer.parseInt(apiCollectionIdResp), new URLStatic(urlResp, URLMethods.Method.valueOf(methodResp))).getUrl();
 
             String urlReq = dependencyNode.getUrlReq();
             String apiCollectionIdReq = dependencyNode.getApiCollectionIdReq();
             String methodReq = dependencyNode.getMethodReq();
-            urlReq = realUrl(Integer.parseInt(apiCollectionIdReq), new URLStatic(urlReq, URLMethods.Method.valueOf(methodReq))).getUrl();
 
             for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
                 Bson filter1 = Filters.and(
