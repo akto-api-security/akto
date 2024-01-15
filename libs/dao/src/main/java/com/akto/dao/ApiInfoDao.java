@@ -140,11 +140,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return pipeline;
     }
 
-    public List<ApiInfo> findApiInfos(List<Integer> apiCollectionIds) {
-        return ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIds), Projections.include("_id"));
-    }
-
-
     @Override
     public String getCollName() {
         return "api_info";
