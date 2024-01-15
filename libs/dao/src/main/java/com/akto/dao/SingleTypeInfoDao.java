@@ -430,7 +430,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         
     }
 
-    public Map<ApiInfo.ApiInfoKey, List<String>>  fetchParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
+    public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
         Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
 
