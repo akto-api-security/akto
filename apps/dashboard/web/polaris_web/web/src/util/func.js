@@ -401,7 +401,7 @@ prettifyEpoch(epoch) {
 
     result["json"] = { "queryParams": queryParams, "requestHeaders": requestHeaders, "requestPayload": requestPayload }
     result["highlightPaths"] = {}
-    result['firstLine'] = func.requestFirstLine(message)
+    result['firstLine'] = func.requestFirstLine(message, queryParams)
     for (const x of highlightPaths) {
       if (x["responseCode"] === -1) {
         let keys = []
@@ -466,12 +466,12 @@ prettifyEpoch(epoch) {
     }
     return result
   },
-  requestFirstLine(message) {
+  requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"]
-      return message["request"]["method"] + " " + url + " " + message["request"]["type"]
+      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + " " + message.type
+      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
     }
   },
   responseFirstLine(message) {
@@ -1255,6 +1255,9 @@ mapCollectionIdToHostName(apiCollections){
     return count === 1 ? "" : "s" 
   },
   convertQueryParamsToUrl(queryParams) {
+    if(!queryParams){
+      return "";
+    }
     let url = ""
     let first = true;
     let joiner = "?"
