@@ -267,4 +267,13 @@ export default {
         })
     },
     
+    buildDependencyTable(apiCollectionIds, skip){
+        return request({
+            url: '/api/buildDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds, skip
+            }
+        })
+    },
 }
