@@ -219,7 +219,7 @@ public abstract class MCollection<T> {
     public static boolean createIndexIfAbsent(String dbName, String collName, Bson idx, IndexOptions options) {
         try{
             MongoDatabase db = clients[0].getDatabase(dbName);
-            
+
             MongoCursor<Document> cursor = db.getCollection(collName).listIndexes().cursor();
             List<Document> indices = new ArrayList<>();
 
@@ -243,10 +243,21 @@ public abstract class MCollection<T> {
 
     }
 
+    public static boolean createUniqueIndex(String dbName, String collName, String[] fieldNames, boolean isAscending) {
+
+        Bson indexInfo = isAscending ? Indexes.ascending(fieldNames) : Indexes.descending(fieldNames);
+        String name = generateIndexName(fieldNames, isAscending);
+        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name).unique(true));
+    }
+
     public static boolean createIndexIfAbsent(String dbName, String collName, String[] fieldNames, boolean isAscending) {
 
         Bson indexInfo = isAscending ? Indexes.ascending(fieldNames) : Indexes.descending(fieldNames);
+        String name = generateIndexName(fieldNames, isAscending);
+        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
+    }
 
+    public static String generateIndexName(String[] fieldNames, boolean isAscending) {
         String name = "";
 
         int lenPerField = 30/fieldNames.length - 1;
@@ -264,8 +275,7 @@ public abstract class MCollection<T> {
 
         name += ("_");
         name += (isAscending ? "1" : "-1");
-
-        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
+        return name;
     }
 
 }
