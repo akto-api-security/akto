@@ -52,6 +52,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -677,7 +678,7 @@ public class InitializerListener implements ServletContextListener {
         String payload = null;
 
         try {
-            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(), valueMap, false);
+            payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
         } catch (Exception e) {
             errors.add("Failed to replace variables");
         }
