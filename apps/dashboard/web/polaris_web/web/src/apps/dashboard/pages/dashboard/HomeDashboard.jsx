@@ -106,7 +106,7 @@ function HomeDashboard() {
         },
         {
             title: 'Test coverage',
-            data: countInfo.coverage,
+            data: countInfo.totalUrls === 0 ? "0%" : countInfo.coverage,
             variant: 'headingLg'
         },
         {
