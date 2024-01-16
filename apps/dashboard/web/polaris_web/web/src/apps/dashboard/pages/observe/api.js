@@ -553,5 +553,13 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    
+    async deMergeApi(apiCollectionId, url, method){
+        return await request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
+        })
     }
 }
