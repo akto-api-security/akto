@@ -30,7 +30,7 @@ public class DependencyFlowNodesDao extends AccountsContextDao<Node>{
         }
 
         String[] fieldNames = {Node._API_COLLECTION_ID, Node._URL, Node._METHOD};
-        instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
+        MCollection.createUniqueIndex(getDBName(), getCollName(), fieldNames, true);
 
         fieldNames = new String[]{Node._API_COLLECTION_ID, Node._MAX_DEPTH};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
