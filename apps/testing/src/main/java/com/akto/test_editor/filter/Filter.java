@@ -1,17 +1,19 @@
 package com.akto.test_editor.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
@@ -33,6 +35,12 @@ public class Filter {
             matchingKeySet = null;
         }
         if (childNodes.size() == 0) {
+            if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString())) {
+                List<Object> val = (List<Object>) node.getValues();
+                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val.get(0), Arrays.asList(val.get(1)), "gt");
+                Boolean res = filterAction.invokeFilter(dataOperandFilterRequest);
+                return new DataOperandsFilterResponse(res, matchingKeySet, contextEntities);
+            }
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Context.toString().toLowerCase() ))) {
                 return new DataOperandsFilterResponse(false, null, null);
             }
