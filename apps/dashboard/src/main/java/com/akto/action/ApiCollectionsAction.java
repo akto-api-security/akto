@@ -16,20 +16,16 @@ import java.util.HashSet;
 import java.util.List;
 
 import com.akto.dao.*;
-import com.akto.dao.billing.OrganizationsDao;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
-import com.akto.utils.usage.UsageMetricCalculator;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -53,7 +49,7 @@ public class ApiCollectionsAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
 
-    private static List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
+    public static List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
 
         for (ApiCollection apiCollection: apiCollections) {
@@ -71,7 +67,6 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
 
-        
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
 
@@ -243,39 +238,24 @@ public class ApiCollectionsAction extends UserAction {
     public String activateCollections() {
 
         if (apiCollections == null) {
-            addActionMessage("No collections selected");
-            return Action.SUCCESS.toUpperCase();
-        }
-        apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
-        if (apiCollections.isEmpty()) {
-            addActionMessage("No deactivated collections selected");
-            return Action.SUCCESS.toUpperCase();
-        }
-        apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
-        int accountId = Context.accountId.get();
-        Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-        if (organization == null) {
-            addActionError("Organization not found");
             return Action.ERROR.toUpperCase();
         }
-        String organizationId = organization.getId();
-        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-        if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-            featureWiseAllowed = new HashMap<>();
-            featureWiseAllowed.put(MetricTypes.ACTIVE_ENDPOINTS.toString(), FeatureAccess.fullAccess);
+        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, apiCollectionIds));
+        this.apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
+        if (apiCollections.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
         }
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
 
-        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOneOrInsert(organizationId, accountId, MetricTypes.ACTIVE_ENDPOINTS);
-        int measureEpoch = usageMetricInfo.getMeasureEpoch();
-
-        int usageBefore = UsageMetricCalculator.calculateActiveEndpoints(measureEpoch);
+        int accountId = Context.accountId.get();
+        FeatureAccess featureAccess = UsageMetricUtils.calcFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
+        int usageBefore = featureAccess.getUsage();
         int count = apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
+        featureAccess.setUsage(usageBefore + count);
 
-        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.toString(), FeatureAccess.noAccess);
-        int usageLimit = featureAccess.getUsageLimit();
-
-        if (featureAccess.checkUnlimited() || (usageBefore + count <= usageLimit)) {
-            List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        if (!featureAccess.checkInvalidAccess()) {
+            apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
             ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds), Updates.unset(ApiCollection._DEACTIVATED));
         } else {
             addActionError("API endpoints in collections exceeded usage limit. Unable to activate collections. Please upgrade your plan.");
@@ -290,18 +270,22 @@ public class ApiCollectionsAction extends UserAction {
             addActionMessage("No collections selected");
             return Action.SUCCESS.toUpperCase();
         }
-        apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
+        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, apiCollectionIds));
+        this.apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
         if (apiCollections.isEmpty()) {
             addActionMessage("No deactivated collections selected");
             return Action.SUCCESS.toUpperCase();
         }
 
-        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
         ApiCollectionsDao.instance.updateMany(
                 Filters.and(
                         Filters.in(Constants.ID, apiCollectionIds),
                         Filters.eq(ApiCollection._DEACTIVATED, true)),
-                Updates.unset(ApiCollection._DEACTIVATED));
+                Updates.combine(
+                        Updates.unset(ApiCollection._DEACTIVATED),
+                        Updates.set(ApiCollection._URLS, new HashSet<>())));
         deleteApiEndpointData(apiCollectionIds);
 
         return Action.SUCCESS.toUpperCase();

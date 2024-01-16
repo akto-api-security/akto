@@ -33,7 +33,8 @@ public class TestResult extends GenericTestResult {
         FAILED_REPLACING_VARIABLES_IN_NUCLEI_TEMPLATE("Failed replacing variables in nuclei template"),
         EXECUTION_FAILED("Test execution failed"),
         INVALID_EXECUTION_BLOCK("Invalid test execution block in template"),
-        NO_API_REQUEST("No test requests created");
+        NO_API_REQUEST("No test requests created"),
+        DEACTIVATED_ENDPOINT("This is a deactivated endpoint");
 
         private final String message;
 

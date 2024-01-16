@@ -34,6 +34,7 @@ import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -600,11 +601,23 @@ public class TestExecutor {
         return true;
     }
 
+    List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
+
+        if (deactivatedCollections.contains(apiInfoKey.getApiCollectionId())) {
+            List<GenericTestResult> testResults = new ArrayList<>();
+            testResults.add(new TestResult(null, null, Collections.singletonList(TestError.DEACTIVATED_ENDPOINT.getMessage()),0, false, Confidence.HIGH, null));
+            return new TestingRunResult(
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
+                false,new ArrayList<>(),100,Context.now(),
+                Context.now(), testRunResultSummaryId, null
+            );
+        }
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
