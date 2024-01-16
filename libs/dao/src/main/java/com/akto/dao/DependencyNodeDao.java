@@ -49,7 +49,7 @@ public class DependencyNodeDao extends AccountsContextDao<DependencyNode>{
                 DependencyNode.API_COLLECTION_ID_RESP, DependencyNode.URL_RESP, DependencyNode.METHOD_RESP,
                 DependencyNode.API_COLLECTION_ID_REQ, DependencyNode.URL_REQ, DependencyNode.METHOD_REQ,
         };
-        instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
+        MCollection.createUniqueIndex(getDBName(), getCollName(), fieldNames, true);
 
         fieldNames = new String[]{
                 DependencyNode.API_COLLECTION_ID_RESP, DependencyNode.URL_RESP, DependencyNode.METHOD_RESP,
