@@ -1233,7 +1233,8 @@ public class APICatalogSync {
 
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
-                        Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
@@ -1242,7 +1243,7 @@ public class APICatalogSync {
                             loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
-                        ;
+                        loggerMaker.errorAndAddToDb(e, String.format("Error while merging collections. Error: %s", e.getMessage()), LogDb.RUNTIME);
                     }
 
                     try {
