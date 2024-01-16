@@ -24,7 +24,6 @@ const func = {
       })
   },
   showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
-    console.log(modalContent, primaryActionContent, primaryAction);
     Store.getState().setConfirmationModalConfig({
       modalContent: modalContent,
       primaryActionContent: primaryActionContent,

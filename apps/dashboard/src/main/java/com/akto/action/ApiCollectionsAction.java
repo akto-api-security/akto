@@ -222,28 +222,37 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
-    public String deactivateCollections() {
-
-        if (apiCollections == null || apiCollections.isEmpty()) {
-            addActionError("No collections selected");
-            return Action.ERROR.toUpperCase();
+    private List<Integer> reduceApiCollectionToId(List<ApiCollection> apiCollections) {
+        if (apiCollections == null) {
+            return new ArrayList<>();
         }
-        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        return apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+    }
+
+    private List<ApiCollection> filterDeactivatedCollections(List<ApiCollection> apiCollections) {
+        if (apiCollections == null) {
+            return new ArrayList<>();
+        }
+        List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+        /*
+         * The apiCollections from request contain only the IDs,
+         * thus we need to fetch the active status from the db.
+         */
+        return ApiCollectionsDao.instance.findAll(Filters.and(
+                Filters.in(Constants.ID, apiCollectionIds),
+                Filters.eq(ApiCollection._DEACTIVATED, true)));
+    }
+
+    public String deactivateCollections() {
+        List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
-
         return Action.SUCCESS.toUpperCase();
     }
 
     public String activateCollections() {
-
-        if (apiCollections == null) {
-            return Action.ERROR.toUpperCase();
-        }
-        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, apiCollectionIds));
-        this.apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
-        if (apiCollections.isEmpty()) {
+        this.apiCollections = filterDeactivatedCollections(this.apiCollections);
+        if (this.apiCollections.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
         }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
@@ -251,34 +260,27 @@ public class ApiCollectionsAction extends UserAction {
         int accountId = Context.accountId.get();
         FeatureAccess featureAccess = UsageMetricUtils.calcFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
         int usageBefore = featureAccess.getUsage();
-        int count = apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
+        int count = this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
         featureAccess.setUsage(usageBefore + count);
 
         if (!featureAccess.checkInvalidAccess()) {
-            apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
-            ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds), Updates.unset(ApiCollection._DEACTIVATED));
+            List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+            ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
+                    Updates.unset(ApiCollection._DEACTIVATED));
         } else {
-            addActionError("API endpoints in collections exceeded usage limit. Unable to activate collections. Please upgrade your plan.");
+            String errorMessage = "API endpoints in collections exceeded usage limit. Unable to activate collections. Please upgrade your plan.";
+            addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
-
         return Action.SUCCESS.toUpperCase();
     }
 
     public String forceActivateCollections() {
-        if (apiCollections == null) {
-            addActionMessage("No collections selected");
+        this.apiCollections = filterDeactivatedCollections(this.apiCollections);
+        if (this.apiCollections.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
         }
-        List<Integer> apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, apiCollectionIds));
-        this.apiCollections = apiCollections.stream().filter(apiCollection -> apiCollection.isDeactivated()).collect(Collectors.toList());
-        if (apiCollections.isEmpty()) {
-            addActionMessage("No deactivated collections selected");
-            return Action.SUCCESS.toUpperCase();
-        }
-
-        apiCollectionIds = apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(
                 Filters.and(
                         Filters.in(Constants.ID, apiCollectionIds),
@@ -287,7 +289,6 @@ public class ApiCollectionsAction extends UserAction {
                         Updates.unset(ApiCollection._DEACTIVATED),
                         Updates.set(ApiCollection._URLS, new HashSet<>())));
         deleteApiEndpointData(apiCollectionIds);
-
         return Action.SUCCESS.toUpperCase();
     }
 

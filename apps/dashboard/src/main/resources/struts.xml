@@ -546,7 +546,7 @@
         <action name="api/deactivateCollections" class="com.akto.action.ApiCollectionsAction" method="deactivateCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -557,7 +557,7 @@
         <action name="api/activateCollections" class="com.akto.action.ApiCollectionsAction" method="activateCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -568,7 +568,7 @@
         <action name="api/forceActivateCollections" class="com.akto.action.ApiCollectionsAction" method="forceActivateCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

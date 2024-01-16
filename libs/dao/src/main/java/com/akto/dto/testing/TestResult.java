@@ -7,7 +7,10 @@ import java.util.List;
 public class TestResult extends GenericTestResult {
 
     private String message;
+    public static final String _ERRORS = "errors";
     private List<String> errors;
+    
+    public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
 
     private String originalMessage;
     private double percentageMatch;
