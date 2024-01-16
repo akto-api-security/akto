@@ -443,4 +443,51 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
         
     }
+
+    public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
+        Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
+        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
+
+        List<Bson> pipeline = new ArrayList<>();
+
+        List<Bson> filters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeys) {
+            filters.add(
+                    Filters.and(
+                            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfoKey.getApiCollectionId()),
+                            Filters.eq(SingleTypeInfo._URL, apiInfoKey.getUrl()),
+                            Filters.eq(SingleTypeInfo._METHOD, apiInfoKey.getMethod().name()),
+                            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                            Filters.eq(SingleTypeInfo._IS_HEADER, false)
+                    )
+            );
+        }
+
+        pipeline.add(Aggregates.match(Filters.or(filters)));
+
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                        .append("url", "$url")
+                        .append("method", "$method");
+
+
+        Bson projections = Projections.fields(
+                Projections.include( "apiCollectionId", "url", "method", "param")
+        );
+
+        pipeline.add(Aggregates.project(projections));
+
+        pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("params", "$param")));
+
+
+        MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (stiCursor.hasNext()) {
+            BasicDBObject next = stiCursor.next();
+            BasicDBObject id = (BasicDBObject) next.get("_id");
+            List<String> params = (List<String>) next.get("params");
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(id.getInt("apiCollectionId"), id.getString("url"), URLMethods.Method.fromString(id.getString("method")));
+            result.put(apiInfoKey, params);
+        }
+
+        return result;
+    }
 }

@@ -61,6 +61,7 @@ import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
+import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -106,6 +107,10 @@ const router = createBrowserRouter([
               {
                 path:"user-config",
                 element:<UserConfig/>
+              },
+              {
+                path:"dependency",
+                element:<DependencyTable/>
               }
             ]
           },

@@ -29,6 +29,7 @@ import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
@@ -1590,6 +1591,7 @@ public class InitializerListener implements ServletContextListener {
                 updateGlobalAktoVersion();
                 trimCappedCollections();
                 setUpPiiAndTestSourcesScheduler();
+                setUpDependencyFlowScheduler();
                 setUpTrafficAlertScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 SingleTypeInfo.init();
@@ -1614,6 +1616,30 @@ public class InitializerListener implements ServletContextListener {
         }, 0, TimeUnit.SECONDS);
 
 
+    }
+
+
+    private void setUpDependencyFlowScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            DependencyFlow dependencyFlow = new DependencyFlow();
+                            loggerMaker.infoAndAddToDb("Starting dependency flow");
+                            dependencyFlow.run();
+                            dependencyFlow.syncWithDb();
+                            loggerMaker.infoAndAddToDb("Finished running dependency flow");
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e,
+                                    String.format("Error while running dependency flow %s", e.toString()),
+                                    LogDb.DASHBOARD);
+                        }
+                    }
+                }, "dependency_flow");
+            }
+        }, 0, 4, TimeUnit.HOURS);
     }
 
     private void updateGlobalAktoVersion() {

@@ -3,7 +3,7 @@ import func from "@/util/func"
 import "../api_inventory.css"
 import { useRef, useEffect, useState } from "react"
 
-const StyledEndpoint = (data) => {
+const StyledEndpoint = (data, fontSize, variant) => {
     const { method, url } = func.toMethodUrlObject(data)
     const arr = url.split("/")
     let colored = []
@@ -12,6 +12,9 @@ const StyledEndpoint = (data) => {
             colored.push(index);
         }
     })
+
+    let finalFontSize = fontSize ? fontSize: "16px"
+    let finalVariant = variant ? variant : "headingMd"
 
     function getMethodColor(method) {
         switch (method) {
@@ -37,7 +40,7 @@ const StyledEndpoint = (data) => {
 
     const endpoint = (
         <HorizontalStack gap={"1"} wrap={false}>
-                <div style={{color: getMethodColor(method), fontSize: '16px', fontWeight: 600}}>
+            <div style={{color: getMethodColor(method), fontSize: finalFontSize, fontWeight: 600}}>
                     {method}
                 </div>
                 <div className="styled-endpoint" ref={ref}>
@@ -45,7 +48,7 @@ const StyledEndpoint = (data) => {
                         arr?.map((item, index) => {
                             return (
                                 <Box key={index} as={"span"} color={colored.includes(index) ? "text-critical-active" : ""}>
-                                    <Text as="span" variant="headingMd">
+                                    <Text as="span" variant={finalVariant}>
                                     {item + "/"}
                                 </Text>
                                 </Box>

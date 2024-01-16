@@ -403,7 +403,7 @@ prettifyEpoch(epoch) {
 
     result["json"] = { "queryParams": queryParams, "requestHeaders": requestHeaders, "requestPayload": requestPayload }
     result["highlightPaths"] = {}
-    result['firstLine'] = func.requestFirstLine(message)
+    result['firstLine'] = func.requestFirstLine(message, queryParams)
     for (const x of highlightPaths) {
       if (x["responseCode"] === -1) {
         let keys = []
@@ -468,12 +468,12 @@ prettifyEpoch(epoch) {
     }
     return result
   },
-  requestFirstLine(message) {
+  requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"]
-      return message["request"]["method"] + " " + url + " " + message["request"]["type"]
+      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + " " + message.type
+      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
     }
   },
   responseFirstLine(message) {
@@ -1246,6 +1246,17 @@ mapCollectionIdToHostName(apiCollections){
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
+
+  convertParamToDotNotation(str) {
+    return str.replace(/[#\$]+/g, '.');;
+  },
+
+  findLastParamField(str) {
+    let paramDot = func.convertParamToDotNotation(str)
+    let parmArr = paramDot.split(".")
+    return parmArr.length > 0 ? parmArr[parmArr.length-1] : paramDot
+  },
+
   addPlurality(count){
     if(count == null || count==undefined){
       return ""
@@ -1253,6 +1264,9 @@ mapCollectionIdToHostName(apiCollections){
     return count === 1 ? "" : "s" 
   },
   convertQueryParamsToUrl(queryParams) {
+    if(!queryParams){
+      return "";
+    }
     let url = ""
     let first = true;
     let joiner = "?"
@@ -1265,6 +1279,7 @@ mapCollectionIdToHostName(apiCollections){
     })
     return url;
   }
+
 }
 
 export default func

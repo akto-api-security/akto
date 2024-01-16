@@ -497,6 +497,16 @@ export default {
         })
     },
 
+    fetchApiDependencies(apiCollectionId, url, method) {
+        return request({
+            url: '/api/fetchApiDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
+
     async getSensitiveInfoForCollections(){
         return await request({
             url: '/api/getSensitiveInfoForCollections',
@@ -542,6 +552,14 @@ export default {
             url: '/api/getLastCalculatedInfo',
             method: 'post',
             data: {}
+        })
+    },
+    
+    async deMergeApi(apiCollectionId, url, method){
+        return await request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
         })
     }
 }
