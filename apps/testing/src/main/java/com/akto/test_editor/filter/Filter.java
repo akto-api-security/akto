@@ -36,7 +36,8 @@ public class Filter {
         }
         if (childNodes.size() == 0) {
             if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString())) {
-                List<Object> val = (List<Object>) node.getValues();
+                Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
+                List<Object> val = (List<Object>) updatedQuerySet;
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val.get(0), Arrays.asList(val.get(1)), "gt");
                 Boolean res = filterAction.invokeFilter(dataOperandFilterRequest);
                 return new DataOperandsFilterResponse(res, matchingKeySet, contextEntities);
