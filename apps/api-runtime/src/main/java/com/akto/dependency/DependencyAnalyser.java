@@ -254,7 +254,9 @@ public class DependencyAnalyser {
     }
 
     public void syncWithDb() {
-        ArrayList<WriteModel<DependencyNode>> bulkUpdates = new ArrayList<>();
+        ArrayList<WriteModel<DependencyNode>> bulkUpdates1 = new ArrayList<>();
+        ArrayList<WriteModel<DependencyNode>> bulkUpdates2 = new ArrayList<>();
+        ArrayList<WriteModel<DependencyNode>> bulkUpdates3 = new ArrayList<>();
 
         mergeNodes();
 
@@ -333,15 +335,16 @@ public class DependencyAnalyser {
                         filter3, update3,  new UpdateOptions().upsert(false)
                 );
 
-                bulkUpdates.add(updateOneModel1);
-                bulkUpdates.add(updateOneModel2);
-                bulkUpdates.add(updateOneModel3);
-
+                bulkUpdates1.add(updateOneModel1);
+                bulkUpdates2.add(updateOneModel2);
+                bulkUpdates3.add(updateOneModel3);
             }
         }
 
         // ordered has to be true or else won't work
-        if (bulkUpdates.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(true));
+        if (bulkUpdates1.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates1, new BulkWriteOptions().ordered(false));
+        if (bulkUpdates2.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates2, new BulkWriteOptions().ordered(false));
+        if (bulkUpdates3.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates3, new BulkWriteOptions().ordered(false));
 
         nodes = new HashMap<>();
     }
