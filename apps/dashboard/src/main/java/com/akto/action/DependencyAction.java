@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
@@ -32,6 +31,7 @@ public class DependencyAction extends UserAction {
 
     private List<Integer> apiCollectionIds;
     private List<BasicDBObject> dependencyTableList;
+    private int total;
     private int skip;
 
 
@@ -53,6 +53,7 @@ public class DependencyAction extends UserAction {
             dependencyTableList.add(res);
         }
 
+        this.total = DependencyFlowNodesDao.instance.findTotalNodesCount(apiCollectionIds, true);
         return SUCCESS.toUpperCase();
     }
 
@@ -79,4 +80,14 @@ public class DependencyAction extends UserAction {
     public List<BasicDBObject> getDependencyTableList() {
         return dependencyTableList;
     }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
+    public int getTotal() {
+        return total;
+    }
+
+    
 }
