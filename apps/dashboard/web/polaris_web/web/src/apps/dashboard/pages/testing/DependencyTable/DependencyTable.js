@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import GithubServerTable from "../../../components/tables/GithubServerTable";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import api from "../api";
@@ -63,17 +64,20 @@ function DependencyTable() {
     const apiCollectionIdsString = queryParams.get('col_ids')
     const apiCollectionIds = JSON.parse(apiCollectionIdsString)
 
-    async function buildDependencyTable(apiCollectionIds){
+    async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
         setLoading(true)
-        let result = await api.buildDependencyTable(apiCollectionIds)
+
+        let result = await api.buildDependencyTable(apiCollectionIds, skip)
         let dependencyTableList = result["dependencyTableList"]
-        let av = []
+        let total = result["total"]
+        let final = []
+
         dependencyTableList.forEach((val) => {
             let node = val["node"]
             let params = val["params"]
             let connections = node["connections"]
             let data = connectionToCollapsibleText(connections, params)
-            av.push({
+            final.push({
                 "url": node["url"],
                 "level": node["maxDepth"],
                 "totalParameters": params.length,
@@ -83,30 +87,26 @@ function DependencyTable() {
             })
         })
 
-        setDependencyResults(av)
-        console.log(result);
         setLoading(false)
+        return { value: final, total: total };
     }
 
-    useEffect(()=>{
-        buildDependencyTable(apiCollectionIds)
-    }, [])
-
     const resultTable = (
-        <GithubSimpleTable
+        <GithubServerTable
             key={"table"}
-            data={dependencyResults}
-            sortOptions={[]}
-            resourceName={resourceName}
+            pageLimit={50}
+            fetchData={fetchTableData}
+            sortOptions={[]} 
+            resourceName={resourceName} 
             filters={[]}
+            hideQueryField={true}
+            calenderFilter={false}
             headers={headers}
-            selectable={false}
             loading={loading}
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
-            notHighlightOnselected={true}
-        />
+        /> 
     )
     return resultTable
 }

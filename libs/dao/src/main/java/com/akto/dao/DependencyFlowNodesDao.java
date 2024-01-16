@@ -32,7 +32,7 @@ public class DependencyFlowNodesDao extends AccountsContextDao<Node>{
         String[] fieldNames = {Node._API_COLLECTION_ID, Node._URL, Node._METHOD};
         instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
 
-        fieldNames = new String[]{Node._API_COLLECTION_ID, Node._URL, Node._METHOD, Node._MAX_DEPTH};
+        fieldNames = new String[]{Node._API_COLLECTION_ID, Node._MAX_DEPTH};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
@@ -47,9 +47,22 @@ public class DependencyFlowNodesDao extends AccountsContextDao<Node>{
 
     public List<Node> findNodesForCollectionIdString(List<String> apiCollectionIdStrings, boolean removeZeroLevel, int skip, int limit) {
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.in("apiCollectionId", apiCollectionIdStrings));
-        if (removeZeroLevel) filters.add(Filters.gt("maxDepth", 0));
+        filters.add(Filters.in(Node._API_COLLECTION_ID, apiCollectionIdStrings));
+        if (removeZeroLevel) filters.add(Filters.gt(Node._MAX_DEPTH, 0));
         return instance.findAll(Filters.and(filters), skip, limit, Sorts.ascending("_id"));
+    }
+
+    public int findTotalNodesCount(List<Integer> apiCollectionIds, boolean removeZeroLevel) {
+        List<String> apiCollectionIdStrings = new ArrayList<>();
+        for (Integer apiCollectionId: apiCollectionIds) {
+            if (apiCollectionId == null) continue;
+            apiCollectionIdStrings.add(apiCollectionId+"");
+        }
+
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.in(Node._API_COLLECTION_ID, apiCollectionIdStrings));
+        if (removeZeroLevel) filters.add(Filters.gt(Node._MAX_DEPTH, 0));
+        return (int) instance.count(Filters.and(filters));
     }
 
     @Override

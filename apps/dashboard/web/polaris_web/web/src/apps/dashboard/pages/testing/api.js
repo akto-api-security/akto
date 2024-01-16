@@ -235,12 +235,12 @@ export default {
         })
     },
     
-    buildDependencyTable(apiCollectionIds){
+    buildDependencyTable(apiCollectionIds, skip){
         return request({
             url: '/api/buildDependencyTable',
             method: 'post',
             data: {
-                apiCollectionIds
+                apiCollectionIds, skip
             }
         })
     },
