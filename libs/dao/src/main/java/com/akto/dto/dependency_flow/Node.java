@@ -6,10 +6,15 @@ import java.util.Objects;
 
 public class Node {
     private String apiCollectionId;
+    public static final String _API_COLLECTION_ID = "apiCollectionId";
     private String url;
+    public static final String _URL = "url";
     private String method;
+    public static final String _METHOD = "method";
     private Map<String, Connection> connections;
+    public static final String _CONNECTIONS = "connections";
     private int maxDepth;
+    public static final String _MAX_DEPTH = "maxDepth";
 
     public Node() {
     }
