@@ -90,13 +90,15 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        String commonErrorMessage = "collection can't be used, please create a new collection.";
+
         if(demoCollections.contains(apiCollectionId)) {
-            addActionError("Demo collection can't be used, please create a new collection");
+            addActionError("Demo " + commonErrorMessage);
             return ERROR.toUpperCase();
         }
 
         if(deactivatedCollections.contains(apiCollectionId)) {
-            addActionError("Deactivated collection can't be used, please create a new collection");
+            addActionError("Deactivated " + commonErrorMessage);
             return ERROR.toUpperCase();
         }
 

@@ -197,27 +197,27 @@ function ApiCollections() {
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
         await apiFunction(collectionIdListObj)
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} ${toastContent} successfully`)
+        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
     const promotedBulkActions = (selectedResources) => [
         {
-            content: 'Remove collections',
+            content: `Remove collection${func.addPlurality(selectedResources.length)}`,
             onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
         },
     ];
 
     const bulkActions = (selectedResources) => [
         {
-            content: 'Deactivate collections',
+            content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
             onAction: () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deleted")
         },
         {
-            content: 'Reactivate collections',
+            content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
             onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
         },
         {
-            content: 'Force reactivate collections',
+            content: `Force reactivate collection${func.addPlurality(selectedResources.length)}`,
             onAction: () => {
                 let warning = "This will force reactivation of all APIs in the selected collections. Are you sure you want to continue?"
                 func.showConfirmationModal(warning, "Force reactivate",

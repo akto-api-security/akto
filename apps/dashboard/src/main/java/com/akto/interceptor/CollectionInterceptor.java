@@ -4,14 +4,20 @@ import java.util.List;
 
 import com.akto.action.TrafficAction;
 import com.akto.action.observe.InventoryAction;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.DashboardMode;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 
 public class CollectionInterceptor extends AbstractInterceptor {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class);
+
     List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     boolean checkDeactivated(int apiCollectionId) {
         return deactivatedCollections.contains(apiCollectionId);
     }
@@ -21,6 +27,10 @@ public class CollectionInterceptor extends AbstractInterceptor {
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
         boolean deactivated = false;
+
+        if(!DashboardMode.isMetered()){
+            return invocation.invoke();
+        }
 
         try {
             Object actionObject = invocation.getInvocationContext().getActionInvocation().getAction();
@@ -34,11 +44,11 @@ public class CollectionInterceptor extends AbstractInterceptor {
             }
 
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in processing action in collection interceptor", LogDb.DASHBOARD);
         }
 
         if (deactivated) {
-            ((ActionSupport) invocation.getAction())
-                    .addActionError(errorMessage);
+            ((ActionSupport) invocation.getAction()).addActionError(errorMessage);
             return UsageInterceptor.UNAUTHORIZED;
         }
 

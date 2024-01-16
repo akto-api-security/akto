@@ -34,7 +34,6 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
         return Organization.class;
     }
 
-
     public Organization findOneByAccountId(int accountId) {
         return OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId));

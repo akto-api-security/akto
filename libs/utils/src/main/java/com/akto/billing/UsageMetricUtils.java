@@ -7,12 +7,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import org.json.JSONObject;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
@@ -127,83 +125,49 @@ public class UsageMetricUtils {
         }
     }
 
-    public static boolean checkMeteredOverage(int accountId, String featureLabel) {
-
-        try {
-
-            if (!DashboardMode.isMetered()) {
-                return false;
-            }
-
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, accountId));
-
-            if (organization == null) {
-                throw new Exception("Organization not found");
-            }
-
-            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-
-            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                throw new Exception("feature map not found or empty for organization " + organization.getId());
-            }
-
-            FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
-            int gracePeriod = organization.getGracePeriod();
-            featureAccess.setGracePeriod(gracePeriod);
-
-            // stop access if feature is not found or overage
-            return featureAccess.checkInvalidAccess();
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to check metered overage. Error - " + e.getMessage(),
-                    LogDb.DASHBOARD);
-        }
-
-        // allow access by default and in case of errors.
-        return false;
+    public static boolean checkMeteredOverage(int accountId, MetricTypes metricTypes) {
+        FeatureAccess featureAccess = calcFeatureAccess(accountId, metricTypes);
+        return featureAccess.checkInvalidAccess();
     }
 
     public static boolean checkActiveEndpointOverage(int accountId){
-        return checkMeteredOverage(accountId, MetricTypes.ACTIVE_ENDPOINTS.name());
+        return checkMeteredOverage(accountId, MetricTypes.ACTIVE_ENDPOINTS);
     }
 
     public static boolean checkTestRunsOverage(int accountId){
-        return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS.name());
+        return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS);
     }
 
     public static FeatureAccess calcFeatureAccess(int accountId, MetricTypes metricType) {
 
-        String featureLabel = metricType.name();
-        Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-        if (organization == null) {
-            return FeatureAccess.fullAccess;
+        FeatureAccess featureAccess = FeatureAccess.fullAccess;
+
+        try {
+            if (!DashboardMode.isMetered()) {
+                return featureAccess;
+            }
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (organization == null) {
+                throw new Exception("Organization not found");
+            }
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+                throw new Exception("feature map not found or empty for organization " + organization.getId());
+            }
+            String organizationId = organization.getId();
+            UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountId, metricType);
+
+            int latestUsage = usageMetric.getUsage();
+            String featureLabel = metricType.name();
+            featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
+            featureAccess.setUsage(latestUsage);
+
+            int gracePeriod = organization.getGracePeriod();
+            featureAccess.setGracePeriod(gracePeriod);
+            return featureAccess;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in calculating usage metric", LogDb.DASHBOARD);
         }
-        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-        if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-            return FeatureAccess.fullAccess;
-        }
-
-        String organizationId = organization.getId();
-        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOneOrInsert(organizationId, accountId, metricType);
-        int measureEpoch = usageMetricInfo.getMeasureEpoch();
-        int syncEpoch = usageMetricInfo.getSyncEpoch();
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        String dashboardMode = DashboardMode.getDashboardMode().toString();
-        String dashboardVersion = accountSettings.getDashboardVersion();
-
-        UsageMetric usageMetric = new UsageMetric(
-                organizationId, accountId, metricType, syncEpoch, measureEpoch,
-                dashboardMode, dashboardVersion);
-
-        UsageMetricCalculator.calculateUsageMetric(usageMetric);
-        int usageBefore = usageMetric.getUsage();
-        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
-
-        featureAccess.setUsage(usageBefore);
-
-        int gracePeriod = organization.getGracePeriod();
-        featureAccess.setGracePeriod(gracePeriod);
 
         return featureAccess;
     }

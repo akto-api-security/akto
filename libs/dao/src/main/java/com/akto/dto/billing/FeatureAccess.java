@@ -68,7 +68,7 @@ public class FeatureAccess {
         this.usage = usage;
     }
 
-    public boolean checkUnlimited() {
+    public boolean checkBooleanOrUnlimited() {
         return usageLimit == -1;
     }
 
@@ -88,7 +88,7 @@ public class FeatureAccess {
             return true;
         }
 
-        if (checkUnlimited()) {
+        if (checkBooleanOrUnlimited()) {
             return false;
         }
 
