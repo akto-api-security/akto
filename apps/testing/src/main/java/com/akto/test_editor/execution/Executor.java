@@ -458,6 +458,13 @@ public class Executor {
                 value = VariableResolver.resolveExpression(varMap, value.toString());
             }
 
+            if (keyContext instanceof ArrayList) {
+                List<String> keyContextList = (List<String>) keyContext;
+                String cKey = keyContextList.get(0);
+                ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, cKey, value.toString(), varMap, authMechanism, customAuthTypes);
+                return resp;
+            }
+
             if (value instanceof List) {
                 try {
                     int index = 0;
