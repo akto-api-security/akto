@@ -51,6 +51,11 @@ function GithubRow(props) {
     }
 
     function handleRowClick(data){
+
+        if(data.deactivated){
+            return;
+        }
+
         if(data?.collapsibleRow){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
@@ -232,7 +237,7 @@ function GithubRow(props) {
                 id={data.id}
                 key={data.id}
                 position={index}
-                {...props.newRow ? {status: (data?.RowStatus ? data.RowStatus : ((index % 2) ? "subdued" : '') ) } : {} }
+                {...props.newRow ? {status: (data.deactivated ? "critical" : ((index % 2) ? "subdued" : '') ) } : {} }
                 {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id)}}
             >
                 {props?.newRow ? <NewCell /> :<OldCell/>}   

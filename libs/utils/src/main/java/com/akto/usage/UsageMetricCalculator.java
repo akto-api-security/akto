@@ -1,23 +1,21 @@
-package com.akto.utils.usage;
+package com.akto.usage;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.akto.action.observe.Utils;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -25,9 +23,7 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
-import com.akto.utils.billing.OrganizationUtils;
 import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
@@ -46,12 +42,13 @@ public class UsageMetricCalculator {
         return demos;
     }
 
-    private static List<Integer> getDeactivated(){
+    public static List<Integer> getDeactivated(){
         List<ApiCollection> deactivated = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
         List<Integer> deactivatedIds = deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
 
         return deactivatedIds;
     }
+    
     public static Bson excludeDemosAndDeactivated(String key){
         List<Integer> demos = getDemos();
         List<Integer> deactivated = getDeactivated();
@@ -60,9 +57,16 @@ public class UsageMetricCalculator {
         return Filters.nin(key, deactivated);
     }
 
+    public static List<String> getInvalidTestErrors() {
+        List<String> invalidErrors = new ArrayList<String>() {{
+            add(TestResult.TestError.DEACTIVATED_ENDPOINT.toString());
+        }};
+        return invalidErrors;
+    }
+
     public static int calculateActiveEndpoints(int measureEpoch) {
 
-        int activeEndpoints = Utils.countEndpoints(
+        int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
                         Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
@@ -83,10 +87,22 @@ public class UsageMetricCalculator {
 
         Bson demoCollFilter = excludeDemosAndDeactivated(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
-        int testRuns = (int) TestingRunResultDao.instance.count(
-            Filters.and(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch), demoCollFilter)
-        );
-        return testRuns;
+        List<Bson> filters = new ArrayList<Bson>(){{
+            add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
+            add(demoCollFilter);
+        }};
+        int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
+
+        /*
+         * NOTE: not using a single nin query,
+         * because this approach uses indexes more efficiently.
+         */
+
+        filters.add(Filters.in("testResults.errors", getInvalidTestErrors()));
+        int invalidTestRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
+        int finalCount = Math.max(testRuns - invalidTestRuns, 0);
+
+        return finalCount;
     }
 
     public static int calculateActiveAccounts(UsageMetric usageMetric) {

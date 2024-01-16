@@ -1,5 +1,6 @@
 package com.akto.dto.billing;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import com.akto.dao.context.Context;
 
 public class FeatureAccess {
@@ -14,6 +15,9 @@ public class FeatureAccess {
     public static final String USAGE_LIMIT = "usageLimit";
     int usage;
     public static final String USAGE = "usage";
+
+    @BsonIgnore
+    int gracePeriod = 0;
 
     public static final FeatureAccess noAccess = new FeatureAccess(false);
     public static final FeatureAccess fullAccess = new FeatureAccess(true);
@@ -70,7 +74,31 @@ public class FeatureAccess {
 
     public static final String IS_OVERAGE_AFTER_GRACE = "isOverageAfterGrace";
 
-    public boolean checkOverageAfterGrace(int gracePeriod) {
+    public int getGracePeriod() {
+        return gracePeriod;
+    }
+
+    public void setGracePeriod(int gracePeriod) {
+        this.gracePeriod = gracePeriod;
+    }
+
+    public boolean checkInvalidAccess() {
+
+        if (!getIsGranted()) {
+            return true;
+        }
+
+        if (checkUnlimited()) {
+            return false;
+        }
+
+        if (usage >= usageLimit) {
+            if (overageFirstDetected == -1) {
+                overageFirstDetected = Context.now();
+            }
+        } else {
+            overageFirstDetected = -1;
+        }
 
         if (gracePeriod <= 0) {
             gracePeriod = STANDARD_GRACE_PERIOD;

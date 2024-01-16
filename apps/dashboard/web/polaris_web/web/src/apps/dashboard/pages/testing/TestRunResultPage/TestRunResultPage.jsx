@@ -229,6 +229,22 @@ function TestRunResultPage(props) {
     </LegacyCard>
   )
 
+  function checkTestErrors(selectedTestRunResult){
+
+    let skipList = [
+      "skipping execution",
+      "deactivated"
+    ]
+
+    let errors = selectedTestRunResult.errors;
+
+    let errorInSkipList = errors.filter(x => {
+      return skipList.some( y => x.includes(y))
+    }).length > 0
+
+    return (!(errors && errors.length > 0 && errorInSkipList))
+  }
+
   const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
@@ -239,7 +255,7 @@ function TestRunResultPage(props) {
       </LegacyCard>
     ,
     ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
-    (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
+    checkTestErrors(selectedTestRunResult) && selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}
       sampleData={selectedTestRunResult?.testResults.map((result) => {
