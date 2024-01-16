@@ -497,6 +497,16 @@ export default {
         })
     },
 
+    fetchApiDependencies(apiCollectionId, url, method) {
+        return request({
+            url: '/api/fetchApiDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
+
     async getSensitiveInfoForCollections(){
         return await request({
             url: '/api/getSensitiveInfoForCollections',
