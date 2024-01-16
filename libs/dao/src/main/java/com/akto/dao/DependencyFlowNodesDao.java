@@ -1,7 +1,10 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.dependency_flow.Node;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
@@ -12,6 +15,26 @@ import java.util.List;
 public class DependencyFlowNodesDao extends AccountsContextDao<Node>{
 
     public static final DependencyFlowNodesDao instance = new DependencyFlowNodesDao();
+
+    public void createIndicesIfAbsent() {
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
+
+        String[] fieldNames = {Node._API_COLLECTION_ID, Node._URL, Node._METHOD};
+        instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
+
+        fieldNames = new String[]{Node._API_COLLECTION_ID, Node._URL, Node._METHOD, Node._MAX_DEPTH};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+    }
 
     public List<Node> findNodesForCollectionIds(List<Integer> apiCollectionIds, boolean removeZeroLevel, int skip, int limit) {
         List<String> apiCollectionIdStrings = new ArrayList<>();
