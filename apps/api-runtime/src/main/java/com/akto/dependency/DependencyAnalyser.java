@@ -121,7 +121,7 @@ public class DependencyAnalyser {
     private void processUrlForParam(String url, String requestParam, Object val, String originalCombinedUrl) {
         for (String responseParam : urlsToResponseParam.get(url)) {
             if (urlParamValueSeen(url, responseParam, val)) {
-                add(url, responseParam, originalCombinedUrl, requestParam);
+                updateNodesMap(url, responseParam, originalCombinedUrl, requestParam);
             }
         }
     }
@@ -167,7 +167,7 @@ public class DependencyAnalyser {
         return urlParamValueStore.contains(url + "$" + param + "$" + val.toString());
     }
 
-    public void add(String combinedUrlResp, String paramResp, String combinedUrlReq, String paramReq) {
+    public void updateNodesMap(String combinedUrlResp, String paramResp, String combinedUrlReq, String paramReq) {
         String[] combinedUrlRespSplit = combinedUrlResp.split("#");
         String apiCollectionIdResp = combinedUrlRespSplit[0];
         String urlResp = combinedUrlRespSplit[1];
