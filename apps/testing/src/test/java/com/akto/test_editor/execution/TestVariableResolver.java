@@ -54,7 +54,7 @@ public class TestVariableResolver {
         varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
         String key = "${changed_body_value}${specialCharacters}${randomVar}";
 
-        List<String> result = VariableResolver.resolveWordListVar(key, varMap);
+        List<String> result = VariableResolver.resolveWordListVar(key, varMap, null);
         assertEquals(Arrays.asList("${changed_body_value}.${randomVar}", "${changed_body_value}$${randomVar}", "${changed_body_value}/${randomVar}"), result);
 
 
@@ -64,7 +64,7 @@ public class TestVariableResolver {
         varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
         key = "asdf${specialCharacters}xyz";
 
-        result = VariableResolver.resolveWordListVar(key, varMap);
+        result = VariableResolver.resolveWordListVar(key, varMap, null);
         assertEquals(Arrays.asList("asdf.xyz", "asdf$xyz", "asdf/xyz"), result);
 
         varMap = new HashMap<>();
@@ -73,7 +73,7 @@ public class TestVariableResolver {
         varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
         key = "${specialCharacters}";
 
-        result = VariableResolver.resolveWordListVar(key, varMap);
+        result = VariableResolver.resolveWordListVar(key, varMap, null);
         assertEquals(Arrays.asList(".", "$", "/"), result);
 
         varMap = new HashMap<>();
@@ -83,7 +83,7 @@ public class TestVariableResolver {
         varMap.put("wordList_names", Arrays.asList(".", "$", "/"));
         key = "${changed_body_value}${specialCharacters}${names}";
 
-        result = VariableResolver.resolveWordListVar(key, varMap);
+        result = VariableResolver.resolveWordListVar(key, varMap, null);
         assertEquals(Arrays.asList("${changed_body_value}.${names}", "${changed_body_value}$${names}", "${changed_body_value}/${names}"), result);
     }
 
