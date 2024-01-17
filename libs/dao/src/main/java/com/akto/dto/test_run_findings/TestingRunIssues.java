@@ -1,6 +1,10 @@
 package com.akto.dto.test_run_findings;
 
 import com.akto.util.enums.GlobalEnums;
+
+import java.util.Arrays;
+import java.util.List;
+
 import org.bson.types.ObjectId;
 
 public class TestingRunIssues {
@@ -19,11 +23,16 @@ public class TestingRunIssues {
     public static final String IGNORE_REASON = "ignoreReason";
     private String ignoreReason;
 
+    private List<Integer> collectionIds;
+
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
                             int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId) {
         this.creationTime = creationTime;
         this.lastSeen = lastSeen;
         this.id = id;
+        if(id !=null && id.getApiInfoKey()!=null){
+            this.collectionIds = Arrays.asList(id.getApiInfoKey().getApiCollectionId());
+        }
         this.severity = severity;
         this.testRunIssueStatus = status;
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
@@ -50,6 +59,9 @@ public class TestingRunIssues {
 
     public void setId(TestingIssuesId id) {
         this.id = id;
+        if(id !=null && id.getApiInfoKey()!=null){
+            this.collectionIds = Arrays.asList(id.getApiInfoKey().getApiCollectionId());
+        }
     }
 
     public TestingIssuesId getId() {
@@ -86,5 +98,13 @@ public class TestingRunIssues {
 
     public void setIgnoreReason(String ignoreReason) {
         this.ignoreReason = ignoreReason;
+    }
+
+    public List<Integer> getCollectionIds() {
+        return collectionIds;
+    }
+
+    public void setCollectionIds(List<Integer> collectionIds) {
+        this.collectionIds = collectionIds;
     }
 }

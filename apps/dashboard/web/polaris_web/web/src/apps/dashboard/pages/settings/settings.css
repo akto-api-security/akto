@@ -11,8 +11,3 @@
 .Polaris-LegacyCard__Header > .Polaris-LegacyStack--alignmentBaseline {
     align-items: center;
 }
-
-.Polaris-LegacyCard__Section > .Polaris-Box {
-    padding-bottom: 12px !important;
-    padding-top: 12px !important;
-}

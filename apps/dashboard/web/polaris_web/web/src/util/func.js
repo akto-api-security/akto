@@ -3,13 +3,17 @@ import {
   CalendarMinor,
   ClockMinor,
   CircleTickMajor,
-  CircleAlertMajor
+  CircleAlertMajor,
+  DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
+  PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
+
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
+import { tokens } from "@shopify/polaris-tokens" 
 
 const func = {
   setToast (isActive, isError, message) {
@@ -48,6 +52,9 @@ const func = {
     return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
   },
 prettifyEpoch(epoch) {
+    if(epoch === 0){
+      return "Never" ;
+    }
     let diffSeconds = (+Date.now()) / 1000 - epoch
     let sign = 1
     if (diffSeconds < 0) { sign = -1 }
@@ -83,7 +90,6 @@ prettifyEpoch(epoch) {
     }
 
     let plural = count <= 1 ? '' : 's'
-
     return count + ' ' + unit + plural + ' ago'
   },
 
@@ -194,6 +200,7 @@ prettifyEpoch(epoch) {
       case "SCHEDULED": return CalendarMinor;
       case "STOPPED": return CircleCancelMajor;
       case "COMPLETED": return CircleTickMajor;
+      case "FAILED" :
       case "FAIL": return CircleAlertMajor;
       default: return ClockMinor;
     }
@@ -202,6 +209,7 @@ prettifyEpoch(epoch) {
     switch (state?._name || state) {
       case "RUNNING": return "subdued";
       case "SCHEDULED": return "warning";
+      case "FAILED":
       case "FAIL":
       case "STOPPED": return "critical";
       case "COMPLETED": return "success";
@@ -249,17 +257,18 @@ prettifyEpoch(epoch) {
     }
   }
   ,
-  copyToClipboard(text) {
+  copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.opacity = 0;
-      document.body.appendChild(textarea);
+      ref.current.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
+      ref.current.removeChild(textarea);
+      this.setToast(true,false,toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       return;
     }
 
@@ -267,7 +276,7 @@ prettifyEpoch(epoch) {
     navigator.clipboard.writeText(text)
       .then(() => {
         // Add toast here
-        this.setToast(true,false,'Text copied to clipboard successfully!');
+        this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
@@ -392,7 +401,7 @@ prettifyEpoch(epoch) {
 
     result["json"] = { "queryParams": queryParams, "requestHeaders": requestHeaders, "requestPayload": requestPayload }
     result["highlightPaths"] = {}
-    result['firstLine'] = func.requestFirstLine(message)
+    result['firstLine'] = func.requestFirstLine(message, queryParams)
     for (const x of highlightPaths) {
       if (x["responseCode"] === -1) {
         let keys = []
@@ -457,12 +466,12 @@ prettifyEpoch(epoch) {
     }
     return result
   },
-  requestFirstLine(message) {
+  requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"]
-      return message["request"]["method"] + " " + url + " " + message["request"]["type"]
+      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + " " + message.type
+      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
     }
   },
   responseFirstLine(message) {
@@ -700,6 +709,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
               id: x.method+ " " + x.url + Math.random(),
@@ -713,7 +724,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? ("Last seen " + this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : 0,
+              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
+              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
@@ -722,6 +734,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              isSensitive: isSensitive,
+              severityScore: score,
           }
 
       }
@@ -1008,16 +1022,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
-  allRoutes.forEach((item)=>{
-    if(!(item.path.includes(":") || !(item.path.includes("/dashboard")))){
-      combinedArr.push({content: item.content, url: item.path})
-    }
-  })
 
   let initialStr = "/dashboard/observe/inventory/"
 
   allCollections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id})
+    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
 
   return combinedArr
@@ -1048,7 +1057,17 @@ getSizeOfFile(bytes) {
   } else {
     return bytes + ' B';
   }
-  },
+},
+mapCollectionIdToHostName(apiCollections){
+    let collectionsObj = {}
+    apiCollections.forEach((collection)=>{
+      if(!collectionsObj[collection.id]){
+        collectionsObj[collection.id] = collection.hostName
+      }
+    })
+
+    return collectionsObj
+},
   getTimeTakenByTest(startTimestamp, endTimestamp){
     const timeDiff = Math.abs(endTimestamp - startTimestamp);
     const hours = Math.floor(timeDiff / 3600);
@@ -1067,13 +1086,191 @@ getSizeOfFile(bytes) {
     }
     return duration.trim();
   },
+
+  getColorForCharts(key){
+    switch(key){
+      case "HIGH":
+        return tokens.color["color-icon-critical"]
+      case "MEDIUM":
+        return tokens.color["color-icon-warning"]
+      case "LOW":
+        return tokens.color["color-icon-info"]
+      case "BOLA":
+        return "#800000"
+      case "NO_AUTH":
+        return "#808000"
+      case "BFLA":
+        return "#D9534F"
+      case "IAM":
+        return "#5BC0DE"
+      case "EDE":
+        return "#FF69B4"
+      case "RL":
+        return "#8B4513"
+      case "MA":
+        return "#E6E6FA"
+      case "INJ":
+        return "#008080"
+      case "ILM":
+        return "#26466D"
+      case "SM":
+        return "#CCCCCC"
+      case "SSRF":
+        return "#555555"
+      case "UC":
+        return "#AF7AC5"
+      case "UHM":
+        return "#337AB7"
+      case "VEM":
+        return "#5CB85C"
+      case "MHH":
+        return "#FFC107"
+      case "SVD":
+        return "#FFA500"
+      case "CORS":
+        return "#FFD700"
+      case "COMMAND_INJECTION":
+        return "#556B2F"
+      case "CRLF":
+        return "#708090"
+      case "SSTI":
+        return "#008B8B"
+      case "LFI":
+        return "#483D8B"
+      case "XSS":
+        return "#8B008B"
+
+      default:
+        return  "#" + Math.floor(Math.random()*16777215).toString(16);
+    }
+  },
+
+  getSensitiveIcons(data){
+    const key = data.toUpperCase();
+    switch (key) {
+        case "DATABASE":
+          return DynamicSourceMinor;
+        case "SECRET":
+          return LockMinor;
+        case "TOKEN":
+          return KeyMajor;
+        case "USERNAME":
+          return ProfileMinor;
+        case "PASSWORD":
+          return PasskeyMinor;
+        case "JWT":
+          return KeyMajor;
+        case "EMAIL":
+          return InviteMinor;
+        case "CREDIT CARD":
+          return CreditCardMajor;
+        case "SSN":
+          return IdentityCardMajor;
+        case "ADDRESS":
+          return LocationsMinor;
+        case "IP ADDRESS":
+          return LocationsMinor;
+        case "PHONE NUMBER":
+          return PhoneMajor;
+        case "UUID":
+          return IdentityCardMajor;
+        case "DATA FILE":
+          return FileMinor;
+        case "IMAGE":
+          return ImageMajor;
+        case "US ADDRESS":
+          return LocationsMinor
+        case "IBAN EUROPE":
+          return BankMajor;
+        case "JAPANESE SOCIAL INSURANCE NUMBER":
+          return HashtagMinor;
+        case "GERMAN INSURANCE IDENTITY NUMBER":
+          return IdentityCardMajor;
+        case "CANADIAN SOCIAL IDENTITY NUMBER":
+          return IdentityCardMajor;
+        case "FINNISH PERSONAL IDENTITY NUMBER":
+          return IdentityCardMajor;
+        case "UK NATIONAL INSURANCE NUMBER":
+          return HashtagMinor;
+        case "INDIAN UNIQUE HEALTH IDENTIFICATION":
+          return IdentityCardMajor;
+        case "US MEDICARE HEALTH INSURANCE CLAIM NUMBER":
+          return HashtagMinor;
+        case "PAN CARD":
+          return IdentityCardMajor;
+        case "ENCRYPT":
+          return LockMinor;
+        case "SESSIONID":
+          return KeyMajor;
+        case "INVOICE":
+          return ReceiptMajor;
+        case "EIN":
+          return IdentityCardMajor;
+        case "PIN":
+          return LocationsMinor;
+        case "BANK":
+          return BankMajor;
+        case "PASSPORT":
+          return IdentityCardMajor;
+        case "LICENSE":
+          return IdentityCardMajor;
+        case "STREETLINE":
+          return LocationsMinor;
+        case "ADDRESSKEY":
+          return LocationsMinor;
+        case "CONTACT":
+          return MobileMajor;
+        case "AUTH":
+          return LocationsMinor;
+        case "DOB":
+          return CalendarMinor;
+        case "BIRTH":
+          return CalendarTimeMinor
+        default: 
+            return KeyMajor;
+    }
+  },
   handleKeyPress (event, funcToCall) {
     const enterKeyPressed = event.keyCode === 13;
     if (enterKeyPressed) {
       event.preventDefault();
       funcToCall();
     }
+  },
+
+  convertParamToDotNotation(str) {
+    return str.replace(/[#\$]+/g, '.');;
+  },
+
+  findLastParamField(str) {
+    let paramDot = func.convertParamToDotNotation(str)
+    let parmArr = paramDot.split(".")
+    return parmArr.length > 0 ? parmArr[parmArr.length-1] : paramDot
+  },
+
+  addPlurality(count){
+    if(count == null || count==undefined){
+      return ""
+    }
+    return count === 1 ? "" : "s" 
+  },
+  convertQueryParamsToUrl(queryParams) {
+    if(!queryParams){
+      return "";
+    }
+    let url = ""
+    let first = true;
+    let joiner = "?"
+    Object.keys(queryParams).forEach((key) => {
+      if (!first) {
+        joiner = "&"
+      }
+      url = url + joiner + key + '=' + encodeURI(queryParams[key])
+      first = false
+    })
+    return url;
   }
+
 }
 
 export default func
