@@ -859,10 +859,10 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "https://akto";
+        String url = "https://stage.akto.bigtech";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
-        for (int i=0; i< 50; i++) {
+        for (int i=0; i< 11; i++) { // 11 because the threshold is 10 for string merging
             urls.add(url + "-"+i + ".io/" + "books");
         }
         for (String c: urls) {
@@ -870,13 +870,13 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,23), false, true);
+        parser.syncFunction(responseParams, false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         APICatalog dbState = parser.apiCatalogSync.getDbState(123);
-        assertEquals(23, dbState.getStrictURLToMethods().size());
+        assertEquals(urls.size(), dbState.getStrictURLToMethods().size());
         assertEquals(0, dbState.getTemplateURLToMethods().size());
 
     }
