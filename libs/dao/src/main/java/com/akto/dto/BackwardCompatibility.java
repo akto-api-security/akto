@@ -41,10 +41,26 @@ public class BackwardCompatibility {
     public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
     private int loadTemplateFilesFromDirectory;
 
+    public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
+    private int aktoDefaultNewUI;
+
+    public static final String COMPUTE_INTEGRATED_CONNECTIONS = "computeIntegratedConnections";
+    private int computeIntegratedConnections;
+    public static final String INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO = "initializeOrganizationAccountBelongsTo";
+    private int initializeOrganizationAccountBelongsTo;
+
+    public static final String ORGS_IN_BILLING = "orgsInBilling";
+    private int orgsInBilling;
+    
+    public static final String DELETE_LAST_CRON_RUN_INFO= "deleteLastCronRunInfo";
+    private int deleteLastCronRunInfo;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory) {
+                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory,
+                                 int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
+                                 int computeIntegratedConnections, int deleteLastCronRunInfo) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -58,6 +74,11 @@ public class BackwardCompatibility {
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
         this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
+        this.aktoDefaultNewUI = aktoDefaultNewUI;
+        this.computeIntegratedConnections = computeIntegratedConnections;
+        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
+        this.orgsInBilling = orgsInBilling;
+        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
     }
 
     public BackwardCompatibility() {
@@ -174,4 +195,44 @@ public class BackwardCompatibility {
     public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
         return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
     } 
+
+    public int getAktoDefaultNewUI() {
+        return aktoDefaultNewUI;
+    }
+
+    public void setAktoDefaultNewUI(int aktoDefaultNewUI) {
+        this.aktoDefaultNewUI = aktoDefaultNewUI;
+    }
+
+    public int getComputeIntegratedConnections() {
+        return computeIntegratedConnections;
+    }
+
+    public void setComputeIntegratedConnections(int computeIntegratedConnections) {
+        this.computeIntegratedConnections = computeIntegratedConnections;
+    }
+    
+    public int getInitializeOrganizationAccountBelongsTo() {
+        return initializeOrganizationAccountBelongsTo;
+    }
+
+    public void setInitializeOrganizationAccountBelongsTo(int initializeOrganizationAccountBelongsTo) {
+        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
+    }
+
+    public int getOrgsInBilling() {
+        return orgsInBilling;
+    }
+
+    public void setOrgsInBilling(int orgsInBilling) {
+        this.orgsInBilling = orgsInBilling;
+    }
+
+    public int getDeleteLastCronRunInfo() {
+        return deleteLastCronRunInfo;
+    }
+
+    public void setDeleteLastCronRunInfo(int deleteLastCronRunInfo) {
+        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+    }
 }

@@ -11,6 +11,7 @@ import com.akto.dto.data_types.EndsWithPredicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
@@ -389,5 +390,44 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
                 url, "GET",200, false, param, SingleTypeInfo.GENERIC, apiCollectionId, false
         );
         return new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+    }
+
+    @Test
+    public void testFetchRequestParameters() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId("/api/books", "GET",-1, false, "param_req_1", SingleTypeInfo.GENERIC, 1000, false);
+        SingleTypeInfo sti1 = new SingleTypeInfo(paramId1, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfo.ParamId paramId2 = new SingleTypeInfo.ParamId("/api/books", "GET",-1, false, "param_req_2", SingleTypeInfo.GENERIC, 1000, false);
+        SingleTypeInfo sti2 = new SingleTypeInfo(paramId2, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfo.ParamId paramId3 = new SingleTypeInfo.ParamId("/api/books", "GET",200, false, "param_resp_1", SingleTypeInfo.GENERIC, 1000, false);
+        SingleTypeInfo sti3 = new SingleTypeInfo(paramId3, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfo.ParamId paramId4 = new SingleTypeInfo.ParamId("/api/cars", "POST",-1, false, "param_req_2", SingleTypeInfo.GENERIC, 1000, false);
+        SingleTypeInfo sti4 = new SingleTypeInfo(paramId4, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfo.ParamId paramId5 = new SingleTypeInfo.ParamId("/api/cars", "POST",200, false, "param_resp_2", SingleTypeInfo.GENERIC, 1000, false);
+        SingleTypeInfo sti5 = new SingleTypeInfo(paramId5, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfo.ParamId paramId6 = new SingleTypeInfo.ParamId("/api/cars", "GET",-1, false, "param_req_3", SingleTypeInfo.GENERIC, 1000, false);
+        SingleTypeInfo sti6 = new SingleTypeInfo(paramId6, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfo.ParamId paramId7 = new SingleTypeInfo.ParamId("/api/cars", "GET",-1, false, "param_req_3", SingleTypeInfo.GENERIC,999, false);
+        SingleTypeInfo sti7 = new SingleTypeInfo(paramId7, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+
+        SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5, sti6, sti7));
+
+        assertEquals(7, SingleTypeInfoDao.instance.getEstimatedCount());
+
+        List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+        apiInfoKeys.add(new ApiInfo.ApiInfoKey(1000, "/api/books", URLMethods.Method.GET));
+        apiInfoKeys.add(new ApiInfo.ApiInfoKey(1000, "/api/cars", URLMethods.Method.POST));
+        Map<ApiInfo.ApiInfoKey, List<String>> apiInfoKeyListMap = SingleTypeInfoDao.instance.fetchRequestParameters(apiInfoKeys);
+
+        assertEquals(2, apiInfoKeyListMap.size());
+        assertEquals(2, apiInfoKeyListMap.get(new ApiInfo.ApiInfoKey(1000, "/api/books", URLMethods.Method.GET)).size());
+        assertEquals(1, apiInfoKeyListMap.get(new ApiInfo.ApiInfoKey(1000, "/api/cars", URLMethods.Method.POST)).size());
     }
 }

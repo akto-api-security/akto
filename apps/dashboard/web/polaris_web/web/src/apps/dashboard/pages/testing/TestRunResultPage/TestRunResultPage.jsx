@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
-  CircleTickMinor,
+  CircleTickMajor,
   ArchiveMinor,
   LinkMinor,
   ResourcesMajor,
@@ -50,7 +50,7 @@ const headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: CircleTickMinor,
+    icon: CircleTickMajor,
   },
   {
     text: 'Test category',
@@ -191,7 +191,7 @@ function TestRunResultPage(props) {
       await api.fetchAffectedEndpoints(runIssues.id).then((resp1) => {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
-      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
+      setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
       setIssueDetails(...[{}]);
     }
@@ -239,7 +239,7 @@ function TestRunResultPage(props) {
       </LegacyCard>
     ,
     ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
-    selectedTestRunResult.testResults &&
+    (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}
       sampleData={selectedTestRunResult?.testResults.map((result) => {

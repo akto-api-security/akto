@@ -1,6 +1,7 @@
 package com.akto.dao.traffic_metrics;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -70,7 +71,7 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
                     ID+ TrafficMetrics.Key.HOST,
                     ID+ TrafficMetrics.Key.VXLAN_ID,
             };
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         }
 
 
