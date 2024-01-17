@@ -1,17 +1,21 @@
 package com.akto.action.observe;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -57,9 +61,15 @@ public class InventoryAction extends UserAction {
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
-        Bson filterQWithTs = Filters.and(Filters.gte("timestamp", startTimestamp), Filters.lte("timestamp", endTimestamp), hostFilterQ);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                hostFilterQ
+        );
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             BasicDBObject id = 
@@ -71,7 +81,6 @@ public class InventoryAction extends UserAction {
             endpoints.add(endpoint);
         }
         
-        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
 
         if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
             List<Bson> pipeline = new ArrayList<>();
@@ -149,10 +158,6 @@ public class InventoryAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
-
-
-
-
 
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));

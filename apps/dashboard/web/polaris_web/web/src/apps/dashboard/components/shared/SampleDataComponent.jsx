@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
     ClipboardMinor,ArrowDownMinor, ArrowUpMinor
 } from '@shopify/polaris-icons';
@@ -11,36 +11,6 @@ import func from "@/util/func";
 import inventoryApi from "../../pages/observe/api"
 import transform from './customDiffEditor';
 
-function formatData(data,style){
-    let localFirstLine = data?.firstLine
-    let finalData = ""
-    let payLoad = null
-    if(style === "http" && data && Object.keys(data).length > 0){
-        if(data.json){
-            Object.keys(data?.json).forEach((element)=> {
-                if(element.includes("query")){
-                    if(data.json[element]){
-                        Object.keys(data?.json[element]).forEach((param) => {
-                            localFirstLine = localFirstLine + '?' + param + '=' + encodeURI(data.json[element][param])
-                        })
-                    }
-                }else if(element.includes("Header")){
-                    if(data.json[element]){
-                        Object.keys(data?.json[element]).forEach((key) => {
-                            finalData = finalData + key + ': ' + data.json[element][key] + "\n"
-                        })
-                    }
-                }else{
-                    payLoad = data.json[element]
-                }
-            })
-        }
-        finalData = finalData.split("\n").sort().join("\n");
-        return (localFirstLine + "\n\n" + finalData + "\n\n" + transform.formatJson(payLoad))
-    }
-    return (data?.firstLine ? data?.firstLine + "\n\n" : "") + (data?.json ? transform.formatJson(data.json) : "");
-  }
-
 function SampleDataComponent(props) {
 
     const { type, sampleData, minHeight, showDiff, isNewDiff } = props;
@@ -48,6 +18,8 @@ function SampleDataComponent(props) {
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
+
+    const ref = useRef(null)
 
     useEffect(()=>{
         let parsed;
@@ -69,8 +41,8 @@ function SampleDataComponent(props) {
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
 
         if(isNewDiff){
-            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine,originalRequestJson?.json?.queryParams,requestJson?.json?.queryParams)
-            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine,originalResponseJson?.json?.queryParams,responseJson?.json?.queryParams)
+            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
+            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine)
 
             let requestHeaderObj = transform.compareJsonKeys(originalRequestJson?.json?.requestHeaders,requestJson?.json?.requestHeaders)
             let responseHeaderObj = transform.compareJsonKeys(originalResponseJson?.json?.responseHeaders,responseJson?.json?.responseHeaders)
@@ -87,8 +59,8 @@ function SampleDataComponent(props) {
             })
         }else{
             setSampleJsonData({ 
-                request: { message: formatData(requestJson,"http"), original: formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: { message: formatData(responseJson,"http"), original: formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
+                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
+                response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
             })
         }
       }, [sampleData])
@@ -132,7 +104,7 @@ function SampleDataComponent(props) {
     async function copyRequest(reqType, type, completeData) {
         let { copyString, snackBarMessage } = await copyContent(type, completeData)
         if (copyString) {
-            navigator.clipboard.writeText(copyString)
+            func.copyToClipboard(copyString, ref, snackBarMessage)
             func.setToast(true, false, snackBarMessage)
             setPopoverActive({ [reqType]: !popoverActive[reqType] })
         }
@@ -250,6 +222,7 @@ function SampleDataComponent(props) {
                                     setPopoverActive({ [type]: !popoverActive[type] })} />}
                                 onClose={() => setPopoverActive(false)}
                             >
+                                <div ref={ref}/>
                                 <ActionList
                                     actionRole="menuitem"
                                     items={getItems(type, sampleData)}

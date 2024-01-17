@@ -10,7 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import GithubRow from './rows/GithubRow';
+import {GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useReducer } from 'react';
 import DateRangePicker from '../layouts/DateRangePicker';
 import "./style.css"
@@ -18,11 +18,11 @@ import func from '@/util/func';
 import { produce } from "immer"
 import values from "@/util/values"
 import transform from '../../pages/observe/transform';
-import SpinnerCentered from '../progress/SpinnerCentered';
+import DropdownSearch from '../shared/DropdownSearch';
 
 function GithubServerTable(props) {
 
-  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
+  const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length > 0 ? [props.sortOptions[0].value] : []);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -31,7 +31,6 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
-  const [selectedIndex, setSelectedIndex] = useState(-1)
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 
@@ -43,8 +42,8 @@ function GithubServerTable(props) {
     })
     async function fetchData() {
       let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, queryValue);
-      setData([...tempData.value])
-      setTotal(tempData.total)
+      tempData ? setData([...tempData.value]) : setData([])
+      tempData ? setTotal(tempData.total) : setTotal(0)
     }
     fetchData();
   }, [sortSelected, appliedFilters, queryValue, page])
@@ -102,25 +101,47 @@ function GithubServerTable(props) {
     handleFilterStatusChange("dateRange",obj)
   }
 
+  const getSortedChoices = (choices) => {
+    return choices.sort((a,b) => a.label.localeCompare(b.label));
+  }
+
   let filters = formatFilters(props.filters)
+
   function formatFilters(filters) {
-    return filters
+    return filters 
       .map((filter) => {
         return {
           key: filter.key,
           label: filter.label,
           filter: (
-            <ChoiceList
-              title={filter.title}
-              titleHidden
-              choices={filter.choices}
-              selected={
-                appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
-                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
-              }
-              onChange={(value) => handleFilterStatusChange(filter.key,value)}
-              {...(filter.singleSelect ? {} : { allowMultiple: true })}
-            />
+              filter.choices.length < 10 ?       
+              <ChoiceList
+                title={filter.title}
+                titleHidden
+                choices={getSortedChoices(filter.choices)}
+                selected={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+                onChange={(value) => handleFilterStatusChange(filter.key,value)}
+                {...(filter.singleSelect ? {} : { allowMultiple: true })}
+              />
+              :
+              <DropdownSearch 
+                placeHoder={"Apply filters"} 
+                optionsList={getSortedChoices(filter.choices)}
+                setSelected={(value) => handleFilterStatusChange(filter.key,value)}
+                {...(filter.singleSelect ? {} : { allowMultiple: true })}
+                allowMultiple
+                preSelected={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+                value={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+              />
           ),
           // shortcut: true,
           pinned: true
@@ -132,7 +153,8 @@ function GithubServerTable(props) {
       key: "dateRange",
       label: props.calenderLabel || "Discovered",
       filter:
-        (<DateRangePicker ranges={values.ranges}
+        (
+          <DateRangePicker ranges={values.ranges}
           initialDispatch = {currDateRange} 
           dispatch={(dateObj) => getDate(dateObj)}
           setPopoverState={() => {}}
@@ -180,8 +202,9 @@ function GithubServerTable(props) {
           page={props.page || 0}
           getNextUrl={props?.getNextUrl}
           onRowClick={props.onRowClick}
-          selectedIndex={selectedIndex}
-          setSelectedIndex={setSelectedIndex}
+          newRow={props?.useNewRow}
+          headings={props?.headings}
+          notHighlightOnselected={props.notHighlightOnselected}
         />
       ),
     );
@@ -194,8 +217,11 @@ function GithubServerTable(props) {
     setPage((page) => (page - 1));
   }
 
+  let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
+  let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
+
   return (
-    <div className={props.selectable ? "removeHeaderColor" : "hideTableHead"}>
+    <div className={tableClass}>
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -214,7 +240,7 @@ function GithubServerTable(props) {
                   disabled: false,
                   loading: false,
                 }}
-                tabs={[]}
+                tabs={props.tableTabs ? props.tableTabs : []}
                 canCreateNewView={false}
                 filters={filters}
                 appliedFilters={appliedFilters}
@@ -222,8 +248,10 @@ function GithubServerTable(props) {
                 mode={mode}
                 setMode={setMode}
                 loading={props.loading || false}
+                selected={props?.selected}
+                onSelect={props?.onSelect}
               />
-              <div className={props.increasedHeight ? "control-row" : ""}>
+              <div className={tableHeightClass}>
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -233,7 +261,7 @@ function GithubServerTable(props) {
                 // condensed
                 selectable={props.selectable || false}
                 onSelectionChange={handleSelectionChange}
-                headings={[
+                headings={props?.headings ? props.headings :[
                   {
                     id: "data",
                     hidden: true,
@@ -242,6 +270,7 @@ function GithubServerTable(props) {
                 ]}
                 bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
                 promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+                hasZebraStriping={props.hasZebraStriping || false}
               >
                 {rowMarkup}
               </IndexTable>

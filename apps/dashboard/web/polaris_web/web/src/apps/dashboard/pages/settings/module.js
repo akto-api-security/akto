@@ -1,6 +1,13 @@
 import settingRequests from './api';
 import func from '@/util/func';
 
+const setupOptions = [
+  { label: 'STAGING', value: 'STAGING' },
+  { label: 'PROD', value: 'PROD' },
+  { label: 'QA', value: 'QA' },
+  { label: 'DEV', value: 'DEV' }
+]
+
 const settingFunctions = {
     getTokenList: async function (type){
         let tokensList = []
@@ -77,15 +84,26 @@ const settingFunctions = {
     fetchAdminInfo: async function(){
       const loginInfo = await this.fetchLoginInfo()
       let arr = []
+      let resp = {}
       await settingRequests.fetchAdminSettings().then((response)=>{
-        let resp = response.accountSettings
+        resp = JSON.parse(JSON.stringify(response.accountSettings))
+        let respOrgStr = "-"
+        if (response.organization) {
+            let respOrg = JSON.parse(JSON.stringify(response.organization))
+            respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
+        }
+
         arr = [
+          // {
+          //   title: 'Organisation',
+          //   text: 'Akto'
+          // },
           {
-            title: 'Organisation',
-            text: 'Akto'
+            title: "Organization ID",
+            text: respOrgStr
           },
           {
-            title: 'Organisation ID',
+            title: 'Account ID',
             text: resp.id,
           },{
             title: 'Dashboard Version',
@@ -100,7 +118,7 @@ const settingFunctions = {
           },
         ]
       })
-      return arr
+      return {arr,resp}
     },
 
 
@@ -117,6 +135,10 @@ const settingFunctions = {
         trafficData = resp.trafficMetricsMap
       })
       return trafficData
+    },
+
+    getSetupOptions: function(){
+      return setupOptions;
     }
 }
 

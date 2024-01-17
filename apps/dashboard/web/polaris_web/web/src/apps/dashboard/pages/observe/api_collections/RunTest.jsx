@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link } from "@shopify/polaris";
 import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -319,7 +319,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
             await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl)
         }
 
-        func.setToast(true, false, "Test run created successfully")
+        setActive(false)
+        const forwardLink = (
+            <HorizontalStack gap={1}>
+                <Text> Test run created successfully. Click </Text>
+                <Link url="/dashboard/testing">here</Link>
+                <Text> to view results.</Text>
+            </HorizontalStack>
+        )
+
+        func.setToast(true, false, forwardLink)
     }
 
     function getLabel(objList, value) {
@@ -499,7 +508,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                         initial={"Default"}
                                         selected={(requests) => {
                                             let maxConcurrentRequests
-                                            console.log(requests);
                                             if (requests === "Default") maxConcurrentRequests = -1
                                             else maxConcurrentRequests = requests
 

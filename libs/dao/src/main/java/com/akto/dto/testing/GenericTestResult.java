@@ -2,9 +2,10 @@ package com.akto.dto.testing;
 
 import com.akto.dto.testing.TestResult.Confidence;
 
-public class GenericTestResult {
+public abstract class GenericTestResult {
 
     private boolean vulnerable;
+    public static final String _CONFIDENCE = "confidence";
     private Confidence confidence = Confidence.HIGH;
 
     public GenericTestResult() {

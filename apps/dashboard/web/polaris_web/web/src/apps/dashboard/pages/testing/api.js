@@ -1,12 +1,12 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters) {
+    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, fetchAll, sortKey, sortOrder, skip, limit, filters) {
         const resp = await request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters
+                startTimestamp, endTimestamp, fetchCicd, fetchAll, sortKey, sortOrder, skip, limit, filters
             }
         })
         return resp
@@ -186,6 +186,25 @@ export default {
         })
         return resp
     },
+
+    async getCountsMap(){
+        return await request({
+            url: '/api/getAllTestsCountMap',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    async getSummaryInfo(startTimestamp, endTimestamp){
+        return await request({
+            url: '/api/getIssueSummaryInfo',
+            method: 'post',
+            data: {
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+            }
+        })
+    },
     fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
@@ -193,6 +212,35 @@ export default {
             data: {
                 testingRunResultSummaryHexId,
                 skip
+            }
+        })
+    },
+    deleteTestRuns(testRunIds){
+        return request({
+            url: '/api/deleteTestRuns',
+            method: 'post',
+            data: {
+               testRunIds
+            }
+        })
+    },
+
+    deleteTestRunsFromSummaries(latestSummaryIds){
+        return request({
+            url: '/api/deleteTestRunsFromSummaries',
+            method: 'post',
+            data: {
+                latestSummaryIds
+            }
+        })
+    },
+    
+    buildDependencyTable(apiCollectionIds, skip){
+        return request({
+            url: '/api/buildDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds, skip
             }
         })
     },
