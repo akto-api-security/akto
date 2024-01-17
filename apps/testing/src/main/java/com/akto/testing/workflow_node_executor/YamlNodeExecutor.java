@@ -175,9 +175,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         }
         double last = 0.0;
         double median;
-        for (int i = 0; i < arr.size(); i++) {
-            last = arr.get(i);
-        }
+        last = arr.get(arr.size() - 1);
         Collections.sort(arr);
 
         int total = 0;
