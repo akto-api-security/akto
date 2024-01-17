@@ -4,10 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.GraphExecutorRequest;
 import com.akto.dto.testing.GraphExecutorResult;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.test_editor.filter.Filter;
 
 public class ConditionalGraphExecutor extends GraphExecutor {
     
@@ -36,7 +42,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
             success = true;
         }
 
-        String childNodeId;
+        String childNodeId = "";
         if (success) {
             if (node.getSuccessChildNode() == null || node.getSuccessChildNode().equals("")) {
                 String curNodeId = node.getId();
@@ -46,14 +52,15 @@ public class ConditionalGraphExecutor extends GraphExecutor {
                     return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), true, errors);
                 } else if (node.getSuccessChildNode().equals("exit")) {
                     return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
-                } else if (node.getSuccessChildNode().equals("terminal")) {
-                    return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), true, errors);
-                }
+                } // else if (node.getSuccessChildNode().equals("terminal")) {
+                //     childNodeId = "terminal";
+                //     //return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), true, errors);
+                // }
                 childNodeId = node.getSuccessChildNode();
             }
         } else {
             if (node.getFailureChildNode() == null || node.getFailureChildNode().equals("")) {
-                return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
+                //return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), false, errors);
             } else {
                 if (node.getFailureChildNode().equals("vulnerable")) {
                     return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), true, errors);
@@ -71,9 +78,42 @@ public class ConditionalGraphExecutor extends GraphExecutor {
             GraphExecutorRequest childExecReq = new GraphExecutorRequest(graphExecutorRequest, childNode, graphExecutorRequest.getWorkflowTestResult(), visitedMap, graphExecutorRequest.getExecutionOrder());
             GraphExecutorResult childExecResult = executeGraph(childExecReq);
             vulnerable = childExecResult.getVulnerable();
+            return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), vulnerable, errors);
+        } else {
+            Filter filter = new Filter();
+            YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
+            FilterNode validatorParentNode = null;
+            for (ExecutorNode execNode: yamlNodeDetails.getExecutorNode().getChildNodes()) {
+                if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
+                    validatorParentNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
+                }
+            }
+
+            if (shouldConsiderParentValidateBlock(graphExecutorRequest, yamlNodeDetails, validatorParentNode, childNodeId, success)) {
+                DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(yamlNodeDetails.getValidatorNode(), null, null, null, null, null , false, "", graphExecutorRequest.getValuesMap(), "");
+                return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), dataOperandsFilterResponse.getResult(), errors);
+            } else {
+                return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), success, errors);
+            }
+        }
+    }
+
+    public boolean shouldConsiderParentValidateBlock(GraphExecutorRequest graphExecutorRequest, YamlNodeDetails yamlNodeDetails, FilterNode validatorParentNode, String nodeId, Boolean success) {
+
+        if (yamlNodeDetails.getValidatorNode() != null && validatorParentNode != null) {
+            if (!success) {
+                try {
+                    String nextNodeId = Utils.evaluateNextNodeId(nodeId);
+                    return graphExecutorRequest.getGraph().getNode(nextNodeId) == null;
+                } catch (Exception e) {
+                    return true;
+                }
+            }
+            return true;
+        } else {
+            return false;
         }
 
-        return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), vulnerable, errors);
     }
 
 }
