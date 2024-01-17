@@ -10,13 +10,17 @@ public class LastCronRunInfo {
     public static final String LAST_UPDATED_SEVERITY = "lastUpdatedSeverity";
     private int lastUpdatedSeverity;
 
+    public static final String LAST_INFO_RESETTED = "lastInfoResetted";
+    private int lastInfoResetted ;
+
     public LastCronRunInfo() {
     }
 
-    public LastCronRunInfo(int lastSyncedCron, int lastUpdatedSensitiveMap, int lastUpdatedSeverity) {
+    public LastCronRunInfo(int lastSyncedCron, int lastUpdatedSensitiveMap, int lastUpdatedSeverity, int lastInfoResetted) {
         this.lastSyncedCron = lastSyncedCron;
         this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
         this.lastUpdatedSeverity = lastUpdatedSeverity;
+        this.lastInfoResetted = lastInfoResetted;
     }
 
     public int getLastSyncedCron() {
@@ -41,5 +45,13 @@ public class LastCronRunInfo {
 
     public void setLastUpdatedSeverity(int lastUpdatedSeverity) {
         this.lastUpdatedSeverity = lastUpdatedSeverity;
+    }
+
+    public int getLastInfoResetted() {
+        return lastInfoResetted;
+    }
+
+    public void setLastInfoResetted(int lastInfoResetted) {
+        this.lastInfoResetted = lastInfoResetted;
     }
 }
