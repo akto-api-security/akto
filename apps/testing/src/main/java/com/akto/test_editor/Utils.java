@@ -150,11 +150,42 @@ public class Utils {
                 }
                 Integer dataInt = (Integer) data;
                 Object query = queryList.get(0);
+
                 if (query instanceof String) {
-                    int queryInt = Integer.parseInt((String) query);
-                    result = compareIntegers(operator, dataInt, queryInt);
+                    try {
+                        int queryInt = Integer.parseInt((String) query);
+                        result = compareIntegers(operator, dataInt, queryInt);
+                    } catch (Exception e) {
+                        Double queryDouble = Double.parseDouble(query.toString());
+                        result = compareDoubles(operator, dataInt.doubleValue(), queryDouble);
+                    }
+                } else if (query instanceof Double) {
+                    Double queryDouble = Double.parseDouble(query.toString());
+                    result = compareDoubles(operator, dataInt.doubleValue(), queryDouble);
                 } else {
                     result = compareIntegers(operator, (int) dataInt, (int) queryList.get(0));
+                }
+            } else if (data instanceof Double) {
+                List<Integer> queryList = (List) querySet;
+                if (queryList == null || queryList.size() == 0) {
+                    return false;
+                }
+                Double dataDouble = (Double) data;
+                Object query = queryList.get(0);
+
+                if (query instanceof String) {
+                    try {
+                        int queryInt = Integer.parseInt((String) query);
+                        result = compareDoubles(operator, dataDouble, Double.valueOf(queryInt));
+                    } catch (Exception e) {
+                        Double queryDouble = Double.parseDouble(query.toString());
+                        result = compareDoubles(operator, dataDouble, queryDouble);
+                    }
+                } else if (query instanceof Double) {
+                    Double queryDouble = Double.parseDouble(query.toString());
+                    result = compareDoubles(operator, dataDouble, queryDouble);
+                } else {
+                    result = compareDoubles(operator, dataDouble, (Double.valueOf(queryList.get(0))));
                 }
             }
             
@@ -162,6 +193,27 @@ public class Utils {
             return false;
         }
 
+        return result;
+    }
+
+    public static Boolean compareDoubles(String operator, double a, double b) {
+        Boolean result = false;
+        switch (operator) {
+            case "gte":
+                result = a >= b;
+                break;
+            case "gt":
+                result = a > b;
+                break;
+            case "lte":
+                result = a <= b;
+                break;
+            case "lt":
+                result = a < b;
+                break;
+            default:
+                return false;
+        }
         return result;
     }
 
