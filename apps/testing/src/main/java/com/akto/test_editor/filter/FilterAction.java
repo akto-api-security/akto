@@ -697,6 +697,7 @@ public final class FilterAction {
                 String val = (String) objVal;
                 Boolean matches = Utils.checkIfContainsMatch(val, "\\$\\{[^}]*\\}");
                 if (matches) {
+                    String origVal = val;
                     val = val.substring(2, val.length());
                     val = val.substring(0, val.length() - 1);
 
@@ -713,10 +714,10 @@ public final class FilterAction {
                     if (params.length > 1) {
                         secondParam = params[1];
                     }
-                    if (secondParam == null) {
-                        obj = VariableResolver.resolveExpression(varMap, val);
-                    } else {
+                    if (isDynamicParamType(firstParam)) {
                         obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                    } else {
+                        obj = VariableResolver.resolveExpression(varMap, origVal);
                     }
                     listVal.set(index, obj);
                     index++;
@@ -847,6 +848,23 @@ public final class FilterAction {
 
         return count;
 
+    }
+
+    public boolean isDynamicParamType(String param) {
+        switch (param) {
+            case "sample_request_payload":
+            case "sample_response_payload":
+            case "test_request_payload":
+            case "test_response_payload":
+            case "sample_request_headers":
+            case "sample_response_headers":
+            case "test_request_headers":
+            case "test_response_headers":
+                return true;
+            default:
+                return false;
+
+        }
     }
     
     public Object resolveDynamicValue(FilterActionRequest filterActionRequest, String firstParam, String secondParam) {

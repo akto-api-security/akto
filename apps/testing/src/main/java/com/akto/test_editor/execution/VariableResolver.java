@@ -60,9 +60,14 @@ public class VariableResolver {
             }
         }
 
-        Object val = getValue(varMap, expression);
+        Object val = resolveExpression(expression);
         if (val == null) {
-            return expression;
+            val = getValue(varMap, expression);
+            if (val == null) {
+                return expression;
+            } else {
+                return val.toString();
+            }
         } else {
             return val.toString();
         }
@@ -537,59 +542,73 @@ public class VariableResolver {
         return worklistVal;
     }
 
-    // public Object resolveExpression(Map<String, Object> varMap, String expression) {
+    public static Object resolveExpression(String expression) {
 
-    //     Object val = null;
+        Object val = null;
 
-    //     Pattern pattern = Pattern.compile("(\\S+)\\s?[\\+\\-\\*\\/]\\s?(\\S+)");
-    //     Matcher matcher = pattern.matcher(expression);
+        Pattern pattern = Pattern.compile("(\\S+)\\s?([\\*/])\\s?(\\S+)");
+        Matcher matcher = pattern.matcher(expression);
 
-    //     if (matcher.find()) {
-    //         try {
-    //             String operand1 = (String) resolveVariable(varMap, matcher.group(1));
-    //             String operator = (String) resolveVariable(varMap, matcher.group(2));
-    //             String operand2 = (String) resolveVariable(varMap, matcher.group(3));
-    //             val = evaluateExpressionValue(operand1, operator, operand2);
+        if (matcher.find()) {
+            try {
+                String operand1 = (String) matcher.group(1);
+                String operator = (String) matcher.group(2);
+                String operand2 = (String) matcher.group(3);
+                val = evaluateExpressionValue(operand1, operator, operand2);
 
-    //         } catch(Exception e) {
-    //             return expression;
-    //         }
+            } catch(Exception e) {
+                return expression;
+            }
             
-    //     }
+        }
 
-    //     return val;
+        return val;
 
-    // }
+    }
 
-    // public Object evaluateExpressionValue(String operand1, String operator, String operand2) {
+    public static Object evaluateExpressionValue(String operand1, String operator, String operand2) {
 
-    //     switch(operator) {
-    //         case "+":
-    //             add(operand1, operator, operand2);
-    //         case "-":
-    //             subtract(operand1, operator, operand2);
-    //         case "*":
-    //             multiply(operand1, operator, operand2);
-    //         case "/":
-    //             divide(operand1, operator, operand2);
-    //         default:
-    //             // throw exception
-    //     }
+        switch(operator) {
+            // case "+":
+            //     add(operand1, operator, operand2);
+            // case "-":
+            //     subtract(operand1, operator, operand2);
+            case "*":
+                return multiply(operand1, operand2);
+            // case "/":
+            //     divide(operand1, operator, operand2);
+            default:
+                return null;
+        }
 
-    //     return null;
+    }
 
-    // }
+    public static Object multiply(String operand1, String operand2) {
+        try {
+            try {
+                int op1 = Integer.parseInt(operand1);
+                try {
+                    int op2 = Integer.parseInt(operand2);
+                    return op1 * op2;
+                } catch (Exception e) {
+                    Double op2 = Double.parseDouble(operand2);
+                    return op1 * op2;
+                }
+            } catch (Exception e) {
+                Double op1 = Double.parseDouble(operand1);
+                try {
+                    int op2 = Integer.parseInt(operand2);
+                    return op1 * op2;
+                } catch (Exception exc) {
+                    Double op2 = Double.parseDouble(operand2);
+                    return op1 * op2;
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
 
-    // public Object multiply(String operand1, String operator, String operand2) {
-    //     try {
-    //         int op1 = Integer.parseInt(operand1);
-    //         int op2 = Integer.parseInt(operand2);
-    //         return op1 * op2;
-    //     } catch (Exception e) {
-    //         return null;
-    //     }
-
-    // }
+    }
 
     // public Object divide(String operand1, String operator, String operand2) {
     //     try {
