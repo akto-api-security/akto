@@ -165,6 +165,28 @@ public class Utils {
                 } else {
                     result = compareIntegers(operator, (int) dataInt, (int) queryList.get(0));
                 }
+            } else if (data instanceof Double) {
+                List<Integer> queryList = (List) querySet;
+                if (queryList == null || queryList.size() == 0) {
+                    return false;
+                }
+                Double dataDouble = (Double) data;
+                Object query = queryList.get(0);
+
+                if (query instanceof String) {
+                    try {
+                        int queryInt = Integer.parseInt((String) query);
+                        result = compareDoubles(operator, dataDouble, Double.valueOf(queryInt));
+                    } catch (Exception e) {
+                        Double queryDouble = Double.parseDouble(query.toString());
+                        result = compareDoubles(operator, dataDouble, queryDouble);
+                    }
+                } else if (query instanceof Double) {
+                    Double queryDouble = Double.parseDouble(query.toString());
+                    result = compareDoubles(operator, dataDouble, queryDouble);
+                } else {
+                    result = compareDoubles(operator, dataDouble, (Double.valueOf(queryList.get(0))));
+                }
             }
             
         } catch (Exception e) {
