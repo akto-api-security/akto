@@ -78,7 +78,7 @@ function DependencyTable() {
             let connections = node["connections"]
             let data = connectionToCollapsibleText(connections, params)
             final.push({
-                "url": node["url"],
+                "url": node["method"] + " " + node["url"],
                 "level": node["maxDepth"],
                 "totalParameters": params.length,
                 "missingParameters": params.length - Object.keys(connections).length,
