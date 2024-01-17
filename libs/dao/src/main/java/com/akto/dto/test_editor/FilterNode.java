@@ -3,11 +3,14 @@ package com.akto.dto.test_editor;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
 public class FilterNode {
     
     private String operand;
     private Boolean result;
     private String concernedProperty;
+    @BsonIgnore
     private Object values;
     private String nodeType;
     private List<FilterNode> childNodes;

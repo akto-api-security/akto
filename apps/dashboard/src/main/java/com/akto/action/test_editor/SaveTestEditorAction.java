@@ -6,32 +6,45 @@ import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -91,6 +104,29 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String getInfoKeyMissing(Info info){
+        if (info.getName() == null){
+            return "name";
+        }
+        if(info.getDescription() == null){
+            return "description";
+        }
+        if(info.getDetails() == null){
+            return "details";
+        }
+        if(info.getCategory() == null){
+            return "category";
+        }
+        if(info.getSeverity() == null){
+            return "severity";
+        }
+        if(info.getSubCategory() == null){
+            return "subcategory";
+        }
+
+        return "";
+    }
+
     public String saveTestEditorFile() {
         TestConfig testConfig;
         try {
@@ -103,6 +139,21 @@ public class SaveTestEditorAction extends UserAction {
             Object info = config.get("info");
             if (info == null) {
                 addActionError("Error in template: info key absent");
+                return ERROR.toUpperCase();
+            }
+
+            // adding all necessary fields check for info in editor
+            InfoParser parser = new InfoParser();
+            Info convertedInfo = parser.parse(info);
+            
+            String keyMissingInInfo = getInfoKeyMissing(convertedInfo);
+            if(keyMissingInInfo.length() > 0){
+                addActionError("Error in template: " + keyMissingInInfo + " key absent");
+                return ERROR.toUpperCase();
+            }
+
+            Category category = convertedInfo.getCategory();
+            if (category.getName() == null || category.getDisplayName() == null || category.getShortName() == null) {
                 return ERROR.toUpperCase();
             }
 
@@ -244,7 +295,26 @@ public class SaveTestEditorAction extends UserAction {
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
+        
+        Bson filters = Filters.and(
+            Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
+            Filters.eq("_id.method", infoKey.getMethod()),
+            Filters.in("_id.url", infoKey.getUrl())
+        );
+        SampleData sd = SampleDataDao.instance.findOne(filters);
+        if (sd != null && sd.getSamples().size() > 0) {
+            sd.getSamples().remove(0);
+            newSampleDataMap.put(infoKey, sd.getSamples());
+        }
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
+        Map<String, List<String>> wordListsMap = testConfig.getWordlists();
+        if (wordListsMap == null) {
+            wordListsMap = new HashMap<String, List<String>>();
+        }
+        
+        wordListsMap = VariableResolver.resolveWordList(wordListsMap, infoKey, newSampleDataMap);
+
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
@@ -255,7 +325,7 @@ public class SaveTestEditorAction extends UserAction {
                     Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
-                    Context.now(), new ObjectId()
+                    Context.now(), new ObjectId(), null
             );
         }
         testingRunResult.setId(new ObjectId());
@@ -266,6 +336,20 @@ public class SaveTestEditorAction extends UserAction {
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();
         subCategoryMap.put(testConfig.getId(), infoObj);
+
+        List<GenericTestResult> runResults = new ArrayList<>();
+
+        for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
+            if (testResult instanceof TestResult) {
+                runResults.add(testResult);
+            } else {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) testResult;
+                runResults.addAll(multiTestRes.convertToExistingTestResult(this.testingRunResult));
+            }
+        }
+
+        this.testingRunResult.setTestResults(runResults);
+
         return SUCCESS.toUpperCase();
     }
 

@@ -23,6 +23,7 @@ public class ApiCollection {
 
     @BsonIgnore
     int urlsCount;
+
     public static final String VXLAN_ID = "vxlanId";
 
     public ApiCollection() {
@@ -104,7 +105,6 @@ public class ApiCollection {
     public void setUrlsCount(int urlsCount) {
         this.urlsCount = urlsCount;
     }
-
     // to be used in front end
     public String getDisplayName() {
         String result;

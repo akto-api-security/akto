@@ -1,22 +1,20 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {
-  Text,
-  Card} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import {
   CircleCancelMajor,
   CalendarMinor,
   ReplayMinor,
-  NoteMinor,
-  PlayCircleMajor,
   PlayMinor,
-  ClockMinor
+  ChevronDownMinor,
+  ChevronUpMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
-import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
+import ChartypeComponent from "./ChartypeComponent";
+import { CellType } from "../../../components/tables/rows/GithubRow";
 
 /*
   {
@@ -38,39 +36,36 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 
 let headers = [
   {
-    text:"",
-    value:"icon",
-    itemOrder:0
+    text:"Test name",
+    title: 'Test run name',
+    value:"testName",
+    itemOrder:1,
   },
   {
-    text:"Text name",
-    value:"name",
-    itemOrder:1
+    text: "Number of tests",
+    title: "Number of tests",
+    value: "number_of_tests",
+    itemOrder: 3,
+    type: CellType.TEXT,
   },
   {
     text:"Severity",
     value: 'severity',
+    title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
   },
   {
-    text: "Number of tests",
-    value: "number_of_tests_str",
-    itemOrder: 3,
-    icon: NoteMinor,
-  },
-  {
-    text: 'Run type',
-    value: 'run_type',
-    itemOrder: 3,
-    icon: PlayCircleMajor
-  },
-  {
     text: 'Run time',
     value: 'run_time',
+    title: 'Status',
     itemOrder: 3,
-    icon: ClockMinor
+    type: CellType.TEXT,
   },
+  {
+    title: '',
+    type: CellType.ACTION,
+  }
 ]
 
 const sortOptions = [
@@ -127,6 +122,7 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
+  
 
 const getActionsList = (hexId) => {
   return [
@@ -183,9 +179,24 @@ function getActions(item){
   return arr
 }
 
+const now = func.timeNow()
+
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("onetime");
+const [currentTab, setCurrentTab] = useState("oneTime");
 const [updateTable, setUpdateTable] = useState(false);
+const [countMap, setCountMap] = useState({});
+const [selected, setSelected] = useState(1);
+const [timeStamp, setTimestamp] = useState({
+  startTimestamp: now - func.recencyPeriod,
+  endTimestamp: now
+})
+const [severityCountMap, setSeverityCountMap] = useState({
+  HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
+  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
+  LOW: {text : 0, color: func.getColorForCharts("LOW")},
+})
+const [subCategoryInfo, setSubCategoryInfo] = useState({})
+const [collapsible, setCollapsible] = useState(true)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -204,7 +215,7 @@ const refreshSummaries = () =>{
 }
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
-  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd);
+  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
   if(checkIsTestRunning(testRuns)){
     refreshSummaries();
   }
@@ -215,7 +226,6 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     setLoading(true);
     let ret = [];
     let total = 0;
-    let now = func.timeNow()
     let dateRange = filters['dateRange'] || false;
     delete filters['dateRange']
     let startTimestamp = 0;
@@ -223,6 +233,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     if (dateRange) {
       startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
       endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000);
+      setTimestamp({startTimestamp: startTimestamp, endTimestamp: endTimestamp})
       filters.endTimestamp = [startTimestamp, endTimestamp]
     }
 
@@ -230,23 +241,31 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
       case "cicd":
         await api.fetchTestingDetails(
-          0, 0, true, sortKey, sortOrder, skip, limit, filters
+          0, 0, true, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
         });
         break;
-      case "recurring":
+      case "scheduled":
         await api.fetchTestingDetails(
-          0, 0, false, sortKey, sortOrder, skip, limit, filters
+          0, 0, false, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
-      case "onetime":
+      case "oneTime":
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, sortKey, sortOrder, skip, limit, filters
+          now - func.recencyPeriod, now, false, false, sortKey, sortOrder, skip, limit, filters
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
+        break;
+      default:
+        await api.fetchTestingDetails(
+          now - func.recencyPeriod, now, false, true, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -269,9 +288,110 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   }
 
+  const fetchCountsMap = async() => {
+    await api.getCountsMap().then((resp)=>{
+      setCountMap(resp)
+    })
+  }
+
+  const fetchSummaryInfo = async()=>{
+    await api.getSummaryInfo(timeStamp.startTimestamp, timeStamp.endTimestamp).then((resp)=>{
+      const severityObj = transform.convertSubIntoSubcategory(resp)
+      setSubCategoryInfo(severityObj.subCategoryMap)
+      const severityMap = severityObj.countMap;
+      let tempMap = JSON.parse(JSON.stringify(severityCountMap))
+      Object.keys(tempMap).forEach((key) => {
+        tempMap[key].text = severityMap[key]
+      })
+      setSeverityCountMap(tempMap)
+    })
+  }
+
+  const tableTabs = [
+    {
+        content: 'All',
+        index: 0,
+        badge: countMap['allTestRuns']?.toString(),
+        onAction: ()=> {setCurrentTab('All')},
+        id: 'All',
+    },
+    {
+      content: 'One time',
+      index: 0,
+      badge: countMap['oneTime']?.toString(),
+      onAction: ()=> {setCurrentTab('oneTime')},
+      id: 'oneTime',
+    },
+    {
+      content: 'Recurring',
+      index: 0,
+      badge: countMap['scheduled']?.toString(),
+      onAction: ()=> {setCurrentTab('scheduled')},
+      id: 'scheduled',
+    },
+    {
+      content: 'CI/CD',
+      index: 0,
+      badge: countMap['cicd']?.toString(),
+      onAction: ()=> {setCurrentTab('cicd')},
+      id: 'cicd',
+    },
+  ]
+
+  useEffect(()=>{
+    fetchCountsMap()
+    fetchSummaryInfo()
+  },[timeStamp])
+
+  const handleSelectedTab = (selectedIndex) => {
+    setLoading(true)
+    setSelected(selectedIndex)
+    setTimeout(()=>{
+        setLoading(false)
+    },200)
+}
+
+const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+const SummaryCardComponent = () =>{
+  let totalVulnerabilites = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  return(
+    <LegacyCard>
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+        <HorizontalStack align="space-between">
+          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
+          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+        </HorizontalStack>
+        {totalVulnerabilites > 0 ? 
+        <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
+          <LegacyCard.Subsection>
+            <Box paddingBlockStart={3}><Divider/></Box>
+            <HorizontalGrid columns={2} gap={6}>
+              <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+            </HorizontalGrid>
+
+          </LegacyCard.Subsection>
+        </Collapsible>
+        : null }
+      </LegacyCard.Section>
+    </LegacyCard>
+  )
+}
+  const promotedBulkActions = (selectedTestRuns) => { 
+    return [
+    {
+      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      onAction: async() => {
+        await api.deleteTestRuns(selectedTestRuns);
+        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        window.location.reload();
+      },
+    },
+  ]};
+
 const coreTable = (
 <GithubServerTable
-    key={updateTable}
+    key={currentTab + updateTable}
     pageLimit={50}
     fetchData={fetchTableData}
     sortOptions={sortOptions} 
@@ -286,49 +406,19 @@ const coreTable = (
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}
+    tableTabs={tableTabs}
+    onSelect={handleSelectedTab}
+    selected={selected}
+    mode={IndexFiltersMode.Default}
+    headings={headers}
+    useNewRow={true}
+    condensedHeight={true}
+    promotedBulkActions={promotedBulkActions}
+    selectable= {true}
   />   
 )
 
-const OnetimeTable = {
-  id:  'onetime',
-  content: "One time",
-  component: (
-    coreTable
-  )
-}
-
-const CicdTable = {
-  id:  'cicd',
-  content: "CI/CD",
-  component: (
-    coreTable
-  )
-}
-
-const RecurringTable = {
-  id:  'recurring',
-  content: "Recurring",
-  component: (
-    coreTable
-  )
-}
-
-function handleCurrTab(tab) {
-  setCurrentTab(tab.id)
-}
-
-const TestTabs = (
-  <Card padding={"0"} key="tabs">
-    <LayoutWithTabs
-      key="tabs"
-      tabs={[OnetimeTable, CicdTable, RecurringTable ]}
-      currTab={handleCurrTab}
-    />
-  </Card>
-)
-
-const components = [ TestTabs]
-
+const components = [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
