@@ -1,7 +1,8 @@
-import { CalloutCard, HorizontalStack, ProgressBar, VerticalStack } from "@shopify/polaris";
+import { HorizontalStack, ProgressBar, VerticalStack, Card, Button, Text, Icon, Box } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import { useNavigate } from "react-router-dom";
 import "./style.css"
+import { CancelMinor } from '@shopify/polaris-icons';
 
 const UsageType = {
     INVENTORY: "inventory",
@@ -26,59 +27,98 @@ function UsageBar(props) {
         featureMap = featureWiseAllowed.TEST_RUNS
     }
 
-    if (featureMap == null || featureMap == undefined) {
-        return <></>
-    }
-
-    if (featureMap.usageLimit == -1) {
+    if (featureMap == null ||
+        featureMap == undefined ||
+        featureMap?.usageLimit == -1) {
         return <></>
     }
 
     let usagePercentage = (featureMap.usage / featureMap.usageLimit) * 100
     let dismissible = false
-    if (usagePercentage < 80) {
+
+    const usageThreshold = 95;
+
+    if (usagePercentage < usageThreshold) {
         dismissible = true
     }
 
-    if (usagePercentage >= 95) {
-        setShowUsageBanner({ ...showUsageBanner, [usageType]: true })
-    }
-
-    if (!showUsageBanner[usageType] && usagePercentage < 80) {
+    if (!showUsageBanner[usageType] && usagePercentage < usageThreshold) {
         return <></>
     }
 
-    return <div className="usage-bar">
-        <CalloutCard
-            title={title}
-            primaryAction={{
-                id: "primary-action",
-                content: "Upgrade plan",
-                onAction: () => { navigate("/dashboard/settings/billing") }
-            }}
-            secondaryAction={{
-                id: "secondary-action",
-                content: "Contact us",
-                onAction: () => { window.open("https://www.akto.io/contact-us") }
-            }}
-            {...(dismissible ? {
-                onDismiss: () => {
-                    setShowUsageBanner({ ...showUsageBanner, [usageType]: false })
-                }
-            } : {})}
-        >
+    return (
+        <Card>
             <VerticalStack gap={4}>
+
+                <HorizontalStack align={"space-between"}>
+                    <Text as="h2" variant="headingSm">
+                        {title}
+                    </Text>
+                    {
+                        dismissible ? <Button
+                            plain
+                            monochrome
+                            onClick={() => { setShowUsageBanner({ ...showUsageBanner, [usageType]: false }) }}
+                            accessibilityLabel="Close"
+                        >
+                            <Icon source={CancelMinor} />
+                        </Button> : <></>
+                    }
+                </HorizontalStack>
                 {content}
-                <HorizontalStack gap={4} align="start" blockAlign="center">
-                    <div style={{ width: "90%" }}>
-                        <ProgressBar progress={usagePercentage} color={usagePercentage < 95 ? 'primary' : 'critical'} />
+                <div style={{ "display": "flex", "justifyContent": "space-between", "alignItems": "center" }}>
+                    <div style={{ "flex": "1" }} className={dismissible ? "" : "critical-usage-bar"}>
+                        <ProgressBar
+                            progress={usagePercentage}
+                            size={"small"}
+                            color={dismissible ? 'primary' : 'critical'}
+                        />
                     </div>
-                    {`${Math.trunc(usagePercentage)} %`}
+                    <div style={{ "flex": "0", "textAlign": "end", "marginLeft": "12px" }}>
+                        {`${Math.trunc(usagePercentage)}%`}
+                    </div>
+                </div>
+                <HorizontalStack gap={"4"}>
+                    <Box
+                        {...(dismissible ? {} : { borderColor: "border-critical" })}
+                        borderRadius={"1"}
+                        borderWidth={"1"}
+                        paddingBlockEnd={"2"}
+                        paddingBlockStart={"2"}
+                        paddingInlineEnd={"4"}
+                        paddingInlineStart={"4"}
+                    >
+                        <Text
+                            fontWeight={"semibold"}
+                            {...(dismissible ? {} : { color: "critical" })}
+                        >
+                            <Button
+                                plain
+                                monochrome
+                                removeUnderline
+                                onClick={() => {
+                                    setShowUsageBanner({ ...showUsageBanner, [usageType]: true });
+                                    navigate("/dashboard/settings/billing")
+                                }}
+                            >
+                                Upgrade plan
+                            </Button>
+                        </Text>
+                    </Box>
+                    <Button
+                        plain
+                        removeUnderline
+                        onClick={() => {
+                            setShowUsageBanner({ ...showUsageBanner, [usageType]: true });
+                            window.open("https://www.akto.io/contact-us")
+                        }}
+                    >
+                        Contact us
+                    </Button>
                 </HorizontalStack>
             </VerticalStack>
-        </CalloutCard>
-    </div>
-
+        </Card>
+    )
 }
 
 export { UsageBar, UsageType };

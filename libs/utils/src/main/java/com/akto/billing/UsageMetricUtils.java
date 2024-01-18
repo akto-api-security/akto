@@ -125,8 +125,8 @@ public class UsageMetricUtils {
         }
     }
 
-    public static boolean checkMeteredOverage(int accountId, MetricTypes metricTypes) {
-        FeatureAccess featureAccess = calcFeatureAccess(accountId, metricTypes);
+    public static boolean checkMeteredOverage(int accountId, MetricTypes metricType) {
+        FeatureAccess featureAccess = getFeatureAccess(accountId, metricType, false);
         return featureAccess.checkInvalidAccess();
     }
 
@@ -138,15 +138,37 @@ public class UsageMetricUtils {
         return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS);
     }
 
-    public static FeatureAccess calcFeatureAccess(int accountId, MetricTypes metricType) {
+    public static FeatureAccess getLatestFeatureAccess(int accountId, MetricTypes metricType) {
+        return getFeatureAccess(accountId, metricType, true);
+    }
 
+    private static FeatureAccess getFeatureAccess(int accountId, MetricTypes metricType, boolean latest) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
-
         try {
             if (!DashboardMode.isMetered()) {
                 return featureAccess;
             }
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+            featureAccess = getFeatureAccess(organization, metricType);
+            if (latest) {
+                String organizationId = organization.getId();
+                UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountId, metricType);
+                int latestUsage = usageMetric.getUsage();
+                featureAccess.setUsage(latestUsage);
+            }
+            return featureAccess;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
+        }
+        return featureAccess;
+    }
+
+    public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {
+        FeatureAccess featureAccess = FeatureAccess.fullAccess;
+        try {
+            if (!DashboardMode.isMetered()) {
+                return featureAccess;
+            }
             if (organization == null) {
                 throw new Exception("Organization not found");
             }
@@ -154,21 +176,14 @@ public class UsageMetricUtils {
             if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
                 throw new Exception("feature map not found or empty for organization " + organization.getId());
             }
-            String organizationId = organization.getId();
-            UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountId, metricType);
-
-            int latestUsage = usageMetric.getUsage();
             String featureLabel = metricType.name();
             featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
-            featureAccess.setUsage(latestUsage);
-
             int gracePeriod = organization.getGracePeriod();
             featureAccess.setGracePeriod(gracePeriod);
             return featureAccess;
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in calculating usage metric", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
         }
-
         return featureAccess;
     }
 

@@ -11,42 +11,58 @@ import com.akto.action.ApiCollectionsAction;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
-import com.akto.dto.Account;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.AccountTask;
 import com.akto.util.Constants;
+import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 public class DeactivateCollections {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DeactivateCollections.class);
 
     final static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static void deactivateCollectionsJob() {
         executorService.schedule(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTask(new Consumer<Account>() {
+                OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                     @Override
-                    public void accept(Account account) {
-                        deactivateCollectionsForAccount(account.getId());
+                    public void accept(Organization organization) {
+                        deactivateCollectionsForOrganization(organization);
                     }
                 }, "deactivate-collections");
-
             }
         }, 0, TimeUnit.SECONDS);
     }
 
-    private static void deactivateCollectionsForAccount(int accountId) {
+    private static void deactivateCollectionsForOrganization(Organization organization) {
+        try {
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            if (!featureAccess.checkInvalidAccess()) {
+                return;
+            }
+            int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
 
-        FeatureAccess featureAccess = UsageMetricUtils.calcFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
-
-        if (!featureAccess.checkInvalidAccess()) {
-            return;
+            for (int accountId : organization.getAccounts()) {
+                Context.accountId.set(accountId);
+                overage = deactivateCollectionsForAccount(overage);
+            }
+        } catch (Exception e) {
+            String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());
+            loggerMaker.errorAndAddToDb(e, errorMessage, LogDb.DASHBOARD);
         }
+    }
 
+    private static int deactivateCollectionsForAccount(int overage) {
+        
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
         apiCollectionsAction.fetchAllCollections();
         List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();
@@ -66,8 +82,6 @@ public class DeactivateCollections {
             return t1 < t2 ? -1 : 1;
         });
 
-        int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
-
         List<Integer> apiCollectionIds = new ArrayList<>();
 
         for (ApiCollection apiCollection : apiCollections) {
@@ -84,5 +98,7 @@ public class DeactivateCollections {
 
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
+
+        return overage;
     }
 }
