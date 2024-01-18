@@ -258,7 +258,7 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
 
         int accountId = Context.accountId.get();
-        FeatureAccess featureAccess = UsageMetricUtils.calcFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
+        FeatureAccess featureAccess = UsageMetricUtils.getLatestFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
         int usageBefore = featureAccess.getUsage();
         int count = this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
         featureAccess.setUsage(usageBefore + count);
