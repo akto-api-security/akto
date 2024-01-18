@@ -16,9 +16,8 @@ public class CollectionInterceptor extends AbstractInterceptor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class);
 
-    List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-
     boolean checkDeactivated(int apiCollectionId) {
+        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         return deactivatedCollections.contains(apiCollectionId);
     }
 

@@ -13,6 +13,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import TooltipText from "../../../components/shared/TooltipText"
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
 import collectionApi from "./api"
+import { UsageBar, UsageType } from "../../../components/usage/UsageBar"
 
 const headers = [
     {
@@ -57,6 +58,8 @@ const headers = [
 ]
 
 const sortOptions = [
+    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
+    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
     { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
@@ -300,7 +303,13 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, tableComponent]
+    const usageComponent = <UsageBar
+        title="Inventory usage"
+        content="Maximize your API inventory by decluttering unused collections or upgrade your plan for additional space."
+        usageType={UsageType.INVENTORY}
+    />
+
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, usageComponent, tableComponent]
 
     return(
         <PageWithMultipleCards
