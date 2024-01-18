@@ -52,6 +52,8 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import static com.akto.dto.RawApi.convertHeaders;
+
 public final class FilterAction {
     
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
@@ -461,7 +463,7 @@ public final class FilterAction {
             return;
         }
         
-        String headerString = RedactSampleData.convertHeaders(headers);
+        String headerString = convertHeaders(headers);
         String val = null;
 
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
@@ -563,7 +565,7 @@ public final class FilterAction {
             }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null);
         } else {
-            String headerString = RedactSampleData.convertHeaders(headers);
+            String headerString = convertHeaders(headers);
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(headerString, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
             res = invokeFilter(dataOperandFilterRequest);
             return new DataOperandsFilterResponse(res, null, null);
@@ -781,7 +783,7 @@ public final class FilterAction {
         return;
     }
 
-    public Object getValue(Object obj, String parentKey, String queryKey) {
+    public static Object getValue(Object obj, String parentKey, String queryKey) {
         Object val = null;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
