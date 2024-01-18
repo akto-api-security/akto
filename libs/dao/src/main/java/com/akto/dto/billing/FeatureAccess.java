@@ -9,7 +9,7 @@ public class FeatureAccess {
     int overageFirstDetected = -1;
     public static final String OVERAGE_FIRST_DETECTED = "overageFirstDetected";
 
-    private static final int STANDARD_GRACE_PERIOD = 60 * 60 * 24 * 7; // 7 days
+    private static final int STANDARD_GRACE_PERIOD = 0;
 
     int usageLimit;
     public static final String USAGE_LIMIT = "usageLimit";

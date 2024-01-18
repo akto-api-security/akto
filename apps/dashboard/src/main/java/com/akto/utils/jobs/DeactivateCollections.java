@@ -63,7 +63,7 @@ public class DeactivateCollections {
             if (t1 == t2) {
                 return 0;
             }
-            return t1 > t2 ? -1 : 1;
+            return t1 < t2 ? -1 : 1;
         });
 
         int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
