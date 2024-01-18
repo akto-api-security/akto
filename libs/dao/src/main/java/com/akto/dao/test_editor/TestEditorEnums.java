@@ -37,7 +37,8 @@ public class TestEditorEnums {
 
     public enum PredicateOperator {
         AND,
-        OR
+        OR,
+        COMPARE_GREATER
     }
 
     public enum KeyValOperator {
