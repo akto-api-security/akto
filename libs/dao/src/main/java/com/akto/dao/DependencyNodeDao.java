@@ -134,4 +134,17 @@ public class DependencyNodeDao extends AccountsContextDao<DependencyNode>{
         );
 
     }
+
+    public List<DependencyNode> findNodesForCollectionIds(List<Integer> apiCollectionIds) {
+        List<String> stringApiCollectionIds = new ArrayList<>();
+        for (Integer apiCollectionId: apiCollectionIds) {
+            if (apiCollectionId != null) stringApiCollectionIds.add(apiCollectionId+"");
+        }
+        return instance.findAll(
+                Filters.or(
+                        Filters.in(DependencyNode.API_COLLECTION_ID_REQ, stringApiCollectionIds),
+                        Filters.in(DependencyNode.API_COLLECTION_ID_RESP, stringApiCollectionIds)
+                )
+        );
+    }
 }
