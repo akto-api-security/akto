@@ -150,6 +150,9 @@ public class ProfileAction extends UserAction {
                 featureAccess.setGracePeriod(gracePeriod);
                 stiggFeatureWiseAllowed.append(key, new BasicDBObject()
                         .append(FeatureAccess.IS_GRANTED, featureAccess.getIsGranted())
+                        .append(FeatureAccess.USAGE_LIMIT, featureAccess.getUsageLimit())
+                        .append(FeatureAccess.USAGE, featureAccess.getUsage())
+                        .append(FeatureAccess.OVERAGE_FIRST_DETECTED, featureAccess.getOverageFirstDetected())
                         .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, featureAccess.checkInvalidAccess()));
             }
 
