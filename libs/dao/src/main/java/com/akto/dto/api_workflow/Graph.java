@@ -2,6 +2,7 @@ package com.akto.dto.api_workflow;
 
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.YamlNodeDetails;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
@@ -26,8 +27,13 @@ public class Graph {
 
             Node node = getNode(sourceId);
             if (node == null) {
-                WorkflowNodeDetails workflowNodeDetails = mapNodeIdToWorkflowNodeDetails.get(sourceId);
-                node = new Node(sourceId, workflowNodeDetails);
+                if (mapNodeIdToWorkflowNodeDetails.get(sourceId) instanceof YamlNodeDetails) {
+                    YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(sourceId);
+                    node = new Node(sourceId, workflowNodeDetails, workflowNodeDetails.getSuccess(), workflowNodeDetails.getFailure());
+                } else {
+                    WorkflowNodeDetails workflowNodeDetails = mapNodeIdToWorkflowNodeDetails.get(sourceId);
+                    node = new Node(sourceId, workflowNodeDetails);
+                }
             }
             node.addNeighbours(targetId);
             addNode(node);

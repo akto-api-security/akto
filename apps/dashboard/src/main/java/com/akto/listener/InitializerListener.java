@@ -45,6 +45,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
+import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
@@ -53,6 +54,7 @@ import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -116,6 +118,7 @@ import static com.mongodb.client.model.Filters.eq;
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
 
@@ -680,7 +683,7 @@ public class InitializerListener implements ServletContextListener {
         String payload = null;
 
         try {
-            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(), valueMap, false);
+            payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
         } catch (Exception e) {
             errors.add("Failed to replace variables");
         }
@@ -1510,6 +1513,8 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
+    private final static int REFRESH_INTERVAL = 60 * 1; // 1 minute
+
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
@@ -1517,6 +1522,16 @@ public class InitializerListener implements ServletContextListener {
         try {
             int gracePeriod = organization.getGracePeriod();
             String organizationId = organization.getId();
+
+            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
+
+            /*
+             * This ensures, we don't fetch feature wise allowed from akto too often.
+             * This helps the dashboard to be more responsive.
+             */
+            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
+                return organization;
+            }
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
             if (initialFeatureWiseAllowed == null) {
@@ -1546,11 +1561,15 @@ public class InitializerListener implements ServletContextListener {
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
 
+            lastFeatureMapUpdate = Context.now();
+            organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
+
             OrganizationsDao.instance.updateOne(
                     Filters.eq(Constants.ID, organizationId),
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
-                            Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
+                            Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
                     LogDb.DASHBOARD);
@@ -1634,7 +1653,8 @@ public class InitializerListener implements ServletContextListener {
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();
-        
+        DependencyNodeDao.instance.createIndicesIfAbsent();
+        DependencyFlowNodesDao.instance.createIndicesIfAbsent();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
@@ -1727,7 +1747,7 @@ public class InitializerListener implements ServletContextListener {
                                         LogDb.DASHBOARD);
                                 processTemplateFilesZip(repoZip, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                             } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb(e,
+                                cacheLoggerMaker.errorAndAddToDb(e,
                                         String.format("Error while updating Test Editor Files %s", e.toString()),
                                         LogDb.DASHBOARD);
                             }
@@ -1860,7 +1880,7 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
                 }
             } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(ex,
+                cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
                         LogDb.DASHBOARD);
             }

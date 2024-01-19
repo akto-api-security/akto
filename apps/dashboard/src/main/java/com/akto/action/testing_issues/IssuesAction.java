@@ -14,6 +14,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
@@ -141,9 +142,11 @@ public class IssuesAction extends UserAction {
             Bson orFilters = Filters.or(andFilters);
             this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
-                List<TestResult> testResults = new ArrayList<>();
-                for (TestResult testResult : runResult.getTestResults()) {
+                List<GenericTestResult> testResults = new ArrayList<>();
+                for (GenericTestResult tr : runResult.getTestResults()) {
+                    TestResult testResult = (TestResult) tr;
                     if (testResult.isVulnerable()) {
                         testResults.add(testResult);
                         sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));

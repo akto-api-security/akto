@@ -3,6 +3,9 @@ package com.akto;
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
+import com.akto.dto.dependency_flow.Connection;
+import com.akto.dto.dependency_flow.Edge;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.loaders.Loader;
@@ -42,6 +45,7 @@ import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.ApiListCondition;
 import com.akto.dto.CollectionConditions.CollectionCondition;
 import com.akto.dto.CollectionConditions.MethodCondition;
+import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.util.enums.GlobalEnums;
@@ -119,6 +123,10 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<TestResult> testResultClassModel = ClassModel.builder(TestResult.class).enableDiscriminator(true)
                 .build();
+        ClassModel<MultiExecTestResult> multiExecTestResultClassModel = ClassModel.builder(MultiExecTestResult.class).enableDiscriminator(true)
+                .build();
+        ClassModel<GenericTestResult> genericTestResultClassModel = ClassModel.builder(GenericTestResult.class).enableDiscriminator(true)
+                .build();
         ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class)
                 .enableDiscriminator(true).build();
         ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true)
@@ -137,10 +145,14 @@ public class DaoInit {
                 .builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult> workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class)
                 .enableDiscriminator(true).build();
+        ClassModel<WorkflowTest> workflowTestClassModel = ClassModel.builder(WorkflowTest.class)
+                .enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true)
                 .build();
         ClassModel<CustomWebhook> CustomWebhookClassModel = ClassModel.builder(CustomWebhook.class)
                 .enableDiscriminator(true).build();
+        ClassModel<WorkflowNodeDetails> WorkflowNodeDetailsClassModel = ClassModel.builder(WorkflowNodeDetails.class)
+                .enableDiscriminator(true).build();                
         ClassModel<CustomWebhookResult> CustomWebhookResultClassModel = ClassModel.builder(CustomWebhookResult.class)
                 .enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult.NodeResult> nodeResultClassModel = ClassModel
@@ -165,6 +177,8 @@ public class DaoInit {
                 .builder(NotBelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<BelongsToPredicate> belongsToPredicateClassModel = ClassModel
                 .builder(BelongsToPredicate.class).enableDiscriminator(true).build();
+        ClassModel<YamlNodeDetails> yamlNodeDetails = ClassModel
+                .builder(YamlNodeDetails.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -184,12 +198,14 @@ public class DaoInit {
         ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
-        ClassModel<CollectionCondition> collectionConditionClassModel = ClassModel.builder(CollectionCondition.class)
-                .enableDiscriminator(true).build();
-        ClassModel<ApiListCondition> apiListConditionClassModel = ClassModel.builder(ApiListCondition.class)
-                .enableDiscriminator(true).build();
-        ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class)
-                .enableDiscriminator(true).build();
+        ClassModel<CollectionCondition> collectionConditionClassModel = ClassModel.builder(CollectionCondition.class).enableDiscriminator(true).build();
+        ClassModel<ApiListCondition> apiListConditionClassModel = ClassModel.builder(ApiListCondition.class).enableDiscriminator(true).build();
+        ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
+        ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
+        ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
+        ClassModel<Node> nodeClassModel = ClassModel.builder(Node.class).enableDiscriminator(true).build();
+        ClassModel<Connection> connectionClassModel = ClassModel.builder(Connection.class).enableDiscriminator(true).build();
+        ClassModel<Edge> edgeClassModel = ClassModel.builder(Edge.class).enableDiscriminator(true).build();
         ClassModel<LastCronRunInfo> cronTimersClassModel = ClassModel.builder(LastCronRunInfo.class)
                 .enableDiscriminator(true).build();
         ClassModel<ConnectionInfo> connectionInfoClassModel = ClassModel.builder(ConnectionInfo.class)
@@ -212,19 +228,21 @@ public class DaoInit {
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel,
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
-                testingRunResultClassModel, testResultClassModel,
+                testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
-                cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
+                cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel,testLibraryClassModel,
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 collectionConditionClassModel, apiListConditionClassModel, methodConditionClassModel,
-                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel).automatic(true).build());
+                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
+                yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
+                        nodeClassModel, connectionClassModel, edgeClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

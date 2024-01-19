@@ -639,6 +639,26 @@ getCollapsibleRow(urls){
   )
 },
 
+getCollapisbleRowDependencyTable(urls){
+  return(
+    <tr style={{background: "#EDEEEF"}}>
+      <td colSpan={7}>
+        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
+          <VerticalStack gap={2}>
+            {urls.map((ele,index)=>{
+              return(
+                <Text>
+                  {ele.url}
+                </Text>
+              )
+            })}
+          </VerticalStack>
+        </Box>
+      </td>
+    </tr>
+  )
+},
+
 getPrettifiedTestRunResults(testRunResults){
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{

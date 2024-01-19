@@ -37,7 +37,8 @@ public class TestEditorEnums {
 
     public enum PredicateOperator {
         AND,
-        OR
+        OR,
+        COMPARE_GREATER
     }
 
     public enum KeyValOperator {
@@ -47,7 +48,8 @@ public class TestEditorEnums {
 
     public enum BodyOperator {
         LENGTH,
-        PERCENTAGE_MATCH
+        PERCENTAGE_MATCH,
+        PERCENTAGE_MATCH_SCHEMA
     }
 
     public enum ExtractOperator {
@@ -197,7 +199,8 @@ public class TestEditorEnums {
         FOLLOW_REDIRECT,
         REMOVE_AUTH_HEADER,
         REPLACE_AUTH_HEADER,
-        REPLACE_BODY
+        REPLACE_BODY,
+        JWT_REPLACE_BODY
     }
 
     public enum NonTerminalExecutorDataOperands {
@@ -209,12 +212,26 @@ public class TestEditorEnums {
         MODIFY_QUERY_PARAM
     }
 
+    public enum TerminalNonExecutableDataOperands {
+        TYPE,
+        TEST_NAME,
+        LABEL,
+        SUCCESS,
+        FAILURE
+    }
+
+    public enum ValidateExecutorDataOperands {
+        Validate
+    }
+
     public enum ExecutorOperandTypes {
         Parent,
         Req,
         Terminal,
         NonTerminal,
-        Data
+        Data,
+        TerminalNonExecutable,
+        Validate
     }
 
     public String getExecutorOperandValue(String key) {
@@ -237,6 +254,18 @@ public class TestEditorEnums {
             }
         }
 
+        for (TerminalNonExecutableDataOperands operand: TerminalNonExecutableDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
         return key;
     }
 
@@ -244,29 +273,41 @@ public class TestEditorEnums {
 
         for (ExecutorParentOperands operand: ExecutorParentOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "parent";
+                return ExecutorOperandTypes.Parent.toString().toLowerCase();
             }
         }
 
         for (RequestParentOperand operand: RequestParentOperand.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "req";
+                return ExecutorOperandTypes.Req.toString().toLowerCase();
             }
         }
 
         for (TerminalExecutorDataOperands operand: TerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "terminal";
+                return ExecutorOperandTypes.Terminal.toString().toLowerCase();
             }
         }
 
         for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "nonterminal";
+                return ExecutorOperandTypes.NonTerminal.toString().toLowerCase();
             }
         }
 
-        return "data";
+        for (TerminalNonExecutableDataOperands operand: TerminalNonExecutableDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.TerminalNonExecutable.toString().toLowerCase();
+            }
+        }
+
+        for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.Validate.toString().toLowerCase();
+            }
+        }
+
+        return ExecutorOperandTypes.Data.toString().toLowerCase();
     }
 
 }

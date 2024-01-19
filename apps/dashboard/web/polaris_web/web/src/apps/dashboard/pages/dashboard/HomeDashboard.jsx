@@ -106,7 +106,7 @@ function HomeDashboard() {
         },
         {
             title: 'Test coverage',
-            data: countInfo.coverage,
+            data: countInfo.totalUrls === 0 ? "0%" : countInfo.coverage,
             variant: 'headingLg'
         },
         {
@@ -135,7 +135,7 @@ function HomeDashboard() {
                 </VerticalStack>
             </Card>
 
-        : <NullData text={"Issues by category"} url={"/dashboard/observe/inventory/1111111111"} urlText={"to run a test."} description={"No test categories found."} key={"subcategoryTrend"}/>
+        : <NullData text={"Issues by category"} url={"/dashboard/observe/inventory"} urlText={"to run a test on a collection."} description={"No test categories found."} key={"subcategoryTrend"}/>
      )
 
     const riskScoreRanges = [
@@ -157,6 +157,8 @@ function HomeDashboard() {
     ]
 
     const riskScoreTrendComp = (
+        (Object.keys(riskScoreRangeMap).length === 0) ? <NullData text={"APIS by risk score"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No apis found."} key={"riskScoreNullTrend"}/>
+        :
         <Card key="scoreTrend">
             <VerticalStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">APIS by risk score</Text>
@@ -187,6 +189,9 @@ function HomeDashboard() {
     )
 
     const sensitiveDataTrendComp = (
+        (!sensitiveData || (!(sensitiveData.request) && !(sensitiveData.response))) ? 
+        <NullData text={"Sensitive Data"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No sensitive data found."} key={"sensitiveNullTrend"}/>
+        :
         <Card key="sensitiveTrend">
             <VerticalStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">Sensitive Data</Text>
@@ -238,7 +243,7 @@ function HomeDashboard() {
                 </VerticalStack>
             </VerticalStack>
         </Card>
-        :  <NullData text={"Issues timeline."} url={"/dashboard/observe/inventory/1111111111"} urlText={"to run a test."} description={"No issues found."} key={"issuesTrend"}/>
+        :  <NullData text={"Issues timeline."} url={"/dashboard/observe/inventory"} urlText={"to run a test on a collection."} description={"No issues found."} key={"issuesTrend"}/>
     )
 
     const checkLoadMore = () => {
