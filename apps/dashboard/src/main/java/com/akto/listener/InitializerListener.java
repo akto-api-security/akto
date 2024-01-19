@@ -53,6 +53,7 @@ import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -680,7 +681,7 @@ public class InitializerListener implements ServletContextListener {
         String payload = null;
 
         try {
-            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(), valueMap, false);
+            payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
         } catch (Exception e) {
             errors.add("Failed to replace variables");
         }
@@ -1491,6 +1492,16 @@ public class InitializerListener implements ServletContextListener {
             int gracePeriod = organization.getGracePeriod();
             String organizationId = organization.getId();
 
+            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
+
+            /*
+             * This ensures, we don't fetch feature wise allowed from akto too often.
+             * This helps the dashboard to be more responsive.
+             */
+            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
+                return organization;
+            }
+
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
             if (initialFeatureWiseAllowed == null) {
                 initialFeatureWiseAllowed = new HashMap<>();
@@ -1623,7 +1634,8 @@ public class InitializerListener implements ServletContextListener {
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();
-        
+        DependencyNodeDao.instance.createIndicesIfAbsent();
+        DependencyFlowNodesDao.instance.createIndicesIfAbsent();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {

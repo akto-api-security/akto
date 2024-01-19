@@ -1,8 +1,10 @@
 package com.akto.test_editor;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.akto.dto.RawApi;
+import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -19,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -26,6 +30,7 @@ public class Utils {
 
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
+    private static final Gson gson = new Gson();
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
@@ -145,11 +150,42 @@ public class Utils {
                 }
                 Integer dataInt = (Integer) data;
                 Object query = queryList.get(0);
+
                 if (query instanceof String) {
-                    int queryInt = Integer.parseInt((String) query);
-                    result = compareIntegers(operator, dataInt, queryInt);
+                    try {
+                        int queryInt = Integer.parseInt((String) query);
+                        result = compareIntegers(operator, dataInt, queryInt);
+                    } catch (Exception e) {
+                        Double queryDouble = Double.parseDouble(query.toString());
+                        result = compareDoubles(operator, dataInt.doubleValue(), queryDouble);
+                    }
+                } else if (query instanceof Double) {
+                    Double queryDouble = Double.parseDouble(query.toString());
+                    result = compareDoubles(operator, dataInt.doubleValue(), queryDouble);
                 } else {
                     result = compareIntegers(operator, (int) dataInt, (int) queryList.get(0));
+                }
+            } else if (data instanceof Double) {
+                List<Integer> queryList = (List) querySet;
+                if (queryList == null || queryList.size() == 0) {
+                    return false;
+                }
+                Double dataDouble = (Double) data;
+                Object query = queryList.get(0);
+
+                if (query instanceof String) {
+                    try {
+                        int queryInt = Integer.parseInt((String) query);
+                        result = compareDoubles(operator, dataDouble, Double.valueOf(queryInt));
+                    } catch (Exception e) {
+                        Double queryDouble = Double.parseDouble(query.toString());
+                        result = compareDoubles(operator, dataDouble, queryDouble);
+                    }
+                } else if (query instanceof Double) {
+                    Double queryDouble = Double.parseDouble(query.toString());
+                    result = compareDoubles(operator, dataDouble, queryDouble);
+                } else {
+                    result = compareDoubles(operator, dataDouble, (Double.valueOf(queryList.get(0))));
                 }
             }
             
@@ -157,6 +193,27 @@ public class Utils {
             return false;
         }
 
+        return result;
+    }
+
+    public static Boolean compareDoubles(String operator, double a, double b) {
+        Boolean result = false;
+        switch (operator) {
+            case "gte":
+                result = a >= b;
+                break;
+            case "gt":
+                result = a > b;
+                break;
+            case "lte":
+                result = a <= b;
+                break;
+            case "lt":
+                result = a < b;
+                break;
+            default:
+                return false;
+        }
         return result;
     }
 
@@ -326,6 +383,176 @@ public class Utils {
             return false;
         }
         return true;
+    }
+
+    public static UrlModifierPayload fetchUrlModifyPayload(String payload) {
+        UrlModifierPayload urlModifierPayload = null;
+        try {
+            payload = payload.replaceAll("=", ":");
+            Map<String, Object> json = gson.fromJson(payload, Map.class);
+            String operation = "regex_replace";
+            Map<String, Object> operationMap = new HashMap<>();
+            if (json.containsKey("regex_replace")) {
+                operationMap = (Map) json.get("regex_replace");
+            } else if (json.containsKey("token_insert")) {
+                operationMap = (Map) json.get("token_insert");
+                operation = "token_insert";
+            } else if (json.containsKey("token_replace")) {
+                operationMap = (Map) json.get("token_replace");
+                operation = "token_replace";
+            }
+            String locStr = operationMap.getOrDefault("location", "0").toString();
+            Double loc = Double.parseDouble(locStr);
+            Integer location = loc.intValue();
+
+            String replaceWith = operationMap.getOrDefault("replace_with", "").toString();
+            try {
+                Double replaceWithDouble = Double.parseDouble(replaceWith);
+                Integer replaceWithInt = replaceWithDouble.intValue();
+                replaceWith = replaceWithInt.toString();
+            } catch (Exception e) {
+                // TODO: handle exception
+            }
+
+            urlModifierPayload = new UrlModifierPayload(operationMap.getOrDefault("regex", "").toString(), 
+                location, replaceWith, operation);
+        } catch (Exception e) {
+            return urlModifierPayload;
+        }
+        return urlModifierPayload;
+    }
+
+    public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
+        String url = "";
+        if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") || urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")) {
+            if (urlModifierPayload.getRegex() != null && !urlModifierPayload.getRegex().equals("")) {
+                url = Utils.applyRegexModifier(oldUrl, urlModifierPayload.getRegex(), urlModifierPayload.getReplaceWith());
+            } else {
+                URI uri = fetchUri(oldUrl);
+                oldUrl = fetchUrlPath(uri, oldUrl);
+
+                String[] urlTokens = oldUrl.split("/");
+                Integer position = urlModifierPayload.getPosition();
+                if (position <= 0) {
+                    // position is not valid
+                    return fetchActualUrl(uri, oldUrl);
+                }
+                return replaceUrlWithToken(urlTokens, urlModifierPayload, position, uri);
+            }
+        } else {
+            URI uri = fetchUri(oldUrl);
+            oldUrl = fetchUrlPath(uri, oldUrl);
+
+            String[] urlTokens = oldUrl.split("/");
+            Integer position = urlModifierPayload.getPosition();
+            if (position <= 0) {
+                // position is not valid
+                return fetchActualUrl(uri, oldUrl);
+            }
+
+            return insertUrlWithToken(urlTokens, urlModifierPayload, position, uri);
+            
+        }
+        return url;
+    }
+
+    private static URI fetchUri(String url) {
+        URI uri = null;
+        try {
+            uri = new URI(url);
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+        return uri;
+    }
+
+    private static String fetchUrlPath(URI uri, String url) {
+        if (uri != null) {
+            return uri.getPath();
+        }
+        return url;
+    }
+
+    private static String fetchActualUrl(URI uri, String url) {
+        if (uri != null && uri.getHost() != null) {
+            return uri.getScheme() + "://" + uri.getHost() + url;
+        } else {
+            return url;
+        }
+    }
+
+    private static String replaceUrlWithToken(String[] urlTokens, UrlModifierPayload urlModifierPayload, int position, URI uri) {
+       
+        String[] urlTokensCopy;
+
+        if (position >= urlTokens.length) {
+            urlTokensCopy = new String[position+1];
+            for (int i=0; i < urlTokens.length; i++) {
+                urlTokensCopy[i] = urlTokens[i];
+            }
+            for (int i=urlTokens.length; i <= position; i++) {
+                urlTokensCopy[i] = "/";
+            }
+            urlTokensCopy[position] = urlModifierPayload.getReplaceWith();
+            String url = "/";
+            for (int i=1; i < urlTokensCopy.length; i++) {
+                if (urlTokensCopy[i].equals("/") || i == urlTokensCopy.length - 1) {
+                    url = url + urlTokensCopy[i];
+                } else {
+                    url = url + urlTokensCopy[i] + "/";
+                }
+            }
+            return fetchActualUrl(uri, url);
+        }
+        urlTokens[position] = urlModifierPayload.getReplaceWith();
+        String url = String.join( "/", urlTokens);
+        return fetchActualUrl(uri, url);
+    }
+
+    private static String insertUrlWithToken(String[] urlTokens, UrlModifierPayload urlModifierPayload, int position, URI uri) {
+        
+        String[] urlTokensCopy;
+
+        if (position > urlTokens.length) {
+            urlTokensCopy = new String[position];
+            for (int i=0; i < urlTokens.length; i++) {
+                urlTokensCopy[i] = urlTokens[i];
+            }
+            for (int i=urlTokens.length; i < position; i++) {
+                urlTokensCopy[i] = "/";
+            }
+            
+            String[] newUrlTokens = new String[urlTokensCopy.length];
+            for (int i = 1; i < position; i++) {
+                newUrlTokens[i-1] = urlTokensCopy[i];
+            }
+            newUrlTokens[position - 1] = urlModifierPayload.getReplaceWith();
+            for (int i = position; i < urlTokensCopy.length - 1; i++) {
+                newUrlTokens[i] = urlTokensCopy[i];
+            }
+            String url = "/";
+            for (int i=0; i < newUrlTokens.length; i++) {
+                if (newUrlTokens[i].equals("/") || i == newUrlTokens.length - 1) {
+                    url = url + newUrlTokens[i];
+                } else {
+                    url = url + newUrlTokens[i] + "/";
+                }
+            }
+            return fetchActualUrl(uri, url);
+
+        }
+
+        String[] newUrlTokens = new String[urlTokens.length];
+        for (int i = 1; i < position; i++) {
+            newUrlTokens[i-1] = urlTokens[i];
+        }
+        newUrlTokens[position - 1] = urlModifierPayload.getReplaceWith();
+        for (int i = position; i < urlTokens.length; i++) {
+            newUrlTokens[i] = urlTokens[i];
+        }
+        String url = String.join( "/", newUrlTokens);
+        url = "/" + url;
+        return fetchActualUrl(uri, url);
     }
 
 }

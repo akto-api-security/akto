@@ -10,6 +10,7 @@ import dashboardFunc from "../../transform";
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
+import ApiDependency from "./ApiDependency";
 
 function ApiDetails(props) {
 
@@ -116,7 +117,17 @@ function ApiDetails(props) {
             />
         </Box>,
     }
-
+    const DependencyTab = {
+        id: 'dependency',
+        content: "Dependency Graph",
+        component: <Box paddingBlockStart={"2"}>
+            <ApiDependency
+                apiCollectionId={apiDetail['apiCollectionId']}
+                endpoint={apiDetail['endpoint']}
+                method={apiDetail['method']}
+            />
+        </Box>,
+    }
     const components = [
             <GithubCell
             key="heading"
@@ -130,7 +141,7 @@ function ApiDetails(props) {
         />,
         <LayoutWithTabs
             key="tabs"
-            tabs={[SchemaTab, ValuesTab]}
+            tabs={[SchemaTab, ValuesTab, DependencyTab]}
             currTab={() => { }}
         />
     ]
