@@ -99,6 +99,9 @@ const transform = {
                 for (let diff of differences) {
                     let kind = diff.kind;
                     let key = diff.path.pop();
+                    if(key==undefined){
+                        continue;
+                    }
                     let searchKey = '"' + key + '": ';
                     switch (kind) {
                         case 'N':
