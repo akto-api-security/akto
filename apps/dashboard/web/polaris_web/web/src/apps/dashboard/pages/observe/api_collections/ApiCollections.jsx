@@ -57,8 +57,8 @@ const headers = [
 ]
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'Risky first', sortKey: 'riskScore' },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Stable first', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
     { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },

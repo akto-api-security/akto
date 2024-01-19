@@ -294,7 +294,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
     if(filters?.urlFilters?.length > 0){
       let filteredData = data.map(element => {
         let filteredUrls = element.urls.filter(obj => filters.urlFilters.includes(obj.url))
-        console.log(filteredUrls)
         return {
           ...element,
           urls: filteredUrls,
