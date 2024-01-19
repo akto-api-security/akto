@@ -4,6 +4,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
@@ -92,6 +93,9 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
+
+        String[] fieldNames = new String[]{TestingRunResult.END_TIMESTAMP, TestResult.TEST_RESULTS_ERRORS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
 }

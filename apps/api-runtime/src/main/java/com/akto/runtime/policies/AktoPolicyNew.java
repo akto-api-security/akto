@@ -22,7 +22,6 @@ import java.util.*;
 
 import static com.akto.runtime.APICatalogSync.createUrlTemplate;
 
-
 public class AktoPolicyNew {
 
     private List<RuntimeFilter> filters = new ArrayList<>();

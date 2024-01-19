@@ -1,6 +1,7 @@
 package com.akto.billing;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -13,6 +14,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -57,15 +59,34 @@ public class UsageMetricCalculator {
         return customTemplates;
     }
 
+    public static List<String> getInvalidTestErrors() {
+        List<String> invalidErrors = new ArrayList<String>() {{
+            add(TestResult.TestError.USAGE_EXCEEDED.getMessage());
+        }};
+        return invalidErrors;
+    }
+
     public static int calculateTestRuns(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
 
         Bson demoCollFilter = excludeDemos(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
-        int testRuns = (int) TestingRunResultDao.instance.count(
-            Filters.and(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch), demoCollFilter)
-        );
-        return testRuns;
+        List<Bson> filters = new ArrayList<Bson>(){{
+            add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
+            add(demoCollFilter);
+        }};
+        int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
+
+        /*
+         * NOTE: not using a single nin query,
+         * because this approach uses indexes more efficiently.
+         */
+
+        filters.add(Filters.in(TestResult.TEST_RESULTS_ERRORS, getInvalidTestErrors()));
+        int invalidTestRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
+        int finalCount = Math.max(testRuns - invalidTestRuns, 0);
+
+        return finalCount;
     }
 
     public static int calculateActiveAccounts(UsageMetric usageMetric) {

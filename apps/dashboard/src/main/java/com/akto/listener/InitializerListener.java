@@ -1507,16 +1507,6 @@ public class InitializerListener implements ServletContextListener {
                 initialFeatureWiseAllowed = new HashMap<>();
             }
 
-            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
-
-            /*
-             * This ensures, we don't fetch feature wise allowed from akto too often.
-             * This helps the dashboard to be more responsive.
-             */
-            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
-                return organization;
-            }
-
             BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId,
                     organization.getAdminEmail());
 

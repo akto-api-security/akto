@@ -28,7 +28,7 @@ const Users = () => {
 
     useEffect(() => {
         getTeamData();
-        billingApi.refreshUsageData({organizationId: window.STIGG_CUSTOMER_ID})
+        billingApi.refreshUsageData()
     }, [])
 
     const isLocalDeploy = window.IS_SAAS !== "true" && window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'

@@ -35,6 +35,10 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
             String[] fieldNames = {UsageMetric.SYNCED_WITH_AKTO};
             MCollection.createIndexIfAbsent(instance.getDBName(), instance.getCollName(), fieldNames, true);
         }
+        {
+            String[] fieldNames = { UsageMetric.ORGANIZATION_ID, UsageMetric.ACCOUNT_ID, UsageMetric.METRIC_TYPE };
+            MCollection.createIndexIfAbsent(instance.getDBName(), instance.getCollName(), fieldNames, true);
+        }
     }
 
     @Override
