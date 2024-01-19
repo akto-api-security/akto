@@ -149,13 +149,8 @@ public class UsageMetricUtils {
                 return featureAccess;
             }
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-            featureAccess = getFeatureAccess(organization, metricType);
-            if (latest) {
-                String organizationId = organization.getId();
-                UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountId, metricType);
-                int latestUsage = usageMetric.getUsage();
-                featureAccess.setUsage(latestUsage);
-            }
+            featureAccess = getFeatureAccess(organization, metricType, latest);
+            Context.accountId.set(accountId);
             return featureAccess;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
@@ -163,7 +158,7 @@ public class UsageMetricUtils {
         return featureAccess;
     }
 
-    public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {
+    public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType, boolean latest) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
         try {
             if (!DashboardMode.isMetered()) {
@@ -180,6 +175,16 @@ public class UsageMetricUtils {
             featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
             int gracePeriod = organization.getGracePeriod();
             featureAccess.setGracePeriod(gracePeriod);
+            if (latest) {
+                String organizationId = organization.getId();
+                int latestUsage = 0;
+                for (int accountIdTemp : organization.getAccounts()) {
+                    Context.accountId.set(accountIdTemp);
+                    UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountIdTemp, metricType);
+                    latestUsage += usageMetric.getUsage();
+                }
+                featureAccess.setUsage(latestUsage);
+            }
             return featureAccess;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);

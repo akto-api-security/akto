@@ -45,7 +45,7 @@ public class DeactivateCollections {
 
     private static void deactivateCollectionsForOrganization(Organization organization) {
         try {
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS, true);
             if (!featureAccess.checkInvalidAccess()) {
                 return;
             }
