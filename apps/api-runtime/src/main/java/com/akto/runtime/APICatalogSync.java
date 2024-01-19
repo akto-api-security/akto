@@ -633,7 +633,8 @@ public class APICatalogSync {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
 
-            if (tempToken.equalsIgnoreCase(dbToken)) {
+            int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
+            if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
                 continue;
             }
             
@@ -649,6 +650,13 @@ public class APICatalogSync {
                 templatizedStrTokens++;
             }
         }
+
+        boolean allNull = true;
+        for (SingleTypeInfo.SuperType superType: newTypes) {
+            allNull = allNull && (superType == null);
+        }
+
+        if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
             return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
@@ -1233,7 +1241,8 @@ public class APICatalogSync {
 
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
-                        Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
@@ -1242,7 +1251,7 @@ public class APICatalogSync {
                             loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
-                        ;
+                        loggerMaker.errorAndAddToDb(e, String.format("Error while merging collections. Error: %s", e.getMessage()), LogDb.RUNTIME);
                     }
 
                     try {
