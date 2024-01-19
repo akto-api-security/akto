@@ -17,8 +17,8 @@ const headers = [
         type: CellType.TEXT,
     },
     {
-        value: "missingParameters",
-        title: 'Missing parameters',
+        value: "dependentParameters",
+        title: 'Dependent parameters',
         type: CellType.TEXT,
     },
     {
@@ -81,7 +81,7 @@ function DependencyTable() {
                 "url": node["method"] + " " + node["url"],
                 "level": node["maxDepth"],
                 "totalParameters": params.length,
-                "missingParameters": params.length - Object.keys(connections).length,
+                "dependentParameters": Object.keys(connections).length,
                 "urls": data,
                 "collapsibleRow": transform.getCollapisbleRowDependencyTable(data)
             })
