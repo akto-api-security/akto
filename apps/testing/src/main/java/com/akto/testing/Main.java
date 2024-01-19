@@ -191,8 +191,6 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
-
         while (true) {
             AccountTask.instance.executeTask(account -> {
 
@@ -216,12 +214,7 @@ public class Main {
                 FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
 
                 if (featureAccess.checkOverageAfterGrace()) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
@@ -229,12 +222,10 @@ public class Main {
                     TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, summaryId),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-
                     return;
                 }
 
-                SyncLimit syncLimit = new SyncLimit(!featureAccess.checkUnlimited(),
-                        featureAccess.getUsageLimit() - featureAccess.getUsage());
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
                 try {
                     setTestingRunConfig(testingRun, trrs);

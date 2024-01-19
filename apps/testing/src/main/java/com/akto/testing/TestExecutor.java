@@ -571,12 +571,16 @@ public class TestExecutor {
                 continue;
             }
 
-            if(syncLimit.updateUsageLeftAndCheckSkip()){
-                continue;
-            }
-
             try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
+                if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                    List<GenericTestResult> testResults = new ArrayList<>();
+                    String testSuperType = testConfig.getInfo().getCategory().getName();
+                    String testSubType = testConfig.getInfo().getSubCategory();
+                    testResults.add(new TestResult(null, null, Collections.singletonList(TestError.USAGE_EXCEEDED.getMessage()), 0, false, Confidence.HIGH, null));
+                    testingRunResult = new TestingRunResult( testRunId, apiInfoKey, testSuperType, testSubType, testResults, false, new ArrayList<>(), 100, Context.now(), Context.now(), testRunResultSummaryId, null);
+                } else {
+                    testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
                 e.printStackTrace();

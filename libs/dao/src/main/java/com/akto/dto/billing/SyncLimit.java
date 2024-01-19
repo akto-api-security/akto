@@ -1,18 +1,23 @@
 package com.akto.dto.billing;
 
 public class SyncLimit {
-    boolean checkLimit;
-    int usageLeft;
+    private final boolean checkLimit;
+    private int usageLeft;
 
     public SyncLimit(boolean checkLimit, int usageLeft) {
         this.checkLimit = checkLimit;
         this.usageLeft = usageLeft;
     }
 
-    public synchronized boolean updateUsageLeftAndCheckSkip() {
-        if(usageLeft >= 0){
-            usageLeft--;
+    public boolean updateUsageLeftAndCheckSkip() {
+        if (!checkLimit) {
+            return false;
         }
-        return checkLimit && usageLeft < 0;
+        synchronized (this) {
+            if (usageLeft >= 0) {
+                usageLeft--;
+            }
+            return checkLimit && usageLeft < 0;
+        }
     }
 }
