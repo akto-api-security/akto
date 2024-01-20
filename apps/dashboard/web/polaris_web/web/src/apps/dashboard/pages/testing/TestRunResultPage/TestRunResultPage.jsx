@@ -238,7 +238,7 @@ function TestRunResultPage(props) {
         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
-    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
+    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && testErrorComponent ,
     (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}
