@@ -22,7 +22,7 @@ public class TestDependencyFlowNodesDao extends MongoBasedTest {
         DependencyFlowNodesDao.instance.insertOne(node);
 
         boolean erroredOut = false;
-        node.getConnections().put("param", new Connection("param", Collections.singletonList(new Edge("0", "url_new", "POST", "param_new", 20, 0))));
+        node.getConnections().put("param", new Connection("param", Collections.singletonList(new Edge("0", "url_new", "POST", "param_new", 20, 0)), false));
         try {
             DependencyFlowNodesDao.instance.insertOne(node);
         } catch (Exception e) {

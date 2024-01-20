@@ -9,7 +9,7 @@ import java.util.*;
 
 public class DependencyFlow {
 
-    public Map<Integer, Node> initialNodes = new HashMap<>();
+    public Map<Integer, ReverseNode> initialNodes = new HashMap<>();
     public Map<Integer, Node> resultNodes = new HashMap<>();
 
     public void syncWithDb() {
@@ -38,11 +38,11 @@ public class DependencyFlow {
         Queue<String> queue = new LinkedList<>();
         Set<Integer> done = new HashSet<>();
 
-        for (Node node: initialNodes.values()) {
-            int id = node.hashCode();
+        for (ReverseNode reverseNode: initialNodes.values()) {
+            int id = reverseNode.hashCode();
             if (resultNodes.containsKey(id)) continue;
             queue.add(0 + "#" + id);
-            Node resultNodeForZeroLevel = new Node(node.getApiCollectionId(), node.getUrl(), node.getMethod(), new HashMap<>());
+            Node resultNodeForZeroLevel = new Node(reverseNode.getApiCollectionId(), reverseNode.getUrl(), reverseNode.getMethod(), new HashMap<>());
             resultNodes.put(id, resultNodeForZeroLevel);
         }
 
@@ -51,22 +51,23 @@ public class DependencyFlow {
             String combined = queue.remove();
             int depth = Integer.parseInt(combined.split("#")[0]);
             int nodeId = Integer.parseInt(combined.split("#")[1]);
-            Node node = initialNodes.get(nodeId);
-            if (node == null || node.getConnections() == null) {
+            ReverseNode reverseNode = initialNodes.get(nodeId);
+            if (reverseNode == null || reverseNode.getReverseConnections() == null) {
                 System.out.println("Dead end");
                 continue;
             }
-            Map<String, Connection> connections = node.getConnections();
-            for (Connection connection: connections.values()) {
-                for (Edge edge: connection.getEdges()) {
-                    Node resultNode = resultNodes.get(Objects.hash(edge.getApiCollectionId(), edge.getUrl(), edge.getMethod()));
-                    Edge reverseEdge = new Edge(node.getApiCollectionId(), node.getUrl(), node.getMethod(), connection.getParam(), edge.getCount(), depth + 1);
-                    Connection reverseConnection = resultNode.getConnections().get(edge.getParam());
-                    if (reverseConnection == null) {
-                        reverseConnection = new Connection(edge.getParam(), new ArrayList<>());
-                        resultNode.getConnections().put(edge.getParam(), reverseConnection);
+            Map<String,ReverseConnection>  reverseConnections = reverseNode.getReverseConnections();
+            for (ReverseConnection reverseConnection: reverseConnections.values()) {
+                for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
+
+                    Node resultNode = resultNodes.get(Objects.hash(reverseEdge.getApiCollectionId(), reverseEdge.getUrl(), reverseEdge.getMethod()));
+                    Edge edge = new Edge(reverseNode.getApiCollectionId(), reverseNode.getUrl(), reverseNode.getMethod(), reverseConnection.getParam(), reverseEdge.getCount(), depth + 1);
+                    Connection connection = resultNode.getConnections().get(reverseEdge.getParam());
+                    if (connection == null) {
+                        connection = new Connection(edge.getParam(), new ArrayList<>(), reverseEdge.isUrlParam());
+                        resultNode.getConnections().put(reverseEdge.getParam(), connection);
                     }
-                    reverseConnection.getEdges().add(reverseEdge);
+                    connection.getEdges().add(edge);
 
                     boolean flag = isDone(resultNode);
                     int key = resultNode.hashCode();
@@ -90,30 +91,31 @@ public class DependencyFlow {
     }
 
     public void fillNodes(DependencyNode dependencyNode) {
-        Node node = new Node(
+        ReverseNode reverseNode = new ReverseNode(
                 dependencyNode.getApiCollectionIdResp(),
                 dependencyNode.getUrlResp(),
                 dependencyNode.getMethodResp(),
                 new HashMap<>()
         );
 
-        Integer key = node.hashCode();
-        node = initialNodes.getOrDefault(key, node);
+        Integer key = reverseNode.hashCode();
+        reverseNode = initialNodes.getOrDefault(key, reverseNode);
 
         for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
             String paramResp = paramInfo.getResponseParam();
-            Connection connection = node.getConnections().getOrDefault(paramResp, new Connection(paramResp, new ArrayList<>()));
+            ReverseConnection reverseConnection = reverseNode.getReverseConnections().getOrDefault(paramResp, new ReverseConnection(paramResp, new ArrayList<>()));
 
             String paramReq = paramInfo.getRequestParam();
-            connection.getEdges().add(new Edge(
-                    dependencyNode.getApiCollectionIdReq(), dependencyNode.getUrlReq(), dependencyNode.getMethodReq(),
-                    paramReq, paramInfo.getCount(), -1
-            ));
+            reverseConnection.getReverseEdges().add(
+                    new ReverseEdge(
+                            dependencyNode.getApiCollectionIdReq(), dependencyNode.getUrlReq(), dependencyNode.getMethodReq(), paramReq, paramInfo.getCount(), paramInfo.getIsUrlParam()
+                    )
+            );
 
-            node.getConnections().put(paramResp, connection);
+            reverseNode.getReverseConnections().put(paramResp, reverseConnection);
         }
 
-        initialNodes.put(key, node);
+        initialNodes.put(key, reverseNode);
     }
 
     public void fillResultNodes(DependencyNode dependencyNode) {
@@ -129,7 +131,7 @@ public class DependencyFlow {
 
         for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
             String paramReq = paramInfo.getRequestParam();
-            Connection connection = new Connection(paramReq, new ArrayList<>());
+            Connection connection = new Connection(paramReq, new ArrayList<>(), paramInfo.isUrlParam());
             node.getConnections().put(paramReq, connection);
         }
 

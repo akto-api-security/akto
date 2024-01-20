@@ -3,9 +3,11 @@ package com.akto.util;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
@@ -88,5 +90,41 @@ public class HttpRequestResponseUtils {
         }
     }
 
+    public static String jsonToFormUrlEncoded(String requestPayload) {
+        JSONObject jsonObject = new JSONObject(requestPayload);
+
+        StringBuilder formUrlEncoded = new StringBuilder();
+
+        // Iterate over the keys in the JSON object
+        for (String key : jsonObject.keySet()) {
+            // Encode the key and value, and append them to the string builder
+            try {
+                formUrlEncoded.append(encode(key))
+                        .append("=")
+                        .append(encode(jsonObject.getString(key)))
+                        .append("&");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Remove the last "&"
+        if (formUrlEncoded.length() > 0) {
+            formUrlEncoded.setLength(formUrlEncoded.length() - 1);
+        }
+
+        return formUrlEncoded.toString();
+    }
+    public static String encode(String s) throws UnsupportedEncodingException {
+        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name())
+                .replaceAll("\\+", "%20")
+                .replaceAll("\\%21", "!")
+                .replaceAll("\\%27", "'")
+                .replaceAll("\\%28", "(")
+                .replaceAll("\\%29", ")")
+                .replaceAll("\\%7E", "~")
+                .replaceAll("\\%5B", "[")
+                .replaceAll("\\%5D", "]");
+    }
 
 }

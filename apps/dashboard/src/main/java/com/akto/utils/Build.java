@@ -16,6 +16,7 @@ import com.akto.runtime.RelationshipSync;
 import com.akto.test_editor.execution.Operations;
 import com.akto.test_editor.filter.FilterAction;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -25,15 +26,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
 import org.checkerframework.checker.units.qual.K;
 
 import java.net.URI;
 import java.util.*;
 
+import static com.akto.util.HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE;
+
 public class Build {
 
-    private Map<Integer, Node>  parentToChildMap = new HashMap<>();
+    private Map<Integer, ReverseNode>  parentToChildMap = new HashMap<>();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class);
 
@@ -62,7 +66,7 @@ public class Build {
         return levelsToSampleDataMap;
     }
 
-    public void runPerLevel(List<SampleData> sdList, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public List<String> runPerLevel(List<SampleData> sdList, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         List<String> messages = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
@@ -83,7 +87,7 @@ public class Build {
                 OriginalHttpResponse response = null;
                 try {
                     response = ApiExecutor.sendRequest(request, true, testingRunConfig);
-                    Node parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
+                    ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
                     boolean foundValues = fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
                     if (foundValues) {
                         RawApi rawApi = new RawApi(request, response, "");
@@ -99,12 +103,7 @@ public class Build {
             }
         }
 
-        try {
-            Utils.pushDataToKafka(0, "", messages, new ArrayList<>(), true);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
+        return messages;
     }
 
     public String findNewHost(OriginalHttpRequest request, Map<String, String> hostRelations) {
@@ -122,13 +121,14 @@ public class Build {
     }
 
 
-    public void run(List<Integer> apiCollectionsIds, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public List<String> run(List<Integer> apiCollectionsIds, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         if (replaceDetailsMap == null) replaceDetailsMap = new HashMap<>();
         if (hostRelations == null) hostRelations = new HashMap<>();
 
         buildParentToChildMap(apiCollectionsIds);
         Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(apiCollectionsIds);
 
+        List<String> messages = new ArrayList<>();
         // loop over levels and make requests
         for (int level: levelsToSampleDataMap.keySet()) {
             List<SampleData> sdList =levelsToSampleDataMap.get(level);
@@ -137,12 +137,15 @@ public class Build {
 
             loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {
-                runPerLevel(sdList, hostRelations, replaceDetailsMap);
+                List<String> messagesPerLevel = runPerLevel(sdList, hostRelations, replaceDetailsMap);
+                messages.addAll(messagesPerLevel);
                 loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while running for level " + level , LoggerMaker.LogDb.DASHBOARD);
             }
         }
+
+        return messages;
     }
 
     public void modifyRequest(OriginalHttpRequest request, ReplaceDetail replaceDetail) {
@@ -154,6 +157,13 @@ public class Build {
                 for (KVPair kvPair: kvPairs) {
                     if (kvPair.isHeader()) {
                         Operations.modifyHeader(rawApi, kvPair.getKey(), kvPair.getValue()+"");
+                    } else if (kvPair.isUrlParam()) {
+                        String url = request.getUrl();
+                        String[] urlSplit = url.split("/");
+                        int position = Integer.parseInt(kvPair.getKey());
+                        urlSplit[position] = kvPair.getValue()+"";
+                        String newUrl = Strings.join(urlSplit, "/");
+                        request.setUrl(newUrl);
                     } else {
                         Map<String, Object> store = new HashMap<>();
                         store.put(kvPair.getKey(), kvPair.getValue());
@@ -162,6 +172,10 @@ public class Build {
                         Set<String> values = new HashSet<>();
                         values.add(kvPair.getKey());
                         String modifiedBody = JSONUtils.modify(rawApi.getRequest().getJsonRequestBody(), values, setValueModifier);
+                        String contentType = rawApi.getRequest().findContentType();
+                        if (contentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
+                            modifiedBody = HttpRequestResponseUtils.jsonToFormUrlEncoded(modifiedBody);
+                        }
                         rawApi.getRequest().setBody(modifiedBody);
 
                         Operations.modifyQueryParam(rawApi, kvPair.getKey(), kvPair.getValue());
@@ -191,8 +205,8 @@ public class Build {
 
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    public boolean fillReplaceDetailsMap(Node node, OriginalHttpResponse response, Map<Integer, ReplaceDetail> replaceDetailsMap) {
-        if (node == null) return true;
+    public boolean fillReplaceDetailsMap(ReverseNode reverseNode, OriginalHttpResponse response, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+        if (reverseNode == null) return true;
 
         Map<Integer, ReplaceDetail> deltaReplaceDetailsMap = new HashMap<>();
 
@@ -211,24 +225,24 @@ public class Build {
 
         boolean found = true;
 
-        Map<String, Connection> connections = node.getConnections();
-        for (Connection connection: connections.values()) {
-            String param = connection.getParam();
+        Map<String,ReverseConnection> connections = reverseNode.getReverseConnections();
+        for (ReverseConnection reverseConnection: connections.values()) {
+            String param = reverseConnection.getParam();
             Set<String> values = valuesMap.get(param);
             Object value = values != null && values.size() > 0 ? values.toArray()[0] : null; // todo:
 
-            for (Edge edge: connection.getEdges()) {
-                Integer id = Objects.hash(edge.getApiCollectionId(), edge.getUrl(), edge.getMethod());
+            for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
+                Integer id = Objects.hash(reverseEdge.getApiCollectionId(), reverseEdge.getUrl(), reverseEdge.getMethod());
                 ReplaceDetail replaceDetail = replaceDetailsMap.get(id);
                 found = value != null || replaceDetail != null;
                 if (!found) continue;
 
                 ReplaceDetail deltaReplaceDetail = deltaReplaceDetailsMap.get(id);
                 if (deltaReplaceDetail == null) {
-                    deltaReplaceDetail = new ReplaceDetail(Integer.parseInt(edge.getApiCollectionId()), edge.getUrl(), edge.getMethod(), new ArrayList<>());
+                    deltaReplaceDetail = new ReplaceDetail(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), reverseEdge.getMethod(), new ArrayList<>());
                     deltaReplaceDetailsMap.put(id, deltaReplaceDetail);
                 }
-                KVPair kvPair = new KVPair(edge.getParam(), value, false, false);
+                KVPair kvPair = new KVPair(reverseEdge.getParam(), value, false, reverseEdge.isUrlParam());
                 deltaReplaceDetail.addIfNotExist(kvPair);
             }
         }
@@ -255,7 +269,7 @@ public class Build {
         Context.accountId.set(1_000_000);
 
         Build build = new Build();
-        build.run(Collections.singletonList(1705581931), new HashMap<>(), new HashMap<>());
+        build.run(Collections.singletonList(1705668952), new HashMap<>(), new HashMap<>());
     }
 
 }

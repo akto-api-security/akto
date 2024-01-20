@@ -372,9 +372,9 @@ public class Utils {
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            DependencyFlow dependencyFlow = new DependencyFlow();
-            dependencyFlow.run();
-            dependencyFlow.syncWithDb();
+//            DependencyFlow dependencyFlow = new DependencyFlow();
+//            dependencyFlow.run();
+//            dependencyFlow.syncWithDb();
         }
     }
 

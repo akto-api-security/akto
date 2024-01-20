@@ -37,6 +37,9 @@ public class DependencyNode {
     public static class ParamInfo {
         private String requestParam;
         public static final String REQUEST_PARAM = "requestParam";
+
+        private boolean isUrlParam;
+        public static final String IS_URL_PARAM = "isUrlParam";
         private String responseParam;
         public static final String RESPONSE_PARAM = "responseParam";
         private int count;
@@ -45,9 +48,10 @@ public class DependencyNode {
         public ParamInfo() {
         }
 
-        public ParamInfo(String requestParam, String responseParam, int count) {
+        public ParamInfo(String requestParam, String responseParam, int count, boolean isUrlParam) {
             this.requestParam = requestParam;
             this.responseParam = responseParam;
+            this.isUrlParam = isUrlParam;
             this.count = count;
         }
 
@@ -75,6 +79,18 @@ public class DependencyNode {
             this.count = count;
         }
 
+        public boolean isUrlParam() {
+            return isUrlParam;
+        }
+
+        public boolean getIsUrlParam() {
+            return isUrlParam;
+        }
+
+        public void setIsUrlParam(boolean urlParam) {
+            isUrlParam = urlParam;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -85,11 +101,11 @@ public class DependencyNode {
 
         @Override
         public int hashCode() {
-            return Objects.hash(requestParam, responseParam);
+            return Objects.hash(requestParam, responseParam, isUrlParam);
         }
 
         public ParamInfo copy() {
-            return new ParamInfo(requestParam, responseParam, count);
+            return new ParamInfo(requestParam, responseParam, count, isUrlParam);
         }
     }
 
