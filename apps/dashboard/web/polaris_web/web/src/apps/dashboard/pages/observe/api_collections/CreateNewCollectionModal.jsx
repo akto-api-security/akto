@@ -16,7 +16,7 @@ function CreateNewCollectionModal(props) {
     function prepareData(){
         let dt = []
             conditions.forEach(condition => {
-                if (condition.type == "API_LIST") {
+                if (condition.type == "CUSTOM") {
                     let apiList = []
                     let collectionId = Object.keys(condition.data)[0]
                     if (collectionId != undefined && condition.data[collectionId].length > 0) {
@@ -54,7 +54,7 @@ function CreateNewCollectionModal(props) {
             (newValue) => setNewCollectionName(newValue),
             []);
 
-    const emptyCondition = { data: {}, operator: "AND", type: "API_LIST" };
+    const emptyCondition = { data: {}, operator: "AND", type: "CUSTOM" };
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), [emptyCondition]);
 
     const handleAddField = () => {

@@ -1,11 +1,12 @@
 package com.akto.dto.CollectionConditions;
 
+import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.BasicDBObject;
 
 public class ConditionUtils {
 
-    private CollectionCondition.Type type;
-    private CollectionCondition.Operator operator;
+    private TestingEndpoints.Type type;
+    private TestingEndpoints.Operator operator;
     private BasicDBObject data;
 
     public BasicDBObject getData() {
@@ -19,19 +20,19 @@ public class ConditionUtils {
     public ConditionUtils() {
     }
 
-    public CollectionCondition.Type getType() {
+    public TestingEndpoints.Type getType() {
         return type;
     }
 
-    public void setType(CollectionCondition.Type type) {
+    public void setType(TestingEndpoints.Type type) {
         this.type = type;
     }
 
-    public CollectionCondition.Operator getOperator() {
+    public TestingEndpoints.Operator getOperator() {
         return operator;
     }
 
-    public void setOperator(CollectionCondition.Operator operator) {
+    public void setOperator(TestingEndpoints.Operator operator) {
         this.operator = operator;
     }
 

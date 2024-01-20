@@ -3,15 +3,16 @@ package com.akto.dto.CollectionConditions;
 import java.util.List;
 import org.bson.conversions.Bson;
 
+import com.akto.dao.MCollection;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-public class MethodCondition extends CollectionCondition{
+public class MethodCondition extends TestingEndpoints {
 
     Method method;
     
@@ -67,7 +68,7 @@ public class MethodCondition extends CollectionCondition{
             return createMethodFilter(method, prefix);
         }
 
-        return Filters.nor(new BasicDBObject());
+        return MCollection.noMatchFilter;
     }
     
 }

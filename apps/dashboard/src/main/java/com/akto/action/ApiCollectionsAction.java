@@ -13,13 +13,6 @@ import com.akto.dao.SingleTypeInfoDao;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-
-import org.bson.conversions.Bson;
-
-import com.akto.dao.APISpecDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -27,8 +20,8 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.CollectionConditions.ApiListCondition;
-import com.akto.dto.CollectionConditions.CollectionCondition;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
@@ -181,13 +174,13 @@ public class ApiCollectionsAction extends UserAction {
 
         List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
         for(ApiCollection collection: apiGroups){
-            List<CollectionCondition> conditions = collection.getConditions();
-            for (CollectionCondition it : conditions) {
+            List<TestingEndpoints> conditions = collection.getConditions();
+            for (TestingEndpoints it : conditions) {
                 switch (it.getType()) {
-                    case API_LIST:
+                    case CUSTOM:
                         Set<ApiInfoKey> tmp = new HashSet<>(it.returnApis());
                         tmp.removeIf((ApiInfoKey key) -> apiCollectionIds.contains(key.getApiCollectionId()));
-                        ((ApiListCondition) it).setApiList(tmp);
+                        ((CustomTestingEndpoints) it).setApisList(new ArrayList<>(tmp));
                         break;
                     default:
                         break;
@@ -220,7 +213,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList), ApiListCondition.Operator.OR);
+        CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
@@ -243,7 +236,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiListCondition condition = new ApiListCondition(new HashSet<>(apiList), ApiListCondition.Operator.OR);
+        CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.removeFromConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
@@ -255,12 +248,12 @@ public class ApiCollectionsAction extends UserAction {
 
     List<ConditionUtils> conditions;
 
-    private static List<CollectionCondition> generateConditions(List<ConditionUtils> conditions){
-        List<CollectionCondition> ret = new ArrayList<>();
+    private static List<TestingEndpoints> generateConditions(List<ConditionUtils> conditions){
+        List<TestingEndpoints> ret = new ArrayList<>();
 
         if (conditions != null) {
             for (ConditionUtils conditionUtils : conditions) {
-                CollectionCondition condition = CollectionCondition.generateCondition(conditionUtils.getType(),
+                TestingEndpoints condition = TestingEndpoints.generateCondition(conditionUtils.getType(),
                         conditionUtils.getOperator(), conditionUtils.getData());
                 if (condition != null) {
                     ret.add(condition);
@@ -275,7 +268,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<CollectionCondition> conditions = generateConditions(this.conditions);
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
         ApiCollectionsDao.instance.insertOne(apiCollection);
@@ -291,7 +284,7 @@ public class ApiCollectionsAction extends UserAction {
     int apiCount;
 
     public String getEndpointsFromConditions(){
-        List<CollectionCondition> conditions = generateConditions(this.conditions);
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
         apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions);
     
