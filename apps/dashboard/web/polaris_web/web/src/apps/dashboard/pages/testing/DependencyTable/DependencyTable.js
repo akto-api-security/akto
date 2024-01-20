@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { Button, Icon, Spinner, Text, VerticalStack } from "@shopify/polaris";
+import { useState } from "react";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import api from "../api";
 import transform from "../transform";
+import { TickMinor, CancelMinor} from "@shopify/polaris-icons"
 
 const headers = [
+    {
+        value: "success",
+        title: '',
+    },
     {
         value: "url",
         title: 'Endpoint',
@@ -57,8 +63,10 @@ function connectionToCollapsibleText(connections, params) {
 }
 
 function DependencyTable() {
-    const [dependencyResults, setDependencyResults] = useState([])
     const [loading, setLoading] = useState(false)
+    const [runResults, setRunResults] = useState({})
+    const [refresh, setRefresh] = useState(false)
+    const [invokeLoading, setInvokeLoading] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const apiCollectionIdsString = queryParams.get('col_ids')
@@ -77,7 +85,18 @@ function DependencyTable() {
             let params = val["params"]
             let connections = node["connections"]
             let data = connectionToCollapsibleText(connections, params)
+            let icon = null
+            let key = node["method"] + " " + node["url"]
+            let runResult = runResults[key]
+            if (runResult) {
+                if (runResult["success"]) {
+                    icon = <Icon source={TickMinor} color="success" />
+                } else {
+                    icon = <Icon source={CancelMinor} color="critical" />
+                }
+            } 
             final.push({
+                "success": icon,
                 "url": node["method"] + " " + node["url"],
                 "level": node["maxDepth"],
                 "totalParameters": params.length,
@@ -93,7 +112,7 @@ function DependencyTable() {
 
     const resultTable = (
         <GithubServerTable
-            key={"table"}
+            key={refresh}
             pageLimit={50}
             fetchData={fetchTableData}
             sortOptions={[]} 
@@ -108,7 +127,43 @@ function DependencyTable() {
             condensedHeight={true}
         /> 
     )
-    return resultTable
+
+    const components = [resultTable]
+
+    const invokeDependencyTable = () => {
+        setInvokeLoading(true)
+        api.invokeDependencyTable().then((resp) => {
+            let runResultList = resp["runResults"]
+            let temp = {}
+            runResultList.forEach((runResult) => {
+                let apiInfoKey = runResult["apiInfoKey"]
+                temp[apiInfoKey["method"] + " " + apiInfoKey["url"]] = runResult
+            })
+
+            setInvokeLoading(false)
+            setRunResults(temp)
+            setRefresh(!refresh)
+        })
+    }
+
+    const secondaryActionsComponent = (
+        <Button onClick={invokeDependencyTable}  primary  >
+            {invokeLoading ? <Spinner size="small" /> : "Invoke"}
+        </Button>
+    )
+
+    return (
+        <PageWithMultipleCards
+                title={
+                    <Text variant='headingLg'>
+                        Dependency Table
+                    </Text>
+                }
+                isFirstPage={true}
+                components={components}
+                secondaryActions={secondaryActionsComponent}
+        />
+    )
 }
 
 export default DependencyTable	

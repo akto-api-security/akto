@@ -12,6 +12,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
+import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RelationshipSync;
 import com.akto.test_editor.execution.Operations;
 import com.akto.test_editor.filter.FilterAction;
@@ -66,8 +67,84 @@ public class Build {
         return levelsToSampleDataMap;
     }
 
-    public List<String> runPerLevel(List<SampleData> sdList, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
-        List<String> messages = new ArrayList<>();
+    public static class RunResult {
+
+        private ApiInfo.ApiInfoKey apiInfoKey;
+        private String currentMessage;
+        private String originalMessage;
+        private boolean success;
+
+        public RunResult(ApiInfo.ApiInfoKey apiInfoKey, String currentMessage, String originalMessage, boolean success) {
+            this.apiInfoKey = apiInfoKey;
+            this.currentMessage = currentMessage;
+            this.originalMessage = originalMessage;
+            this.success = success;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            RunResult runResult = (RunResult) o;
+            return apiInfoKey.equals(runResult.apiInfoKey);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(apiInfoKey);
+        }
+
+        @Override
+        public String toString() {
+            return "RunResult{" +
+                    "apiInfoKey=" + apiInfoKey +
+                    ", currentMessage='" + currentMessage + '\'' +
+                    ", originalMessage='" + originalMessage + '\'' +
+                    ", success=" + success +
+                    '}';
+        }
+
+        public ApiInfo.ApiInfoKey getApiInfoKey() {
+            return apiInfoKey;
+        }
+
+        public void setApiInfoKey(ApiInfo.ApiInfoKey apiInfoKey) {
+            this.apiInfoKey = apiInfoKey;
+        }
+
+        public String getCurrentMessage() {
+            return currentMessage;
+        }
+
+        public void setCurrentMessage(String currentMessage) {
+            this.currentMessage = currentMessage;
+        }
+
+        public String getOriginalMessage() {
+            return originalMessage;
+        }
+
+        public void setOriginalMessage(String originalMessage) {
+            this.originalMessage = originalMessage;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public boolean getIsSuccess() {
+            return success;
+        }
+
+        public void setIsSuccess(boolean success) {
+            this.success = success;
+        }
+
+        
+    }
+
+    public List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+        List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
             List<String> samples = sampleData.getSamples();
@@ -77,6 +154,9 @@ public class Build {
                 OriginalHttpRequest request = new OriginalHttpRequest();
                 request.buildFromSampleMessage(sample);
                 String newHost = findNewHost(request, hostRelations);
+
+                OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
+                originalHttpResponse.buildFromSampleMessage(sample);
 
                 // do modifications
                 ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
@@ -92,7 +172,13 @@ public class Build {
                     if (foundValues) {
                         RawApi rawApi = new RawApi(request, response, "");
                         rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "MIRRORING");
-                        messages.add(rawApi.getOriginalMessage());
+                        RunResult runResult = new RunResult(
+                                new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
+                                rawApi.getOriginalMessage(),
+                                sample,
+                                rawApi.getResponse().getStatusCode() == originalHttpResponse.getStatusCode()
+                        );
+                        runResults.add(runResult);
                         break;
                     }
                 } catch (Exception e) {
@@ -103,7 +189,7 @@ public class Build {
             }
         }
 
-        return messages;
+        return runResults;
     }
 
     public String findNewHost(OriginalHttpRequest request, Map<String, String> hostRelations) {
@@ -121,14 +207,14 @@ public class Build {
     }
 
 
-    public List<String> run(List<Integer> apiCollectionsIds, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public List<RunResult> run(List<Integer> apiCollectionsIds, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         if (replaceDetailsMap == null) replaceDetailsMap = new HashMap<>();
         if (hostRelations == null) hostRelations = new HashMap<>();
 
         buildParentToChildMap(apiCollectionsIds);
         Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(apiCollectionsIds);
 
-        List<String> messages = new ArrayList<>();
+        List<RunResult> runResults = new ArrayList<>();
         // loop over levels and make requests
         for (int level: levelsToSampleDataMap.keySet()) {
             List<SampleData> sdList =levelsToSampleDataMap.get(level);
@@ -137,15 +223,15 @@ public class Build {
 
             loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {
-                List<String> messagesPerLevel = runPerLevel(sdList, hostRelations, replaceDetailsMap);
-                messages.addAll(messagesPerLevel);
+                List<RunResult> runResultsPerLevel = runPerLevel(sdList, hostRelations, replaceDetailsMap);
+                runResults.addAll(runResultsPerLevel);
                 loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while running for level " + level , LoggerMaker.LogDb.DASHBOARD);
             }
         }
 
-        return messages;
+        return runResults;
     }
 
     public void modifyRequest(OriginalHttpRequest request, ReplaceDetail replaceDetail) {
@@ -269,7 +355,11 @@ public class Build {
         Context.accountId.set(1_000_000);
 
         Build build = new Build();
-        build.run(Collections.singletonList(1705668952), new HashMap<>(), new HashMap<>());
+        long start = System.currentTimeMillis();
+        List<RunResult> runResults = build.run(Collections.singletonList(1705668952), new HashMap<>(), new HashMap<>());
+        System.out.println(System.currentTimeMillis()  - start);
+
+//        System.out.println(runResults);
     }
 
 }

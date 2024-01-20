@@ -244,4 +244,14 @@ export default {
             }
         })
     },
+
+    invokeDependencyTable(apiCollectionIds){
+        return request({
+            url: '/api/invokeDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
 }

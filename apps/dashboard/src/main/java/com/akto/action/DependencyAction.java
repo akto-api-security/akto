@@ -6,12 +6,10 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.dependency_flow.TreeHelper;
 import com.akto.dto.type.URLMethods;
+import com.akto.utils.Build;
 import com.mongodb.BasicDBObject;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class DependencyAction extends UserAction {
 
@@ -57,6 +55,17 @@ public class DependencyAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private List<Build.RunResult> runResults;
+    public String invokeDependencyTable() {
+        Build build = new Build();
+        runResults = build.run(Collections.singletonList(1705668952), new HashMap<>(), new HashMap<>());
+        for (Build.RunResult runResult: runResults) {
+            runResult.setCurrentMessage("");;
+            runResult.setOriginalMessage("");
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public Collection<Node> getResult() {
         return result;
     }
@@ -89,5 +98,8 @@ public class DependencyAction extends UserAction {
         return total;
     }
 
-    
+
+    public List<Build.RunResult> getRunResults() {
+        return runResults;
+    }
 }
