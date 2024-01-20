@@ -1273,6 +1273,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setUpFillCollectionIdArrayJob() {
+        scheduler.schedule(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        fillCollectionIdArray();
+                    }
+                }, "fill-collection-id");
+            }
+        }, 0, TimeUnit.SECONDS);
+    }
 
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
@@ -1457,7 +1469,7 @@ public class InitializerListener implements ServletContextListener {
 
                         setUpUpdateCustomCollections();
 
-                        fillCollectionIdArray();
+                        setUpFillCollectionIdArrayJob();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {

@@ -46,7 +46,7 @@ function CollectionComponent(props) {
         if (data == undefined || Object.keys(data) == undefined || Object.keys(data)[0] == undefined)
             return undefined;
 
-        if( condition.type != "API_LIST" ){
+        if( condition.type != "CUSTOM" ){
             return undefined;
         }
 
@@ -137,7 +137,7 @@ function CollectionComponent(props) {
 
     function getDefaultValues(type){
         switch(type){
-            case "API_LIST":
+            case "CUSTOM":
                 return {}
             case "METHOD":
                 return {method:"GET"}
@@ -149,7 +149,7 @@ function CollectionComponent(props) {
             key={`condition-type-${index}`}
             menuItems={[{
                 label: 'Api list',
-                value: 'API_LIST',
+                value: 'CUSTOM',
             },
             {
                 label: 'Method',
@@ -164,7 +164,7 @@ function CollectionComponent(props) {
 
     const component = (condition, index) => {
         switch (condition.type) {
-            case "API_LIST":
+            case "CUSTOM":
                 return collectionComponent(condition, index)
 
             case "METHOD":

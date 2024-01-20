@@ -10,8 +10,8 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.CollectionConditions.ApiListCondition;
-import com.akto.dto.CollectionConditions.CollectionCondition;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
 
 public class ApiCollection {
 
@@ -38,7 +38,7 @@ public class ApiCollection {
     Type type;
     public static final String _TYPE = "type";
 
-    List<CollectionCondition> conditions;
+    List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
 
     public ApiCollection() {
@@ -53,7 +53,7 @@ public class ApiCollection {
         this.vxlanId = vxlanId;
     }
 
-    public ApiCollection(int id, String name, List<CollectionCondition> conditions) {
+    public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
         this.id = id;
         this.name = name;
         this.conditions = conditions;
@@ -157,28 +157,28 @@ public class ApiCollection {
         this.type = type;
     }
     
-    public List<CollectionCondition> getConditions() {
+    public List<TestingEndpoints> getConditions() {
         return conditions;
     }
 
-    public void setConditions(List<CollectionCondition> conditions) {
+    public void setConditions(List<TestingEndpoints> conditions) {
         this.conditions = conditions;
     }
 
-    private void initializeConditionsList(CollectionCondition condition) {
+    private void initializeConditionsList(TestingEndpoints condition) {
         if (this.conditions == null) {
             this.conditions = new ArrayList<>();
         }
     }
 
-    private void updateConditionList(CollectionCondition condition, boolean isAddOperation) {
-        for (CollectionCondition it : conditions) {
+    private void updateConditionList(TestingEndpoints condition, boolean isAddOperation) {
+        for (TestingEndpoints it : conditions) {
             boolean sameType = it.getType() == condition.getType();
             if (sameType) {
                 switch (it.getType()) {
-                    case API_LIST:
-                        // Only one API_LIST condition should exist
-                        ApiListCondition.updateApiListCondition((ApiListCondition) it, condition.returnApis(), isAddOperation);
+                    case CUSTOM:
+                        // Only one CUSTOM condition should exist
+                        CustomTestingEndpoints.updateApiListCondition((CustomTestingEndpoints) it, condition.returnApis(), isAddOperation);
                         return;
                     default:
                         break;
@@ -195,12 +195,12 @@ public class ApiCollection {
         }
     }
 
-    public void addToConditions(CollectionCondition condition) {
+    public void addToConditions(TestingEndpoints condition) {
         initializeConditionsList(condition);
         updateConditionList(condition, true);
     }
 
-    public void removeFromConditions(CollectionCondition condition) {
+    public void removeFromConditions(TestingEndpoints condition) {
         initializeConditionsList(condition);
         updateConditionList(condition, false);
     }

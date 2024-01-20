@@ -26,7 +26,7 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.CollectionConditions.CollectionCondition;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -65,7 +65,7 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static int getApisCountFromConditions(List<CollectionCondition> conditions) {
+    public static int getApisCountFromConditions(List<TestingEndpoints> conditions) {
 
         if(conditions == null || conditions.isEmpty()){
             return 0;
@@ -76,19 +76,19 @@ public class ApiCollectionUsers {
         return (int) ApiInfoDao.instance.count(apiInfoFilters);
     }
 
-    public static void updateApiCollection(List<CollectionCondition> conditions, int id) {
+    public static void updateApiCollection(List<TestingEndpoints> conditions, int id) {
 
         ApiCollectionsDao.instance.updateOne(
                 Filters.eq(Constants.ID, id),
                 Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
     }
 
-    private static Bson getFilters(List<CollectionCondition> conditions, CollectionType type){
+    private static Bson getFilters(List<TestingEndpoints> conditions, CollectionType type){
         List<Bson> filters = new ArrayList<>();
         List<Bson> orFilters = new ArrayList<>();
         conditions.forEach((condition) -> {
             Bson conditionFilter = condition.returnFiltersMap().get(type);
-            if(condition.getOperator().equals(CollectionCondition.Operator.OR)){
+            if(condition.getOperator().equals(TestingEndpoints.Operator.OR)){
                 orFilters.add(conditionFilter);
             } else {
                 filters.add(conditionFilter);
@@ -100,7 +100,7 @@ public class ApiCollectionUsers {
         return Filters.and(filters);
     }
 
-    private static void operationForCollectionId(List<CollectionCondition> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
+    private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
             Bson filter = getFilters(conditions, type);
@@ -113,19 +113,19 @@ public class ApiCollectionUsers {
         updateCollectionsForCollectionId(filtersMap, update);
     }
 
-    public static void addToCollectionsForCollectionId(List<CollectionCondition> conditions, int apiCollectionId) {
+    public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
     }
 
-    public static void removeFromCollectionsForCollectionId(List<CollectionCondition> conditions, int apiCollectionId) {
+    public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
     }
 
-    public static void computeCollectionsForCollectionId(List<CollectionCondition> conditions, int apiCollectionId) {
+    public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         addToCollectionsForCollectionId(conditions, apiCollectionId);
         removeFromCollectionsForCollectionId(conditions, apiCollectionId);
         updateApiCollection(conditions, apiCollectionId);
