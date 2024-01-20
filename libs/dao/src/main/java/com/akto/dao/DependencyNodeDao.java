@@ -3,13 +3,8 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.DependencyNode;
-import com.akto.dto.dependency_flow.Node;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.IndexOptions;
-import com.mongodb.client.model.Indexes;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -54,7 +49,7 @@ public class DependencyNodeDao extends AccountsContextDao<DependencyNode>{
         fieldNames = new String[]{
                 DependencyNode.API_COLLECTION_ID_RESP, DependencyNode.URL_RESP, DependencyNode.METHOD_RESP,
                 DependencyNode.API_COLLECTION_ID_REQ, DependencyNode.URL_REQ, DependencyNode.METHOD_REQ,
-                DependencyNode.ParamInfo.REQUEST_PARAM, DependencyNode.ParamInfo.RESPONSE_PARAM
+                DependencyNode.ParamInfo.REQUEST_PARAM, DependencyNode.ParamInfo.RESPONSE_PARAM, DependencyNode.ParamInfo.IS_URL_PARAM
         };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
