@@ -3,9 +3,7 @@ package com.akto;
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
-import com.akto.dto.dependency_flow.Connection;
-import com.akto.dto.dependency_flow.Edge;
-import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.dependency_flow.*;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.loaders.Loader;
@@ -210,6 +208,7 @@ public class DaoInit {
         ClassModel<UsageMetricInfo> UsageMetricInfoClassModel = ClassModel.builder(UsageMetricInfo.class).enableDiscriminator(true).build();
         ClassModel<UsageSync> UsageSyncClassModel = ClassModel.builder(UsageSync.class).enableDiscriminator(true).build();
         ClassModel<Organization> OrganizationClassModel = ClassModel.builder(Organization.class).enableDiscriminator(true).build();
+        ClassModel<ReplaceDetail> replaceDetailClassModel = ClassModel.builder(ReplaceDetail.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
@@ -235,7 +234,7 @@ public class DaoInit {
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
-                        nodeClassModel, connectionClassModel, edgeClassModel).automatic(true).build());
+                        nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -270,7 +269,8 @@ public class DaoInit {
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(MetricTypes.class),
                 new EnumCodec<>(User.AktoUIMode.class),
-                new EnumCodec<>(TrafficMetricsAlert.FilterType.class));
+                new EnumCodec<>(TrafficMetricsAlert.FilterType.class),
+                new EnumCodec<>(KVPair.KVType.class));
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

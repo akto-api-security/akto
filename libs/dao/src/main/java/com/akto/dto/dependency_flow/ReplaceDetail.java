@@ -4,10 +4,16 @@ import java.util.*;
 
 public class ReplaceDetail {
     int apiCollectionId;
+    public static final String _API_COLLECTION_ID = "apiCollectionId";
     String url;
+    public static final String _URL = "url";
     String method;
+    public static final String _METHOD = "method";
     List<KVPair> kvPairs;
+    public static final String _KV_PAIRS = "kvPairs";
 
+    public ReplaceDetail() {
+    }
 
     public ReplaceDetail(int apiCollectionId, String url, String method, List<KVPair> kvPairs) {
         this.apiCollectionId = apiCollectionId;

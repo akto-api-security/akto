@@ -4,19 +4,25 @@ import java.util.Objects;
 
 public class KVPair {
     private String key;
-    private Object value;
     private boolean isHeader;
-
     private boolean isUrlParam;
+
+    private String value;
+    private KVType type;
+
+    public enum KVType {
+        STRING, INTEGER, JSON
+    }
 
     public KVPair() {
     }
 
-    public KVPair(String key, Object value, boolean isHeader, boolean isUrlParam) {
+    public KVPair(String key, String value, boolean isHeader, boolean isUrlParam, KVType type) {
         this.key = key;
         this.value = value;
         this.isHeader = isHeader;
         this.isUrlParam = isUrlParam;
+        this.type = type;
     }
 
     @Override
@@ -39,17 +45,24 @@ public class KVPair {
     public void setKey(String key) {
         this.key = key;
     }
+    public boolean isHeader() {
+        return isHeader;
+    }
 
-    public Object getValue() {
+    public String getValue() {
         return value;
     }
 
-    public void setValue(Object value) {
+    public void setValue(String value) {
         this.value = value;
     }
 
-    public boolean isHeader() {
-        return isHeader;
+    public KVType getType() {
+        return type;
+    }
+
+    public void setType(KVType type) {
+        this.type = type;
     }
 
     public void setHeader(boolean header) {

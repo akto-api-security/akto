@@ -1,13 +1,18 @@
 package com.akto.action;
 
 import com.akto.dao.DependencyFlowNodesDao;
+import com.akto.dao.ReplaceDetailsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.dependency_flow.KVPair;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.dependency_flow.TreeHelper;
 import com.akto.dto.type.URLMethods;
 import com.akto.utils.Build;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 import java.util.*;
 
@@ -29,6 +34,7 @@ public class DependencyAction extends UserAction {
 
     private List<Integer> apiCollectionIds;
     private List<BasicDBObject> dependencyTableList;
+    private List<ReplaceDetail> replaceDetails;
     private int total;
     private int skip;
 
@@ -42,6 +48,8 @@ public class DependencyAction extends UserAction {
             apiInfoKeys.add(new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod())));
         }
         Map<ApiInfo.ApiInfoKey, List<String>> parametersMap = SingleTypeInfoDao.instance.fetchRequestParameters(apiInfoKeys);
+
+        replaceDetails = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
 
         for (Node node: nodes) {
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod()));
@@ -63,6 +71,26 @@ public class DependencyAction extends UserAction {
             runResult.setCurrentMessage("");;
             runResult.setOriginalMessage("");
         }
+        return SUCCESS.toUpperCase();
+    }
+
+    List<KVPair> kvPairs = new ArrayList<>();
+
+    public String saveReplaceDetails() {
+        if (url == null || url.isEmpty() || method == null ) {
+            addActionError("Invalid url or method");
+            return ERROR.toUpperCase();
+        }
+
+        ReplaceDetailsDao.instance.updateOne(
+                Filters.and(
+                        Filters.eq(ReplaceDetail._API_COLLECTION_ID, apiCollectionId),
+                        Filters.eq(ReplaceDetail._URL, url),
+                        Filters.eq(ReplaceDetail._METHOD, method.name())
+                ),
+                Updates.set(ReplaceDetail._KV_PAIRS, kvPairs)
+        );
+
         return SUCCESS.toUpperCase();
     }
 
@@ -102,4 +130,14 @@ public class DependencyAction extends UserAction {
     public List<Build.RunResult> getRunResults() {
         return runResults;
     }
+
+    public void setKvPairs(List<KVPair> kvPairs) {
+        this.kvPairs = kvPairs;
+    }
+
+    public List<ReplaceDetail> getReplaceDetails() {
+        return replaceDetails;
+    }
+
+    
 }

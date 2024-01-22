@@ -254,4 +254,14 @@ export default {
             }
         })
     },
+
+    saveReplaceDetails(apiCollectionId, url, method, kvPairs){
+        return request({
+            url: '/api/saveReplaceDetails',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method, kvPairs
+            }
+        })
+    },
 }

@@ -323,12 +323,16 @@ public class Build {
                 found = value != null || replaceDetail != null;
                 if (!found) continue;
 
+                if (value == null) continue;
+
                 ReplaceDetail deltaReplaceDetail = deltaReplaceDetailsMap.get(id);
                 if (deltaReplaceDetail == null) {
                     deltaReplaceDetail = new ReplaceDetail(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), reverseEdge.getMethod(), new ArrayList<>());
                     deltaReplaceDetailsMap.put(id, deltaReplaceDetail);
                 }
-                KVPair kvPair = new KVPair(reverseEdge.getParam(), value, false, reverseEdge.isUrlParam());
+
+                KVPair.KVType type = value instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
+                KVPair kvPair = new KVPair(reverseEdge.getParam(), value.toString(), false, reverseEdge.isUrlParam(), type);
                 deltaReplaceDetail.addIfNotExist(kvPair);
             }
         }
