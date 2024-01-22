@@ -1273,6 +1273,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setUpFillCollectionIdArrayJob() {
+        scheduler.schedule(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        fillCollectionIdArray();
+                    }
+                }, "fill-collection-id");
+            }
+        }, 0, TimeUnit.SECONDS);
+    }
 
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
@@ -1301,6 +1313,32 @@ public class InitializerListener implements ServletContextListener {
                 ApiCollectionUsers.updateCollections(collections.getValue(), filter, update);
             }
         }
+    }
+
+    public void updateCustomCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for (ApiCollection apiCollection : apiCollections) {
+            if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
+                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            }
+        }
+    }
+
+    public void setUpUpdateCustomCollections() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            updateCustomCollections();
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "update-custom-collections");
+            }
+        }, 0, 24, TimeUnit.HOURS);
     }
 
     public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
@@ -1428,7 +1466,10 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
-                        fillCollectionIdArray();
+
+                        setUpUpdateCustomCollections();
+
+                        setUpFillCollectionIdArrayJob();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
