@@ -5,6 +5,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
@@ -113,14 +114,15 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId");
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
+        pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(endpointsCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = endpointsCursor.next();
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt(SingleTypeInfo._COLLECTION_IDS);
                 int count = basicDBObject.getInt("count");
                 countMap.put(apiCollectionId, count);
             } catch (Exception e) {
@@ -138,7 +140,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
             .append(ApiInfoKey.URL, "$url")
             .append(ApiInfoKey.METHOD, "$method");
 
-        pipeline.add(Aggregates.match(Filters.eq(ApiInfoKey.API_COLLECTION_ID, apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
 
         int recentEpoch = Context.now() - deltaPeriodValue;
 

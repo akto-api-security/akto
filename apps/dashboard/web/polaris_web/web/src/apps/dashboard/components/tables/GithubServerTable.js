@@ -177,6 +177,7 @@ function GithubServerTable(props) {
       resourceIDResolver,
     });
 
+  const [popoverActive, setPopoverActive] = useState(-1);
 
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
@@ -205,6 +206,8 @@ function GithubServerTable(props) {
           newRow={props?.useNewRow}
           headings={props?.headings}
           notHighlightOnselected={props.notHighlightOnselected}
+          popoverActive={popoverActive}
+          setPopoverActive={setPopoverActive}
         />
       ),
     );
