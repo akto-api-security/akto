@@ -42,6 +42,7 @@ import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
 import com.akto.dto.Attempt.AttemptResult;
+import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
@@ -195,6 +196,7 @@ public class DaoInit {
         ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
+        ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
         ClassModel<Node> nodeClassModel = ClassModel.builder(Node.class).enableDiscriminator(true).build();
@@ -233,6 +235,7 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
+                methodConditionClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel).automatic(true).build());
@@ -268,6 +271,7 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
                 new EnumCodec<>(AktoGptConfigState.class),
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
+                new EnumCodec<>(TestingEndpoints.Operator.class),
                 new EnumCodec<>(MetricTypes.class),
                 new EnumCodec<>(User.AktoUIMode.class),
                 new EnumCodec<>(TrafficMetricsAlert.FilterType.class));
