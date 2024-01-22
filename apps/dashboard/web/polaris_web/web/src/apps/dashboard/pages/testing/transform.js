@@ -169,7 +169,7 @@ const transform = {
     prettifyTestName: (testName, icon, iconColor, state)=>{
       let iconComp
       switch(state){
-        case "COMPLETED":``
+        case "COMPLETED":
           iconComp = (<Box><Icon source={circle_tick_minor} /></Box>)
           break;
         case "STOPPED":
