@@ -23,6 +23,10 @@ public class Utils {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
+        if(apiCollection == null){
+            return new ArrayList<>();
+        }
+
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId, skip);
         } else {
