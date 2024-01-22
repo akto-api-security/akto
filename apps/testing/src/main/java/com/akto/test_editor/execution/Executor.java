@@ -168,7 +168,10 @@ public class Executor {
                         List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
                         List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
 
-                        if (originalHostHeaders.get(0) != null
+                        if (!originalHostHeaders.isEmpty()
+                            && originalHostHeaders.get(0) != null
+                            && !attemptHostHeaders.isEmpty()
+                            && attemptHostHeaders.get(0) != null
                             && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
                             && testingRunConfig != null
                             && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
@@ -183,7 +186,7 @@ public class Executor {
                         }
 
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("unable to update host header for overridden test URL",
+                        loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
                                 LogDb.TESTING);
                     }
                         

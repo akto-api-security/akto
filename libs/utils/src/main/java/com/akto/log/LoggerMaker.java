@@ -5,7 +5,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
-import com.akto.notifications.slack.DailyUpdate;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -14,7 +13,6 @@ import com.mongodb.client.model.Projections;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,8 +33,11 @@ public class LoggerMaker  {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+    protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
+            
             @Override
             public void run() {
                 try {
@@ -48,7 +49,7 @@ public class LoggerMaker  {
                     Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
                     slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
                 } catch (Exception e) {
-                    System.out.println("error in getting config: " + e.getMessage());
+                    internalLogger.error("error in getting slack config: " + e.toString());
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
@@ -104,7 +105,7 @@ public class LoggerMaker  {
         this.db = db;
     }
 
-    private void sendToSlack(String err) {
+    protected static void sendToSlack(String err) {
         if (slackWebhookUrl != null) {
             try {
                 Slack slack = Slack.getInstance();
@@ -116,12 +117,12 @@ public class LoggerMaker  {
                 slack.send(slackWebhookUrl, ret.toJson());
 
             } catch (IOException e) {
-                logger.error("Can't send to Slack: " + e.getMessage(), e);
+                internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
     }
 
-    public void errorAndAddToDb(String err, LogDb db) {
+    protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
         }
@@ -131,6 +132,11 @@ public class LoggerMaker  {
         } catch (Exception e){
 
         }
+        return err;
+    }
+
+    public void errorAndAddToDb(String err, LogDb db) {
+        basicError(err, db);
 
         if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
             sendToSlack(err);

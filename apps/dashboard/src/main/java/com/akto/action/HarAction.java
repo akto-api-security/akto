@@ -110,6 +110,11 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType()))  {
+            addActionError("API groups can't be used");
+            return ERROR.toUpperCase();
+        }
+
         if (harString == null) {
             harString = this.content.toString();
         }

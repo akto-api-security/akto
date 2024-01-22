@@ -445,6 +445,18 @@ public class Utils {
         UrlModifierPayload urlModifierPayload = null;
         try {
             payload = payload.replaceAll("=", ":");
+
+            if (payload.contains("regex:")) {
+                payload = payload.substring(0, 22) + "\"" + payload.substring(22, payload.indexOf(",")) + "\"" + payload.substring(payload.indexOf(","), payload.length());
+            }
+
+            String x[] = payload.split("replace_with:");
+            if (x.length < 2) {
+                return urlModifierPayload;
+            }
+            String y[] = x[1].split("}}");
+            x[1] = y[0].toString() + "\"}}";
+            payload = String.join("replace_with:\"", x);
             Map<String, Object> json = gson.fromJson(payload, Map.class);
             String operation = "regex_replace";
             Map<String, Object> operationMap = new HashMap<>();

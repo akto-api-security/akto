@@ -349,6 +349,7 @@ const transform = {
     prettifyCollectionsData(newData){
         const prettifyData = newData.map((c)=>{
             return{
+                ...c,
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
