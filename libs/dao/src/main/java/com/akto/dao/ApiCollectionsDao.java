@@ -172,6 +172,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
+        if(apiCollection == null){
+            return new ArrayList<>();
+        }
+
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId, skip, limit, deltaPeriodValue);
         } else {
