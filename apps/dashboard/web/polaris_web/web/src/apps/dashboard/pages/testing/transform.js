@@ -1,7 +1,7 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup} from '@shopify/polaris';
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
@@ -629,26 +629,6 @@ getCollapisbleRow(urls){
                 <Link monochrome url={ele.nextUrl} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
-              )
-            })}
-          </VerticalStack>
-        </Box>
-      </td>
-    </tr>
-  )
-},
-
-getCollapisbleRowDependencyTable(urls){
-  return(
-    <tr style={{background: "#EDEEEF"}}>
-      <td colSpan={7}>
-        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-          <VerticalStack gap={2}>
-            {urls.map((ele,index)=>{
-              return(
-                <Text>
-                  {ele.url}
-                </Text>
               )
             })}
           </VerticalStack>
