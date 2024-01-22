@@ -9,6 +9,7 @@ import com.akto.dto.IgnoreData;
 import com.akto.dto.type.AccountDataTypesInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
@@ -100,6 +101,8 @@ public class ResourceAnalyserTest extends MongoBasedTest {
 
         // to add new single type info of urlParams
         httpCallParser.syncFunction(responseParams, true, true);
+        APICatalogSync.mergeUrlsAndSave(0, true, false);
+        APICatalogSync.mergeUrlsAndSave(1, true, false);
 
         List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
         assertEquals(13, singleTypeInfoList.size()); // 3 per api (url3 and url4 merged) and 1 url param

@@ -1,17 +1,37 @@
 package com.akto.test_editor.execution;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bson.conversions.Bson;
+
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.parsers.HttpCallParser;
+import com.akto.test_editor.Utils;
 import com.akto.util.modifier.AddJkuJWTModifier;
 import com.akto.util.modifier.InvalidSignatureJWTModifier;
 import com.akto.util.modifier.JwtKvModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 public class VariableResolver {
     
@@ -40,9 +60,14 @@ public class VariableResolver {
             }
         }
 
-        Object val = getValue(varMap, expression);
+        Object val = resolveExpression(expression);
         if (val == null) {
-            return expression;
+            val = getValue(varMap, expression);
+            if (val == null) {
+                return expression;
+            } else {
+                return val.toString();
+            }
         } else {
             return val.toString();
         }
@@ -249,7 +274,7 @@ public class VariableResolver {
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
-        if (key == null || !(key instanceof String)) {
+        if (key == null) {
             return false;
         }
 
@@ -304,66 +329,286 @@ public class VariableResolver {
         }
 
         List<String> result = new ArrayList<>();
-        for (String word: wordList) {
-            result.add(expression.replace(wordListKey, word));
+        for (Object word: wordList) {
+            result.add(expression.replace(wordListKey, word.toString()));
         }
 
         return result;
     }
 
-    // public Object resolveExpression(Map<String, Object> varMap, String expression) {
+    public static Map<String, List<String>> resolveWordList(Map<String, List<String>> wordListsMap, ApiInfo.ApiInfoKey infoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
 
-    //     Object val = null;
+        for (String k: wordListsMap.keySet()) {
+            Map<String, String> m = new HashMap<>();
+            Object keyObj;
+            String key, location;
+            boolean isRegex = false;
+            boolean allApis = false;
+            try {
+                List<String> wordList = (List<String>) wordListsMap.get(k);
+                continue;
+            } catch (Exception e) {
+                try {
+                    m = (Map) wordListsMap.get(k);
+                } catch (Exception er) {
+                    continue;
+                }
+            }
 
-    //     Pattern pattern = Pattern.compile("(\\S+)\\s?[\\+\\-\\*\\/]\\s?(\\S+)");
-    //     Matcher matcher = pattern.matcher(expression);
+            keyObj = m.get("key");
+            location = m.get("location");
+            if (keyObj instanceof Map) {
+                Map<String, String> kMap = (Map) keyObj;
+                key = (String) kMap.get("regex");
+                isRegex = true;
+            } else {
+                key = (String) m.get("key");
+            }
 
-    //     if (matcher.find()) {
-    //         try {
-    //             String operand1 = (String) resolveVariable(varMap, matcher.group(1));
-    //             String operator = (String) resolveVariable(varMap, matcher.group(2));
-    //             String operand2 = (String) resolveVariable(varMap, matcher.group(3));
-    //             val = evaluateExpressionValue(operand1, operator, operand2);
-
-    //         } catch(Exception e) {
-    //             return expression;
-    //         }
             
-    //     }
+            if (m.containsKey("all_apis")) {
+                allApis = Objects.equals(m.get("all_apis"), true);
+            }
+            if (!allApis) {
+                continue;
+            }
 
-    //     return val;
+            Bson filters = Filters.and(
+                Filters.eq("apiCollectionId", infoKey.getApiCollectionId()),
+                Filters.or(
+                    Filters.regex("param", key),
+                    Filters.regex("param", key.toLowerCase())
+                    )
+            );
 
-    // }
+            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
 
-    // public Object evaluateExpressionValue(String operand1, String operator, String operand2) {
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
+                if (infKey.equals(infoKey)) {
+                    continue;
+                }
+                Bson sdfilters = Filters.and(
+                    Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", singleTypeInfo.getMethod()),
+                    Filters.in("_id.url", singleTypeInfo.getUrl())
+                );
 
-    //     switch(operator) {
-    //         case "+":
-    //             add(operand1, operator, operand2);
-    //         case "-":
-    //             subtract(operand1, operator, operand2);
-    //         case "*":
-    //             multiply(operand1, operator, operand2);
-    //         case "/":
-    //             divide(operand1, operator, operand2);
-    //         default:
-    //             // throw exception
-    //     }
+                SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                newSampleDataMap.put(infKey, sd.getSamples());
 
-    //     return null;
+            }
+            List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key, location, isRegex);
+            wordListsMap.put(k, wordListVal);
+        }
 
-    // }
+        return wordListsMap;
 
-    // public Object multiply(String operand1, String operator, String operand2) {
-    //     try {
-    //         int op1 = Integer.parseInt(operand1);
-    //         int op2 = Integer.parseInt(operand2);
-    //         return op1 * op2;
-    //     } catch (Exception e) {
-    //         return null;
-    //     }
+    }
 
-    // }
+
+    public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>> sampleDataMap, ApiInfo.ApiInfoKey apiInfoKey) {
+
+        for (String k: varMap.keySet()) {
+            if (!k.contains("wordList_")) {
+                continue;
+            }
+            Map<String, String> m = new HashMap<>();
+            Object keyObj;
+            String key, location;
+            boolean isRegex = false;
+            boolean allApis = false;
+            try {
+                List<String> wordList = (List<String>) varMap.get(k);
+                continue;
+            } catch (Exception e) {
+                try {
+                    m = (Map) varMap.get(k);
+                } catch (Exception er) {
+                    continue;
+                }
+            }
+            keyObj = m.get("key");
+            if (keyObj instanceof Map) {
+                Map<String, String> kMap = (Map) keyObj;
+                key = (String) kMap.get("regex");
+                isRegex = true;
+            } else {
+                key = (String) m.get("key");
+            }
+            location = m.get("location");
+            if (m.containsKey("all_apis")) {
+                allApis = Objects.equals(m.get("all_apis"), true);
+            }
+
+            Map<ApiInfoKey, List<String>> modifiedSampleDataMap = new HashMap<>();
+            if (allApis) {
+                for (ApiInfoKey infoKey: sampleDataMap.keySet()) {
+                    List<String> sample = sampleDataMap.get(infoKey);
+                    if (infoKey.getApiCollectionId() != apiInfoKey.getApiCollectionId()) {
+                        continue;
+                    }
+                    // if (infoKey.equals(apiInfoKey)) {
+                    //     sample.remove(0);
+                    // }
+                    modifiedSampleDataMap.put(infoKey, sample);
+                }
+            } else {
+                modifiedSampleDataMap.put(apiInfoKey, sampleDataMap.get(apiInfoKey));
+            }
+
+            List<String> wordListVal = fetchWordList(modifiedSampleDataMap, key, location, isRegex);
+
+            if (wordListVal.size() >= 10) {
+                break;
+            }
+
+            varMap.put(k, wordListVal);
+        }
+
+    }
+
+    public static List<String> fetchWordList(Map<ApiInfoKey, List<String>> modifiedSampleDataMap, String key, String location, boolean isRegex) {
+        Set<String> wordListSet = new HashSet<>();
+        List<String> wordListVal = new ArrayList<>();
+        for (ApiInfoKey infoKey: modifiedSampleDataMap.keySet()) {
+            List<String> samples = modifiedSampleDataMap.get(infoKey);
+            wordListSet.addAll(extractValuesFromSampleData(samples, key, location, isRegex));
+        }
+        for (String s : wordListSet) {
+            wordListVal.add(s);
+            if (wordListVal.size() >= 10) {
+                break;
+            }
+        }
+        return wordListVal;
+    }
+
+    public static Set<String> extractValuesFromSampleData(List<String> samples, String key, String location, boolean isRegex) {
+
+        Set<String> worklistVal = new HashSet<>();
+        for (String sample: samples) {
+            HttpResponseParams httpResponseParams;
+            HttpRequestParams httpRequestParams;
+            try {
+                httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpRequestParams = httpResponseParams.getRequestParams();
+                if (location == null || location.equals("header")) {
+                    Map<String, List<String>> headers = httpResponseParams.getHeaders();
+                    for (String headerName: headers.keySet()) {
+                        if (!Utils.checkIfMatches(headerName, key, isRegex)) {
+                            continue;
+                        }
+                        List<String> headerValues = headers.get(headerName);
+                        for (String value: headerValues) {
+                            worklistVal.add(value);
+                        }
+                    }
+
+                    Map<String, List<String>> reqHeaders = httpRequestParams.getHeaders();
+
+                    for (String headerName: reqHeaders.keySet()) {
+                        if (!Utils.checkIfMatches(headerName, key, isRegex)) {
+                            continue;
+                        }
+                        List<String> headerValues = reqHeaders.get(headerName);
+                        for (String value: headerValues) {
+                            worklistVal.add(value);
+                        }
+                    }
+                }
+
+                if (location == null || location.equals("payload")) {
+                    worklistVal.addAll(Utils.findAllValuesForKey(httpRequestParams.getPayload(), key, isRegex));
+                    worklistVal.addAll(Utils.findAllValuesForKey(httpResponseParams.getPayload(), key, isRegex));
+                }
+                
+                if (location == null || location.equals("query_param")) {
+                    BasicDBObject queryParams = RequestTemplate.getQueryJSON(httpRequestParams.getURL());
+                    for (String qu: queryParams.keySet()) {
+                        if (!Utils.checkIfMatches(qu, key, isRegex)) {
+                            continue;
+                        }
+                        worklistVal.add(queryParams.getString(qu));
+                    }
+                }
+
+            } catch (Exception e) {
+                continue;
+            }
+            
+        }
+
+        return worklistVal;
+    }
+
+    public static Object resolveExpression(String expression) {
+
+        Object val = null;
+
+        Pattern pattern = Pattern.compile("(\\S+)\\s?([\\*/])\\s?(\\S+)");
+        Matcher matcher = pattern.matcher(expression);
+
+        if (matcher.find()) {
+            try {
+                String operand1 = (String) matcher.group(1);
+                String operator = (String) matcher.group(2);
+                String operand2 = (String) matcher.group(3);
+                val = evaluateExpressionValue(operand1, operator, operand2);
+
+            } catch(Exception e) {
+                return expression;
+            }
+            
+        }
+
+        return val;
+
+    }
+
+    public static Object evaluateExpressionValue(String operand1, String operator, String operand2) {
+
+        switch(operator) {
+            // case "+":
+            //     add(operand1, operator, operand2);
+            // case "-":
+            //     subtract(operand1, operator, operand2);
+            case "*":
+                return multiply(operand1, operand2);
+            // case "/":
+            //     divide(operand1, operator, operand2);
+            default:
+                return null;
+        }
+
+    }
+
+    public static Object multiply(String operand1, String operand2) {
+        try {
+            try {
+                int op1 = Integer.parseInt(operand1);
+                try {
+                    int op2 = Integer.parseInt(operand2);
+                    return op1 * op2;
+                } catch (Exception e) {
+                    Double op2 = Double.parseDouble(operand2);
+                    return op1 * op2;
+                }
+            } catch (Exception e) {
+                Double op1 = Double.parseDouble(operand1);
+                try {
+                    int op2 = Integer.parseInt(operand2);
+                    return op1 * op2;
+                } catch (Exception exc) {
+                    Double op2 = Double.parseDouble(operand2);
+                    return op1 * op2;
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
+
+    }
 
     // public Object divide(String operand1, String operator, String operand2) {
     //     try {

@@ -1,9 +1,5 @@
 package com.akto.runtime;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -15,8 +11,6 @@ import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestConfigYamlParser;
-import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
@@ -26,9 +20,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.runtime.policies.AktoPolicies;
 import com.akto.util.AccountTask;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
@@ -231,8 +222,6 @@ public class Main {
         });
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
-        Map<String, Flow> flowMap = new HashMap<>();
-        Map<String, AktoPolicies> aktoPolicyMap = new HashMap<>();
 
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -333,31 +322,14 @@ public class Main {
                         loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
                     }
 
-                    if (!flowMap.containsKey(accountId)) {
-                        Flow flow= new Flow(
-                                apiConfig.getThreshold(), apiConfig.getSync_threshold_count(), apiConfig.getSync_threshold_time(),
-                                apiConfig.getThreshold(), apiConfig.getSync_threshold_count(), apiConfig.getSync_threshold_time(),
-                                apiConfig.getUserIdentifier()
-                        );
-
-                        flowMap.put(accountId, flow);
-                    }
-
-                    if (!aktoPolicyMap.containsKey(accountId)) {
-                        AktoPolicies aktoPolicy = new AktoPolicies(fetchAllSTI);
-                        aktoPolicyMap.put(accountId, aktoPolicy);
-                    }
-
                     HttpCallParser parser = httpCallParserMap.get(accountId);
-                    // Flow flow = flowMap.get(accountId);
-                    AktoPolicies aktoPolicy = aktoPolicyMap.get(accountId);
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
                         accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                         loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
-                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
+                        parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
                         loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
 
                         // send to central kafka
@@ -377,11 +349,6 @@ public class Main {
                         } else {
                             loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
                         }
-
-                        // flow.init(accWiseResponse);
-                        loggerMaker.infoAndAddToDb("Initiating akto policy for account: " + accountId, LogDb.RUNTIME);
-                        aktoPolicy.main(accWiseResponse, apiCatalogSync, fetchAllSTI);
-                        loggerMaker.infoAndAddToDb("Akto policy completed for account: " + accountId, LogDb.RUNTIME);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }

@@ -9,6 +9,9 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.akto.dto.type.CollectionReplaceDetails;
 
+import com.akto.util.ConnectionInfo;
+import com.akto.util.LastCronRunInfo;
+
 import com.akto.dto.test_editor.TestLibrary;
 
 public class AccountSettings {
@@ -73,6 +76,11 @@ public class AccountSettings {
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
 
+    public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
+    private LastCronRunInfo lastUpdatedCronInfo;
+    
+    public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
+    private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
     private List<TestLibrary> testLibraries;
     public static final String TEST_LIBRARIES = "testLibraries";
 
@@ -310,5 +318,20 @@ public class AccountSettings {
 
     public void setTelemetryUpdateSentTsMap(Map<String, Integer> telemetryUpdateSentTsMap) {
         this.telemetryUpdateSentTsMap = telemetryUpdateSentTsMap;
+    }
+    public LastCronRunInfo getLastUpdatedCronInfo() {
+        return lastUpdatedCronInfo;
+    }
+
+    public void setLastUpdatedCronInfo(LastCronRunInfo lastUpdatedCronInfo) {
+        this.lastUpdatedCronInfo = lastUpdatedCronInfo;
+    }
+
+    public Map<String, ConnectionInfo> getConnectionIntegrationsInfo() {
+        return connectionIntegrationsInfo;
+    }
+
+    public void setConnectionIntegrationsInfo(Map<String, ConnectionInfo> connectionIntegrationsInfo) {
+        this.connectionIntegrationsInfo = connectionIntegrationsInfo;
     }
 }

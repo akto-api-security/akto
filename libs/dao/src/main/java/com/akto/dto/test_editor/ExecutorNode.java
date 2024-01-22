@@ -1,6 +1,11 @@
 package com.akto.dto.test_editor;
 
 import java.util.List;
+import java.util.Map;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ExecutorNode {
     
@@ -8,6 +13,7 @@ public class ExecutorNode {
     
     private List<ExecutorNode> childNodes;
 
+    @BsonIgnore
     private Object values;
 
     private String operationType;
@@ -51,6 +57,30 @@ public class ExecutorNode {
 
     public void setOperationType(String operationType) {
         this.operationType = operationType;
+    }
+
+    public String fetchConditionalString(String key) {
+        ObjectMapper m = new ObjectMapper();
+        String str = "";
+        try {
+            Map<String,Object> mapValues = m.convertValue(this.getValues(), Map.class);
+            str = (String) mapValues.get(key);
+        } catch (Exception e) {
+            try {
+                List<Object> listValues = (List<Object>) this.getValues();
+                for (int i = 0; i < listValues.size(); i++) {
+                    Map<String,Object> mapValues = m.convertValue(listValues.get(i), Map.class);
+                    str = (String) mapValues.get(key);
+                    if (str != null) {
+                        break;
+                    }
+                }
+            } catch (Exception er) {
+                // TODO: handle exception
+            }
+            // TODO: handle exception
+        }
+        return str;
     }
     
 }

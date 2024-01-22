@@ -2,8 +2,6 @@ package com.akto.action.observe;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -36,7 +34,7 @@ public class Utils {
                 .append("method", "$method");
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method"));
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS));
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.match(filters));
