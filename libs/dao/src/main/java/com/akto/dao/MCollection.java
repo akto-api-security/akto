@@ -7,7 +7,7 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import org.bson.BsonDocument;
+import com.mongodb.BasicDBObject;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -29,6 +29,7 @@ public abstract class MCollection<T> {
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
+    public static final Bson noMatchFilter = Filters.nor(new BasicDBObject());;
 
     public Document getStats() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());

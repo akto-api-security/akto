@@ -11,6 +11,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Utils {
@@ -56,7 +57,7 @@ public class Utils {
                 .append("method", "$method");
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method"));
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS));
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.match(filters));
@@ -82,7 +83,7 @@ public class Utils {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
 
         int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 
