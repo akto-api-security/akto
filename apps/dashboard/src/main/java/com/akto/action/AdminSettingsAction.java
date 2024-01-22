@@ -77,11 +77,11 @@ public class AdminSettingsAction extends UserAction {
             addActionError("Only admin can add change this setting");
             return Action.ERROR.toUpperCase();
         }
-        AccountSettingsDao.instance.getMCollection().updateOne(
-                AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.ENABLE_TELEMETRY, this.enableTelemetry),
-                new UpdateOptions().upsert(true)
-        );
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        TelemetrySettings telemetrySettings = accountSettings.getTelemetrySettings();
+        telemetrySettings.setCustomerEnabled(enableTelemetry);
+        telemetrySettings.setCustomerEnabledAt(Context.now());
+        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.TELEMETRY_SETTINGS, telemetrySettings));
         return SUCCESS.toUpperCase();
     }
 

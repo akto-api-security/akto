@@ -52,6 +52,9 @@ public class BackwardCompatibility {
     public static final String ORGS_IN_BILLING = "orgsInBilling";
     private int orgsInBilling;
 
+    public static final String DEFAULT_TELEMETRY_SETTINGS = "defaultTelemetrySettings";
+    private int defaultTelemetrySettings;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -221,5 +224,13 @@ public class BackwardCompatibility {
 
     public void setOrgsInBilling(int orgsInBilling) {
         this.orgsInBilling = orgsInBilling;
+    }
+
+    public int getDefaultTelemetrySettings() {
+        return defaultTelemetrySettings;
+    }
+
+    public void setDefaultTelemetrySettings(int defaultTelemetrySettings) {
+        this.defaultTelemetrySettings = defaultTelemetrySettings;
     }
 }

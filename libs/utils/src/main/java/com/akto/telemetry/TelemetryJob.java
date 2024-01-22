@@ -44,8 +44,14 @@ public class TelemetryJob {
                     loggerMaker.infoAndAddToDb(String.format("AccountSettings is missing for account: %d, skipping telemetry cron", accountId), LoggerMaker.LogDb.DASHBOARD);
                     return;
                 }
-                if (!accountSettings.isEnableTelemetry()) {
-                    loggerMaker.infoAndAddToDb(String.format("Telemetry is disabled for account %d, skipping telemetry cron", accountId), LoggerMaker.LogDb.DASHBOARD);
+                if (accountSettings.getTelemetrySettings() == null) {
+                    loggerMaker.infoAndAddToDb(String.format("Telemetry settings missing in account settings for %d", accountId), LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
+                if(accountSettings.getTelemetrySettings().isTelemetryEnabled()){
+                    loggerMaker.infoAndAddToDb(String.format("Telemetry is enabled for account: %d", accountId), LoggerMaker.LogDb.DASHBOARD);
+                } else {
+                    loggerMaker.infoAndAddToDb(String.format("Telemetry is disabled for account: %d", accountId), LoggerMaker.LogDb.DASHBOARD);
                     return;
                 }
 

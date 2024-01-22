@@ -29,7 +29,7 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
-        setEnableTelemetry(resp.enableTelemetry)
+        setEnableTelemetry(resp.telemetrySettings.customerEnabled)
     }
 
     useEffect(()=>{

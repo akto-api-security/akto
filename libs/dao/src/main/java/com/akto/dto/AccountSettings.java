@@ -59,7 +59,10 @@ public class AccountSettings {
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
     public static final String ENABLE_TELEMETRY = "enableTelemetry";
-    private boolean enableTelemetry;
+
+    public static final String TELEMETRY_SETTINGS = "telemetrySettings";
+
+    private TelemetrySettings telemetrySettings;
 
     private Map<String, Integer> telemetryUpdateSentTsMap;
     public static final String TELEMETRY_UPDATE_SENT_TS_MAP = "telemetryUpdateSentTsMap";
@@ -296,19 +299,19 @@ public class AccountSettings {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
     }
 
-    public boolean isEnableTelemetry() {
-        return enableTelemetry;
-    }
-
-    public void setEnableTelemetry(boolean enableTelemetry) {
-        this.enableTelemetry = enableTelemetry;
-    }
-
     public Map<String, Integer> getTelemetryUpdateSentTsMap() {
         return telemetryUpdateSentTsMap;
     }
 
     public void setTelemetryUpdateSentTsMap(Map<String, Integer> telemetryUpdateSentTsMap) {
         this.telemetryUpdateSentTsMap = telemetryUpdateSentTsMap;
+    }
+
+    public TelemetrySettings getTelemetrySettings() {
+        return telemetrySettings;
+    }
+
+    public void setTelemetrySettings(TelemetrySettings telemetrySettings) {
+        this.telemetrySettings = telemetrySettings;
     }
 }

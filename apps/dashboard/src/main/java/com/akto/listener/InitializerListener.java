@@ -1252,6 +1252,28 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void setDefaultTelemetrySettings(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDefaultTelemetrySettings() == 0) {
+            int now = Context.now();
+            TelemetrySettings telemetrySettings = new TelemetrySettings();
+            telemetrySettings.setCustomerEnabled(false);
+            telemetrySettings.setCustomerEnabledAt(now);
+            telemetrySettings.setStiggEnabledAt(now);
+            telemetrySettings.setStiggEnabled(false);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            if (accountSettings != null) {
+                loggerMaker.infoAndAddToDb("Setting default telemetry settings", LogDb.DASHBOARD);
+                accountSettings.setTelemetrySettings(telemetrySettings);
+                AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.TELEMETRY_SETTINGS, telemetrySettings));
+            }
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DEFAULT_TELEMETRY_SETTINGS, Context.now())
+            );
+            loggerMaker.infoAndAddToDb("Default telemetry settings set successfully", LogDb.DASHBOARD);
+        }
+    }
+
     public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getAktoDefaultNewUI() == 0){
 
@@ -1648,6 +1670,9 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
+            setTelemetrySettings(organization, telemetryEnabled);
+
             organization.setHotjarSiteId(hotjarSiteId);
 
             organization.setGracePeriod(gracePeriod);
@@ -1665,6 +1690,28 @@ public class InitializerListener implements ServletContextListener {
         }
 
         return organization;
+    }
+
+    private static void setTelemetrySettings(Organization organization, boolean telemetryEnabled){
+        Set<Integer> accounts = organization.getAccounts();
+        if(accounts ==null || accounts.isEmpty()){
+            organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organization.getId()));
+            accounts = organization.getAccounts();
+        }
+        for (Integer accountId : accounts) {
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(eq("_id", accountId));
+            TelemetrySettings settings = accountSettings.getTelemetrySettings();
+            if(settings.getStiggEnabled() != telemetryEnabled){
+                loggerMaker.infoAndAddToDb(String.format("Current stigg setting: %s, new stigg setting: %s for accountId: %d", settings.getStiggEnabled(), telemetryEnabled, accountId), LogDb.DASHBOARD);
+                settings.setStiggEnabled(telemetryEnabled);
+                settings.setStiggEnabledAt(Context.now());
+                accountSettings.setTelemetrySettings(settings);
+                AccountSettingsDao.instance.updateOne(eq("_id", accountId), Updates.set(AccountSettings.TELEMETRY_SETTINGS, accountSettings.getTelemetrySettings()));
+            }
+            else {
+                loggerMaker.infoAndAddToDb(String.format("Current stigg setting: %s, new stigg setting: %s for accountId: %d are same, not taking any action", settings.getStiggEnabled(), telemetryEnabled, accountId), LogDb.DASHBOARD);
+            }
+        }
     }
 
     private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {
@@ -1707,6 +1754,7 @@ public class InitializerListener implements ServletContextListener {
         enableNewMerging(backwardCompatibility);
         enableMergeAsyncOutside(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
+        setDefaultTelemetrySettings(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
