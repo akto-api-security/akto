@@ -146,14 +146,19 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
     @Test
     public void testSeverityScore() throws Exception{
+        // set `ts` every time after runing cron to set last cron timestamp
+        // Thread.sleep before running cron to show that some time has passed since running cron
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiInfoDao.instance.getMCollection().drop();
         AktoDataTypeDao.instance.getMCollection().drop();
         CustomDataTypeDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
+        TestingRunIssuesDao.instance.getMCollection().drop();
 
         InitializerListener.addAktoDataTypes(new BackwardCompatibility());
         SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
+
+        int ts = 0;
 
         fillDBValues();
         String url1 = "https://petstore.swagger.io/v2/store/order";
@@ -171,14 +176,13 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         TestingRunIssues issue4 = generateTestResultIssue(url3, "GET", GlobalEnums.Severity.MEDIUM, "REMOVE_TOKENS");
         TestingRunIssues issue5 = generateTestResultIssue(url2, "POST", GlobalEnums.Severity.LOW, "REMOVE_TOKENS");
         TestingRunIssues issue6 = generateTestResultIssue(url2, "POST", GlobalEnums.Severity.MEDIUM, "MUST_CONTAIN_RESPONSE_HEADERS");
-
-        TestingRunIssuesDao.instance.getMCollection().drop();
+        
         TestingRunIssuesDao.instance.insertMany(Arrays.asList(issue1, issue2, issue3, issue4, issue5, issue6));
-
+        
         RiskScoreOfCollections riskScoreOfCollections = new RiskScoreOfCollections();
-        int ts = 0;
+        
+        Thread.sleep(1000);
         riskScoreOfCollections.updateSeverityScoreInApiInfo(ts);
-
         ts = Context.now();
 
         Bson filter1 = Filters.and(
@@ -205,29 +209,14 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         ApiInfo apiInfo3 = ApiInfoDao.instance.findOne(filter3);
         assertEquals((double) 20, apiInfo3.getSeverityScore(), 0);
 
+        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.FIXED),
+            Updates.set(TestingRunIssues.LAST_SEEN, Context.now())
+        );
+        TestingRunIssuesDao.instance.updateOne(Filters.in("_id", issue1.getId()), update);
+        TestingRunIssuesDao.instance.updateOne(Filters.in("_id", issue3.getId()), update);
+        TestingRunIssuesDao.instance.updateOne(Filters.in("_id", issue5.getId()), update);
+
         Thread.sleep(1000);
-
-        IssuesAction issuesAction = new IssuesAction();
-        issuesAction.setIssueId(issue1.getId());
-        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
-        issuesAction.setIgnoreReason("Fixed");
-
-        String resp1 = issuesAction.updateIssueStatus();
-        assertEquals(resp1, "SUCCESS");
-
-        issuesAction.setIssueId(issue3.getId());
-        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
-        issuesAction.setIgnoreReason("Fixed");
-
-        String resp2 = issuesAction.updateIssueStatus();
-        assertEquals(resp2, "SUCCESS");
-
-        issuesAction.setIssueId(issue5.getId());
-        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
-        issuesAction.setIgnoreReason("Fixed");
-
-        String resp3 = issuesAction.updateIssueStatus();
-        assertEquals(resp3, "SUCCESS");
         riskScoreOfCollections.updateSeverityScoreInApiInfo(ts);
         ts = Context.now();
 
@@ -240,14 +229,14 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         ApiInfo apiInfo6 = ApiInfoDao.instance.findOne(filter3);
         assertEquals((double) 10, apiInfo6.getSeverityScore(), 0);
 
-
-        Thread.sleep(1000);
-
         TestingRunIssues issue7 = generateTestResultIssue(url2, "POST", GlobalEnums.Severity.MEDIUM, "CSRF_LOGIN_ATTACK");
         TestingRunIssuesDao.instance.insertOne(issue7);
 
         riskScoreOfCollections = new RiskScoreOfCollections();
+
+        Thread.sleep(1000);
         riskScoreOfCollections.updateSeverityScoreInApiInfo(ts);
+        ts = Context.now();
 
         ApiInfo apiInfo7 = ApiInfoDao.instance.findOne(filter2);
         assertEquals((double) 20 , apiInfo7.getSeverityScore(), 0);
