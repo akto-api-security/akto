@@ -25,6 +25,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.Utils;
+import com.akto.util.modifier.AddJWKModifier;
 import com.akto.util.modifier.AddJkuJWTModifier;
 import com.akto.util.modifier.InvalidSignatureJWTModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
@@ -175,7 +176,7 @@ public class VariableResolver {
                 }
 
                 if (secondParam.equalsIgnoreCase("none_algo_token") || secondParam.equalsIgnoreCase("invalid_signature_token") 
-                    || secondParam.equalsIgnoreCase("jku_added_token")) {
+                    || secondParam.equalsIgnoreCase("jku_added_token") || secondParam.equalsIgnoreCase("jwk_added_token")) {
                         return true;
                 }
             } catch (Exception e) {
@@ -224,6 +225,13 @@ public class VariableResolver {
                 AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
                 try {
                     modifiedHeaderVal = addJkuJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("jwk_added_token")) {
+                AddJWKModifier addJWKModifier = new AddJWKModifier();
+                try {
+                    modifiedHeaderVal = addJWKModifier.jwtModify("", val);
                 } catch(Exception e) {
                     return null;
                 }
