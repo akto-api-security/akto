@@ -134,7 +134,6 @@ public class Parser {
                     try {
                         RequestBody requestBody = operation.getRequestBody();
                         if (requestBody != null) {
-                            requestBody = new RequestBody();
                             Content content = requestBody.getContent();
                             if (content != null) {
                                 Pair<String, String> example = ContentParser.getExampleFromContent(content);
