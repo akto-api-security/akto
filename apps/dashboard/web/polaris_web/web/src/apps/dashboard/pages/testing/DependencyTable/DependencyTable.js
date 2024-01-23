@@ -8,6 +8,7 @@ import { TickMinor, CancelMinor } from "@shopify/polaris-icons"
 import TableExpand from "./TableExpand";
 import func from "../../../../../util/func";
 import EditModal from "./EditModal";
+import GlobalVarModal from "./GlobalVarModal";
 
 const headers = [
     {
@@ -97,6 +98,14 @@ function DependencyTable() {
     const [refresh, setRefresh] = useState(false)
     const [invokeLoading, setInvokeLoading] = useState(false)
 
+    const [active, setActive] = useState(false);
+    const [editApiCollectionId, setEditApiCollectionId] = useState(null)
+    const [editUrl, setEditUrl] = useState(null)
+    const [editMethod, setEditMethod] = useState(null)
+    const [editData, setEditData] = useState([])
+
+    const [globalVarActive, setGlobalVarActive] = useState(false)
+
     const queryParams = new URLSearchParams(location.search);
     const apiCollectionIdsString = queryParams.get('col_ids')
     const apiCollectionIds = JSON.parse(apiCollectionIdsString)
@@ -150,12 +159,6 @@ function DependencyTable() {
         setLoading(false)
         return { value: final, total: total };
     }
-
-    const [active, setActive] = useState(false);
-    const [editApiCollectionId, setEditApiCollectionId] = useState(null)
-    const [editUrl, setEditUrl] = useState(null)
-    const [editMethod, setEditMethod] = useState(null)
-    const [editData, setEditData] = useState([])
 
     const showEditModal = (apiCollectionId, url, method, data) => {
         setActive(true)
@@ -221,9 +224,15 @@ function DependencyTable() {
         <EditModal
             editData={editData} active={active} setActive={setActive} saveEditData={saveEditData} modifyEditData={modifyEditData}
         />
-
     )
-    const components = [resultTable, modalComponent]
+
+    const globalVarModalComponent = (
+        <GlobalVarModal
+            active={globalVarActive} setActive={setGlobalVarActive} apiCollectionIds={apiCollectionIds}
+        />
+    )
+
+    const components = [resultTable, modalComponent, globalVarModalComponent]
 
     const invokeDependencyTable = () => {
         setInvokeLoading(true)
@@ -247,6 +256,12 @@ function DependencyTable() {
         </Button>
     )
 
+    const globalVarsComponent = (
+        <Button onClick={() => {setGlobalVarActive(true)}} >
+            Edit Global vars
+        </Button>
+    )
+
     return (
         <PageWithMultipleCards
             title={
@@ -257,6 +272,7 @@ function DependencyTable() {
             isFirstPage={true}
             components={components}
             secondaryActions={secondaryActionsComponent}
+            primaryAction={globalVarsComponent}
         />
     )
 }
