@@ -3,6 +3,7 @@ package com.akto.utils;
 import com.akto.DaoInit;
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dao.ModifyHostDetailsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -143,7 +144,7 @@ public class Build {
         
     }
 
-    public List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, ModifyHostDetail> modifyHostDetailMap, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
@@ -153,7 +154,7 @@ public class Build {
             for (String sample: samples) {
                 OriginalHttpRequest request = new OriginalHttpRequest();
                 request.buildFromSampleMessage(sample);
-                String newHost = findNewHost(request, hostRelations);
+                String newHost = findNewHost(request, modifyHostDetailMap);
 
                 OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
                 originalHttpResponse.buildFromSampleMessage(sample);
@@ -192,14 +193,20 @@ public class Build {
         return runResults;
     }
 
-    public String findNewHost(OriginalHttpRequest request, Map<String, String> hostRelations) {
+    public String findNewHost(OriginalHttpRequest request, Map<String, ModifyHostDetail> modifyHostDetailMap) {
         try {
             String url = request.getFullUrlIncludingDomain();
             URI uri = new URI(url);
             String currentHost = uri.getHost();
-            String newHost = hostRelations.get(currentHost);
+            ModifyHostDetail modifyHostDetail = modifyHostDetailMap.get(currentHost);
+            if (modifyHostDetail == null) return null;
+            String newHost = modifyHostDetail.getNewHost();
             if (newHost == null) return null;
-            return  uri.getScheme() + "://" + newHost;
+            if (newHost.startsWith("http")) {
+                return newHost;
+            } else {
+                return  uri.getScheme() + "://" + newHost;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -207,9 +214,14 @@ public class Build {
     }
 
 
-    public List<RunResult> run(List<Integer> apiCollectionsIds, Map<String, String> hostRelations, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public List<RunResult> run(List<Integer> apiCollectionsIds, List<ModifyHostDetail> modifyHostDetails, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         if (replaceDetailsMap == null) replaceDetailsMap = new HashMap<>();
-        if (hostRelations == null) hostRelations = new HashMap<>();
+        if (modifyHostDetails == null) modifyHostDetails = new ArrayList<>();
+
+        Map<String, ModifyHostDetail> modifyHostDetailMap = new HashMap<>();
+        for (ModifyHostDetail modifyHostDetail: modifyHostDetails) {
+            modifyHostDetailMap.put(modifyHostDetail.getCurrentHost(), modifyHostDetail);
+        }
 
         buildParentToChildMap(apiCollectionsIds);
         Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(apiCollectionsIds);
@@ -223,7 +235,7 @@ public class Build {
 
             loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {
-                List<RunResult> runResultsPerLevel = runPerLevel(sdList, hostRelations, replaceDetailsMap);
+                List<RunResult> runResultsPerLevel = runPerLevel(sdList, modifyHostDetailMap, replaceDetailsMap);
                 runResults.addAll(runResultsPerLevel);
                 loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
@@ -360,7 +372,8 @@ public class Build {
 
         Build build = new Build();
         long start = System.currentTimeMillis();
-        List<RunResult> runResults = build.run(Collections.singletonList(1705668952), new HashMap<>(), new HashMap<>());
+        List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
+        List<RunResult> runResults = build.run(Collections.singletonList(1705668952), modifyHostDetails, new HashMap<>());
         System.out.println(System.currentTimeMillis()  - start);
 
 //        System.out.println(runResults);
