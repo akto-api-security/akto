@@ -264,4 +264,24 @@ export default {
             }
         })
     },
+
+    fetchGlobalVars(apiCollectionIds){
+        return request({
+            url: '/api/fetchGlobalVars',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
+
+    saveGlobalVars(modifyHostDetails){
+        return request({
+            url: '/api/saveGlobalVars',
+            method: 'post',
+            data: {
+                modifyHostDetails
+            }
+        })
+    },
 }

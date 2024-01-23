@@ -8,7 +8,7 @@ function EditModal(props) {
    const {editData, active, setActive, saveEditData, modifyEditData} = props
     const modalComponent = (
         <Modal
-            key="modal"
+            key="edit_modal"
             open={active}
             onClose={() => setActive(false)}
             title="Edit dependencies"

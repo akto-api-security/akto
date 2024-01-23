@@ -1,18 +1,15 @@
 package com.akto.action;
 
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.ReplaceDetailsDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.*;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.dependency_flow.KVPair;
-import com.akto.dto.dependency_flow.Node;
-import com.akto.dto.dependency_flow.ReplaceDetail;
-import com.akto.dto.dependency_flow.TreeHelper;
+import com.akto.dto.dependency_flow.*;
 import com.akto.dto.type.URLMethods;
 import com.akto.utils.Build;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
+import org.apache.logging.log4j.util.Strings;
+import org.bson.conversions.Bson;
 
 import java.util.*;
 
@@ -94,6 +91,57 @@ public class DependencyAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private List<ModifyHostDetail> modifyHostDetails = new ArrayList<>();
+    public String fetchGlobalVars() {
+        List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(apiCollectionIds);
+        List<Integer> nonTrafficCollectionIds = new ArrayList<>();
+
+        Set<String> hosts = new HashSet<>();
+        for (ApiCollection apiCollection: metaForIds) {
+            String hostName = apiCollection.getHostName();
+            if (hostName == null) {
+                nonTrafficCollectionIds.add(apiCollection.getId());
+            } else {
+                hosts.add(hostName);
+            }
+        }
+
+        if (!nonTrafficCollectionIds.isEmpty()) {
+            Set<String> hostsFromNonTrafficCollections = SingleTypeInfoDao.instance.fetchHosts(nonTrafficCollectionIds);
+            hosts.addAll(hostsFromNonTrafficCollections);
+        }
+
+        modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
+        Set<String> modifiedHosts = new HashSet<>();
+        for (ModifyHostDetail modifiedHostDetail: modifyHostDetails) {
+            modifiedHosts.add(modifiedHostDetail.getCurrentHost());
+        }
+
+        for (String host: hosts) {
+            if (!modifiedHosts.contains(host)) modifyHostDetails.add(new ModifyHostDetail(host, null));
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String saveGlobalVars() {
+        List<WriteModel<ModifyHostDetail>> bulkUpdates = new ArrayList<>();
+        for (ModifyHostDetail modifyHostDetail: modifyHostDetails) {
+            Bson filter = Filters.eq(ModifyHostDetail.CURRENT_HOST, modifyHostDetail.getCurrentHost());
+            String newHost = modifyHostDetail.getNewHost();
+
+            if (newHost == null || newHost.trim().isEmpty()) {
+                bulkUpdates.add(new DeleteOneModel<>(filter));
+            } else {
+                Bson update = Updates.set(ModifyHostDetail.NEW_HOST, newHost);
+                bulkUpdates.add(new UpdateOneModel<ModifyHostDetail>(filter, update, new UpdateOptions().upsert(true)));
+            }
+        }
+
+        if (!bulkUpdates.isEmpty()) ModifyHostDetailsDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+        return SUCCESS.toUpperCase();
+    }
+
     public Collection<Node> getResult() {
         return result;
     }
@@ -139,5 +187,11 @@ public class DependencyAction extends UserAction {
         return replaceDetails;
     }
 
-    
+    public List<ModifyHostDetail> getModifyHostDetails() {
+        return modifyHostDetails;
+    }
+
+    public void setModifyHostDetails(List<ModifyHostDetail> modifyHostDetails) {
+        this.modifyHostDetails = modifyHostDetails;
+    }
 }
