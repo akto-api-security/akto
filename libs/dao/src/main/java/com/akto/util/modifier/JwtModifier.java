@@ -90,9 +90,7 @@ public abstract class JwtModifier extends PayloadModifier {
         byte[] decodedHeaderBytes = Base64.getDecoder().decode(encodedHeader);
         String decodedHeaderStr = new String(decodedHeaderBytes, StandardCharsets.UTF_8);
 
-        // convert string to map
         Map<String, Object> json = new Gson().fromJson(decodedHeaderStr, Map.class);
-        // alg -> none
         for (String key: extraHeaders.keySet()) {
             json.put(key, extraHeaders.get(key));
         }
