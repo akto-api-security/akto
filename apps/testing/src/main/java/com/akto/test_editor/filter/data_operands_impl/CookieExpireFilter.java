@@ -43,7 +43,6 @@ public class CookieExpireFilter extends DataOperandsImpl {
             String expiresTs = cookieMap.get("Expires");
             DateTimeFormatter formatter = DateTimeFormatter.RFC_1123_DATE_TIME;
             ZonedDateTime dateTime = ZonedDateTime.parse(expiresTs, formatter);
-            System.out.println(dateTime);
             
             ZonedDateTime now = ZonedDateTime.now();
             Duration duration = Duration.between(now, dateTime);
