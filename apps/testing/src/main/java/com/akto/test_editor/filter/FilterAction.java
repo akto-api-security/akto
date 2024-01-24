@@ -39,6 +39,7 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ContainsAllFilter;
 import com.akto.test_editor.filter.data_operands_impl.ContainsEitherFilter;
 import com.akto.test_editor.filter.data_operands_impl.ContainsJwt;
+import com.akto.test_editor.filter.data_operands_impl.CookieExpireFilter;
 import com.akto.test_editor.filter.data_operands_impl.DataOperandsImpl;
 import com.akto.test_editor.filter.data_operands_impl.EqFilter;
 import com.akto.test_editor.filter.data_operands_impl.GreaterThanEqFilter;
@@ -70,6 +71,7 @@ public final class FilterAction {
         put("lte", new LesserThanEqFilter());
         put("not_contains_either", new NotContainsEitherFilter());
         put("contains_jwt", new ContainsJwt());
+        put("cookie_expire_filter", new CookieExpireFilter());
     }};
 
     public FilterAction() { }
