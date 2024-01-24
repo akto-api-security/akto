@@ -308,18 +308,7 @@ public class Build {
 
         Map<Integer, ReplaceDetail> deltaReplaceDetailsMap = new HashMap<>();
 
-        String respPayload = response.getBody();
-        if (respPayload == null || respPayload.isEmpty()) respPayload = "{}";
-        if (respPayload.startsWith("[")) respPayload = "{\"json\": "+respPayload+"}";
-
-        Map<String,Set<String>> valuesMap = new HashMap<>();
-        try {
-            JsonParser jp = factory.createParser(respPayload);
-            JsonNode jsonNode = mapper.readTree(jp);
-            RelationshipSync.extractAllValuesFromPayload(jsonNode, new ArrayList<>(), valuesMap);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        Map<String, Set<String>> valuesMap = RelationshipSync.extractAllValuesFromPayload(response.getBody());
 
         boolean found = true;
 
