@@ -283,6 +283,11 @@ const router = createBrowserRouter([
   path: "/",
     element: <Navigate to="/login" />,
   },
+  // catches all undefined paths and redirects to homepage.
+  {
+    path: "*",
+    element: <Navigate to="/dashboard/home" />,
+  }
 ])
 
 function App() {

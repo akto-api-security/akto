@@ -1568,10 +1568,13 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+            BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
+            gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
+            boolean expired = OrganizationUtils.fetchExpired(metaData);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
+            organization.setExpired(expired);
 
             lastFeatureMapUpdate = Context.now();
             organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
@@ -1581,6 +1584,7 @@ public class InitializerListener implements ServletContextListener {
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),

@@ -8,6 +8,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.OrgMetaData;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.util.UsageUtils;
@@ -276,34 +277,37 @@ public class OrganizationUtils {
         return (BasicDBList) (ret.get("entitlements"));
     }
 
-    public static int fetchOrgGracePeriod(String orgId, String adminEmail) {
-        String orgIdUUID = UUID.fromString(orgId).toString();
-        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject ret = fetchFromBillingService("fetchOrgMetaData", reqBody);
-
-        if (ret == null) {
-            return 0;
-        }
-
-        BasicDBObject additionalMetaData = (BasicDBObject) ret.getOrDefault("additionalMetaData", new BasicDBObject());
-        String gracePeriodStr = (String) additionalMetaData.getOrDefault("GRACE_PERIOD_END_EPOCH", "");
+    public static int fetchOrgGracePeriodFromMetaData(BasicDBObject additionalMetaData) {
+        String gracePeriodStr = (String) additionalMetaData.getOrDefault(OrgMetaData.GRACE_PERIOD_END_EPOCH.name(), "");
 
         int gracePeriod = 0;
 
         if(gracePeriodStr.isEmpty()) {
             return 0;
         }
-
         try {
             gracePeriod = Integer.parseInt(gracePeriodStr);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to parse grace period for orgId: " + orgId + " adminEmail: " + adminEmail + " gracePeriodStr: " + gracePeriodStr, LoggerMaker.LogDb.DASHBOARD);   
+            loggerMaker.errorAndAddToDb("Failed to parse grace period" + gracePeriodStr, LoggerMaker.LogDb.DASHBOARD);
         }
-
         if(gracePeriod <= 0) {
             return 0;
         }
-
         return gracePeriod;
+    }
+
+    public static BasicDBObject fetchOrgMetaData(String orgId, String adminEmail) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
+        BasicDBObject orgMetaData = fetchFromBillingService("fetchOrgMetaData", reqBody);
+        orgMetaData = orgMetaData == null ? new BasicDBObject() : orgMetaData;
+        BasicDBObject additionalMetaData = (BasicDBObject) orgMetaData.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData;
+    }
+
+    public static boolean fetchExpired(BasicDBObject additionalMetaData) {
+        String expiredStr = (String) additionalMetaData.getOrDefault(OrgMetaData.EXPIRED.name(), "false");
+        boolean expired = Boolean.parseBoolean(expiredStr);
+        return expired;
     }
 }

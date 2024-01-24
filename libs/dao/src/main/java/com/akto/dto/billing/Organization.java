@@ -30,6 +30,9 @@ public class Organization {
     public static final String GRACE_PERIOD = "gracePeriod";
     private int gracePeriod;
 
+    public static final String _EXPIRED = "expired";
+    private boolean expired;
+
     public Organization() { }
 
     public Organization(String id, String name, String adminEmail, Set<Integer> accounts, boolean onPrem) {
@@ -111,5 +114,13 @@ public class Organization {
 
     public void setLastFeatureMapUpdate(int lastFeatureMapUpdate) {
         this.lastFeatureMapUpdate = lastFeatureMapUpdate;
+    }
+
+    public boolean isExpired() {
+        return expired;
+    }
+
+    public void setExpired(boolean expired) {
+        this.expired = expired;
     }
 }

@@ -78,6 +78,8 @@
                         window.STIGG_CLIENT_KEY='invalid-key'
                     }
 
+                    window.EXPIRED = '${requestScope.expired}'
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 
