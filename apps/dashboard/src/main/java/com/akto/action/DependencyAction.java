@@ -58,7 +58,7 @@ public class DependencyAction extends UserAction {
 
         for (Node node: nodes) {
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod()));
-            List<String> params = parametersMap.get(apiInfoKey);
+            List<String> params = parametersMap.getOrDefault(apiInfoKey, new ArrayList<>());
             BasicDBObject res = new BasicDBObject("node", node);
             res.put("params", params);
             dependencyTableList.add(res);
