@@ -1,12 +1,20 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.*;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
+import com.akto.runtime.RelationshipSync;
 import com.akto.utils.Build;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
 import org.apache.logging.log4j.util.Strings;
 import org.bson.conversions.Bson;
@@ -143,6 +151,51 @@ public class DependencyAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(1_000_000);
+
+        DependencyAction dependencyAction = new DependencyAction();
+        dependencyAction.setApiCollectionId(1706005870);
+        dependencyAction.setUrl("https://api.hcaptcha.com/getcaptcha/20000000-ffff-ffff-ffff-000000000002");
+        dependencyAction.setMethod(Method.POST);
+        dependencyAction.setParams(new HashSet<>(Arrays.asList("hl", "pdc", "host", "origin", "v", "pst")));
+
+        dependencyAction.fetchValuesForParameters();
+        System.out.println(dependencyAction.getParamToValuesMap());
+    }
+
+
+    private Set<String> params;
+    private final Map<String, Set<String>> paramToValuesMap = new HashMap<>();
+    public String fetchValuesForParameters() {
+        Bson filter = Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url),
+                Filters.eq("_id.method", method.name())
+        );
+        SampleData sampleData = SampleDataDao.instance.findOne(filter);
+
+        if (sampleData == null) return SUCCESS.toUpperCase();
+
+        List<String> samples = sampleData.getSamples();
+        if (samples.isEmpty()) return SUCCESS.toUpperCase();
+
+        String sample = samples.get(0);
+
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.buildFromSampleMessage(sample);
+        Map<String, Set<String>> valuesMap = RelationshipSync.extractAllValuesFromPayload(originalHttpRequest.getJsonRequestBody());
+
+        for (String key: valuesMap.keySet()) {
+            if (params.contains(key)) {
+                paramToValuesMap.put(key, valuesMap.getOrDefault(key, new HashSet<>()));
+            }
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     public Collection<Node> getResult() {
         return result;
     }
@@ -194,5 +247,14 @@ public class DependencyAction extends UserAction {
 
     public void setModifyHostDetails(List<ModifyHostDetail> modifyHostDetails) {
         this.modifyHostDetails = modifyHostDetails;
+    }
+
+
+    public void setParams(Set<String> params) {
+        this.params = params;
+    }
+
+    public Map<String, Set<String>> getParamToValuesMap() {
+        return paramToValuesMap;
     }
 }

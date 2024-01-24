@@ -284,4 +284,17 @@ export default {
             }
         })
     },
+
+    fetchValuesForParameters(apiCollectionId, url, method, params){
+        if (typeof apiCollectionId === "string") {
+            apiCollectionId = parseInt(apiCollectionId)
+        }
+        return request({
+            url: '/api/fetchValuesForParameters',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method, params
+            }
+        })
+    },
 }

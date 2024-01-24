@@ -1,5 +1,5 @@
 import { Box, Button, Icon, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -14,6 +14,7 @@ const headers = [
     {
         value: "success",
         title: '',
+        type: CellType.TEXT,
     },
     {
         value: "url",
@@ -36,8 +37,8 @@ const headers = [
         type: CellType.TEXT,
     },
     {
-        title: '',
-        type: CellType.COLLAPSIBLE
+        title: '  ',
+        type: CellType.COLLAPSIBLE,
     }
 ]
 
@@ -46,47 +47,6 @@ const resourceName = {
     plural: 'Dependency table',
 };
 
-function connectionToCollapsibleText(childApiCollectionId, childUrl, childMethod, connections, params, replaceDetailMap) {
-    let res = []
-    let store = new Set()
-    Object.keys(connections).forEach((ele) => {
-        let edges = connections[ele]["edges"]
-        let edge = edges[0]
-        store.add(ele)
-
-        let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod,ele, Boolean(connections[ele]["isHeader"], Boolean(connections[ele]["isUrlParam"])))
-        let val = replaceDetailMap.get(key)
-
-        res.push({
-            "parentUrl": edge["url"],
-            "parentMethod": edge["method"],
-            "parentParam": edge["param"],
-            "childParam": ele,
-            "childParamIsUrlParam": Boolean(connections[ele]["isUrlParam"]),
-            "childParamIsHeader": Boolean(connections[ele]["isHeader"]),
-            "value": val
-        })
-    })
-
-    params.forEach(param => {
-        if (store.has(param)) return
-
-        let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod, param, false, false) // todo
-        let val = replaceDetailMap.get(key)
-
-        res.push({
-            "parentUrl": null,
-            "parentMethod": null,
-            "parentParam": null,
-            "childParam": param,
-            "childParamIsUrlParam": false, // todo
-            "childParamIsHeader": false,
-            "value": val
-        })
-    })
-
-    return res
-}
 
 const generateKeyForReplaceDetailMap = (apiCollectionId, url, method, key, isHeader, isUrlParam) => {
     return apiCollectionId + "#" + url + "#" + method + "#" + key + "#" + Boolean(isHeader) + "#" + Boolean(isUrlParam)
@@ -109,6 +69,49 @@ function DependencyTable() {
     const queryParams = new URLSearchParams(location.search);
     const apiCollectionIdsString = queryParams.get('col_ids')
     const apiCollectionIds = JSON.parse(apiCollectionIdsString)
+
+    function connectionToCollapsibleText(childApiCollectionId, childUrl, childMethod, connections, params, replaceDetailMap) {
+        let res = []
+        let store = new Set()
+        Object.keys(connections).forEach((ele) => {
+            let edges = connections[ele]["edges"]
+            let edge = edges[0]
+            store.add(ele)
+
+            let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod, ele, Boolean(connections[ele]["isHeader"], Boolean(connections[ele]["isUrlParam"])))
+            let val = replaceDetailMap.get(key)
+
+            res.push({
+                "parentUrl": edge["url"],
+                "parentMethod": edge["method"],
+                "parentParam": edge["param"],
+                "childParam": ele,
+                "childParamIsUrlParam": Boolean(connections[ele]["isUrlParam"]),
+                "childParamIsHeader": Boolean(connections[ele]["isHeader"]),
+                "value": val
+            })
+        })
+
+        params.forEach(param => {
+            if (store.has(param)) return
+
+            let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod, param, false, false) // todo
+            let val = replaceDetailMap.get(key)
+
+            res.push({
+                "parentUrl": null,
+                "parentMethod": null,
+                "parentParam": null,
+                "childParam": param,
+                "childParamIsUrlParam": false, // todo
+                "childParamIsHeader": false,
+                "value": val
+            })
+        })
+
+        return res
+    }
+
 
     async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
         setLoading(true)
@@ -133,7 +136,7 @@ function DependencyTable() {
             let node = val["node"]
             let params = val["params"]
             let connections = node["connections"]
-            let data = connectionToCollapsibleText(node["apiCollectionId"],node["url"],node["method"],connections, params, replaceDetailMap)
+            let data = connectionToCollapsibleText(node["apiCollectionId"], node["url"], node["method"], connections, params, replaceDetailMap)
             let icon = null
             let key = node["method"] + " " + node["url"]
             let runResult = runResults[key]
@@ -145,6 +148,7 @@ function DependencyTable() {
                 }
             }
             final.push({
+                "name": node["method"] + " " + node["url"],
                 "id": node["method"] + " " + node["url"],
                 "success": icon,
                 "url": node["method"] + " " + node["url"],
@@ -152,7 +156,7 @@ function DependencyTable() {
                 "totalParameters": params.length,
                 "missingParameters": params.length - Object.keys(connections).length,
                 "urls": data,
-                "collapsibleRow": TableExpand(data, node["apiCollectionId"], node["url"], node["method"], showEditModal)
+                "collapsibleRow": <TableExpand data={data} childApiCollectionId={node["apiCollectionId"]} childUrl={node["url"]} childMethod={node["method"]} showEditModal={showEditModal}/>
             })
         })
 
@@ -222,12 +226,14 @@ function DependencyTable() {
 
     const modalComponent = (
         <EditModal
+            key="edit-modal"
             editData={editData} active={active} setActive={setActive} saveEditData={saveEditData} modifyEditData={modifyEditData}
         />
     )
 
     const globalVarModalComponent = (
         <GlobalVarModal
+            key="global-var-modal"
             active={globalVarActive} setActive={setGlobalVarActive} apiCollectionIds={apiCollectionIds}
         />
     )
@@ -257,7 +263,7 @@ function DependencyTable() {
     )
 
     const globalVarsComponent = (
-        <Button onClick={() => {setGlobalVarActive(true)}} >
+        <Button onClick={() => { setGlobalVarActive(true) }} >
             Edit Global vars
         </Button>
     )
