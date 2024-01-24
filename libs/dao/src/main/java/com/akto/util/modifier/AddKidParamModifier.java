@@ -1,10 +1,10 @@
 package com.akto.util.modifier;
 
-public class AddJWKModifier extends JwtModifier{
+public class AddKidParamModifier extends JwtModifier{
 
     @Override
     public String jwtModify(String key, String value) throws Exception {
         
-        return addJwkHeader(value);
+        return addKidParamHeader(value);
     }
 }
