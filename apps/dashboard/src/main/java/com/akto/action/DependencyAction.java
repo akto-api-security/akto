@@ -72,7 +72,7 @@ public class DependencyAction extends UserAction {
     public String invokeDependencyTable() {
         Build build = new Build();
         List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
-        runResults = build.run(Collections.singletonList(1705668952), modifyHostDetails, new HashMap<>());
+        runResults = build.run(apiCollectionIds, modifyHostDetails, new HashMap<>());
         for (Build.RunResult runResult: runResults) {
             runResult.setCurrentMessage("");;
             runResult.setOriginalMessage("");

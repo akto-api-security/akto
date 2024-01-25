@@ -75,12 +75,14 @@ function DependencyTable() {
         let store = new Set()
         Object.keys(connections).forEach((ele) => {
             let edges = connections[ele]["edges"]
+            if (!edges ||edges.length === 0) return
             let edge = edges[0]
             store.add(ele)
 
             let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod, ele, Boolean(connections[ele]["isHeader"], Boolean(connections[ele]["isUrlParam"])))
             let val = replaceDetailMap.get(key)
 
+            console.log(edge, ele)
             res.push({
                 "parentUrl": edge["url"],
                 "parentMethod": edge["method"],
@@ -242,7 +244,7 @@ function DependencyTable() {
 
     const invokeDependencyTable = () => {
         setInvokeLoading(true)
-        api.invokeDependencyTable().then((resp) => {
+        api.invokeDependencyTable(apiCollectionIds).then((resp) => {
             let runResultList = resp["runResults"]
             let temp = {}
             runResultList.forEach((runResult) => {
