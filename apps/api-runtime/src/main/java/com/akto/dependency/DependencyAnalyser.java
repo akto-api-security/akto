@@ -286,6 +286,8 @@ public class DependencyAnalyser {
             String apiCollectionIdReq = dependencyNode.getApiCollectionIdReq();
             String methodReq = dependencyNode.getMethodReq();
 
+            if (apiCollectionIdResp.equals(apiCollectionIdReq) && urlResp.equals(urlReq) && methodResp.equals(methodReq)) continue;
+
             for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
                 Bson filter1 = Filters.and(
                         Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
