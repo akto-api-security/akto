@@ -55,6 +55,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
+import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClients;
 
 import org.bson.codecs.configuration.CodecRegistries;
@@ -276,6 +277,7 @@ public class DaoInit {
 
         MongoClientSettings clientSettings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString)
+                .readPreference(ReadPreference.secondaryPreferred())
                 .codecRegistry(codecRegistry)
                 .build();
 
