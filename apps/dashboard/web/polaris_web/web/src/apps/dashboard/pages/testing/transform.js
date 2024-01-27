@@ -2,9 +2,12 @@ import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup} from '@shopify/polaris';
+import { history } from "@/util/history";
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar} from '@shopify/polaris';
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
+import { circle_cancel, circle_tick_minor } from "../../components/icons";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -168,10 +171,10 @@ const transform = {
       let iconComp
       switch(state){
         case "COMPLETED":
-          iconComp = (<Avatar shape="round" size="extraSmall" source="/public/circle_tick_minor.svg" />)
+          iconComp = (<Box><Icon source={circle_tick_minor} /></Box>)
           break;
         case "STOPPED":
-          iconComp = (<Avatar shape="round" size="extraSmall" source="/public/circle_cancel.svg" />)
+          iconComp = (<Box><Icon source={circle_cancel} /></Box>)
           break;
         default:
           iconComp = (<Box><Icon source={icon} color={iconColor}/></Box>)
@@ -218,7 +221,7 @@ const transform = {
       obj['icon'] = func.getTestingRunIcon(state);
       obj['iconColor'] = func.getTestingRunIconColor(state)
       obj['name'] = data.name || "Test"
-      obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary?.testResultsCount, state)
+      obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
       obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
       obj['scheduleTimestamp'] = data.scheduleTimestamp
@@ -238,7 +241,6 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state), state),
-          number_of_tests: getTestsInfo(testingRunResultSummary?.testResultsCount, state),
           severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
         }
         return prettifiedTest
@@ -618,7 +620,7 @@ getUrlComp(url){
   )
 },
 
-getCollapisbleRow(urls){
+getCollapsibleRow(urls){
   return(
     <tr style={{background: "#EDEEEF"}}>
       <td colSpan={7}>
@@ -626,7 +628,7 @@ getCollapisbleRow(urls){
           <VerticalStack gap={2}>
             {urls.map((ele,index)=>{
               return(
-                <Link monochrome url={ele.nextUrl} removeUnderline key={index}>
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
               )
@@ -681,7 +683,7 @@ getPrettifiedTestRunResults(testRunResults){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapisbleRow(obj.urls),
+      collapsibleRow: this.getCollapsibleRow(obj.urls),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)

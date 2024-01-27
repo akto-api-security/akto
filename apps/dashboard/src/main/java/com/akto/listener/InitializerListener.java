@@ -45,6 +45,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
+import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
@@ -117,6 +118,7 @@ import static com.mongodb.client.model.Filters.eq;
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
 
@@ -1271,6 +1273,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setUpFillCollectionIdArrayJob() {
+        scheduler.schedule(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        fillCollectionIdArray();
+                    }
+                }, "fill-collection-id");
+            }
+        }, 0, TimeUnit.SECONDS);
+    }
 
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
@@ -1299,6 +1313,32 @@ public class InitializerListener implements ServletContextListener {
                 ApiCollectionUsers.updateCollections(collections.getValue(), filter, update);
             }
         }
+    }
+
+    public void updateCustomCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for (ApiCollection apiCollection : apiCollections) {
+            if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
+                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            }
+        }
+    }
+
+    public void setUpUpdateCustomCollections() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            updateCustomCollections();
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "update-custom-collections");
+            }
+        }, 0, 24, TimeUnit.HOURS);
     }
 
     public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
@@ -1426,7 +1466,10 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
-                        fillCollectionIdArray();
+
+                        setUpUpdateCustomCollections();
+
+                        setUpFillCollectionIdArrayJob();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1482,6 +1525,8 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
+    private final static int REFRESH_INTERVAL = 60 * 1; // 1 minute
+
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
@@ -1489,6 +1534,16 @@ public class InitializerListener implements ServletContextListener {
         try {
             int gracePeriod = organization.getGracePeriod();
             String organizationId = organization.getId();
+
+            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
+
+            /*
+             * This ensures, we don't fetch feature wise allowed from akto too often.
+             * This helps the dashboard to be more responsive.
+             */
+            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
+                return organization;
+            }
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
             if (initialFeatureWiseAllowed == null) {
@@ -1518,11 +1573,15 @@ public class InitializerListener implements ServletContextListener {
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
 
+            lastFeatureMapUpdate = Context.now();
+            organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
+
             OrganizationsDao.instance.updateOne(
                     Filters.eq(Constants.ID, organizationId),
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
-                            Updates.set(Organization.GRACE_PERIOD, gracePeriod)));
+                            Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
                     LogDb.DASHBOARD);
@@ -1700,7 +1759,7 @@ public class InitializerListener implements ServletContextListener {
                                         LogDb.DASHBOARD);
                                 processTemplateFilesZip(repoZip, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                             } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb(e,
+                                cacheLoggerMaker.errorAndAddToDb(e,
                                         String.format("Error while updating Test Editor Files %s", e.toString()),
                                         LogDb.DASHBOARD);
                             }
@@ -1833,7 +1892,7 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
                 }
             } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(ex,
+                cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
                         LogDb.DASHBOARD);
             }

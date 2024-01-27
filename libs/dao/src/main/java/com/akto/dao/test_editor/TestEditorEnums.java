@@ -15,7 +15,8 @@ public class TestEditorEnums {
         LT,
         NEQ,
         PARAM,
-        CONTAINS_JWT
+        CONTAINS_JWT,
+        COOKIE_EXPIRE_FILTER
     }
 
     public enum CollectionOperands {
@@ -37,7 +38,8 @@ public class TestEditorEnums {
 
     public enum PredicateOperator {
         AND,
-        OR
+        OR,
+        COMPARE_GREATER
     }
 
     public enum KeyValOperator {

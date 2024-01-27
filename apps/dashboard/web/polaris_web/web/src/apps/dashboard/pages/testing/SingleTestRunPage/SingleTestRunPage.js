@@ -298,7 +298,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
           ...element,
           urls: filteredUrls,
           totalUrls: filteredUrls.length,
-          collapsibleRow: transform.getCollapisbleRow(filteredUrls)
+          collapsibleRow: transform.getCollapsibleRow(filteredUrls)
         }
       });
       return filteredData
