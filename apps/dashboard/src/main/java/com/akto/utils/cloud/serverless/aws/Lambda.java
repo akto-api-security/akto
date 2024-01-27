@@ -77,7 +77,7 @@ public class Lambda implements ServerlessFunction {
             req.setEnvironment(updatedEnvironment);
 
             awsLambda.updateFunctionConfiguration(req);
-            loggerMaker.infoAndAddToDb("Succeefully updated function configuration for function: " + functionName, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Successfully updated function configuration for function: " + functionName, LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
         }
