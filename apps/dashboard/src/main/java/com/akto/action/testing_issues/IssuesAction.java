@@ -210,6 +210,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
         infoObj.put("updatedTs", testConfig.getUpdateTs());
+        infoObj.put("author", testConfig.getAuthor());
 
         superCategory.put("displayName", info.getCategory().getDisplayName());
         superCategory.put("name", info.getCategory().getName());
