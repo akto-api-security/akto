@@ -203,7 +203,7 @@ public class JiraIntegrationAction extends UserAction {
                 jiraTicketKey = payloadObj.getString("key");
                 jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + jiraTicketKey;
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return null;
             }
         } catch(Exception e) {
