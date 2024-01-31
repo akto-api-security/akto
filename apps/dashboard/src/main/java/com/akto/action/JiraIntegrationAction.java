@@ -194,7 +194,7 @@ public class JiraIntegrationAction extends UserAction {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
             }
             BasicDBObject payloadObj;
@@ -203,6 +203,7 @@ public class JiraIntegrationAction extends UserAction {
                 jiraTicketKey = payloadObj.getString("key");
                 jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + jiraTicketKey;
             } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return null;
             }
         } catch(Exception e) {
