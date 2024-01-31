@@ -90,13 +90,12 @@ public class JiraIntegrationAction extends UserAction {
                         continue;
                     }
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
-                    for (Object issueObj: issueTypes) {
-                        BasicDBObject obj2 = (BasicDBObject) issueObj;
-                        String issueName = obj2.getString("name");
-                        if (!issueName.equalsIgnoreCase("TASK")) {
-                            continue;
-                        }
-                        issueType = obj2.getString("id");
+                    issueType = determineIssueType(issueTypes, "TASK");
+                    if (issueType == null) {
+                        issueType = determineIssueType(issueTypes, "BUG");
+                    }
+                    if (issueType == null) {
+                        issueType = determineIssueType(issueTypes, "");
                     }
                 }
                 if (issueType == null) {
@@ -112,6 +111,20 @@ public class JiraIntegrationAction extends UserAction {
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String determineIssueType(BasicDBList issueTypes, String jiraIssueType) {
+
+        String issueType = null;
+        for (Object issueObj: issueTypes) {
+            BasicDBObject obj2 = (BasicDBObject) issueObj;
+            String issueName = obj2.getString("name");
+            if (!jiraIssueType.equals("") && !issueName.equalsIgnoreCase(jiraIssueType)) {
+                continue;
+            }
+            issueType = obj2.getString("id");
+        }
+        return issueType;
     }
 
     public String addIntegration() {
