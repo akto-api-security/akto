@@ -195,6 +195,22 @@ public class JiraIntegrationAction extends UserAction {
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
+                if (responsePayload != null) {
+                    try {
+                        BasicDBObject obj = BasicDBObject.parse(responsePayload);
+                        List<String> errorMessages = (List) obj.get("errorMessages");
+                        String error;
+                        if (errorMessages.size() == 0) {
+                            BasicDBObject errObj = BasicDBObject.parse(obj.getString("errors"));
+                            error = errObj.getString("project");
+                        } else {
+                            error = errorMessages.get(0);
+                        }
+                        addActionError(error);
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                }
                 return Action.ERROR.toUpperCase();
             }
             BasicDBObject payloadObj;
