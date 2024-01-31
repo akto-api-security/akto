@@ -39,12 +39,6 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.rate_limit.ApiRateLimit;
-import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
-import com.akto.dto.testing.rate_limit.RateLimitHandler;
-import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.dto.traffic.Key;
-import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -98,7 +92,6 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1270,6 +1263,28 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void setDefaultTelemetrySettings(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDefaultTelemetrySettings() == 0) {
+            int now = Context.now();
+            TelemetrySettings telemetrySettings = new TelemetrySettings();
+            telemetrySettings.setCustomerEnabled(false);
+            telemetrySettings.setCustomerEnabledAt(now);
+            telemetrySettings.setStiggEnabledAt(now);
+            telemetrySettings.setStiggEnabled(false);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            if (accountSettings != null) {
+                loggerMaker.infoAndAddToDb("Setting default telemetry settings", LogDb.DASHBOARD);
+                accountSettings.setTelemetrySettings(telemetrySettings);
+                AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.TELEMETRY_SETTINGS, telemetrySettings));
+            }
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DEFAULT_TELEMETRY_SETTINGS, Context.now())
+            );
+            loggerMaker.infoAndAddToDb("Default telemetry settings set successfully", LogDb.DASHBOARD);
+        }
+    }
+
     public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getAktoDefaultNewUI() == 0){
 
@@ -1754,6 +1769,7 @@ public class InitializerListener implements ServletContextListener {
 
         try {
             int gracePeriod = organization.getGracePeriod();
+            String hotjarSiteId = organization.getHotjarSiteId();
             String organizationId = organization.getId();
 
             int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
@@ -1789,7 +1805,13 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+            BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
+            gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
+            hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
+            setTelemetrySettings(organization, telemetryEnabled);
+
+            organization.setHotjarSiteId(hotjarSiteId);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -1802,6 +1824,7 @@ public class InitializerListener implements ServletContextListener {
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
@@ -1809,6 +1832,28 @@ public class InitializerListener implements ServletContextListener {
         }
 
         return organization;
+    }
+
+    private static void setTelemetrySettings(Organization organization, boolean telemetryEnabled){
+        Set<Integer> accounts = organization.getAccounts();
+        if(accounts ==null || accounts.isEmpty()){
+            organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organization.getId()));
+            accounts = organization.getAccounts();
+        }
+        for (Integer accountId : accounts) {
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(eq("_id", accountId));
+            TelemetrySettings settings = accountSettings.getTelemetrySettings();
+            if(settings.getStiggEnabled() != telemetryEnabled){
+                loggerMaker.infoAndAddToDb(String.format("Current stigg setting: %s, new stigg setting: %s for accountId: %d", settings.getStiggEnabled(), telemetryEnabled, accountId), LogDb.DASHBOARD);
+                settings.setStiggEnabled(telemetryEnabled);
+                settings.setStiggEnabledAt(Context.now());
+                accountSettings.setTelemetrySettings(settings);
+                AccountSettingsDao.instance.updateOne(eq("_id", accountId), Updates.set(AccountSettings.TELEMETRY_SETTINGS, accountSettings.getTelemetrySettings()));
+            }
+            else {
+                loggerMaker.infoAndAddToDb(String.format("Current stigg setting: %s, new stigg setting: %s for accountId: %d are same, not taking any action", settings.getStiggEnabled(), telemetryEnabled, accountId), LogDb.DASHBOARD);
+            }
+        }
     }
 
     private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {
@@ -1864,6 +1909,7 @@ public class InitializerListener implements ServletContextListener {
         enableNewMerging(backwardCompatibility);
         enableMergeAsyncOutside(backwardCompatibility);
         loadTemplateFilesFromDirectory(backwardCompatibility);
+        setDefaultTelemetrySettings(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
