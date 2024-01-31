@@ -307,4 +307,9 @@ public class OrganizationUtils {
         BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
         return additionalMetaData.getString("HOTJAR_SITE_ID", "");
     }
+
+    public static boolean fetchTelemetryEnabled(BasicDBObject metadata) {
+        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
+    }
 }

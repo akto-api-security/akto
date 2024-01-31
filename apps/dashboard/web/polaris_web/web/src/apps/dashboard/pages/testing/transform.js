@@ -8,7 +8,7 @@ import {ResourcesMajor,
   FraudProtectMajor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
 import { history } from "@/util/history";
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
