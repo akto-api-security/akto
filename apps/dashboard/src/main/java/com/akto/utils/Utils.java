@@ -5,9 +5,11 @@ import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.AccountSettings;
+import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -17,8 +19,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicyNew;
+import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +43,38 @@ public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
     private final static ObjectMapper mapper = new ObjectMapper();
+
+    public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
+        Map<String,String> result = new HashMap<>();
+
+        if (auth == null) {
+            return result;
+        }
+
+        try {
+            String authType = auth.get("type").asText().toLowerCase();
+
+            switch (authType) {
+                case "bearer":
+                    ArrayNode authParams = (ArrayNode) auth.get("bearer");
+                    for (JsonNode authHeader : authParams) {
+                        String tokenKey = authHeader.get("key").asText();
+                        if (tokenKey.equals("token")) {
+                            String tokenValue = authHeader.get("value").asText();
+                            String replacedTokenValue = replaceVariables(tokenValue, variableMap);
+
+                            result.put("Authorization", "Bearer " + replacedTokenValue);
+
+                        }
+                    }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Unable to parse auth from postman file: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        return result;
+    }
+
     public static Map<String, String> getVariableMap(ArrayNode variables){
         Map<String,String> result = new HashMap<>();
         if(variables == null){
@@ -89,10 +122,16 @@ public class Utils {
         return sb.toString();
     }
     
-    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay) {
+    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap) {
         try {
             JsonNode request = apiInfo.get("request");
+
             String apiName = apiInfo.get("name").asText();
+
+            JsonNode authApiNode = request.get("auth");
+            if (authApiNode != null) {
+                authMap = getAuthMap(authApiNode, variables);
+            }
 
             Map<String, String> result = new HashMap<>();
             result.put("akto_account_id", accountId);
@@ -104,6 +143,7 @@ public class Utils {
 
             ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
             Map<String, String> requestHeadersMap = getHeaders(requestHeadersNode, variables);
+            requestHeadersMap.putAll(authMap);
             String requestHeadersString =  mapper.writeValueAsString(requestHeadersMap);
             result.put("requestHeaders", requestHeadersString);
 
@@ -134,7 +174,7 @@ public class Utils {
                         statusCode =  res.getStatusCode()+"";
                         status =  "";
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
+                        loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
                         return null;
                     }
                 } else {
@@ -328,19 +368,23 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-                info.setPolicy(new AktoPolicyNew(false));
                 info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             info.getHttpCallParser().syncFunction(responses, true, false);
-            info.getPolicy().main(responses, true, false);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false);
+            info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+            APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
                 info.getResourceAnalyser().analyse(responseParams);
             }
             info.getResourceAnalyser().syncWithDb();
+            DependencyFlow dependencyFlow = new DependencyFlow();
+            dependencyFlow.run();
+            dependencyFlow.syncWithDb();
         }
     }
 
@@ -393,6 +437,27 @@ public class Utils {
         }
 
         return payload;
+    }
+
+    public static float calculateRiskValueForSeverity(String severity){
+        float riskScore = 0 ;
+        switch (severity) {
+            case "HIGH":
+                riskScore += 100;
+                break;
+
+            case "MEDIUM":
+                riskScore += 10;
+                break;
+
+            case "LOW":
+                riskScore += 1;
+        
+            default:
+                break;
+        }
+
+        return riskScore;
     }
 
 }

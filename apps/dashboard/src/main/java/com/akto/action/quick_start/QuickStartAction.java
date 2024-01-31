@@ -104,6 +104,9 @@ public class QuickStartAction extends UserAction {
     }
 
     public String fetchLoadBalancers() {
+        if(DashboardMode.isSaasDeployment()){
+            return SUCCESS.toUpperCase();
+        }
         if(deploymentMethod != null && deploymentMethod.equals(DeploymentMethod.KUBERNETES)) {
             return handleKubernetes();
         }

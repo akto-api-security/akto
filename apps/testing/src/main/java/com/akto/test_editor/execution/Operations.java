@@ -7,8 +7,6 @@ import java.util.Map;
 
 import com.akto.graphql.GraphQLUtils;
 
-import org.json.JSONObject;
-
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
