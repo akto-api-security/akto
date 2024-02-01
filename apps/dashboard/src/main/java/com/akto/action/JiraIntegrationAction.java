@@ -75,6 +75,7 @@ public class JiraIntegrationAction extends UserAction {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null);
             String responsePayload = response.getBody();
+            loggerMaker.errorAndAddToDb("triggered meta api for test integration step, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode() + " ,url " + url, LoggerMaker.LogDb.DASHBOARD);
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
@@ -86,16 +87,21 @@ public class JiraIntegrationAction extends UserAction {
                 for (Object projObj: projects) {
                     BasicDBObject obj = (BasicDBObject) projObj;
                     String key = obj.getString("key");
-                    if (!key.equals(projId)) {
+                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
+                    if (!key.equalsIgnoreCase(projId)) {
                         continue;
                     }
+                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
                     issueType = determineIssueType(issueTypes, "TASK");
+                    loggerMaker.infoAndAddToDb("evaluated issue type for TASK type " + issueType, LoggerMaker.LogDb.DASHBOARD);
                     if (issueType == null) {
                         issueType = determineIssueType(issueTypes, "BUG");
+                        loggerMaker.infoAndAddToDb("evaluated issue type for BUG type " + issueType, LoggerMaker.LogDb.DASHBOARD);
                     }
                     if (issueType == null) {
                         issueType = determineIssueType(issueTypes, "");
+                        loggerMaker.infoAndAddToDb("evaluated issue type for ANY type " + issueType, LoggerMaker.LogDb.DASHBOARD);
                     }
                 }
                 if (issueType == null) {
@@ -207,7 +213,7 @@ public class JiraIntegrationAction extends UserAction {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
                 if (responsePayload != null) {
                     try {
                         BasicDBObject obj = BasicDBObject.parse(responsePayload);
