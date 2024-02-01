@@ -29,9 +29,8 @@ const CellType = {
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings } = props;
+    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive } = props;
     const navigate = useNavigate();
-    const [popoverActive, setPopoverActive] = useState(-1);
     const [data, setData] = useState(dataObj);
     const [collapsibleActive, setCollapsibleActive] = useState("none")
 

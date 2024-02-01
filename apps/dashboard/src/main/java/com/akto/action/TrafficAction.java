@@ -34,7 +34,7 @@ public class TrafficAction {
         traffic = new HashMap<>();
         List<TrafficInfo> trafficInfoList = TrafficInfoDao.instance.findAll(Filters.and(
             Filters.eq("_id.url", url),
-            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
             Filters.eq("_id.responseCode", -1),
             Filters.eq("_id.method", method),
             Filters.gte("_id.bucketStartEpoch", startEpoch/3600/24/30),
@@ -59,7 +59,7 @@ public class TrafficAction {
         sampleDataList = new ArrayList<>();
         sampleDataList = SampleDataDao.instance.findAll(Filters.and(
             Filters.eq("_id.url", url),
-            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
             Filters.eq("_id.responseCode", -1),
             Filters.eq("_id.method", method),
             Filters.gte("_id.bucketStartEpoch", 0),
@@ -79,7 +79,7 @@ public class TrafficAction {
         List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(
                 Filters.and(
                         Filters.eq("_id.url", url),
-                        Filters.eq("_id.apiCollectionId", apiCollectionId),
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
                         Filters.eq("_id.method", method)
                 )
         );

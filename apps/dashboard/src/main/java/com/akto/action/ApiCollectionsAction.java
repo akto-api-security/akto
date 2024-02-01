@@ -4,17 +4,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
-import com.akto.dao.APISpecDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 
+import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
@@ -22,6 +13,12 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.CollectionConditions.ConditionUtils;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -48,6 +45,15 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
+    List<ApiInfoKey> apiList;
+
+    public List<ApiInfoKey> getApiList() {
+        return apiList;
+    }
+
+    public void setApiList(List<ApiInfoKey> apiList) {
+        this.apiList = apiList;
+    }
 
     public static List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
@@ -55,10 +61,14 @@ public class ApiCollectionsAction extends UserAction {
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
-            if (count != null && apiCollection.getHostName() != null) {
+            int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
+            if (count != null && (apiCollection.getHostName() != null)) {
+                apiCollection.setUrlsCount(count);
+            } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
+                count = Utils.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 apiCollection.setUrlsCount(count);
             } else {
-                apiCollection.setUrlsCount(apiCollection.getUrls().size());
+                apiCollection.setUrlsCount(fallbackCount);
             }
             apiCollection.setUrls(new HashSet<>());
         }
@@ -81,15 +91,16 @@ public class ApiCollectionsAction extends UserAction {
 
     static int maxCollectionNameLength = 25;
     private String collectionName;
-    public String createCollection() {
+
+    private boolean isValidApiCollectionName(){
         if (this.collectionName == null) {
             addActionError("Invalid collection name");
-            return ERROR.toUpperCase();
+            return false;
         }
 
         if (this.collectionName.length() > maxCollectionNameLength) {
             addActionError("Custom collections max length: " + maxCollectionNameLength);
-            return ERROR.toUpperCase();
+            return false;
         }
 
         for (char c: this.collectionName.toCharArray()) {
@@ -100,7 +111,7 @@ public class ApiCollectionsAction extends UserAction {
 
             if (!(alphabets || numbers || specialChars || spaces)) {
                 addActionError("Collection names can only be alphanumeric and contain '-','.' and '_'");
-                return ERROR.toUpperCase();
+                return false;
             }
         }
 
@@ -108,6 +119,15 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(collectionName);
         if (sameNameCollection != null){
             addActionError("Collection names must be unique");
+            return false;
+        }
+
+        return true;
+    }
+
+    public String createCollection() {
+        
+        if(!isValidApiCollectionName()){
             return ERROR.toUpperCase();
         }
 
@@ -144,13 +164,148 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     private static void deleteApiEndpointData(List<Integer> apiCollectionIds){
+
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
+        Bson update = Updates.pullAll(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
+
         SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
+        SingleTypeInfoDao.instance.updateMany(filter, update);
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        SensitiveParamInfoDao.instance.updateMany(filter, update);
 
+        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+        for(ApiCollection collection: apiGroups){
+            List<TestingEndpoints> conditions = collection.getConditions();
+            for (TestingEndpoints it : conditions) {
+                switch (it.getType()) {
+                    case CUSTOM:
+                        Set<ApiInfoKey> tmp = new HashSet<>(it.returnApis());
+                        tmp.removeIf((ApiInfoKey key) -> apiCollectionIds.contains(key.getApiCollectionId()));
+                        ((CustomTestingEndpoints) it).setApisList(new ArrayList<>(tmp));
+                        break;
+                    default:
+                        break;
+                }
+            }
+            ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
+        }
+    }
+
+    public String addApisToCustomCollection(){
+
+        if(apiList.isEmpty()){
+            addActionError("No APIs selected");
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        if(apiCollection == null){
+            
+            if(!isValidApiCollectionName()){
+                return ERROR.toUpperCase();
+            }
+
+            apiCollection = new ApiCollection(Context.now(), collectionName, new ArrayList<>() );
+            ApiCollectionsDao.instance.insertOne(apiCollection);
+
+        } else if(!ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
+            addActionError("Invalid api collection group.");
+            return ERROR.toUpperCase();
+        }
+
+        CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
+        apiCollection.addToConditions(condition);
+        ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
+        ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+
+        fetchAllCollections();
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String removeApisFromCustomCollection(){
+
+        if(apiList.isEmpty()){
+            addActionError("No APIs selected");
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        if(apiCollection == null || !ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
+            addActionError("Invalid api collection group");
+            return ERROR.toUpperCase();
+        }
+
+        CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
+        apiCollection.removeFromConditions(condition);
+        ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+
+        fetchAllCollections();
+    
+        return SUCCESS.toUpperCase();
+    }
+
+    List<ConditionUtils> conditions;
+
+    private static List<TestingEndpoints> generateConditions(List<ConditionUtils> conditions){
+        List<TestingEndpoints> ret = new ArrayList<>();
+
+        if (conditions != null) {
+            for (ConditionUtils conditionUtils : conditions) {
+                TestingEndpoints condition = TestingEndpoints.generateCondition(conditionUtils.getType(),
+                        conditionUtils.getOperator(), conditionUtils.getData());
+                if (condition != null) {
+                    ret.add(condition);
+                }
+            }
+        }
+        return ret;
+    }
+
+    public String createCustomCollection() {
+        if (!isValidApiCollectionName()) {
+            return ERROR.toUpperCase();
+        }
+
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+
+        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+        
+        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+        
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(apiCollection);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    int apiCount;
+
+    public String getEndpointsFromConditions(){
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+
+        apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions);
+    
+        return SUCCESS.toUpperCase();
+    }
+
+    public String computeCustomCollections(){
+        
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        if(apiCollection == null || !ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
+            addActionError("Invalid api collection group");
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+        
+        return SUCCESS.toUpperCase();
     }
 
     // required for icons and total sensitive endpoints in collections
@@ -315,7 +470,7 @@ public class ApiCollectionsAction extends UserAction {
     public int getSensitiveUrlsInResponse() {
         return sensitiveUrlsInResponse;
     }
-
+ 
     public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
         return sensitiveSubtypesInCollection;
     }
@@ -344,4 +499,19 @@ public class ApiCollectionsAction extends UserAction {
         return timerInfo;
     }
 
+    public List<ConditionUtils> getConditions() {
+        return conditions;
+    }
+
+    public void setConditions(List<ConditionUtils> conditions) {
+        this.conditions = conditions;
+    }
+
+    public int getApiCount() {
+        return apiCount;
+    }
+
+    public void setApiCount(int apiCount) {
+        this.apiCount = apiCount;
+    }
 }

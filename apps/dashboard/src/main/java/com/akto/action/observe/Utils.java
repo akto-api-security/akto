@@ -11,6 +11,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Utils {
@@ -21,6 +22,10 @@ public class Utils {
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip) {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if(apiCollection == null){
+            return new ArrayList<>();
+        }
 
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId, skip);
@@ -42,6 +47,34 @@ public class Utils {
     public final static String _START_TS = "startTs";
     public final static String _LAST_SEEN_TS = "lastSeenTs";
 
+    public static int countEndpoints(Bson filters) {
+        int ret = 0;
+
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+
+        Bson projections = Projections.fields(
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS));
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.match(filters));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.limit(LARGE_LIMIT));
+        pipeline.add(Aggregates.count());
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while (endpointsCursor.hasNext()) {
+            ret = endpointsCursor.next().getInt("count");
+            break;
+        }
+
+        return ret;
+    }
+
     public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
@@ -49,7 +82,7 @@ public class Utils {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
 
         int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 
