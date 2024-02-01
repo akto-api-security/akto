@@ -19,7 +19,7 @@ import PersistStore from '../../../main/PersistStore';
 import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
-import DashboardBanner from './components/DashboardBanner';
+import {DashboardBanner} from './components/DashboardBanner';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
 
 function HomeDashboard() {

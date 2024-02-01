@@ -1,7 +1,8 @@
-import { Box, Button, HorizontalStack, Page, Popover, Text, VerticalStack } from "@shopify/polaris";
+import { ActionList, Box, Button, HorizontalStack, Icon, Page, Popover, Text, VerticalStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
 import { useState } from "react";
+import { PlayMinor, NoteMinor } from "@shopify/polaris-icons"
 
 const PageWithMultipleCards = (props) => {
 
@@ -38,6 +39,21 @@ const PageWithMultipleCards = (props) => {
     }
 
     const learnMoreObj = learnMoreObject[transformString(location.pathname)]
+    if(learnMoreObj){
+        if (learnMoreObj?.docsLink !== undefined) {
+            learnMoreObj.docsLink.forEach((doc) => {
+                doc.prefix = <Box><Icon source={NoteMinor} /></Box>;
+                doc.onAction = () => window.open(doc.value, "_blank")
+            });
+        }
+
+        if (learnMoreObj?.videoLink !== undefined) {
+            learnMoreObj.videoLink.forEach((doc) => {
+                doc.prefix = <Box><Icon source={PlayMinor} /></Box>;
+                doc.onAction = () => window.open(doc.value, "_blank")
+            });
+        }
+    }
 
     const learnMoreComp = (
         <Popover
@@ -50,18 +66,18 @@ const PageWithMultipleCards = (props) => {
             autofocusTarget="first-node"
             onClose={() => { setPopoverActive(false) }}
         >
-            <Popover.Section>
-                <Box width="230px">
-                    <VerticalStack gap={1}>
-                        <Text>
-                            {learnMoreObj.title}
-                        </Text>
-                        <Text color="subdued">
-                            {learnMoreObj.description}
-                        </Text>
-                    </VerticalStack>
-                </Box>
-            </Popover.Section>
+            <Box width="230px" padding={4} paddingBlockEnd={"0"}>
+                <VerticalStack gap={1}>
+                    <Text>
+                        {learnMoreObj.title}
+                    </Text>
+                    <Text color="subdued">
+                        {learnMoreObj.description}
+                    </Text>
+                </VerticalStack>
+            </Box>
+            <ActionList items={[...learnMoreObj.docsLink, ...learnMoreObj.videoLink]} />
+            
         </Popover>
     )
 

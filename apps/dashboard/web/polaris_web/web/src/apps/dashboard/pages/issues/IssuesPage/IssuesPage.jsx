@@ -5,7 +5,7 @@ import api from "../api"
 import Store from "../../../store";
 import transform from "../transform";
 import func from "@/util/func";
-import { ClockMinor,DynamicSourceMinor,LinkMinor } from '@shopify/polaris-icons';
+import { ClockMinor,DynamicSourceMinor,LinkMinor, MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
 import { Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
@@ -284,8 +284,26 @@ function IssuesPage(){
 
     const openVulnerabilityReport = () => {
         let summaryId = btoa(JSON.stringify(issuesFilters))
-    window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+        window.open('/dashboard/issues/summary/' + summaryId, '_blank');
     }
+
+    const infoItems = [
+        {
+            title: "Triage",
+            icon: MarkFulfilledMinor,
+            description: "Prioritize, assign them to team members and manage API issues effectively.",
+        },
+        {
+            title: "Download vulnerability report",
+            icon: ReportMinor,
+            description: "Export and share detailed report of vulnerabilities in your APIs.",
+        },
+        {
+            title: "Send them to GitHub",
+            icon: ExternalMinor,
+            description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
+        }
+    ]
     
     return (
         <PageWithMultipleCards
@@ -299,6 +317,10 @@ function IssuesPage(){
                     description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
                     buttonText={"Run test"}
                     redirectUrl={"/dashboard/observe/inventory"}
+                    infoItems={infoItems}
+                    infoTitle={"Once you have issues:"}
+                    learnText={"issues"}
+                    docsUrl={"https://docs.akto.io/readme"}
                 />
 
             

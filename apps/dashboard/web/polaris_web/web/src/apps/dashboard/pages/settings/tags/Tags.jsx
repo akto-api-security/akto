@@ -89,6 +89,8 @@ function Tags(){
                     description={"Tag your APIs with business keywords for easier grouping."}
                     buttonText={"Create tag"}
                     redirectUrl={"/dashboard/settings/tags/details"}
+                    learnText={"Creating tags"}
+                    docsUrl={"https://docs.akto.io/readme"}
                 />
 
             
