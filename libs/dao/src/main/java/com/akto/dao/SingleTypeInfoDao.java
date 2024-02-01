@@ -77,6 +77,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames =  new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        // needed for usage metric calculation
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo.LAST_SEEN }, true);
+        
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._TIMESTAMP }, true);
+
     }
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {

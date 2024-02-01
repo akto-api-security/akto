@@ -10,6 +10,7 @@ import {
     ClockMinor,
     CircleTickMajor
   } from '@shopify/polaris-icons';
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 
 function AuthTypes() {
     const headers = [
@@ -44,6 +45,7 @@ function AuthTypes() {
     };
 
     const [authTypes, setAuthTypes] = useState([]);
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate()
 
@@ -80,6 +82,7 @@ function AuthTypes() {
         async function fetchData() {
             await authTypesApi.fetchCustomAuthTypes().then((res) => {
                 let usersMap = res.usersMap;
+                setShowEmptyScreen(res.customAuthTypes.length === 0)
                 setAuthTypes(res.customAuthTypes.map((authType) => {
                     authType.id = authType.name
                     authType.updatedTimestamp = func.prettifyEpoch(authType.timestamp);
@@ -103,7 +106,17 @@ function AuthTypes() {
             }
             isFirstPage={true}
             components={[
-                <GithubSimpleTable
+            showEmptyScreen ? 
+                <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/file_lock.svg"}
+                    headingText={"No Auth type"}
+                    description={"Define custom auth mechanism based on where you send the auth key. We support auth key detection in header, payload and even cookies in your APIs."}
+                    buttonText={"Create auth type"}
+                    redirectUrl={"/dashboard/settings/auth-types/details"}
+                />
+
+            
+            : <GithubSimpleTable
                     key="table"
                     data={authTypes}
                     resourceName={resourceName}

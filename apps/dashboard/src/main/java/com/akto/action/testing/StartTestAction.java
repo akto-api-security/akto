@@ -28,6 +28,7 @@ import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.Utils;
+import com.akto.utils.usage.UsageMetricCalculator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -713,6 +714,18 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private int testRunsByUser;
+
+    public String getUsageTestRuns(){
+        try {
+            this.testRunsByUser = UsageMetricCalculator.calculateTestRuns(0);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
+    }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1001,6 +1014,10 @@ public class StartTestAction extends UserAction {
 
     public void setLatestSummaryIds(List<String> latestSummaryIds) {
         this.latestSummaryIds = latestSummaryIds;
+    }
+
+    public int getTestRunsByUser() {
+        return testRunsByUser;
     }
 
 

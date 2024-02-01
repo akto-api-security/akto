@@ -10,7 +10,6 @@ import transform from './transform';
 import StackedChart from '../../components/charts/StackedChart';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from "highcharts"
-import SpinnerCentered from '../../components/progress/SpinnerCentered';
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
 import testingFunc from "../testing/transform"
@@ -20,6 +19,8 @@ import PersistStore from '../../../main/PersistStore';
 import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
+import DashboardBanner from './components/DashboardBanner';
+import SpinnerCentered from '../../components/progress/SpinnerCentered';
 
 function HomeDashboard() {
 
@@ -37,6 +38,7 @@ function HomeDashboard() {
     const [skip, setSkip] = useState(0)
     const [criticalUrls, setCriticalUrls] = useState(0);
     const [initialSteps, setInitialSteps] = useState({}) ;
+    const [showBannerComponent, setShowBannerComponent] = useState(false)
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -54,6 +56,7 @@ function HomeDashboard() {
             testingApi.getSummaryInfo(0 , func.timeNow()),
             api.fetchRecentFeed(skip),
             api.getIntegratedConnections(),
+            observeApi.getUserEndpoints(),
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -65,6 +68,8 @@ function HomeDashboard() {
         let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
         let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
         let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
+        let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : 0 ;
+        setShowBannerComponent(userEndpoints === 0)
 
         setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
         setCoverageObj(coverageInfo)
@@ -261,28 +266,48 @@ function HomeDashboard() {
     }
 
     const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
-    return (
-        <div style={{display: 'flex'}}>
+
+    const dashboardComp = (
+        <div style={{display: 'flex'}} key={"dashboardComp"}>
             <div style={{flex: 7}}>
                 <PageWithMultipleCards
-                        title={
+                    {...showBannerComponent ? {} : {
+                        title:(
                             <Text variant='headingLg'>
                                 Home
                             </Text>
-                        }
-                        isFirstPage={true}
-                        components={components}
+                        )
+
+                    }}
+                    isFirstPage={true}
+                    components={components}
                 />
             </div>
             <div style={{flex: 3, paddingRight: '32px'}}>
                 <VerticalStack gap={5}>
-                    <InitialSteps initialSteps={initialSteps}/>
+                    <InitialSteps initialSteps={initialSteps} showBannerComponent={showBannerComponent}/>
                     <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>
             </div>
         </div>
+    )
+
+    const bannerComp = (
+        <VerticalStack>
+            <Box padding={8} paddingBlockEnd={"0"}>
+                <VerticalStack gap={8}>
+                    <Text variant='headingLg'>Home</Text>
+                    <DashboardBanner />
+                </VerticalStack>
+            </Box>
+            {dashboardComp}
+        </VerticalStack>
+    )
+
+    return (
+        loading ? <SpinnerCentered /> : showBannerComponent ? bannerComp : dashboardComp
     )
 }
 

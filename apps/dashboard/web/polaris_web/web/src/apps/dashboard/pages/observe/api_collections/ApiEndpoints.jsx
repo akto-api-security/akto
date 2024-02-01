@@ -22,6 +22,7 @@ import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 
 const headings = [
     {
@@ -109,6 +110,7 @@ function ApiEndpoints() {
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
 
     const [endpointData, setEndpointData] = useState([])
     const [selectedTab, setSelectedTab] = useState("All")
@@ -168,6 +170,7 @@ function ApiEndpoints() {
     async function fetchData() {
         setLoading(true)
         let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
+        setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
         let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiCollectionData.data.apiInfoList
         let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
@@ -524,7 +527,14 @@ function ApiEndpoints() {
                 apiCollectionId={apiCollectionId}
                 endpointsList={loading ? [] : endpointData["All"]}
             />
-             ] : [
+             ] : showEmptyScreen ? [
+                <EmptyScreensLayout key={"emptyScreen"}
+                            iconSrc={"/public/file_plus.svg"}
+                            headingText={"Discover APIs to get started"}
+                            description={"Your API collection is currently empty. Import APIs from other collections now."}
+                            buttonText={"Import from other collections"}
+                            redirectUrl={"/dashboard/observe/inventory"}
+                />] :[
                 <div className="apiEndpointsTable" key="table">
                       <GithubSimpleTable
                           key="table"

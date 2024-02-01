@@ -3,16 +3,7 @@ package com.akto.action;
 import java.util.*;
 
 import org.bson.conversions.Bson;
-import com.akto.dao.APISpecDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -28,6 +19,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.utils.usage.UsageMetricCalculator;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -51,6 +43,8 @@ public class ApiCollectionsAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
     List<ApiInfoKey> apiList;
+
+    private int usageEndpoints;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -373,6 +367,16 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    public String fetchCustomerEndpoints(){
+        try {
+            this.usageEndpoints = UsageMetricCalculator.calculateActiveEndpoints(0);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -440,4 +444,9 @@ public class ApiCollectionsAction extends UserAction {
     public void setApiCount(int apiCount) {
         this.apiCount = apiCount;
     }
+
+    public int getUsageEndpoints() {
+        return usageEndpoints;
+    }
+
 }
