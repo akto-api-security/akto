@@ -1,6 +1,7 @@
 import React from 'react'
 import { Avatar, HorizontalStack, Text } from "@shopify/polaris"
 import BannerLayout from '../../../../components/banners/BannerLayout'
+import { COLLECTIONS_VIDEO_LENGTH, COLLECTIONS_VIDEO_THUMBNAIL, COLLECTIONS_VIDEO_URL } from '../../../../../main/onboardingData'
 
 function CollectionsPageBanner() {
 
@@ -37,6 +38,9 @@ function CollectionsPageBanner() {
             buttonText={"Go to quickstart"}
             buttonUrl={"/dashboard/quick-start"}
             bodyComponent={iconComponent}
+            videoLength={COLLECTIONS_VIDEO_LENGTH}
+            videoLink={COLLECTIONS_VIDEO_URL}
+            videoThumbnail={COLLECTIONS_VIDEO_THUMBNAIL}
         />
     )
     
