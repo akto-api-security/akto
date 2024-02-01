@@ -268,24 +268,17 @@ function HomeDashboard() {
     const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
 
     const dashboardComp = (
-        <div style={{display: 'flex'}} key={"dashboardComp"}>
+        <div style={{display: 'flex', gap: '32px'}} key={"dashboardComp"}>
             <div style={{flex: 7}}>
-                <PageWithMultipleCards
-                    {...showBannerComponent ? {} : {
-                        title:(
-                            <Text variant='headingLg'>
-                                Home
-                            </Text>
-                        )
-
-                    }}
-                    isFirstPage={true}
-                    components={components}
-                />
+                <VerticalStack gap={4}>
+                    {components?.filter((component) => {
+                        return component
+                    })}
+                </VerticalStack>
             </div>
-            <div style={{flex: 3, paddingRight: '32px'}}>
+            <div style={{flex: 3}}>
                 <VerticalStack gap={5}>
-                    <InitialSteps initialSteps={initialSteps} showBannerComponent={showBannerComponent}/>
+                    <InitialSteps initialSteps={initialSteps}/>
                     <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
@@ -294,20 +287,20 @@ function HomeDashboard() {
         </div>
     )
 
-    const bannerComp = (
-        <VerticalStack>
-            <Box padding={8} paddingBlockEnd={"0"}>
-                <VerticalStack gap={8}>
-                    <Text variant='headingLg'>Home</Text>
-                    <DashboardBanner />
-                </VerticalStack>
-            </Box>
-            {dashboardComp}
-        </VerticalStack>
-    )
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp]
 
     return (
-        loading ? <SpinnerCentered /> : showBannerComponent ? bannerComp : dashboardComp
+        loading ? <SpinnerCentered /> :
+            <PageWithMultipleCards
+                title={
+                    <Text variant='headingLg'>
+                        Home
+                    </Text>
+                }
+                isFirstPage={true}
+                components={pageComponents}
+            />
+                
     )
 }
 
