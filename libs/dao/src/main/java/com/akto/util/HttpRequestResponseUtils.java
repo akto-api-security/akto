@@ -52,6 +52,7 @@ public class HttpRequestResponseUtils {
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
         List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
         List<String> contentTypeValues;
+        if (headers == null) return null;
         for (String k: headers.keySet()) {
             if (k.equalsIgnoreCase("content-type")) {
                 contentTypeValues = headers.get(k);

@@ -40,6 +40,9 @@ public class DependencyNode {
 
         private boolean isUrlParam;
         public static final String IS_URL_PARAM = "isUrlParam";
+
+        private boolean isHeader;
+        public static final String IS_HEADER = "isHeader";
         private String responseParam;
         public static final String RESPONSE_PARAM = "responseParam";
         private int count;
@@ -48,11 +51,12 @@ public class DependencyNode {
         public ParamInfo() {
         }
 
-        public ParamInfo(String requestParam, String responseParam, int count, boolean isUrlParam) {
+        public ParamInfo(String requestParam, String responseParam, int count, boolean isUrlParam, boolean isHeader) {
             this.requestParam = requestParam;
             this.responseParam = responseParam;
             this.isUrlParam = isUrlParam;
             this.count = count;
+            this.isHeader = isHeader;
         }
 
         public String getRequestParam() {
@@ -91,21 +95,33 @@ public class DependencyNode {
             isUrlParam = urlParam;
         }
 
+        public boolean isHeader() {
+            return isHeader;
+        }
+
+        public boolean getIsHeader() {
+            return isHeader;
+        }
+
+        public void setIsHeader(boolean header) {
+            isHeader = header;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             ParamInfo paramInfo = (ParamInfo) o;
-            return requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam);
+            return isUrlParam == paramInfo.isUrlParam && isHeader == paramInfo.isHeader && requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(requestParam, responseParam, isUrlParam);
+            return Objects.hash(requestParam, responseParam, isUrlParam, isHeader);
         }
 
         public ParamInfo copy() {
-            return new ParamInfo(requestParam, responseParam, count, isUrlParam);
+            return new ParamInfo(requestParam, responseParam, count, isUrlParam, isHeader);
         }
     }
 

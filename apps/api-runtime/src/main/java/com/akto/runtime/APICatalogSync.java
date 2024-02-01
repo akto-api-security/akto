@@ -1483,11 +1483,19 @@ public class APICatalogSync {
         }
 
         if (writesForSensitiveSampleData.size() > 0) {
-            SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+            try {
+                SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         if (writesForSensitiveParamInfo.size() > 0) {
-            SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+            try {
+                SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         buildFromDB(true, fetchAllSTI);
