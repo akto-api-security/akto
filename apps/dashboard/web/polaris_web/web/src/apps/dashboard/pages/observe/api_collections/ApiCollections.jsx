@@ -1,7 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
 import api from "../api"
-import { useEffect,useState, useCallback, useRef } from "react"
+import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -13,6 +13,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import CollectionsPageBanner from "./component/CollectionsPageBanner"
 
 const headers = [
     {
@@ -107,6 +108,7 @@ function ApiCollections() {
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
+    const [endpointsOfUser, setEndpointsOfUser] = useState(0)
     
     
     const tableTabs = [
@@ -161,7 +163,8 @@ function ApiCollections() {
         let apiPromises = [
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
-            api.getLastTrafficSeen()
+            api.getLastTrafficSeen(),
+            api.getUserEndpoints(),
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -169,6 +172,8 @@ function ApiCollections() {
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let userEndpoints = results[3].status === 'fulfilled' ? results[3].value : 0;
+        setEndpointsOfUser(userEndpoints)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
@@ -278,7 +283,7 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, tableComponent]
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (endpointsOfUser === 0 ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     return(
         <PageWithMultipleCards

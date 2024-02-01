@@ -15,6 +15,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import func from "@/util/func"
 import ChartypeComponent from "./ChartypeComponent";
 import { CellType } from "../../../components/tables/rows/GithubRow";
+import TestrunsBannerComponent from "./TestrunsBannerComponent";
 
 /*
   {
@@ -122,7 +123,6 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
-  
 
 const getActionsList = (hexId) => {
   return [
@@ -197,6 +197,7 @@ const [severityCountMap, setSeverityCountMap] = useState({
 })
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
+const [totalTestRunsByUser, setTotalTestRunsByUser] = useState(0)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -338,7 +339,17 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     },
   ]
 
+  const fetchTotalCount = () =>{
+    setLoading(true)
+    api.getUserTestRuns().then((resp)=> {
+      setTotalTestRunsByUser(resp)
+    })
+    setLoading(false)
+    
+  }
+
   useEffect(()=>{
+    fetchTotalCount()
     fetchCountsMap()
     fetchSummaryInfo()
   },[timeStamp])
@@ -418,7 +429,7 @@ const coreTable = (
   />   
 )
 
-const components = [<SummaryCardComponent key={"summary"}/>, coreTable]
+const components = totalTestRunsByUser === 0 ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}

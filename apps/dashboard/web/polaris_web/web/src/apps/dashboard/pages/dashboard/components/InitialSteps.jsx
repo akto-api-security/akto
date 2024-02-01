@@ -6,7 +6,7 @@ import api from '../api';
 import transform from '../transform';
 import func from '@/util/func';
 
-function InitialSteps({initialSteps}) {
+function InitialSteps({initialSteps, showBannerComponent}) {
 
     const [stepsCompleted, setStepsCompleted] = useState(0) ;
     const [dropdownActive, setDropdownActive] = useState(-1) ;
@@ -107,8 +107,10 @@ function InitialSteps({initialSteps}) {
         )
     }
 
+    const padding = showBannerComponent ? "20px" : "76px"
+
     return (
-        <div style={{paddingTop: '76px'}}>
+        <div style={{paddingTop: padding}}>
             <Card padding={0}>
                 <VerticalStack gap={3}>
                     <Box padding={5} background="bg-info-subdued-hover">

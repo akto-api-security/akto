@@ -8,6 +8,7 @@ import func from "@/util/func";
 import { ClockMinor,DynamicSourceMinor,LinkMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
 import { Button } from "@shopify/polaris";
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 
 const headers = [
     {
@@ -150,6 +151,7 @@ function IssuesPage(){
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const allCollections = PersistStore(state => state.allCollections);
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -274,6 +276,9 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
+        if(total === 0){
+            setShowEmptyScreen(true)
+        }
         return {value:ret , total:total};
     }
 
@@ -287,7 +292,17 @@ function IssuesPage(){
             title="Issues"
             isFirstPage={true}
             components = {[
-                <GithubServerTable
+                showEmptyScreen ? 
+                <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/alert_hexagon.svg"}
+                    headingText={"No issues yet!"}
+                    description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                    buttonText={"Run test"}
+                    redirectUrl={"/dashboard/observe/inventory"}
+                />
+
+            
+            : <GithubServerTable
                     key={key}
                     headers={headers}
                     resourceName={resourceName} 
@@ -305,7 +320,7 @@ function IssuesPage(){
                     getStatus={func.getTestResultStatus}
                 />
             ]}
-            primaryAction={<Button monochrome removeUnderline plain onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button>}
             />
     )
 }
