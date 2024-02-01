@@ -6,6 +6,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.Log;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.util.EmailAccountName;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -57,11 +58,11 @@ public class TelemetryJob {
 
                 int now = Context.now();
                 //Fetch logs from lastRunTs to now
-                fetchAndSendLogs(now, LoggerMaker.LogDb.TESTING, org.getId(), accountId);
-                fetchAndSendLogs(now, LoggerMaker.LogDb.DASHBOARD, org.getId(), accountId);
-                fetchAndSendLogs(now, LoggerMaker.LogDb.RUNTIME, org.getId(), accountId);
-                fetchAndSendLogs(now, LoggerMaker.LogDb.ANALYSER, org.getId(), accountId);
-                fetchAndSendLogs(now, LoggerMaker.LogDb.BILLING, org.getId(), accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.TESTING, org, accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.DASHBOARD, org, accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.RUNTIME, org, accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.ANALYSER, org, accountId);
+                fetchAndSendLogs(now, LoggerMaker.LogDb.BILLING, org, accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Telemetry cron failed due to:" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             }
@@ -84,7 +85,7 @@ public class TelemetryJob {
         }
     }
 
-    public static void fetchAndSendLogs(int toTs, LoggerMaker.LogDb dbName, String orgId, int accountId){
+    public static void fetchAndSendLogs(int toTs, LoggerMaker.LogDb dbName, Organization org, int accountId){
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         Map<String, Integer> telemetryUpdateSentTsMap = accountSettings.getTelemetryUpdateSentTsMap();
         if (telemetryUpdateSentTsMap == null) {
@@ -105,7 +106,7 @@ public class TelemetryJob {
             logs = instance.findAll(filter, skip, limit, Sorts.ascending(Log.TIMESTAMP), null);
             skip += limit;
             //send logs to telemetry server
-            int lastLogTs = sendLogs(logs, dbName, orgId, accountId);
+            int lastLogTs = sendLogs(logs, dbName, org, accountId);
             if(lastLogTs <=0) {
                 break;
             }
@@ -120,7 +121,7 @@ public class TelemetryJob {
                 .callTimeout(1, TimeUnit.SECONDS)
                 .build();
 
-    private static int sendLogs(List<Log> logs, LoggerMaker.LogDb dbName, String orgId, int accountId) {
+    private static int sendLogs(List<Log> logs, LoggerMaker.LogDb dbName, Organization org, int accountId) {
         if(logs.isEmpty()){
             loggerMaker.infoAndAddToDb("Logs list is empty for db:" + dbName + " skipping", LoggerMaker.LogDb.DASHBOARD);
             return 0;
@@ -136,7 +137,9 @@ public class TelemetryJob {
 
         BasicDBObject data = new BasicDBObject("service", dbName.name())
                 .append("logs", telemetryLogs)
-                .append("orgId", orgId)
+
+                .append("orgId", org.getId())
+                .append("orgName", new EmailAccountName(org.getAdminEmail()).getAccountName())
                 .append("accountId", accountId)
                 .append("type", "TELEMETRY");
 
