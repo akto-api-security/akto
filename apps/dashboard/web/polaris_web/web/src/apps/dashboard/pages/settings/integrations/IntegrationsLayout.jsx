@@ -1,5 +1,4 @@
 import React from 'react'
-import PageWithCard from '../../../components/layouts/PageWithCard'
 import { Button, LegacyCard } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 
