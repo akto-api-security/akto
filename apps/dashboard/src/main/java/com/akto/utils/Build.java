@@ -2,7 +2,6 @@ package com.akto.utils;
 
 import com.akto.DaoInit;
 import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.ModifyHostDetailsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
@@ -13,26 +12,22 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
-import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RelationshipSync;
+import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.execution.Operations;
-import com.akto.test_editor.filter.FilterAction;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
-import org.checkerframework.checker.units.qual.K;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE;
@@ -43,16 +38,33 @@ public class Build {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class);
 
-    private void buildParentToChildMap(List<Integer> apiCollectionIds) {
-        List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findNodesForCollectionIds(apiCollectionIds);
-        DependencyFlow dependencyFlow = new DependencyFlow();
-        for (DependencyNode dependencyNode: dependencyNodeList) dependencyFlow.fillNodes(dependencyNode);
-        parentToChildMap = dependencyFlow.initialNodes;
+    private void buildParentToChildMap(List<Node> nodes) {
+        parentToChildMap = new HashMap<>();
+        for (Node node: nodes) {
+            for (Connection connection: node.getConnections().values()) {
+                String requestParam = connection.getParam();
+                for (Edge edge: connection.getEdges()) {
+                    String responseParam = edge.getParam();
+                    ReverseNode reverseNode = new ReverseNode(
+                            edge.getApiCollectionId(), edge.getUrl(), edge.getMethod(), new HashMap<>()
+                    );
+
+                    int key = reverseNode.hashCode();
+                    reverseNode = parentToChildMap.getOrDefault(key, reverseNode);
+
+                    Map<String, ReverseConnection> reverseConnections = reverseNode.getReverseConnections();
+                    ReverseConnection reverseConnection = reverseConnections.getOrDefault(responseParam, new ReverseConnection(responseParam, new ArrayList<>()));
+                    reverseConnection.getReverseEdges().add(new ReverseEdge(node.getApiCollectionId(), node.getUrl(), node.getMethod(), requestParam, edge.getCount(), connection.getIsUrlParam(), connection.getIsHeader()));
+
+                    reverseConnections.put(responseParam, reverseConnection);
+                    parentToChildMap.put(key, reverseNode);
+                }
+            }
+        }
+
     }
 
-    private Map<Integer, List<SampleData>> buildLevelsToSampleDataMap(List<Integer> apiCollectionIds) {
-        // get dependencyFlow
-        List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionIds,false,0, 10_000);
+    private Map<Integer, List<SampleData>> buildLevelsToSampleDataMap(List<Node> nodes) {
 
         // divide them into levels
         Map<Integer,List<SampleData>> levelsToSampleDataMap = new HashMap<>();
@@ -148,58 +160,64 @@ public class Build {
         List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
+            if (id.url.contains("fetchAPICollection")) {
+                System.out.println("hi");
+            }
             List<String> samples = sampleData.getSamples();
             if (samples.isEmpty()) continue;;
 
-            for (String sample: samples) {
-                OriginalHttpRequest request = new OriginalHttpRequest();
-                request.buildFromSampleMessage(sample);
-                String newHost = findNewHost(request, modifyHostDetailMap);
+            String sample = samples.get(0);
+            OriginalHttpRequest request = new OriginalHttpRequest();
+            request.buildFromSampleMessage(sample);
+            String newHost = findNewHost(request, modifyHostDetailMap);
 
-                OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
-                originalHttpResponse.buildFromSampleMessage(sample);
+            OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
+            originalHttpResponse.buildFromSampleMessage(sample);
 
-                // do modifications
-                ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
-                modifyRequest(request, replaceDetail);
+            // do modifications
+            ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
+            modifyRequest(request, replaceDetail);
 
-                TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost);
 
-                OriginalHttpResponse response = null;
-                try {
-                    response = ApiExecutor.sendRequest(request, true, testingRunConfig);
-                    ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
-                    boolean foundValues = fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
-                    if (foundValues) {
-                        RawApi rawApi = new RawApi(request, response, "");
-                        rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "MIRRORING");
-                        RunResult runResult = new RunResult(
-                                new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
-                                rawApi.getOriginalMessage(),
-                                sample,
-                                rawApi.getResponse().getStatusCode() == originalHttpResponse.getStatusCode()
-                        );
-                        runResults.add(runResult);
-                        break;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    loggerMaker.errorAndAddToDb(e, "error while sending request", LoggerMaker.LogDb.DASHBOARD);
-                    e.printStackTrace();
-                }
+            OriginalHttpResponse response = null;
+            try {
+                response = ApiExecutor.sendRequest(request,false, testingRunConfig);
+                ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
+                fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
+                RawApi rawApi = new RawApi(request, response, "");
+                rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "MIRRORING");
+                RunResult runResult = new RunResult(
+                        new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
+                        rawApi.getOriginalMessage(),
+                        sample,
+                        rawApi.getResponse().getStatusCode() == originalHttpResponse.getStatusCode()
+                );
+                runResults.add(runResult);
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb(e, "error while sending request", LoggerMaker.LogDb.DASHBOARD);
+                e.printStackTrace();
             }
         }
 
         return runResults;
     }
 
-    public String findNewHost(OriginalHttpRequest request, Map<String, ModifyHostDetail> modifyHostDetailMap) {
+    // todo: handle all cases
+    public static String findNewHost(OriginalHttpRequest request, Map<String, ModifyHostDetail> modifyHostDetailMap) {
         try {
             String url = request.getFullUrlIncludingDomain();
             URI uri = new URI(url);
             String currentHost = uri.getHost();
             ModifyHostDetail modifyHostDetail = modifyHostDetailMap.get(currentHost);
+            if (modifyHostDetail == null) {
+                if (uri.getPort() != -1) currentHost += ":" + uri.getPort();
+                modifyHostDetail = modifyHostDetailMap.get(currentHost);
+            }
+
             if (modifyHostDetail == null) return null;
+
             String newHost = modifyHostDetail.getNewHost();
             if (newHost == null) return null;
             if (newHost.startsWith("http")) {
@@ -223,8 +241,10 @@ public class Build {
             modifyHostDetailMap.put(modifyHostDetail.getCurrentHost(), modifyHostDetail);
         }
 
-        buildParentToChildMap(apiCollectionsIds);
-        Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(apiCollectionsIds);
+
+        List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds,false,0, 10_000);
+        buildParentToChildMap(nodes);
+        Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(nodes);
 
         List<RunResult> runResults = new ArrayList<>();
         // loop over levels and make requests
@@ -239,6 +259,7 @@ public class Build {
                 runResults.addAll(runResultsPerLevel);
                 loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
+                e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error while running for level " + level , LoggerMaker.LogDb.DASHBOARD);
             }
         }
@@ -246,7 +267,7 @@ public class Build {
         return runResults;
     }
 
-    public void modifyRequest(OriginalHttpRequest request, ReplaceDetail replaceDetail) {
+    public static void modifyRequest(OriginalHttpRequest request, ReplaceDetail replaceDetail) {
         RawApi rawApi = new RawApi(request, null, null);
 
         if (replaceDetail != null) {
@@ -271,7 +292,7 @@ public class Build {
                         values.add(kvPair.getKey());
                         String modifiedBody = JSONUtils.modify(rawApi.getRequest().getJsonRequestBody(), values, setValueModifier);
                         String contentType = rawApi.getRequest().findContentType();
-                        if (contentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
+                        if (contentType != null && contentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
                             modifiedBody = HttpRequestResponseUtils.jsonToFormUrlEncoded(modifiedBody);
                         }
                         rawApi.getRequest().setBody(modifiedBody);
@@ -303,28 +324,39 @@ public class Build {
 
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    public boolean fillReplaceDetailsMap(ReverseNode reverseNode, OriginalHttpResponse response, Map<Integer, ReplaceDetail> replaceDetailsMap) {
-        if (reverseNode == null) return true;
+    public void fillReplaceDetailsMap(ReverseNode reverseNode, OriginalHttpResponse response, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+        if (reverseNode == null) return;
 
         Map<Integer, ReplaceDetail> deltaReplaceDetailsMap = new HashMap<>();
 
         Map<String, Set<String>> valuesMap = RelationshipSync.extractAllValuesFromPayload(response.getBody());
 
-        boolean found = true;
+        Map<String, List<String>> responseHeaders = response.getHeaders();
+        for (String headerKey: responseHeaders.keySet()) {
+            List<String> values = responseHeaders.get(headerKey);
+            if (values == null) continue;
+
+            if (headerKey.equalsIgnoreCase("set-cookie")) {
+                Map<String, String> cookieMap = AuthPolicy.parseCookie(values);
+                for (String cookieKey : cookieMap.keySet()) {
+                    String cookieVal = cookieMap.get(cookieKey);
+                    valuesMap.put(cookieKey, new HashSet<>(Collections.singletonList(cookieVal)));
+                }
+            } else {
+                valuesMap.put(headerKey, new HashSet<>(values));
+            }
+
+        }
 
         Map<String,ReverseConnection> connections = reverseNode.getReverseConnections();
         for (ReverseConnection reverseConnection: connections.values()) {
             String param = reverseConnection.getParam();
             Set<String> values = valuesMap.get(param);
             Object value = values != null && values.size() > 0 ? values.toArray()[0] : null; // todo:
+            if (value == null) continue;
 
             for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
                 Integer id = Objects.hash(reverseEdge.getApiCollectionId(), reverseEdge.getUrl(), reverseEdge.getMethod());
-                ReplaceDetail replaceDetail = replaceDetailsMap.get(id);
-                found = value != null || replaceDetail != null;
-                if (!found) continue;
-
-                if (value == null) continue;
 
                 ReplaceDetail deltaReplaceDetail = deltaReplaceDetailsMap.get(id);
                 if (deltaReplaceDetail == null) {
@@ -333,12 +365,10 @@ public class Build {
                 }
 
                 KVPair.KVType type = value instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
-                KVPair kvPair = new KVPair(reverseEdge.getParam(), value.toString(), false, reverseEdge.isUrlParam(), type);
+                KVPair kvPair = new KVPair(reverseEdge.getParam(), value.toString(), reverseEdge.getIsHeader(), reverseEdge.isUrlParam(), type);
                 deltaReplaceDetail.addIfNotExist(kvPair);
             }
         }
-
-        if (!found) return false;
 
         for (Integer key: deltaReplaceDetailsMap.keySet()) {
             ReplaceDetail replaceDetail = replaceDetailsMap.get(key);
@@ -352,17 +382,29 @@ public class Build {
             replaceDetailsMap.put(key, replaceDetail);
         }
 
-        return true;
+    }
+
+    public static void main1(String[] args) throws URISyntaxException {
+//        System.out.println(new URI("http://localhost/admini").getPort());
+        ModifyHostDetail modifyHostDetail = new ModifyHostDetail("localhost:9092", "http://localhost:9093");
+        Map<String, ModifyHostDetail>  modifyHostDetailMap = new HashMap<>();
+        modifyHostDetailMap.put(modifyHostDetail.getCurrentHost(), modifyHostDetail);
+
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.setUrl("http://localhost:9092");
+        String newHost = findNewHost(originalHttpRequest, modifyHostDetailMap);
+        System.out.println(newHost);
     }
 
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
+        Context.accountId.set(6_000_000);
 
         Build build = new Build();
         long start = System.currentTimeMillis();
         List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
-        List<RunResult> runResults = build.run(Collections.singletonList(1705668952), modifyHostDetails, new HashMap<>());
+        modifyHostDetails.add(new ModifyHostDetail("localhost:8092", "http://localhost:8093"));
+        List<RunResult> runResults = build.run(Collections.singletonList(1706594295), modifyHostDetails, new HashMap<>());
         System.out.println(System.currentTimeMillis()  - start);
 
 //        System.out.println(runResults);

@@ -10,6 +10,8 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.runtime.policies.AuthPolicy;
+import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -37,7 +39,7 @@ public class DependencyAnalyser {
     }
 
     public void analyse(HttpResponseParams responseParams) {
-        if (responseParams.statusCode < 200 || responseParams.statusCode >= 300) return;
+        if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
 
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
@@ -85,6 +87,31 @@ public class DependencyAnalyser {
                 urlParamValueStore.add(combinedUrl + "$" + param + "$" + val);
             }
         }
+
+        Map<String, List<String>> responseHeaders = responseParams.getHeaders();
+        for (String param: responseHeaders.keySet()) {
+            List<String> values = responseHeaders.get(param);
+            if (param.equals("set-cookie")) {
+                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                for (String cookieKey: cookieMap.keySet()) {
+                    String cookieVal = cookieMap.get(cookieKey);
+                    paramSet.add(cookieKey);
+                    if (!filterValues(cookieVal)) continue;
+                    valueStore.add(cookieVal);
+                    urlValueStore.add(combinedUrl + "$" + cookieVal);
+                    urlParamValueStore.add(combinedUrl + "$" + cookieKey + "$" + cookieVal);
+                }
+            } else {
+                for (String val: values) {
+                    paramSet.add(param);
+                    if (!filterValues(val) || HTTPHeadersExample.responseHeaders.contains(param)) continue;
+                    valueStore.add(val);
+                    urlValueStore.add(combinedUrl + "$" + val);
+                    urlParamValueStore.add(combinedUrl + "$" + param + "$" + val);
+                }
+            }
+        }
+
         urlsToResponseParam.put(combinedUrl, paramSet);
 
         // Store url in Set
@@ -99,7 +126,7 @@ public class DependencyAnalyser {
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
 
         for (String requestParam: reqFlattened.keySet()) {
-            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false);
+            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false);
         }
 
         if (APICatalog.isTemplateUrl(url)) {
@@ -113,31 +140,48 @@ public class DependencyAnalyser {
                 String s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
                 Set<Object> val = new HashSet<>();
                 val.add(s);
-                processRequestParam(i+"", val, combinedUrl, true);
+                processRequestParam(i+"", val, combinedUrl, true, false);
             }
+        }
+
+        Map<String, List<String>> requestHeaders = requestParams.getHeaders();
+        for (String param: requestHeaders.keySet()) {
+            if (HTTPHeadersExample.requestHeaders.contains(param)) continue;
+            List<String> values = requestHeaders.get(param);
+
+            if (param.equals("cookie")) {
+                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                for (String cookieKey: cookieMap.keySet()) {
+                    String cookieValue = cookieMap.get(cookieKey);
+                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true);
+                }
+            } else {
+                processRequestParam(param, new HashSet<>(values), combinedUrl, false, true);
+            }
+
         }
     }
 
-    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam) {
+    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
         for (Object val : reqFlattenedValuesSet) {
             if (filterValues(val) && valueSeen(val)) {
-                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam);
+                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
             }
         }
     }
 
-    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam) {
+    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
         for (String url : urlsToResponseParam.keySet()) {
             if (!url.equals(originalCombinedUrl) && urlValSeen(url, val)) {
-                processUrlForParam(url, requestParam, val, originalCombinedUrl, isUrlParam);
+                processUrlForParam(url, requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
             }
         }
     }
 
-    private void processUrlForParam(String url, String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam) {
+    private void processUrlForParam(String url, String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
         for (String responseParam : urlsToResponseParam.get(url)) {
             if (urlParamValueSeen(url, responseParam, val)) {
-                updateNodesMap(url, responseParam, originalCombinedUrl, requestParam, isUrlParam);
+                updateNodesMap(url, responseParam, originalCombinedUrl, requestParam, isUrlParam, isHeader);
             }
         }
     }
@@ -166,7 +210,7 @@ public class DependencyAnalyser {
     public boolean filterValues(Object val) {
         if (val == null) return false;
         if (val instanceof Boolean) return false;
-        if (val instanceof String) return val.toString().length() > 4 && val.toString().length() < 64;
+        if (val instanceof String) return val.toString().length() > 4 && val.toString().length() <= 4096;
         if (val instanceof Integer) return ((int) val) > 50;
         return true;
     }
@@ -183,7 +227,7 @@ public class DependencyAnalyser {
         return urlParamValueStore.contains(url + "$" + param + "$" + val.toString());
     }
 
-    public void updateNodesMap(String combinedUrlResp, String paramResp, String combinedUrlReq, String paramReq, boolean isUrlParam) {
+    public void updateNodesMap(String combinedUrlResp, String paramResp, String combinedUrlReq, String paramReq, boolean isUrlParam, boolean isHeader) {
         String[] combinedUrlRespSplit = combinedUrlResp.split("#");
         String apiCollectionIdResp = combinedUrlRespSplit[0];
         String urlResp = combinedUrlRespSplit[1];
@@ -194,7 +238,7 @@ public class DependencyAnalyser {
         String urlReq = combinedUrlReqSplit[1];
         String methodReq = combinedUrlReqSplit[2];
 
-        DependencyNode.ParamInfo paramInfo = new DependencyNode.ParamInfo(paramReq, paramResp, 1, isUrlParam);
+        DependencyNode.ParamInfo paramInfo = new DependencyNode.ParamInfo(paramReq, paramResp, 1, isUrlParam, isHeader);
 
         List<DependencyNode.ParamInfo> paramInfos = new ArrayList<>();
         paramInfos.add(paramInfo);
@@ -317,7 +361,8 @@ public class DependencyAnalyser {
                                 Filters.and(
                                         Filters.eq(DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam()),
                                         Filters.eq(DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam()),
-                                        Filters.eq(DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam())
+                                        Filters.eq(DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam()),
+                                        Filters.eq(DependencyNode.ParamInfo.IS_HEADER, paramInfo.isHeader())
                                 )
                         ))
                 );
@@ -326,6 +371,7 @@ public class DependencyAnalyser {
                         new BasicDBObject(DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam())
                                 .append(DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam())
                                 .append(DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam())
+                                .append(DependencyNode.ParamInfo.IS_HEADER, paramInfo.isHeader())
                                 .append(DependencyNode.ParamInfo.COUNT, 0)
                 );
 
@@ -343,7 +389,8 @@ public class DependencyAnalyser {
                         Filters.eq(DependencyNode.METHOD_RESP, methodResp),
                         Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam()),
                         Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam()),
-                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam())
+                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam()),
+                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_HEADER, paramInfo.isHeader())
                 );
 
                 Bson update3 = Updates.combine(

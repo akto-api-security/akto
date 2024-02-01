@@ -9,18 +9,20 @@ public class ReverseEdge {
     private int count;
 
     private boolean isUrlParam;
+    private boolean isHeader;
 
 
     public ReverseEdge() {
     }
 
-    public ReverseEdge(String apiCollectionId, String url, String method, String param, int count, boolean isUrlParam) {
+    public ReverseEdge(String apiCollectionId, String url, String method, String param, int count, boolean isUrlParam, boolean isHeader) {
         this.apiCollectionId = apiCollectionId;
         this.url = url;
         this.method = method;
         this.param = param;
         this.count = count;
         this.isUrlParam = isUrlParam;
+        this.isHeader = isHeader;
     }
 
     public String getApiCollectionId() {
@@ -67,7 +69,15 @@ public class ReverseEdge {
         return isUrlParam;
     }
 
-    public void setUrlParam(boolean urlParam) {
+    public void setIsUrlParam(boolean urlParam) {
         isUrlParam = urlParam;
+    }
+
+    public boolean getIsHeader() {
+        return isHeader;
+    }
+
+    public void setIsHeader(boolean header) {
+        isHeader = header;
     }
 }

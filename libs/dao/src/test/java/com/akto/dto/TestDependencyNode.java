@@ -14,7 +14,7 @@ public class TestDependencyNode {
     @Test
     public void testUpdateOrCreateParamInfo() {
         List<DependencyNode.ParamInfo> paramInfoList = new ArrayList<>();
-        DependencyNode.ParamInfo paramInfo1 = new DependencyNode.ParamInfo("req2a", "resp1a", 2, false);
+        DependencyNode.ParamInfo paramInfo1 = new DependencyNode.ParamInfo("req2a", "resp1a", 2, false, false);
         paramInfoList.add(paramInfo1.copy());
 
         DependencyNode dependencyNode = new DependencyNode(
@@ -26,7 +26,7 @@ public class TestDependencyNode {
         assertEquals(paramInfo1.getCount()*2, dependencyNode.getParamInfos().get(0).getCount());
 
 
-        DependencyNode.ParamInfo paramInfo2 = new DependencyNode.ParamInfo("req2b", "resp1b", 2, false);
+        DependencyNode.ParamInfo paramInfo2 = new DependencyNode.ParamInfo("req2b", "resp1b", 2, false, false);
 
         dependencyNode.updateOrCreateParamInfo(paramInfo2);
         assertEquals(2, dependencyNode.getParamInfos().size());
