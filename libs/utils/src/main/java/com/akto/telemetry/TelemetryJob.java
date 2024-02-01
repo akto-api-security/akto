@@ -106,7 +106,7 @@ public class TelemetryJob {
             logs = instance.findAll(filter, skip, limit, Sorts.ascending(Log.TIMESTAMP), null);
             skip += limit;
             //send logs to telemetry server
-            int lastLogTs = sendLogs(logs, dbName, org.getId(), accountId);
+            int lastLogTs = sendLogs(logs, dbName, org, accountId);
             if(lastLogTs <=0) {
                 break;
             }
