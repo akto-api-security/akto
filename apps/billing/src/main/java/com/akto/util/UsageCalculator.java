@@ -9,6 +9,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
+import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
@@ -25,6 +26,7 @@ import static com.akto.dto.billing.OrganizationUsage.*;
 
 public class UsageCalculator {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageCalculator.class);
+    private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
     public static final UsageCalculator instance = new UsageCalculator();
 
     private UsageCalculator() {}
@@ -94,7 +96,7 @@ public class UsageCalculator {
             usageMetric.setUsage(usage);
             UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,"can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
+            cacheLoggerMaker.errorAndAddToDb(e,"can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
         }
     }
 
