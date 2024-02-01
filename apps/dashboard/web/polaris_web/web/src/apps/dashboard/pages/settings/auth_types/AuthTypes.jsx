@@ -113,6 +113,8 @@ function AuthTypes() {
                     description={"Define custom auth mechanism based on where you send the auth key. We support auth key detection in header, payload and even cookies in your APIs."}
                     buttonText={"Create auth type"}
                     redirectUrl={"/dashboard/settings/auth-types/details"}
+                    learnText={"Creating auth type"}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/auth-types"}
                 />
 
             

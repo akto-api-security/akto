@@ -109,4 +109,4 @@ function DashboardBanner() {
     )
 }
 
-export default DashboardBanner
+export {DashboardBanner, InfoComponent}

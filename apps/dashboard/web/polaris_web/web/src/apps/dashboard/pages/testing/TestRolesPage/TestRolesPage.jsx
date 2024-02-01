@@ -94,6 +94,8 @@ function TestRolesPage(){
                     description={"No test role to show yet. Create one now to test for role specific vulnerabilities such as BOLA or privilege escalation."}
                     buttonText={"Create test role"}
                     redirectUrl={"/dashboard/testing/roles/details"}
+                    learnText={"Creating test roles"}
+                    docsUrl={"https://docs.akto.io/testing/user-roles"}
                 />
 
             

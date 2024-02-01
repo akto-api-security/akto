@@ -534,6 +534,8 @@ function ApiEndpoints() {
                             description={"Your API collection is currently empty. Import APIs from other collections now."}
                             buttonText={"Import from other collections"}
                             redirectUrl={"/dashboard/observe/inventory"}
+                            learnText={"inventory"}
+                            docsUrl={"https://docs.akto.io/api-inventory/concepts/api-collection"}
                 />] :[
                 <div className="apiEndpointsTable" key="table">
                       <GithubSimpleTable
