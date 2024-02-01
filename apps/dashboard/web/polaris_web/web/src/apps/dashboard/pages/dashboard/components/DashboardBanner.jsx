@@ -4,6 +4,7 @@ import { Box, Text, VerticalStack } from '@shopify/polaris'
 import { AppsMinor, MarketingMinor, ResetMinor, CustomersMinor, EditMinor, NoteMinor, ReadTimeMinor, StarFilledMinor } from "@shopify/polaris-icons"
 import GridRows from '../../../components/shared/GridRows'
 import BannerRow from './BannerRow'
+import { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_THUMBNAIL, HOMEDASHBOARD_VIDEO_URL } from '../../../../main/onboardingData'
 
 function InfoComponent({title, items})  {
     return(
@@ -92,8 +93,6 @@ function DashboardBanner() {
         </VerticalStack>
     )
 
-    const thumbnailUrl = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
-
     return (
         <BannerLayout
             title="Get started with your Dashboard"
@@ -103,9 +102,9 @@ function DashboardBanner() {
             buttonUrl={"https://docs.akto.io/readme"}
             containerComp={containerComp}
             newTab={true}
-            videoLength={195}
-            videoThumbnail={thumbnailUrl}
-            videoLink={"https://www.youtube.com/watch?v=fRyusl8ppdY&ab_channel=Akto"}
+            videoLength={HOMEDASHBOARD_VIDEO_LENGTH}
+            videoThumbnail={HOMEDASHBOARD_VIDEO_THUMBNAIL}
+            videoLink={HOMEDASHBOARD_VIDEO_URL}
         />
     )
 }

@@ -1,6 +1,7 @@
-import { Button, HorizontalStack, Page, VerticalStack } from "@shopify/polaris";
+import { Box, Button, HorizontalStack, Page, Popover, Text, VerticalStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
+import { useState } from "react";
 
 const PageWithMultipleCards = (props) => {
 
@@ -9,6 +10,7 @@ const PageWithMultipleCards = (props) => {
     const location = useLocation();
     const navigate = useNavigate()
     const isNewTab = location.key==='default' || !(window.history.state && window.history.state.idx > 0)
+    const [popoverActive, setPopoverActive] = useState(false)
 
     const navigateBack = () => {
         navigate(-1)
@@ -35,10 +37,37 @@ const PageWithMultipleCards = (props) => {
         return transformedString;
     }
 
-    const isLearnMore = learnMoreObject.hasOwnProperty(transformString(location.pathname))
+    const learnMoreObj = learnMoreObject[transformString(location.pathname)]
+
+    const learnMoreComp = (
+        <Popover
+            active={popoverActive}
+            activator={(
+                <Button onClick={() => setPopoverActive(true)} disclosure>
+                    Learn
+                </Button>
+            )}
+            autofocusTarget="first-node"
+            onClose={() => { setPopoverActive(false) }}
+        >
+            <Popover.Section>
+                <Box width="230px">
+                    <VerticalStack gap={1}>
+                        <Text>
+                            {learnMoreObj.title}
+                        </Text>
+                        <Text color="subdued">
+                            {learnMoreObj.description}
+                        </Text>
+                    </VerticalStack>
+                </Box>
+            </Popover.Section>
+        </Popover>
+    )
+
     const useSecondaryActions = (
         <HorizontalStack gap={2}>
-            {isLearnMore ? <Button disclosure>Learn</Button> : null }
+            {learnMoreObj ? learnMoreComp : null }
             {secondaryActions}
         </HorizontalStack>
     )

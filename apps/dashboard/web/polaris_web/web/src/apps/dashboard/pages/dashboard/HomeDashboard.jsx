@@ -271,7 +271,7 @@ function HomeDashboard() {
         <div style={{display: 'flex', gap: '32px'}} key={"dashboardComp"}>
             <div style={{flex: 7}}>
                 <VerticalStack gap={4}>
-                    {components?.filter((component) => {
+                    {components.map((component) => {
                         return component
                     })}
                 </VerticalStack>
@@ -290,7 +290,6 @@ function HomeDashboard() {
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp]
 
     return (
-        loading ? <SpinnerCentered /> :
             <PageWithMultipleCards
                 title={
                     <Text variant='headingLg'>
