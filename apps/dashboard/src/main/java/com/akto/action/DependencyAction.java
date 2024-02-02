@@ -9,10 +9,13 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.log.LoggerMaker;
 import com.akto.runtime.RelationshipSync;
 import com.akto.utils.Build;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
@@ -20,6 +23,9 @@ import org.apache.logging.log4j.util.Strings;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class DependencyAction extends UserAction {
 
@@ -68,15 +74,50 @@ public class DependencyAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private List<Build.RunResult> runResults;
+    private int newCollectionId;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     public String invokeDependencyTable() {
-        Build build = new Build();
-        List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
-        runResults = build.run(apiCollectionIds, modifyHostDetails, new HashMap<>());
-        for (Build.RunResult runResult: runResults) {
-            runResult.setCurrentMessage("");;
-            runResult.setOriginalMessage("");
+        ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+        apiCollectionsAction.setCollectionName("temp " + Context.now());
+        apiCollectionsAction.createCollection();
+        List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();;
+
+        if (apiCollections.size() == 0) {
+            addActionError("Coulnd't create collection");
+            return ERROR.toUpperCase();
         }
+        newCollectionId = apiCollections.get(0).getId();
+
+        int accountId = Context.accountId.get();
+
+        executorService.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                Build build = new Build();
+                List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
+                List<ReplaceDetail> replaceDetailsFromDb = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
+                Map<Integer, ReplaceDetail> replaceDetailMap = new HashMap<>();
+                for (ReplaceDetail replaceDetail: replaceDetailsFromDb) {
+                    replaceDetailMap.put(replaceDetail.hashCode(), replaceDetail);
+                }
+                List<Build.RunResult> runResults = build.run(apiCollectionIds, modifyHostDetails, replaceDetailMap);
+                List<String> messages = new ArrayList<>();
+
+                for (Build.RunResult runResult: runResults) {
+                    String currentMessage = runResult.getCurrentMessage();
+                    messages.add(currentMessage);
+                }
+
+                try {
+                    Utils.pushDataToKafka(newCollectionId, "", messages, new ArrayList<>(), true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+            }
+        }, 0, TimeUnit.SECONDS);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -90,7 +131,7 @@ public class DependencyAction extends UserAction {
 
         ReplaceDetailsDao.instance.updateOne(
                 Filters.and(
-                        Filters.eq(ReplaceDetail._API_COLLECTION_ID, apiCollectionId),
+                        Filters.eq(ReplaceDetail._API_COLLECTION_ID, apiCollectionId+""),
                         Filters.eq(ReplaceDetail._URL, url),
                         Filters.eq(ReplaceDetail._METHOD, method.name())
                 ),
@@ -229,10 +270,6 @@ public class DependencyAction extends UserAction {
     }
 
 
-    public List<Build.RunResult> getRunResults() {
-        return runResults;
-    }
-
     public void setKvPairs(List<KVPair> kvPairs) {
         this.kvPairs = kvPairs;
     }
@@ -256,5 +293,9 @@ public class DependencyAction extends UserAction {
 
     public Map<String, Set<String>> getParamToValuesMap() {
         return paramToValuesMap;
+    }
+
+    public int getNewCollectionId() {
+        return newCollectionId;
     }
 }

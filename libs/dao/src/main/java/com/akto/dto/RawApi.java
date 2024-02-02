@@ -188,8 +188,8 @@ public class RawApi {
     }
 
     public void fillOriginalMessage(int akto_account_id, int time, String type, String source) throws Exception {
-        String requestHeaders = om.writeValueAsString(convertHeaders(this.request.getHeaders()));
-        String responseHeaders = om.writeValueAsString(convertHeaders(this.response.getHeaders()));
+        String requestHeaders = convertHeaders(this.request.getHeaders());
+        String responseHeaders = convertHeaders(this.response.getHeaders());
 
         String path = this.request.getFullUrlWithParams();
         List<String> contentTypeHeaderValues = this.request.getHeaders().get("content-type");
