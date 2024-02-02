@@ -10,6 +10,7 @@ import {
     CalendarMinor
   } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
+import { TAGS_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 
 function Tags(){
 
@@ -90,7 +91,7 @@ function Tags(){
                     buttonText={"Create tag"}
                     redirectUrl={"/dashboard/settings/tags/details"}
                     learnText={"Creating tags"}
-                    docsUrl={"https://docs.akto.io/readme"}
+                    docsUrl={TAGS_PAGE_DOCS_URL}
                 />
 
             

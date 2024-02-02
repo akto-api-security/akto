@@ -23,6 +23,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
+import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 
 const headings = [
     {
@@ -535,7 +536,7 @@ function ApiEndpoints() {
                             buttonText={"Import from other collections"}
                             redirectUrl={"/dashboard/observe/inventory"}
                             learnText={"inventory"}
-                            docsUrl={"https://docs.akto.io/api-inventory/concepts/api-collection"}
+                            docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] :[
                 <div className="apiEndpointsTable" key="table">
                       <GithubSimpleTable

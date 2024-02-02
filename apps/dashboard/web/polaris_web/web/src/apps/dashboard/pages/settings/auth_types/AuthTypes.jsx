@@ -11,6 +11,7 @@ import {
     CircleTickMajor
   } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
+import { AUTH_TYPES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 
 function AuthTypes() {
     const headers = [
@@ -114,7 +115,7 @@ function AuthTypes() {
                     buttonText={"Create auth type"}
                     redirectUrl={"/dashboard/settings/auth-types/details"}
                     learnText={"Creating auth type"}
-                    docsUrl={"https://docs.akto.io/api-inventory/concepts/auth-types"}
+                    docsUrl={AUTH_TYPES_PAGE_DOCS_URL}
                 />
 
             
