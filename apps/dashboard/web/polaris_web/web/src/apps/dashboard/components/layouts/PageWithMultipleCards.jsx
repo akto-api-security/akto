@@ -38,7 +38,7 @@ const PageWithMultipleCards = (props) => {
         return transformedString;
     }
 
-    const learnMoreObj = learnMoreObject[transformString(location.pathname)]
+    const learnMoreObj = learnMoreObject.hasOwnProperty(transformString(location.pathname)) ? learnMoreObject[transformString(location.pathname)] : null
     if(learnMoreObj){
         if (learnMoreObj?.docsLink !== undefined) {
             learnMoreObj.docsLink.forEach((doc) => {
@@ -56,6 +56,7 @@ const PageWithMultipleCards = (props) => {
     }
 
     const learnMoreComp = (
+        learnMoreObj ?
         <Popover
             active={popoverActive}
             activator={(
@@ -69,16 +70,16 @@ const PageWithMultipleCards = (props) => {
             <Box width="230px" padding={4} paddingBlockEnd={"0"}>
                 <VerticalStack gap={1}>
                     <Text>
-                        {learnMoreObj.title}
+                        {learnMoreObj?.title}
                     </Text>
                     <Text color="subdued">
-                        {learnMoreObj.description}
+                        {learnMoreObj?.description}
                     </Text>
                 </VerticalStack>
             </Box>
-            <ActionList items={[...learnMoreObj.docsLink, ...learnMoreObj.videoLink]} />
+            <ActionList items={[...learnMoreObj?.docsLink, ...learnMoreObj?.videoLink]} />
             
-        </Popover>
+        </Popover> : null
     )
 
     const useSecondaryActions = (

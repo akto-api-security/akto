@@ -618,12 +618,10 @@ public class StartTestAction extends UserAction {
         filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
         long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
 
-        int startTime = Context.now();
-        int endTime = Context.now() + 86400;
         List<Bson> filtersForSchedule = new ArrayList<>();
         Collections.addAll(filtersForSchedule,
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTime),
-                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTime),
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTimestamp),
+                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp),
                 Filters.nin(Constants.ID,getCicdTests())
         );
         long scheduleCount =  TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForSchedule));
