@@ -131,7 +131,7 @@ public class DependencyAction extends UserAction {
 
         ReplaceDetailsDao.instance.updateOne(
                 Filters.and(
-                        Filters.eq(ReplaceDetail._API_COLLECTION_ID, apiCollectionId+""),
+                        Filters.eq(ReplaceDetail._API_COLLECTION_ID, apiCollectionId),
                         Filters.eq(ReplaceDetail._URL, url),
                         Filters.eq(ReplaceDetail._METHOD, method.name())
                 ),

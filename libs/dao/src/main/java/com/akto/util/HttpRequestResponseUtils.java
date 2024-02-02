@@ -3,6 +3,7 @@ package com.akto.util;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
@@ -20,6 +21,17 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+
+    public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
+        if (body.startsWith("[")) body = "{\"json\": "+body+"}";
+        BasicDBObject respPayloadObj;
+        try {
+            respPayloadObj = BasicDBObject.parse(body);
+        } catch (Exception e) {
+            respPayloadObj = BasicDBObject.parse("{}");
+        }
+        return JSONUtils.flatten(respPayloadObj);
+    }
 
     public static String rawToJsonString(String rawRequest, Map<String,List<String>> requestHeaders) {
         if (rawRequest == null) return null;
