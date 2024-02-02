@@ -229,7 +229,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     let total = 0;
     let dateRange = filters['dateRange'] || false;
     delete filters['dateRange']
-    let startTimestamp = 0;
+    let startTimestamp = func.recencyPeriod;
     let endTimestamp = func.timeNow()
     if (dateRange) {
       startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
@@ -242,7 +242,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
       case "cicd":
         await api.fetchTestingDetails(
-          0, 0, true, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, true, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -250,7 +250,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          0, 0, false, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, false, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -258,7 +258,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "oneTime":
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, false, false, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -266,7 +266,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       default:
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, true, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, false, true, sortKey, sortOrder, skip, limit, filters
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
