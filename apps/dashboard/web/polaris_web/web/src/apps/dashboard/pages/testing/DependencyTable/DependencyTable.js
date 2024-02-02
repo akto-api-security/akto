@@ -1,4 +1,4 @@
-import { Box, Button, Icon, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Box, Button, HorizontalStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
@@ -149,14 +149,22 @@ function DependencyTable() {
                     icon = <Icon source={CancelMinor} color="critical" />
                 }
             }
+
+            let headerCount = 0;
+            Object.values(connections).forEach(x => {
+                if (x["isHeader"]) headerCount += 1;
+            })
+
+            let totalParams = params.length + headerCount
+
             final.push({
                 "name": node["method"] + " " + node["url"],
                 "id": node["method"] + " " + node["url"],
                 "success": icon,
                 "url": node["method"] + " " + node["url"],
                 "level": node["maxDepth"],
-                "totalParameters": params.length,
-                "missingParameters": params.length - Object.keys(connections).length,
+                "totalParameters": totalParams,
+                "missingParameters": totalParams - Object.keys(connections).length,
                 "urls": data,
                 "collapsibleRow": <TableExpand data={data} childApiCollectionId={node["apiCollectionId"]} childUrl={node["url"]} childMethod={node["method"]} showEditModal={showEditModal}/>
             })
@@ -243,18 +251,31 @@ function DependencyTable() {
     const components = [resultTable, modalComponent, globalVarModalComponent]
 
     const invokeDependencyTable = () => {
+        if (invokeLoading) return
         setInvokeLoading(true)
         api.invokeDependencyTable(apiCollectionIds).then((resp) => {
-            let runResultList = resp["runResults"]
-            let temp = {}
-            runResultList.forEach((runResult) => {
-                let apiInfoKey = runResult["apiInfoKey"]
-                temp[apiInfoKey["method"] + " " + apiInfoKey["url"]] = runResult
-            })
+            let newCollectionId = resp["newCollectionId"]
+            // let temp = {}
+            // runResultList.forEach((runResult) => {
+            //     let apiInfoKey = runResult["apiInfoKey"]
+            //     temp[apiInfoKey["method"] + " " + apiInfoKey["url"]] = runResult
+            // })
 
             setInvokeLoading(false)
-            setRunResults(temp)
-            setRefresh(!refresh)
+            // setRunResults(temp)
+            // setRefresh(!refresh)
+
+            const url = "/dashboard/observe/inventory/" + newCollectionId
+
+            const forwardLink = (
+                <HorizontalStack gap={1}>
+                    <Text> API collection created successfully. Click </Text>
+                    <Link url={url}>here</Link>
+                    <Text> to view collection.</Text>
+                </HorizontalStack>
+            )
+
+            func.setToast(true, false, forwardLink)
         })
     }
 

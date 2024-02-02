@@ -3,6 +3,7 @@ package com.akto.utils;
 import com.akto.DaoInit;
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.ModifyHostDetailsDao;
+import com.akto.dao.ReplaceDetailsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -156,13 +157,11 @@ public class Build {
         
     }
 
+    Set<ApiInfo.ApiInfoKey> apisReplayedSet = new HashSet<>();
     public List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, ModifyHostDetail> modifyHostDetailMap, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
-            if (id.url.contains("fetchAPICollection")) {
-                System.out.println("hi");
-            }
             List<String> samples = sampleData.getSamples();
             if (samples.isEmpty()) continue;;
 
@@ -175,7 +174,7 @@ public class Build {
             originalHttpResponse.buildFromSampleMessage(sample);
 
             // do modifications
-            ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
+            ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
             modifyRequest(request, replaceDetail);
 
             TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost);
@@ -183,10 +182,12 @@ public class Build {
             OriginalHttpResponse response = null;
             try {
                 response = ApiExecutor.sendRequest(request,false, testingRunConfig);
+                apisReplayedSet.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
+                request.getHeaders().remove(AccountSettings.AKTO_IGNORE_FLAG);
                 ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
                 fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
                 RawApi rawApi = new RawApi(request, response, "");
-                rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "MIRRORING");
+                rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "HAR");
                 RunResult runResult = new RunResult(
                         new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
                         rawApi.getOriginalMessage(),
@@ -263,6 +264,24 @@ public class Build {
                 loggerMaker.errorAndAddToDb(e, "Error while running for level " + level , LoggerMaker.LogDb.DASHBOARD);
             }
         }
+
+        loggerMaker.infoAndAddToDb("Running independent APIs", LoggerMaker.LogDb.DASHBOARD);
+        int skip = 0;
+        int limit = 1000;
+        while (true) {
+            List<SampleData> all = SampleDataDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionsIds), skip,limit, null);
+            List<SampleData> filtered = new ArrayList<>();
+            for (SampleData sampleData: all) {
+                Key key = sampleData.getId();
+                if (apisReplayedSet.contains(new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod()))) continue;
+                filtered.add(sampleData);
+            }
+            List<RunResult> runResultsAll = runPerLevel(filtered, modifyHostDetailMap, replaceDetailsMap);
+            runResults.addAll(runResultsAll);
+            skip += limit;
+            if (all.size() < limit) break;
+        }
+        loggerMaker.infoAndAddToDb("Finished running independent APIs", LoggerMaker.LogDb.DASHBOARD);
 
         return runResults;
     }
@@ -356,11 +375,12 @@ public class Build {
             if (value == null) continue;
 
             for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
-                Integer id = Objects.hash(reverseEdge.getApiCollectionId(), reverseEdge.getUrl(), reverseEdge.getMethod());
+                int apiCollectionId = Integer.parseInt(reverseEdge.getApiCollectionId());
+                Integer id = Objects.hash(apiCollectionId, reverseEdge.getUrl(), reverseEdge.getMethod());
 
                 ReplaceDetail deltaReplaceDetail = deltaReplaceDetailsMap.get(id);
                 if (deltaReplaceDetail == null) {
-                    deltaReplaceDetail = new ReplaceDetail(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), reverseEdge.getMethod(), new ArrayList<>());
+                    deltaReplaceDetail = new ReplaceDetail(apiCollectionId, reverseEdge.getUrl(), reverseEdge.getMethod(), new ArrayList<>());
                     deltaReplaceDetailsMap.put(id, deltaReplaceDetail);
                 }
 
@@ -384,27 +404,30 @@ public class Build {
 
     }
 
-    public static void main1(String[] args) throws URISyntaxException {
-//        System.out.println(new URI("http://localhost/admini").getPort());
-        ModifyHostDetail modifyHostDetail = new ModifyHostDetail("localhost:9092", "http://localhost:9093");
-        Map<String, ModifyHostDetail>  modifyHostDetailMap = new HashMap<>();
-        modifyHostDetailMap.put(modifyHostDetail.getCurrentHost(), modifyHostDetail);
-
-        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
-        originalHttpRequest.setUrl("http://localhost:9092");
-        String newHost = findNewHost(originalHttpRequest, modifyHostDetailMap);
-        System.out.println(newHost);
-    }
-
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(6_000_000);
+        Context.accountId.set(1_000_000);
 
         Build build = new Build();
         long start = System.currentTimeMillis();
         List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
         modifyHostDetails.add(new ModifyHostDetail("localhost:8092", "http://localhost:8093"));
-        List<RunResult> runResults = build.run(Collections.singletonList(1706594295), modifyHostDetails, new HashMap<>());
+
+        List<Integer> apiCollectionIds = Collections.singletonList(1706759873);
+        List<ReplaceDetail> replaceDetailsFromDb = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
+        Map<Integer, ReplaceDetail> replaceDetailMap = new HashMap<>();
+        for (ReplaceDetail replaceDetail: replaceDetailsFromDb) {
+            replaceDetailMap.put(replaceDetail.hashCode(), replaceDetail);
+        }
+
+        List<RunResult> runResults = build.run(apiCollectionIds, modifyHostDetails, replaceDetailMap);
+        List<String> messages = new ArrayList<>();
+        for (RunResult runResult: runResults) {
+            String currentMessage = runResult.getCurrentMessage();
+            System.out.println(currentMessage);
+            messages.add(currentMessage);
+        }
+        Utils.pushDataToKafka(103, "", messages, new ArrayList<>(), true);
         System.out.println(System.currentTimeMillis()  - start);
 
 //        System.out.println(runResults);

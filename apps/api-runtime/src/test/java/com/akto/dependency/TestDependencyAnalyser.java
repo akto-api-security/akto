@@ -210,32 +210,32 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         int now = Context.now();
 
         List<DependencyNode.ParamInfo> paramInfos1 = new ArrayList<>();
-        paramInfos1.add(new DependencyNode.ParamInfo("param_req_1", "param_resp_1", 1, false));
+        paramInfos1.add(new DependencyNode.ParamInfo("param_req_1", "param_resp_1", 1, false, false));
         DependencyNode dependencyNode1 = new DependencyNode("1000", "/api/books/1", "GET","1000", "/api/cars", "POST", paramInfos1, now);
         nodes.put(dependencyNode1.hashCode(), dependencyNode1);
 
         List<DependencyNode.ParamInfo> paramInfos2 = new ArrayList<>();
-        paramInfos2.add(new DependencyNode.ParamInfo("param_req_1", "param_resp_1", 2, false));
+        paramInfos2.add(new DependencyNode.ParamInfo("param_req_1", "param_resp_1", 2, false, false));
         DependencyNode dependencyNode2 = new DependencyNode("1000", "/api/books/2", "GET","1000", "/api/cars", "POST", paramInfos2, now);
         nodes.put(dependencyNode2.hashCode(), dependencyNode2);
 
         List<DependencyNode.ParamInfo> paramInfos3 = new ArrayList<>();
-        paramInfos3.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1, false));
+        paramInfos3.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1, false, false));
         DependencyNode dependencyNode3 = new DependencyNode("1000", "/api/toys/1", "GET","1000", "/api/bus", "POST", paramInfos3, now);
         nodes.put(dependencyNode3.hashCode(), dependencyNode3);
 
         List<DependencyNode.ParamInfo> paramInfos4 = new ArrayList<>();
-        paramInfos4.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1, false));
+        paramInfos4.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1, false, false));
         DependencyNode dependencyNode4 = new DependencyNode("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST", paramInfos4, now);
         nodes.put(dependencyNode4.hashCode(), dependencyNode4);
 
         List<DependencyNode.ParamInfo> paramInfos5 = new ArrayList<>();
-        paramInfos5.add(new DependencyNode.ParamInfo("param_req_3", "param_resp_3", 1, false));
+        paramInfos5.add(new DependencyNode.ParamInfo("param_req_3", "param_resp_3", 1, false, false));
         DependencyNode dependencyNode5 = new DependencyNode("1000", "/api/food/1", "GET","1000", "/api/hotel/2", "POST", paramInfos5, now);
         nodes.put(dependencyNode5.hashCode(), dependencyNode5);
 
         List<DependencyNode.ParamInfo> paramInfos6 = new ArrayList<>();
-        paramInfos6.add(new DependencyNode.ParamInfo("param_req_3", "param_resp_3", 3, false));
+        paramInfos6.add(new DependencyNode.ParamInfo("param_req_3", "param_resp_3", 3, false, false));
         DependencyNode dependencyNode6 = new DependencyNode("1000", "/api/food/2", "GET","1000", "/api/hotel/1", "POST", paramInfos6, now);
         nodes.put(dependencyNode6.hashCode(), dependencyNode6);
 
