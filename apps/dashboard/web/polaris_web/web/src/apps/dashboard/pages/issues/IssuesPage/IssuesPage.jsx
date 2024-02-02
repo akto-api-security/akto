@@ -9,6 +9,7 @@ import { ClockMinor,DynamicSourceMinor,LinkMinor, MarkFulfilledMinor, ReportMino
 import PersistStore from "../../../../main/PersistStore";
 import { Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
+import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 
 const headers = [
     {
@@ -320,7 +321,7 @@ function IssuesPage(){
                     infoItems={infoItems}
                     infoTitle={"Once you have issues:"}
                     learnText={"issues"}
-                    docsUrl={"https://docs.akto.io/readme"}
+                    docsUrl={ISSUES_PAGE_DOCS_URL}
                 />
 
             

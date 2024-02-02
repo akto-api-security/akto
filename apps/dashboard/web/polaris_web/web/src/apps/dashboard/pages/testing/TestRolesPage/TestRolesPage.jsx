@@ -10,6 +10,7 @@ import {
     CalendarMinor
   } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
+import { ROLES_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 
 const headers = [
     {
@@ -95,7 +96,7 @@ function TestRolesPage(){
                     buttonText={"Create test role"}
                     redirectUrl={"/dashboard/testing/roles/details"}
                     learnText={"Creating test roles"}
-                    docsUrl={"https://docs.akto.io/testing/user-roles"}
+                    docsUrl={ROLES_PAGE_DOCS_URL}
                 />
 
             

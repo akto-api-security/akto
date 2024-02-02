@@ -10,6 +10,12 @@ const TESTING_VIDEO_URL = "https://www.youtube.com/watch?v=lKzEU0f_rVI&ab_channe
 const TESTING_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/lKzEU0f_rVI/sddefault.jpg"
 const TESTING_VIDEO_LENGTH = 35 
 
+const ISSUES_PAGE_DOCS_URL = "https://docs.akto.io/readme"
+const ENDPOINTS_PAGE_DOCS_URL = "https://docs.akto.io/api-inventory/concepts/api-collection"
+const AUTH_TYPES_PAGE_DOCS_URL = "https://docs.akto.io/api-inventory/concepts/auth-types"
+const TAGS_PAGE_DOCS_URL = "https://docs.akto.io/readme"
+const ROLES_PAGE_DOCS_URL = "https://docs.akto.io/testing/user-roles"
+
 const learnMoreObject = {
     dashboard_home: {
         title: "Home page",
@@ -176,5 +182,6 @@ const learnMoreObject = {
 export { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_URL, HOMEDASHBOARD_VIDEO_THUMBNAIL,
     COLLECTIONS_VIDEO_LENGTH, COLLECTIONS_VIDEO_THUMBNAIL, COLLECTIONS_VIDEO_URL,
     TESTING_VIDEO_LENGTH, TESTING_VIDEO_THUMBNAIL, TESTING_VIDEO_URL,
-    learnMoreObject
+    learnMoreObject, ISSUES_PAGE_DOCS_URL, ROLES_PAGE_DOCS_URL, ENDPOINTS_PAGE_DOCS_URL,
+    AUTH_TYPES_PAGE_DOCS_URL, TAGS_PAGE_DOCS_URL
 }
