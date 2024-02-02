@@ -13,7 +13,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
-import com.akto.runtime.RelationshipSync;
+import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
@@ -28,10 +28,10 @@ import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE;
+import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
 
 public class Build {
 
@@ -294,7 +294,16 @@ public class Build {
             if (kvPairs != null && !kvPairs.isEmpty())  {
                 for (KVPair kvPair: kvPairs) {
                     if (kvPair.isHeader()) {
-                        Operations.modifyHeader(rawApi, kvPair.getKey(), kvPair.getValue()+"");
+                        String value = kvPair.getValue()+"";
+                        String headerValue = rawApi.getRequest().findHeaderValue(kvPair.getKey());
+                        String[] headerValueSplit = headerValue.split(" ");
+                        if (headerValueSplit.length == 2) {
+                            String prefix = headerValueSplit[0];
+                            if (Arrays.asList("bearer", "basic").contains(prefix.toLowerCase())) {
+                                value = prefix + " " + value;
+                            }
+                        }
+                        Operations.modifyHeader(rawApi, kvPair.getKey(), value);
                     } else if (kvPair.isUrlParam()) {
                         String url = request.getUrl();
                         String[] urlSplit = url.split("/");
@@ -348,7 +357,8 @@ public class Build {
 
         Map<Integer, ReplaceDetail> deltaReplaceDetailsMap = new HashMap<>();
 
-        Map<String, Set<String>> valuesMap = RelationshipSync.extractAllValuesFromPayload(response.getBody());
+        String respPayload = response.getBody();
+        Map<String, Set<Object>> valuesMap = extractValuesFromPayload(respPayload);
 
         Map<String, List<String>> responseHeaders = response.getHeaders();
         for (String headerKey: responseHeaders.keySet()) {
@@ -370,7 +380,7 @@ public class Build {
         Map<String,ReverseConnection> connections = reverseNode.getReverseConnections();
         for (ReverseConnection reverseConnection: connections.values()) {
             String param = reverseConnection.getParam();
-            Set<String> values = valuesMap.get(param);
+            Set<Object> values = valuesMap.get(param);
             Object value = values != null && values.size() > 0 ? values.toArray()[0] : null; // todo:
             if (value == null) continue;
 
@@ -411,10 +421,16 @@ public class Build {
         Build build = new Build();
         long start = System.currentTimeMillis();
         List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
-        modifyHostDetails.add(new ModifyHostDetail("localhost:8092", "http://localhost:8093"));
+//        modifyHostDetails.add(new ModifyHostDetail("localhost:8092", "http://localhost:8093"));
 
-        List<Integer> apiCollectionIds = Collections.singletonList(1706759873);
+        List<Integer> apiCollectionIds = Collections.singletonList(1706860608);
         List<ReplaceDetail> replaceDetailsFromDb = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
+
+        KVPair kvPairUsername = new KVPair("username", "aktotest2@ripplingdemo.com",false, false, KVPair.KVType.STRING);
+        KVPair kvPairPassword = new KVPair("password", "5793612E2620422D486D1D74B96DC477C1B0901B6BE85BA94C74611179FEDA51:$separator$:v2",false, false, KVPair.KVType.STRING);
+        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/o/token/", "POST", Arrays.asList(kvPairUsername, kvPairPassword)));
+        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/identity_sso/get_role_inbound_sso_setting/", "POST", Arrays.asList(kvPairUsername)));
+
         Map<Integer, ReplaceDetail> replaceDetailMap = new HashMap<>();
         for (ReplaceDetail replaceDetail: replaceDetailsFromDb) {
             replaceDetailMap.put(replaceDetail.hashCode(), replaceDetail);
@@ -424,7 +440,8 @@ public class Build {
         List<String> messages = new ArrayList<>();
         for (RunResult runResult: runResults) {
             String currentMessage = runResult.getCurrentMessage();
-            System.out.println(currentMessage);
+            HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(currentMessage);
+            System.out.println(responseParams.requestParams.getURL() + " - " + responseParams.statusCode);
             messages.add(currentMessage);
         }
         Utils.pushDataToKafka(103, "", messages, new ArrayList<>(), true);

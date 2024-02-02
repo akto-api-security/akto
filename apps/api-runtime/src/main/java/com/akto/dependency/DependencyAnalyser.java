@@ -20,6 +20,8 @@ import org.bson.conversions.Bson;
 
 import java.util.*;
 
+import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
+
 public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
     Store urlValueStore; // this is to store all the url$value seen in response payload
@@ -66,16 +68,7 @@ public class DependencyAnalyser {
 
         // Store response params in store
         String respPayload = responseParams.getPayload();
-        if (respPayload == null || respPayload.isEmpty()) respPayload = "{}";
-        if (respPayload.startsWith("[")) respPayload = "{\"json\": "+respPayload+"}";
-        BasicDBObject respPayloadObj;
-        try {
-            respPayloadObj = BasicDBObject.parse(respPayload);
-        } catch (Exception e) {
-            respPayloadObj = BasicDBObject.parse("{}");
-        }
-
-        Map<String, Set<Object>> respFlattened = JSONUtils.flatten(respPayloadObj);
+        Map<String, Set<Object>> respFlattened = extractValuesFromPayload(respPayload);
 
         Set<String> paramSet = urlsToResponseParam.getOrDefault(combinedUrl, new HashSet<>());
         for (String param: respFlattened.keySet()) {
@@ -156,7 +149,16 @@ public class DependencyAnalyser {
                     processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true);
                 }
             } else {
-                processRequestParam(param, new HashSet<>(values), combinedUrl, false, true);
+                Set<Object> valuesSet = new HashSet<>();
+                for (String v: values) {
+                    String[] vArr = v.split(" ");
+                    if (vArr.length == 2 && Arrays.asList("bearer", "basic").contains(vArr[0].toLowerCase())) {
+                        valuesSet.add(vArr[1]);
+                    } else {
+                        valuesSet.add(v);
+                    }
+                }
+                processRequestParam(param, valuesSet, combinedUrl, false, true);
             }
 
         }
