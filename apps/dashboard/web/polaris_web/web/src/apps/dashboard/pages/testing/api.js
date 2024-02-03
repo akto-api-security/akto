@@ -1,12 +1,12 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, fetchOneTime, sortKey, sortOrder, skip, limit, filters, fetchRecurring) {
+    async fetchTestingDetails(startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType) {
         const resp = await request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd, fetchOneTime, sortKey, sortOrder, skip, limit, filters, fetchRecurring
+                startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType
             }
         })
         return resp
