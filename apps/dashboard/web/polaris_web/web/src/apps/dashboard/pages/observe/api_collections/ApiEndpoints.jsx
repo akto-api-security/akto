@@ -1,95 +1,86 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Box, Popover, ActionList, Icon, Modal } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { useParams } from "react-router-dom"
+import {useLocation, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-import {
-    ClockMinor,
-    LockMinor,
-    ChevronDownMinor,
-    InfoMinor,
-    SearchMinor
-} from '@shopify/polaris-icons';
 
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
 import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
-import StyledEndpoint from "./component/StyledEndpoint"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
-import OpenApiSpec from "../OpenApiSpec"
 import PersistStore from "../../../../main/PersistStore"
+import transform from "../transform"
+import { CellType } from "../../../components/tables/rows/GithubRow"
+import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
 
-const headers = [
-    {
-        text: "Method",
-        value: "method",
-        showFilter: true
-    },
+const headings = [
     {
         text: "Endpoint",
-        value: "parameterisedEndpoint",
-        itemOrder: 1,
-        showFilter: true,
-        component: StyledEndpoint
+        value: "endpointComp",
+        title: "Api endpoints",
     },
     {
-        text: 'Tags',
-        value: 'tags',
-        itemCell: 3,
-        showFilter: true
+        text: "Risk score",
+        title: "Risk score",
+        value: "riskScoreComp",
     },
     {
-        text: 'Sensitive Params',
-        value: 'sensitiveTags',
-        itemOrder: 2,
-        showFilter: true
-    },
-    {
-        text: 'Last Seen',
-        value: 'last_seen',
-        icon: SearchMinor,
-        itemOrder: 3
+        text: "Hostname",
+        value: 'hostName',
+        title: "Hostname",
+        maxWidth: '100px',
+        type: CellType.TEXT,
     },
     {
         text: 'Access Type',
         value: 'access_type',
-        icon: InfoMinor,
-        itemOrder: 3,
-        showFilter: true
+        title: 'Access type',
+        showFilter: true,
+        type: CellType.TEXT,
     },
     {
         text: 'Auth Type',
+        title: 'Auth type',
         value: 'auth_type',
-        icon: LockMinor,
-        itemOrder: 3,
+        showFilter: true,
+        type: CellType.TEXT,
+    },
+    {
+        text: 'Sensitive Params',
+        title: 'Sensitive params',
+        value: 'sensitiveTagsComp',
+        filterKey: 'sensitiveTags',
         showFilter: true
     },
     {
-        text: "Discovered",
-        value: 'added',
-        icon: ClockMinor,
-        itemOrder: 3
-    },
-    {
-        text: 'Changes',
-        value: 'changes',
-        icon: InfoMinor,
-        itemOrder: 3
-
+        text: 'Last Seen',
+        title: 'Last seen',
+        value: 'last_seen',
+        isText: true,
     }
 ]
 
+let headers = JSON.parse(JSON.stringify(headings))
+headers.push({
+    text: 'Method',
+    filterKey: 'method',
+    showFilter: true
+})
+
+
 const sortOptions = [
+    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore'},
+    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore'},
     { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
     { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
     { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint' },
@@ -98,18 +89,20 @@ const sortOptions = [
     { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
     { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
     { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type' },
-    { label: 'Last seen', value: 'added asc', directionLabel: 'Newest', sortKey: 'added' },
-    { label: 'Last seen', value: 'added desc', directionLabel: 'Oldest', sortKey: 'added' },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs' },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs' },
 ];
 
 function ApiEndpoints() {
 
     const params = useParams()
+    const location = useLocation()
     const apiCollectionId = params.apiCollectionId
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const allCollections = PersistStore(state => state.allCollections);
 
     const pageTitle = collectionsMap[apiCollectionId]
 
@@ -130,6 +123,47 @@ function ApiEndpoints() {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
+
+    const queryParams = new URLSearchParams(location.search);
+    const selectedUrl = queryParams.get('selected_url')
+    const selectedMethod = queryParams.get('selected_method')
+    const tableTabs = [
+        {
+            content: 'All',
+            index: 0,
+            badge: endpointData["All"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('All')},
+            id: 'All',
+        },
+        {
+            content: 'New',
+            index: 1,
+            badge: endpointData["New"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('New')},
+            id: 'New',
+        },
+        {
+            content: 'Sensitive',
+            index: 2,
+            badge: endpointData["Sensitive"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('Sensitive')},
+            id:'Sensitive',
+        },
+        {
+            content: 'High risk',
+            index: 3,
+            badge: endpointData["Risk"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('Risk')},
+            id: 'Risk',
+        },
+        {
+            content: 'No auth detected',
+            index: 4,
+            badge: endpointData["No_auth"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('No_auth')},
+            id: 'No_auth'
+        },
+    ]
 
     async function fetchData() {
         setLoading(true)
@@ -158,12 +192,12 @@ function ApiEndpoints() {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
-        data['All'] = allEndpoints
-        data['Sensitive'] = allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['Unauthenticated'] = allEndpoints.filter(x => x.open)
-        data['Undocumented'] = allEndpoints.filter(x => x.shadow)
-        data['Deprecated'] = func.getDeprecatedEndpoints(apiInfoListInCollection, unusedEndpointsInCollection, apiCollectionId)
-        // console.log(data)
+        const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+        data['All'] = prettifyData
+        data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
+        data['New'] = prettifyData.filter(x=> x.isNew)
+        data['No_auth'] = prettifyData.filter(x => x.open)
         setEndpointData(data)
         setSelectedTab("All")
         setSelected(0)
@@ -174,6 +208,21 @@ function ApiEndpoints() {
 
         setLoading(false)
     }
+
+    useEffect(() => {
+        if (!endpointData || !endpointData["All"] || !selectedUrl || !selectedMethod) return
+        let allData = endpointData["All"]
+
+        const selectedApiDetail = allData.filter((x) => {
+            return selectedUrl === x.endpoint && selectedMethod === x.method
+        })
+
+        if (!selectedApiDetail || selectedApiDetail.length === 0)  return
+
+        setApiDetail(selectedApiDetail[0])
+        setShowDetails(true)
+
+    }, [selectedUrl, selectedMethod, endpointData])
 
     const checkGptActive = async() => {
         await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
@@ -197,54 +246,9 @@ function ApiEndpoints() {
         setFilteredEndpoints(filteredItems)
     }
 
-    const tabStrings = [
-        'All',
-        'Sensitive',
-        'Unauthenticated',
-        'Undocumented',
-        'Deprecated'
-    ]
-
-    const tabs = tabStrings.map((item, index) => ({
-        content: item,
-        index,
-        id: `${item}-${index}`,
-    }));
-
-    tabs.push(
-        {
-            content: "Workflow tests",
-            index: tabs.length,
-            id: `Tests-${tabs.length}`,
-            component: <WorkflowTests
-                apiCollectionId={apiCollectionId}
-                endpointsList={loading ? [] : endpointData["All"]}
-            />,
-            hideQueryField: true
-        },
-    )
-
-    let openApiSecObj = {
-        content: "Documented",
-        index: tabs.length,
-        id: `Tests-${tabs.length}`,
-        component: <OpenApiSpec apiCollectionId={apiCollectionId} />,
-        hideQueryField: true,
-    }
-    
-    tabs.push(openApiSecObj)
-
-    const onSelect = (selectedIndex) => {
-        setLoading(true);
-        setSelectedTab(tabStrings[selectedIndex])
-        setSelected(selectedIndex)
-        setTimeout(() => {
-            setLoading(false);
-        }, 300);
-    }
-
     function handleRowClick(data) {
-        const sameRow = func.deepComparison(apiDetail, data);
+        let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
+        const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)
         } else {
@@ -254,13 +258,18 @@ function ApiEndpoints() {
             if (sameRow) {
                 return prev;
             }
-            return { ...data }
+            return { ...tmp }
         })
     }
 
     function handleRefresh() {
         fetchData()
         func.setToast(true, false, "Endpoints refreshed")
+    }
+
+    function computeApiGroup() {
+        api.computeCustomCollections(pageTitle);
+        func.setToast(true, false, "API group is being computed.")
     }
 
     async function exportOpenApi() {
@@ -280,7 +289,7 @@ function ApiEndpoints() {
 
             if (!lastFetchedUrl || !lastFetchedMethod) break;
         }
-        func.setToast(true, false, "OpenAPI spec downlaoded successfully")
+        func.setToast(true, false, "OpenAPI spec downloaded successfully")
     }
 
     function exportCsv() {
@@ -304,6 +313,12 @@ function ApiEndpoints() {
         const result = await api.exportToPostman(apiCollectionId)
         if (result)
         func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
+    }
+
+    const [showWorkflowTests, setShowWorkflowTests] = useState(false)
+
+    function toggleWorkflowTests() {
+        setShowWorkflowTests(!showWorkflowTests)
     }
 
     function disambiguateLabel(key, value) {
@@ -376,6 +391,190 @@ function ApiEndpoints() {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+    const secondaryActionsComponent = (
+        <HorizontalStack gap="2">
+
+            <Popover 
+                active={exportOpen}
+                activator={(
+                    <Button onClick={() => setExportOpen(true)} disclosure>
+                        More Actions
+                    </Button>
+                )}
+                autofocusTarget="first-node"
+                onClose={() => { setExportOpen(false) }}
+            >
+                <Popover.Pane fixed>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
+                                <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
+                            </div>
+                            {
+                                allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length > 0 ?
+                                    <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
+                                        <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
+                                    </div> :
+                                    null
+                            }
+                            { allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length == 0 ?
+                                <UploadFile
+                                fileFormat=".har"
+                                fileChanged={file => handleFileChange(file)}
+                                tooltipText="Upload traffic(.har)"
+                                label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
+                                primary={false} 
+                                /> : null
+                            }
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <Text>Export as:</Text>
+                                <VerticalStack gap={1}>
+                                <div onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                    <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
+                                </div>
+                                <div onClick={exportPostman} style={{cursor: 'pointer'}}>
+                                    <Text fontWeight="regular" variant="bodyMd">Postman</Text>
+                                </div>
+                                <div onClick={exportCsv} style={{cursor: 'pointer'}}>
+                                    <Text fontWeight="regular" variant="bodyMd">CSV</Text>
+                                </div>
+                            </VerticalStack>
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
+                                <Text fontWeight="regular" variant="bodyMd">
+                                    {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
+                                </Text>
+                            </div>
+                        </VerticalStack>
+                    </Popover.Section>
+                </Popover.Pane>
+            </Popover>
+
+            {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
+                    
+            <RunTest
+                apiCollectionId={apiCollectionId}
+                endpoints={filteredEndpoints}
+                filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+            />
+        </HorizontalStack>
+    )
+
+    const handleSelectedTab = (selectedIndex) => {
+        setLoading(true)
+        setSelected(selectedIndex)
+        setTimeout(()=>{
+            setLoading(false)
+        },200)
+    }
+
+    const [showApiGroupModal, setShowApiGroupModal] = useState(false)
+    const [apis, setApis] = useState([])
+    const [actionOperation, setActionOperation] = useState(Operation.ADD)
+
+    function handleApiGroupAction(selectedResources, operation){
+
+        setActionOperation(operation)
+        setApis(selectedResources)
+        setShowApiGroupModal(true);
+    }
+
+    function toggleApiGroupModal(){
+        setShowApiGroupModal(false);
+    }
+
+    const promotedBulkActions = (selectedResources) => {
+
+        let isApiGroup = allCollections.filter(x => {
+            return x.id == apiCollectionId && x.type == "API_GROUP"
+        }).length > 0
+
+        let ret = []
+        if (isApiGroup) {
+            ret.push(
+                {
+                    content: 'Remove from API group',
+                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
+                }
+            )
+        } else {
+            ret.push({
+                content: 'Add to API group',
+                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
+            })
+        }
+        return ret;
+    }
+
+      const components = [
+        loading ? [<SpinnerCentered key="loading" />] : (
+            showWorkflowTests ? [
+                <WorkflowTests
+                key={"workflow-tests"}
+                apiCollectionId={apiCollectionId}
+                endpointsList={loading ? [] : endpointData["All"]}
+            />
+             ] : [
+                <div className="apiEndpointsTable" key="table">
+                      <GithubSimpleTable
+                          key="table"
+                          pageLimit={50}
+                          data={endpointData[selectedTab]}
+                          sortOptions={sortOptions}
+                          resourceName={resourceName}
+                          filters={[]}
+                          disambiguateLabel={disambiguateLabel}
+                          headers={headers}
+                          getStatus={() => { return "warning" }}
+                          selected={selected}
+                          onRowClick={handleRowClick}
+                          onSelect={handleSelectedTab}
+                          getFilteredItems={getFilteredItems}
+                          mode={IndexFiltersMode.Default}
+                          headings={headings}
+                          useNewRow={true}
+                          condensedHeight={true}
+                          tableTabs={tableTabs}
+                          selectable={true}
+                          promotedBulkActions={promotedBulkActions}
+                      />
+                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                          <Modal.Section flush>
+                              <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
+                          </Modal.Section>
+                      </Modal>
+                  </div>,
+                  <ApiDetails
+                      key="details"
+                      showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+                      setShowDetails={setShowDetails}
+                      apiDetail={apiDetail}
+                      headers={transform.getDetailsHeaders()}
+                      getStatus={() => { return "warning" }}
+                      isGptActive={isGptActive}
+                  />,
+                  <ApiGroupModal
+                      key="api-group-modal"
+                      showApiGroupModal={showApiGroupModal}
+                      toggleApiGroupModal={toggleApiGroupModal}
+                      apis={apis}
+                      operation={actionOperation}
+                      currentApiGroupName={pageTitle}
+                      fetchData={fetchData}
+                  />
+            ]
+        )
+      ]
 
     return (
         <PageWithMultipleCards
@@ -385,93 +584,8 @@ function ApiEndpoints() {
                 </Box>
             }
             backUrl="/dashboard/observe/inventory"
-            secondaryActions={
-                <HorizontalStack gap="2">
-                    <Box paddingInlineEnd="3" paddingInlineStart="3">
-                        <Button onClick={handleRefresh} plain monochrome removeUnderline>
-                            <Text fontWeight="medium" variant="bodyMd">Refresh</Text>
-                        </Button>
-                    </Box>
-                    <Popover
-                        active={exportOpen}
-                        activator={(
-                            <Box paddingInlineEnd="1" paddingInlineStart="3">
-                            <Button
-                                plain monochrome removeUnderline
-                                onClick={() => setExportOpen(true)}>
-                                <HorizontalStack gap="1">
-                                <Text fontWeight="medium" variant="bodyMd">Export</Text>
-                                    <Box>
-                                        <Icon source={ChevronDownMinor} />
-                                    </Box>
-                                </HorizontalStack>
-                            </Button>
-                            </Box>
-                        )}
-                        autofocusTarget="first-node"
-                        onClose={() => { setExportOpen(false) }}
-                    >
-                        <ActionList
-                            items={[
-                                { content: 'OpenAPI spec', onAction: exportOpenApi },
-                                { content: 'Postman', onAction: exportPostman },
-                                { content: 'CSV', onAction: exportCsv },
-                            ]}
-                        />
-                    </Popover>
-                    <UploadFile
-                        fileFormat=".har"
-                        fileChanged={file => handleFileChange(file)}
-                        tooltipText="Upload traffic(.har)"
-                        label={(<Box paddingInlineEnd="3" paddingInlineStart="3"><Text fontWeight="medium" variant="bodyMd">Upload traffic</Text></Box>)}
-                        primary={false} />
-
-                    {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
-                    
-                    <RunTest
-                        apiCollectionId={apiCollectionId}
-                        endpoints={filteredEndpoints}
-                        filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
-                        disabled={tabs[selected].component !== undefined}
-                    />
-                </HorizontalStack>
-            }
-            components={
-                loading ? [<SpinnerCentered key="loading" />] :
-                    [
-                        <div className="apiEndpointsTable" key="table">
-                            <GithubSimpleTable
-                                key="table"
-                                pageLimit={50}
-                                data={tabs[selected].component ? [] : endpointData[selectedTab]}
-                                sortOptions={sortOptions}
-                                resourceName={resourceName}
-                                filters={[]}
-                                disambiguateLabel={disambiguateLabel}
-                                headers={headers}
-                                getStatus={() => { return "warning" }}
-                                tabs={tabs}
-                                selected={selected}
-                                onSelect={onSelect}
-                                onRowClick={handleRowClick}
-                                getFilteredItems={getFilteredItems}
-                            />
-                            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
-                                <Modal.Section flush>
-                                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
-                                </Modal.Section>
-                            </Modal>
-                        </div>,
-                        <ApiDetails
-                            key="details"
-                            showDetails={showDetails}
-                            setShowDetails={setShowDetails}
-                            apiDetail={apiDetail}
-                            headers={headers}
-                            getStatus={() => { return "warning" }}
-                            isGptActive={isGptActive}
-                        />
-                    ]}
+            secondaryActions={secondaryActionsComponent}
+            components={components}
         />
     )
 }

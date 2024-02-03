@@ -87,6 +87,9 @@ public class QuickStartAction extends UserAction {
     }
 
     public String fetchLoadBalancers() {
+        if(DashboardMode.isSaasDeployment()){
+            return SUCCESS.toUpperCase();
+        }
         List<AwsResource> availableLBs = new ArrayList<>();
         List<AwsResource> selectedLBs = new ArrayList<>();
         ExecutorService executorService = Executors.newFixedThreadPool(3);

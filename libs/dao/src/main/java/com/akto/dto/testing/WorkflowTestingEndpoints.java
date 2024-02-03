@@ -1,8 +1,12 @@
 package com.akto.dto.testing;
 
+import com.akto.dao.MCollection;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo;
 
 import java.util.List;
+
+import org.bson.conversions.Bson;
 
 public class WorkflowTestingEndpoints extends TestingEndpoints{
     public static final String _WORK_FLOW_TEST = "workflowTest";
@@ -33,5 +37,10 @@ public class WorkflowTestingEndpoints extends TestingEndpoints{
 
     public void setWorkflowTest(WorkflowTest workflowTest) {
         this.workflowTest = workflowTest;
+    }
+
+    @Override
+    public Bson createFilters(CollectionType type) {
+        return MCollection.noMatchFilter;
     }
 }

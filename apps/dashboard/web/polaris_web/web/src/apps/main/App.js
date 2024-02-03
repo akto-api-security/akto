@@ -55,8 +55,10 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
+import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -69,6 +71,10 @@ const router = createBrowserRouter([
         path: "",
         element: <HomePage />,
         children: [
+          {
+            path: "home",
+            element: <HomeDashboard />,
+          },
           {
             path: "testing",
             element: <PageTesting />,
@@ -98,6 +104,10 @@ const router = createBrowserRouter([
               {
                 path:"user-config",
                 element:<UserConfig/>
+              },
+              {
+                path:"dependency",
+                element:<DependencyTable/>
               }
             ]
           },
