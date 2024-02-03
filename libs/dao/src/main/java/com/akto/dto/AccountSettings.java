@@ -62,12 +62,6 @@ public class AccountSettings {
     
     public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
     private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
-    private List<TestLibrary> testLibraries;
-    public static final String TEST_LIBRARIES = "testLibraries";
-
-    public List<TestLibrary> getTestLibraries() {
-        return testLibraries;
-    }
 
     public static final String TEST_LIBRARIES = "testLibraries";
     private List<TestLibrary> testLibraries;
