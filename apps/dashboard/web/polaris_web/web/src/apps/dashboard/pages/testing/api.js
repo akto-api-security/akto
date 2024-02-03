@@ -1,12 +1,12 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, fetchAll, sortKey, sortOrder, skip, limit, filters) {
+    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, fetchOneTime, sortKey, sortOrder, skip, limit, filters, fetchRecurring) {
         const resp = await request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd, fetchAll, sortKey, sortOrder, skip, limit, filters
+                startTimestamp, endTimestamp, fetchCicd, fetchOneTime, sortKey, sortOrder, skip, limit, filters, fetchRecurring
             }
         })
         return resp
@@ -187,11 +187,11 @@ export default {
         return resp
     },
 
-    async getCountsMap(){
+    async getCountsMap(startTimestamp, endTimestamp){
         return await request({
             url: '/api/getAllTestsCountMap',
             method: 'post',
-            data: {}
+            data: {startTimestamp, endTimestamp}
         })
     },
 
