@@ -70,7 +70,9 @@ public class StartTestAction extends UserAction {
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
-    private boolean fetchAllTestRuns;
+    private boolean fetchOneTime;
+    private boolean fetchRecurring;
+    private boolean isTestingRunCiCd;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -293,13 +295,6 @@ public class StartTestAction extends UserAction {
                     continue;
 
                 switch (key) {
-
-                    case "endTimestamp":
-                        List<Long> ll = Utils.castList(Long.class, value);
-                        filterList.add(Filters.gte(key, ll.get(0)));
-                        filterList.add(Filters.lte(key, ll.get(1)));
-                        break;
-
                     case "severity":
                         List<String> severities = Utils.castList(String.class, value);
                         filterList.add(Filters.in(Constants.ID, getTestsWithSeverity(severities)));
@@ -328,13 +323,6 @@ public class StartTestAction extends UserAction {
     }
 
     public String retrieveAllCollectionTests() {
-        if (this.startTimestamp == 0) {
-            this.startTimestamp = Context.now();
-        }
-
-        if (this.endTimestamp == 0) {
-            this.endTimestamp = Context.now() + 86400;
-        }
 
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
@@ -343,20 +331,26 @@ public class StartTestAction extends UserAction {
         if(fetchCicd){
             // filters for test runs to be only CI/CD pipeline
             testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
-        } else if(fetchAllTestRuns){
-            // get All test runs which are not run by test editor
-            testingRunFilters.add(Filters.ne("triggeredBy", "test_editor"));
-        } else {
+        } else{
+            testingRunFilters.add(Filters.nin(Constants.ID, getCicdTests()));
+        } 
+        
+        if(fetchOneTime){
+            // get All test runs which are not run by test editor{one time}
+            testingRunFilters.add(Filters.eq("periodInSeconds",0));
+        } else if(fetchRecurring) {
             // the left test are the scheduled one
             Collections.addAll(testingRunFilters, 
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
-                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
-                Filters.nin(Constants.ID,getCicdTests()),
-                Filters.ne("triggeredBy", "test_editor")
+                Filters.ne("periodInSeconds", 0)
             );
         }
 
         testingRunFilters.addAll(prepareFilters());
+        testingRunFilters.add(Filters.and(
+            Filters.lte(TestingRun.END_TIMESTAMP, endTimestamp),
+            Filters.gte(TestingRun.END_TIMESTAMP, startTimestamp),
+            Filters.ne("triggeredBy", "test_editor")
+        ));
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
 
@@ -409,6 +403,15 @@ public class StartTestAction extends UserAction {
         this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0,
                 limitForTestingRunResultSummary, sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
+
+        long cicdCount =  TestingRunDao.instance.getMCollection().countDocuments(
+            Filters.and(
+                Filters.eq(Constants.ID, testingRunId),
+                Filters.in(Constants.ID, getCicdTests())
+            )
+        );
+
+        this.isTestingRunCiCd = cicdCount > 0 ? true : false;
 
         if (this.testingRun != null && this.testingRun.getTestIdConfig() == 1) {
             WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun
@@ -611,23 +614,27 @@ public class StartTestAction extends UserAction {
     // needed for new ui as the table was server table.
     public String computeAllTestsCountMap(){
         Map<String,Long> result = new HashMap<>();
+        ArrayList<Bson> filters = new ArrayList<>();
+        filters.addAll(prepareFilters());
+        filters.add(Filters.and(
+            Filters.lte(TestingRun.END_TIMESTAMP, endTimestamp),
+            Filters.gte(TestingRun.END_TIMESTAMP, startTimestamp),
+            Filters.ne("triggeredBy", "test_editor")
+        ));
+        
+        long totalCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
+        
+        ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
+        filterForCicd.add(Filters.in(Constants.ID, getCicdTests()));
+        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filterForCicd));
+        
+        filters.add(Filters.eq("periodInSeconds", 0));
+        filters.add(Filters.nin(Constants.ID, getCicdTests()));
+        long oneTimeCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
 
-        long totalCount = TestingRunDao.instance.getMCollection().countDocuments();
-        List<Bson> filtersForCiCd = new ArrayList<>();
-        filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
-        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
+        long scheduleCount = totalCount - oneTimeCount - cicdCount;
 
-        int startTime = Context.now();
-        int endTime = Context.now() + 86400;
-        List<Bson> filtersForSchedule = new ArrayList<>();
-        Collections.addAll(filtersForSchedule,
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTime),
-                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTime),
-                Filters.nin(Constants.ID,getCicdTests())
-        );
-        long scheduleCount =  TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForSchedule));
-
-        long oneTimeCount = totalCount - cicdCount - scheduleCount;
+        
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
@@ -971,12 +978,20 @@ public class StartTestAction extends UserAction {
         return metadataFilters;
     }
 
-    public boolean isFetchAllTestRuns() {
-        return fetchAllTestRuns;
+    public boolean isFetchOneTime() {
+        return fetchOneTime;
     }
 
-    public void setFetchAllTestRuns(boolean fetchAllTestRuns) {
-        this.fetchAllTestRuns = fetchAllTestRuns;
+    public void setFetchOneTime(boolean fetchOneTime) {
+        this.fetchOneTime = fetchOneTime;
+    }
+
+    public boolean isFetchRecurring() {
+        return fetchRecurring;
+    }
+
+    public void setFetchRecurring(boolean fetchRecurring) {
+        this.fetchRecurring = fetchRecurring;
     }
     
     public Map<String, Integer> getIssuesSummaryInfoMap() {
@@ -1001,6 +1016,10 @@ public class StartTestAction extends UserAction {
 
     public void setLatestSummaryIds(List<String> latestSummaryIds) {
         this.latestSummaryIds = latestSummaryIds;
+    }
+
+    public boolean isTestingRunCiCd() {
+        return isTestingRunCiCd;
     }
 
 
