@@ -8,6 +8,7 @@ import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
+import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.akto.runtime.policies.AuthPolicy;
@@ -40,7 +41,17 @@ public class DependencyAnalyser {
         this.dbState = dbState;
     }
 
-    public void analyse(HttpResponseParams responseParams) {
+    public void analyse(String message, int finalApiCollectionId) {
+        HttpResponseParams responseParams;
+
+        // parsing the message again because we want actual data. For example urlParams are eleminated in runtime code
+        try {
+            responseParams = HttpCallParser.parseKafkaMessage(message);
+            responseParams.requestParams.setApiCollectionId(finalApiCollectionId);
+        } catch (Exception e) {
+            return;
+        }
+
         if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
 
         HttpRequestParams requestParams = responseParams.getRequestParams();
@@ -97,7 +108,7 @@ public class DependencyAnalyser {
             } else {
                 for (String val: values) {
                     paramSet.add(param);
-                    if (!filterValues(val) || HTTPHeadersExample.responseHeaders.contains(param)) continue;
+                    if (!filterValues(val) || param.startsWith(":") || HTTPHeadersExample.responseHeaders.contains(param)) continue;
                     valueStore.add(val);
                     urlValueStore.add(combinedUrl + "$" + val);
                     urlParamValueStore.add(combinedUrl + "$" + param + "$" + val);
@@ -139,7 +150,7 @@ public class DependencyAnalyser {
 
         Map<String, List<String>> requestHeaders = requestParams.getHeaders();
         for (String param: requestHeaders.keySet()) {
-            if (HTTPHeadersExample.requestHeaders.contains(param)) continue;
+            if (param.startsWith(":") || HTTPHeadersExample.requestHeaders.contains(param)) continue;
             List<String> values = requestHeaders.get(param);
 
             if (param.equals("cookie")) {

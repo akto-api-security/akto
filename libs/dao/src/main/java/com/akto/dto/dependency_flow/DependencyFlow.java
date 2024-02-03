@@ -2,13 +2,8 @@ package com.akto.dto.dependency_flow;
 
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.DependencyNodeDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.DependencyNode;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLTemplate;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Projections;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -98,7 +93,15 @@ public class DependencyFlow {
                     int key = resultNode.hashCode();
                     if (done.contains(key)) continue;
                     Edge edge = new Edge(reverseNode.getApiCollectionId(), reverseNode.getUrl(), reverseNode.getMethod(), reverseConnection.getParam(), reverseEdge.getIsHeader(), reverseEdge.getCount(), depth + 1);
-                    Connection connection = resultNode.getConnections().get(reverseEdge.getParam());
+                    String requestParam = reverseEdge.getParam();
+
+                    if (reverseEdge.isUrlParam()) {
+                        requestParam += "_isUrlParam";
+                    } else if (reverseEdge.getIsHeader()) {
+                        requestParam += "_isHeader";
+                    }
+
+                    Connection connection = resultNode.getConnections().get(requestParam);
                     if (connection == null) {
                         connection = new Connection(edge.getParam(), new ArrayList<>(), reverseEdge.isUrlParam(), reverseEdge.getIsHeader());
                         resultNode.getConnections().put(reverseEdge.getParam(), connection);
@@ -253,6 +256,13 @@ public class DependencyFlow {
         for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
             String paramReq = paramInfo.getRequestParam();
             Connection connection = new Connection(paramReq, new ArrayList<>(), paramInfo.getIsUrlParam(), paramInfo.getIsHeader());
+
+            if (paramInfo.getIsHeader()) {
+                paramReq += "_isHeader";
+            } else if (paramInfo.getIsUrlParam()) {
+                paramReq += "_isUrlParam";
+            }
+
             node.getConnections().put(paramReq, connection);
         }
 

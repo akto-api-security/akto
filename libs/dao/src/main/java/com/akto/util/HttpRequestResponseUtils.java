@@ -23,6 +23,7 @@ public class HttpRequestResponseUtils {
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
+        if (body == null) return new HashMap<>();
         if (body.startsWith("[")) body = "{\"json\": "+body+"}";
         BasicDBObject respPayloadObj;
         try {

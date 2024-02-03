@@ -51,7 +51,7 @@ public class DependencyAction extends UserAction {
 
 
     public String buildDependencyTable() {
-        List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionIds, true, skip, 50);
+        List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionIds,false, skip, 50);
         dependencyTableList = new ArrayList<>();
 
         List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
