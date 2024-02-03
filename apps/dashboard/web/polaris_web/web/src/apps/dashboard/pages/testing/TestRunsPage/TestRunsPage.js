@@ -237,7 +237,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
       case "cicd":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, true, false, sortKey, sortOrder, skip, limit, filters, false,
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -245,7 +245,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, false, false, sortKey, sortOrder, skip, limit, filters, true
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING"
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -253,7 +253,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "oneTime":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, false, true, sortKey, sortOrder, skip, limit, filters, false
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME"
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -261,7 +261,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       default:
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, false, true, sortKey, sortOrder, skip, limit, filters, false
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
