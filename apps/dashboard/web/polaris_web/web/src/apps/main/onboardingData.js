@@ -18,7 +18,6 @@ const ROLES_PAGE_DOCS_URL = "https://docs.akto.io/testing/user-roles"
 
 const learnMoreObject = {
     dashboard_home: {
-        title: "Home page",
         docsLink: [
             {
                 content:"Get started guide",
@@ -33,7 +32,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_observe_inventory: {
-        title: "Collections page",
+        title: "API Inventory",
         description: "Convenient way to access and manage APIs",
         docsLink: [
             {
@@ -69,7 +68,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_observe_inventory_ids: {
-        title: "Endpoints page",
+        title: "API Endpoints",
         description: "All API endpoints across all of your services in Akto.",
         docsLink: [
             {
@@ -105,7 +104,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_observe_changes: {
-        title: "API changes page",
+        title: "API changes",
         description: "Explore the API changes and more.",
         docsLink: [
             {
@@ -125,7 +124,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_observe_sensitive: {
-        title: "Sensitive data page",
+        title: "Sensitive data",
         description: "Explore the sensitive data and its parameters.",
         docsLink: [
             {
@@ -157,7 +156,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_testing: {
-        title: "Testing page",
+        title: "Test results",
         description: "View all your test results and take action on them in one place.",
         docsLink: [
             {
@@ -181,7 +180,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_testing_roles: {
-        title: "Test roles page",
         docsLink: [
             {
                 content:"How to create new test role",
@@ -196,7 +194,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_testing_user_config:{
-        title: "User config page",
         docsLink: [
             {
                 content:"How to create user config",
@@ -211,7 +208,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_issues:{
-        title: "Testing issues page",
+        title: "API Issues",
         description: "Manage, export & share detailed report of vulnerabilities in your APIs.",
         docsLink: [
             {
@@ -227,7 +224,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_ci_cd:{
-        title: "Setting CI/CD page",
         docsLink: [
             {
                 content:"Run tests in CI/CD",
@@ -242,7 +238,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_auth_types:{
-        title: "Setting Auth Type page",
         docsLink: [
             {
                 content:"How to create Auth Type",
@@ -257,7 +252,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_tags:{
-        title: "Setting tags page",
         docsLink: [
             {
                 content:"How to create tag",
@@ -272,7 +266,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations:{
-        title: "Setting integrations page",
         docsLink: [
             {
                 content:"Get started guide",
@@ -287,7 +280,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_burp:{
-        title: "Setting Burp integration page",
         docsLink: [
             {
                 content:"Connect Akto with Burp Suite",
@@ -302,7 +294,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_postman:{
-        title: "Setting Postman integration page",
         docsLink: [
             {
                 content:"Connect Akto with Postman",
@@ -317,7 +308,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_akto_apis:{
-        title: "Setting Akto API integration page",
         docsLink: [
             {
                 content:"API reference",
@@ -332,7 +322,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_akto_gpt:{
-        title: "Setting Akto GPT integration page",
+        title: "Akto GPT",
         description: "Harness the power of ChatGPT for API Security on your fingertips now.",
         docsLink: [
             {
@@ -348,7 +338,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_slack:{
-        title: "Setting Slack integration page",
         docsLink: [
             {
                 content:"What is Webhook Alert?",
@@ -363,7 +352,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_webhooks:{
-        title: "Setting Webhooks integration page",
         docsLink: [
             {
                 content:"What is Webhook Alert?",
@@ -382,7 +370,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_github_sso:{
-        title: "Setting GitHub SSO integration page",
         docsLink: [
             {
                 content:"How to setup GitHub SSO",
@@ -397,7 +384,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_azure_sso:{
-        title: "Setting Azure SSO integration page",
         docsLink: [
             {
                 content:"How to setup Azure SSO",
@@ -412,7 +398,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_okta_sso:{
-        title: "Setting Okta SSO integration page",
         docsLink: [
             {
                 content:"How to setup Okta SSO",
@@ -427,7 +412,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_jira:{
-        title: "Setting Jira integration page",
         docsLink: [
             {
                 content:"Alerts guide",
@@ -442,7 +426,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_integrations_github_app:{
-        title: "Setting GitHub App integration page",
         docsLink: [
             {
                 content:"Get started guide",
@@ -457,7 +440,6 @@ const learnMoreObject = {
         ]
     },
     dashboard_settings_test_library:{
-        title: "Setting test library page",
         docsLink: [
             {
                 content:"How to contribute to test library",
@@ -480,7 +462,7 @@ const learnMoreObject = {
         ]
     },
     dashboard_test_editor:{
-        title: "Test editor page",
+        title: "Test editor",
         description: "Test playground for security teams and developers to write custom tests to find vulnerabilities in APIs.",
         docsLink: [
             {
