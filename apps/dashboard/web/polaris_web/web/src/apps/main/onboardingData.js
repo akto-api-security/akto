@@ -1,14 +1,14 @@
 const HOMEDASHBOARD_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const HOMEDASHBOARD_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/lKzEU0f_rVI/sddefault.jpg"
-const HOMEDASHBOARD_VIDEO_LENGTH = 35
+const HOMEDASHBOARD_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const HOMEDASHBOARD_VIDEO_LENGTH = 195
 
 const COLLECTIONS_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const COLLECTIONS_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/lKzEU0f_rVI/sddefault.jpg"
-const COLLECTIONS_VIDEO_LENGTH = 35
+const COLLECTIONS_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const COLLECTIONS_VIDEO_LENGTH = 195
 
 const TESTING_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const TESTING_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/lKzEU0f_rVI/sddefault.jpg"
-const TESTING_VIDEO_LENGTH = 35 
+const TESTING_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const TESTING_VIDEO_LENGTH = 195 
 
 const ISSUES_PAGE_DOCS_URL = "https://docs.akto.io/readme"
 const ENDPOINTS_PAGE_DOCS_URL = "https://docs.akto.io/api-inventory/concepts/api-collection"
@@ -217,6 +217,259 @@ const learnMoreObject = {
             {
                 content:"Get started guide",
                 value:"https://docs.akto.io/readme"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_ci_cd:{
+        title: "Setting CI/CD page",
+        docsLink: [
+            {
+                content:"Run tests in CI/CD",
+                value:"https://docs.akto.io/testing/run-tests-in-cicd"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_auth_types:{
+        title: "Setting Auth Type page",
+        docsLink: [
+            {
+                content:"How to create Auth Type",
+                value:"https://docs.akto.io/api-inventory/concepts/auth-types"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_tags:{
+        title: "Setting tags page",
+        docsLink: [
+            {
+                content:"How to create tag",
+                value:"https://docs.akto.io/api-inventory/concepts/auth-types"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations:{
+        title: "Setting integrations page",
+        docsLink: [
+            {
+                content:"Get started guide",
+                value:"https://docs.akto.io/readme"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_burp:{
+        title: "Setting Burp integration page",
+        docsLink: [
+            {
+                content:"Connect Akto with Burp Suite",
+                value:"https://docs.akto.io/traffic-connections/traffic-data-sources/burp-suite"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_postman:{
+        title: "Setting Postman integration page",
+        docsLink: [
+            {
+                content:"Connect Akto with Postman",
+                value:"https://docs.akto.io/traffic-connections/traffic-data-sources/postman"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_akto_apis:{
+        title: "Setting Akto API integration page",
+        docsLink: [
+            {
+                content:"API reference",
+                value:"https://docs.akto.io/api-reference/api-reference"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_akto_gpt:{
+        title: "Setting Akto GPT integration page",
+        description: "Harness the power of ChatGPT for API Security on your fingertips now.",
+        docsLink: [
+            {
+                content:"AktoGPT Guide",
+                value:"https://docs.akto.io/aktogpt"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_slack:{
+        title: "Setting Slack integration page",
+        docsLink: [
+            {
+                content:"What is Webhook Alert?",
+                value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_webhooks:{
+        title: "Setting Webhooks integration page",
+        docsLink: [
+            {
+                content:"What is Webhook Alert?",
+                value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
+            }
+            {
+                content:"How to configure alerts on API changes",
+                value:"https://docs.akto.io/api-inventory/how-to/configure-alerts-on-api-changes"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_github_sso:{
+        title: "Setting GitHub SSO integration page",
+        docsLink: [
+            {
+                content:"How to setup GitHub SSO",
+                value:"https://docs.akto.io/sso/github-oidc"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_azure_sso:{
+        title: "Setting Azure SSO integration page",
+        docsLink: [
+            {
+                content:"How to setup Azure SSO",
+                value:"https://docs.akto.io/sso/azuread-saml"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_okta_sso:{
+        title: "Setting Okta SSO integration page",
+        docsLink: [
+            {
+                content:"How to setup Okta SSO",
+                value:"https://docs.akto.io/sso/okta-oidc"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_jira:{
+        title: "Setting Jira integration page",
+        docsLink: [
+            {
+                content:"Alerts guide",
+                value:"https://docs.akto.io/api-inventory/concepts/alerts"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_github_app:{
+        title: "Setting GitHub App integration page",
+        docsLink: [
+            {
+                content:"Get started guide",
+                value:"https://docs.akto.io/readme"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_test_library:{
+        title: "Setting test library page",
+        docsLink: [
+            {
+                content:"How to contribute to test library",
+                value:"https://docs.akto.io/test-editor/test-library#how-to-contribute-to-test-library"
+            }
+            {
+                content:"How to edit built in test",
+                value:"https://docs.akto.io/test-editor/writing-custom-tests"
+            }
+            {
+                content:"Test YAML Syntax",
+                value:"https://docs.akto.io/test-editor/test-yaml-syntax-one-pager"
             }
         ],
         videoLink: [
