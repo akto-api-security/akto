@@ -1,22 +1,40 @@
 package com.akto.test_editor.execution;
 
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.GraphExecutorRequest;
+import com.akto.dto.testing.GraphExecutorResult;
+import com.akto.dto.testing.LoginWorkflowGraphEdge;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.dto.testing.YamlTestResult;
+import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.util.modifier.JWTPayloadReplacer;
 import com.akto.utils.RedactSampleData;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -25,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 
 public class Executor {
@@ -33,44 +52,67 @@ public class Executor {
 
     public final String _HOST = "host";
 
-    public List<TestResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
+    public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
-        List<TestResult> result = new ArrayList<>();
+        List<GenericTestResult> result = new ArrayList<>();
         
         TestResult invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.INVALID_EXECUTION_BLOCK.getMessage()), 0, false, TestResult.Confidence.HIGH, null);
-
+        YamlTestResult yamlTestResult;
+        WorkflowTest workflowTest = null;
         if (node.getChildNodes().size() < 2) {
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             result.add(invalidExecutionResult);
-            return result;
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
+        RawApi origRawApi = rawApi.copy();
         RawApi sampleRawApi = rawApi.copy();
         ExecutorSingleRequest singleReq = null;
         if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
             result.add(invalidExecutionResult);
-            return result;
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
         }
 
         boolean requestSent = false;
 
         List<String> error_messages = new ArrayList<>();
 
+        String executionType = node.getChildNodes().get(0).getValues().toString();
+        if (executionType.equals("multiple")) {
+            workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode));
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            
+            return yamlTestResult;
+        }
+
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
             List<RawApi> sampleRawApis = new ArrayList<>();
             sampleRawApis.add(sampleRawApi);
-
-            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
             List<RawApi> testRawApis = new ArrayList<>();
-            testRawApis = singleReq.getRawApis();
-            if (testRawApis == null) {
-                error_messages.add(singleReq.getErrMsg());
-                continue;
+            boolean modifications = false;
+            if (reqNode.getChildNodes() == null || reqNode.getChildNodes().size() == 0) {
+                testRawApis.add(sampleRawApi.copy());
+                singleReq = new ExecutorSingleRequest(true, "", testRawApis, true);;
+            } else {
+                modifications = true;
+                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
+                testRawApis = singleReq.getRawApis();
+                if (testRawApis == null) {
+                    error_messages.add(singleReq.getErrMsg());
+                    continue;
+                }
             }
+            
             boolean vulnerable = false;
             for (RawApi testReq: testRawApis) {
+                if (modifications && testReq.equals(origRawApi)) {
+                    continue;
+                }
                 if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
                     break;
                 }
@@ -81,7 +123,10 @@ public class Executor {
                         List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
                         List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
 
-                        if (originalHostHeaders.get(0) != null
+                        if (!originalHostHeaders.isEmpty()
+                            && originalHostHeaders.get(0) != null
+                            && !attemptHostHeaders.isEmpty()
+                            && attemptHostHeaders.get(0) != null
                             && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
                             && testingRunConfig != null
                             && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
@@ -96,7 +141,7 @@ public class Executor {
                         }
 
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("unable to update host header for overridden test URL",
+                        loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
                                 LogDb.TESTING);
                     }
                         
@@ -125,7 +170,106 @@ public class Executor {
             result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
-        return result;
+        yamlTestResult = new YamlTestResult(result, workflowTest);
+
+        return yamlTestResult;
+    }
+
+    public WorkflowTest buildWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
+
+            return convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+        }
+
+    public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
+        
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        Graph graph = new Graph();
+        graph.buildGraph(workflowTest);
+        int id = Context.now();
+        List<String> executionOrder = new ArrayList<>();
+        WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), null, null);
+        GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, graph.getNode("x1"), workflowTest, null, null, varMap, "conditional", workflowTestResult, new HashMap<>(), executionOrder);
+        GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest);
+        return new MultiExecTestResult(graphExecutorResult.getWorkflowTestResult().getNodeResultMap(), graphExecutorResult.getVulnerable(), Confidence.HIGH, graphExecutorRequest.getExecutionOrder());
+    }
+
+    public WorkflowTest convertToWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism, 
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
+
+        ObjectMapper m = new ObjectMapper();
+        String source, target;
+        List<String> edges = new ArrayList<>();
+        int edgeNumber = 1;
+        LoginWorkflowGraphEdge edgeObj;
+        Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = new HashMap<>();
+
+        for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
+
+            source = "x"+ edgeNumber;
+
+            String testId = null;
+            try {
+                Map<String,Object> mapValues = m.convertValue(reqNode.getValues(), Map.class);
+                testId = (String) mapValues.get("test_name");
+            } catch (Exception e) {
+                try {
+                    List<Object> listValues = (List<Object>) reqNode.getValues();
+                    for (int i = 0; i < listValues.size(); i++) {
+                        Map<String,Object> mapValues = m.convertValue(listValues.get(i), Map.class);
+                        testId = (String) mapValues.get("test_name");
+                        if (testId != null) {
+                            break;
+                        }
+                    }
+                } catch (Exception er) {
+                    // TODO: handle exception
+                }
+                // TODO: handle exception
+            }
+
+            String successNodeId = reqNode.fetchConditionalString("success");
+            String failureNodeId = reqNode.fetchConditionalString("failure");
+
+            if (testId != null) {
+                JSONObject json = new JSONObject() ;
+                json.put("method", rawApi.getRequest().getMethod());
+                json.put("requestPayload", rawApi.getRequest().getBody());
+                json.put("path", rawApi.getRequest().getUrl());
+                json.put("requestHeaders", rawApi.getRequest().getHeaders().toString());
+                json.put("type", "");
+                
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
+            } else {
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
+            }
+
+            target = successNodeId;
+            if (edgeNumber != reqNodes.getChildNodes().size()) {
+                if (target == null || target.equals("vulnerable") || target.equals("exit")) {
+                    target = com.akto.testing.workflow_node_executor.Utils.evaluateNextNodeId(source);
+                }
+                edgeObj = new LoginWorkflowGraphEdge(source, target, target);
+                edges.add(edgeObj.toString());
+            } else {
+                edgeObj = new LoginWorkflowGraphEdge(source, "terminal", "terminal");
+                edges.add(edgeObj.toString());
+            }
+            target = failureNodeId;
+            if (target != null && !target.equals("vulnerable") && !target.equals("exit")) {
+                edgeObj = new LoginWorkflowGraphEdge(source, target, target);
+                edges.add(edgeObj.toString());
+            }
+
+            edgeNumber++;
+
+        }
+
+        return new WorkflowTest(Context.now(), apiInfoKey.getApiCollectionId(), "", Context.now(), "", Context.now(),
+                null, edges, mapNodeIdToWorkflowNodeDetails, WorkflowTest.State.DRAFT);
     }
 
     public TestResult validate(ExecutionResult attempt, RawApi rawApi, Map<String, Object> varMap, String logId, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -161,6 +305,14 @@ public class Executor {
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
             return new ExecutorSingleRequest(true, "", null, true);
+        }
+
+        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString())) {
+            return new ExecutorSingleRequest(true, "", rawApis, true);
+        }
+
+        if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.TerminalNonExecutable.toString())) {
+            return new ExecutorSingleRequest(true, "", rawApis, true);
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
@@ -309,6 +461,19 @@ public class Executor {
                 value = VariableResolver.resolveExpression(varMap, value.toString());
             }
 
+            if (value instanceof List) {
+                try {
+                    int index = 0;
+                    List<Object> valList = (List<Object>) value;
+                    for (Object v: valList) {
+                        v = VariableResolver.resolveExpression(varMap, v.toString());
+                        valList.set(index, v);
+                        index++;
+                    }
+                } catch (Exception e) {
+                }
+            }
+
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes);
             return resp;
         } catch(Exception e) {
@@ -342,7 +507,18 @@ public class Executor {
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":
-                return Operations.replaceBody(rawApi, key);
+                String newPayload = rawApi.getRequest().getBody();
+                if (key instanceof Map) {
+                    Map<String, Map<String, String>> regexReplace = (Map) key;
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else {
+                    newPayload = key.toString();
+                }
+                return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
@@ -357,13 +533,9 @@ public class Executor {
                 return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
                 String newUrl = null;
-                if (key instanceof Map) {
-                    Map<String, Map<String, String>> regexReplace = (Map) key;
-                    String url = rawApi.getRequest().getUrl();
-                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
-                    String regex = regexInfo.get("regex");
-                    String replaceWith = regexInfo.get("replace_with");
-                    newUrl = Utils.applyRegexModifier(url, regex, replaceWith);
+                UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
+                if (urlModifierPayload != null) {
+                    newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
                 } else {
                     newUrl = key.toString();
                 }
@@ -411,6 +583,48 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, "auth value missing");
                 }
                 return Operations.modifyHeader(rawApi, authHeader, authVal);
+            case "test_name":
+                return new ExecutorSingleOperationResp(true, "");
+            case "jwt_replace_body":
+                JWTPayloadReplacer jwtPayloadReplacer = new JWTPayloadReplacer(key.toString());
+                boolean modified = false;
+                for (String k: rawApi.getRequest().getHeaders().keySet()) {
+                    List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
+                    if (hList.size() == 0){
+                        continue;
+                    }
+                    String hVal = hList.get(0);
+                    String[] splitValue = hVal.toString().split(" ");
+                    List<String> finalValue = new ArrayList<>();
+
+                    boolean isJwt = false;
+
+                    for (String val: splitValue) {
+                        if (!KeyTypes.isJWT(val)) {
+                            finalValue.add(val);
+                            continue;
+                        }
+                        isJwt = true;
+                        String modifiedHeaderVal = null;
+
+                        try {
+                            modifiedHeaderVal = jwtPayloadReplacer.jwtModify("", val);
+                        } catch(Exception e) {
+                            return null;
+                        }
+                        finalValue.add(modifiedHeaderVal);
+                    }
+
+                    if (!isJwt) {
+                        continue;
+                    }
+                    modified = true;
+
+                    return Operations.modifyHeader(rawApi, k, String.join( " ", finalValue));
+                }
+                if (!modified) {
+                    return new ExecutorSingleOperationResp(true, "");
+                }
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
 

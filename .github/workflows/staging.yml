@@ -147,7 +147,10 @@ jobs:
             --set dashboard.aktoApiSecurityDashboard.image.tag=${IMAGE_TAG} \
             --set testing.aktoApiSecurityTesting.image.repository="aktosecurity/akto-api-testing" \
             --set testing.aktoApiSecurityTesting.image.tag=${IMAGE_TAG} 
-
+          kubectl delete deployment/${IMAGE_TAG}-akto-runtime  -n dev
+          kubectl delete deployment/${IMAGE_TAG}-akto-keel  -n dev
+          kubectl delete deployment/${IMAGE_TAG}-akto-testing  -n dev
+          
           echo "initiating patch..." >> $GITHUB_STEP_SUMMARY
           kubectl patch deployment/${IMAGE_TAG}-akto-dashboard -n dev --type=strategic --patch-file akto_k8s_agent_complete.yml
 
@@ -225,7 +228,6 @@ jobs:
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
         cat mongo.yml | sed "s/akto/${IMAGE_TAG}/g" > mongo_complete.yml
-
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:

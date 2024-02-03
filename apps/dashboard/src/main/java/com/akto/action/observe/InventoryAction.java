@@ -1,17 +1,21 @@
 package com.akto.action.observe;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -155,10 +159,6 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-
-
-
-
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
         for (BasicDBObject singleTypeInfo: list) {
@@ -186,7 +186,7 @@ public class InventoryAction extends UserAction {
 
         BasicDBObject query = new BasicDBObject();
         if (apiCollectionId > -1) {
-            query.append("_id.apiCollectionId", apiCollectionId);
+            query.append(SingleTypeInfo._COLLECTION_IDS, new BasicDBObject("$in", Arrays.asList(apiCollectionId)));
         }
 
         int counter = 0;
@@ -381,7 +381,7 @@ public class InventoryAction extends UserAction {
             filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
             
             if (apiCollectionId != -1) {
-                Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+                Bson apiCollectionIdFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
                 filterCustomSensitiveParams.add(apiCollectionIdFilter);
             }
 
@@ -562,7 +562,7 @@ public class InventoryAction extends UserAction {
     public String method;
     public String loadParamsOfEndpoint() {
         Bson filters = Filters.and(
-            Filters.eq("apiCollectionId", apiCollectionId),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
             Filters.eq("url", url),  
             Filters.eq("method", method)
         );

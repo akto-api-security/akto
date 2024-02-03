@@ -2,8 +2,12 @@ package com.akto.dto;
 
 import com.akto.dto.settings.DefaultPayload;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.akto.util.ConnectionInfo;
+import com.akto.util.LastCronRunInfo;
 
 import com.akto.dto.test_editor.TestLibrary;
 
@@ -52,6 +56,18 @@ public class AccountSettings {
 
     public static final String DEFAULT_PAYLOADS = "defaultPayloads";
     private Map<String, DefaultPayload> defaultPayloads;
+
+    public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
+    private LastCronRunInfo lastUpdatedCronInfo;
+    
+    public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
+    private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
+    private List<TestLibrary> testLibraries;
+    public static final String TEST_LIBRARIES = "testLibraries";
+
+    public List<TestLibrary> getTestLibraries() {
+        return testLibraries;
+    }
 
     public static final String TEST_LIBRARIES = "testLibraries";
     private List<TestLibrary> testLibraries;
@@ -225,4 +241,19 @@ public class AccountSettings {
         this.testLibraries = testLibraries;
     }
 
+    public LastCronRunInfo getLastUpdatedCronInfo() {
+        return lastUpdatedCronInfo;
+    }
+
+    public void setLastUpdatedCronInfo(LastCronRunInfo lastUpdatedCronInfo) {
+        this.lastUpdatedCronInfo = lastUpdatedCronInfo;
+    }
+
+    public Map<String, ConnectionInfo> getConnectionIntegrationsInfo() {
+        return connectionIntegrationsInfo;
+    }
+
+    public void setConnectionIntegrationsInfo(Map<String, ConnectionInfo> connectionIntegrationsInfo) {
+        this.connectionIntegrationsInfo = connectionIntegrationsInfo;
+    }
 }
