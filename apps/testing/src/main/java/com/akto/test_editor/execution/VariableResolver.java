@@ -280,8 +280,10 @@ public class VariableResolver {
         return false;
     }
 
-    public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
+    public static List<String> resolveWordListVar(String key, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey) {
         String expression = key.toString();
+
+        resolveWordList((Map) varMap, apiInfoKey, new HashMap<>());
 
         List<String> wordList = new ArrayList<>();
         String wordListKey = null;
@@ -343,6 +345,17 @@ public class VariableResolver {
                 key = (String) m.get("key");
             }
 
+            Object keyContext = VariableResolver.resolveContextKey((Map) wordListsMap, key.toString());
+            if (keyContext instanceof ArrayList) {
+                List<String> keyContextList = (List<String>) keyContext;
+                if (keyContextList.size() > 0) {
+                    key = keyContextList.get(0);
+                }
+            }
+            
+            if (key.contains("private_var.key")) {
+                continue;
+            }
             
             if (m.containsKey("all_apis")) {
                 allApis = Objects.equals(m.get("all_apis"), true);
@@ -363,9 +376,9 @@ public class VariableResolver {
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                 ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
-                if (infKey.equals(infoKey)) {
-                    continue;
-                }
+                // if (infKey.equals(infoKey)) {
+                //     continue;
+                // }
                 Bson sdfilters = Filters.and(
                     Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
                     Filters.eq("_id.method", singleTypeInfo.getMethod()),
@@ -414,6 +427,19 @@ public class VariableResolver {
             } else {
                 key = (String) m.get("key");
             }
+
+            Object keyContext = VariableResolver.resolveContextKey(varMap, key.toString());
+            if (keyContext instanceof ArrayList) {
+                List<String> keyContextList = (List<String>) keyContext;
+                if (keyContextList.size() > 0) {
+                    key = keyContextList.get(0);
+                }
+            }
+            
+            if (key.contains("private_var.key")) {
+                continue;
+            }
+
             location = m.get("location");
             if (m.containsKey("all_apis")) {
                 allApis = Objects.equals(m.get("all_apis"), true);

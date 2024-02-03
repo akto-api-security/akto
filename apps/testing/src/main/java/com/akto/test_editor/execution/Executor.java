@@ -100,7 +100,7 @@ public class Executor {
                 singleReq = new ExecutorSingleRequest(true, "", testRawApis, true);;
             } else {
                 modifications = true;
-                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
+                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes, apiInfoKey);
                 testRawApis = singleReq.getRawApis();
                 if (testRawApis == null) {
                     error_messages.add(singleReq.getErrMsg());
@@ -296,7 +296,7 @@ public class Executor {
         return testResult;
     }
 
-    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
+    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
 
         List<ExecutorNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
@@ -341,7 +341,7 @@ public class Executor {
             // if rawapi size is 1, var type is wordlist, iterate on values
             RawApi rApi = rawApis.get(0).copy();
             if (rawApis.size() == 1 && VariableResolver.isWordListVariable(key, varMap)) {
-                List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
+                List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap, apiInfoKey);
 
                 for (int i = 0; i < wordListVal.size(); i++) {
                     RawApi copyRApi = rApi.copy();
@@ -355,7 +355,7 @@ public class Executor {
                 }
 
             } else if (rawApis.size() == 1 && VariableResolver.isWordListVariable(value, varMap)) {
-                List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
+                List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap, apiInfoKey);
 
                 for (int i = 0; i < wordListVal.size(); i++) {
                     RawApi copyRApi = rApi.copy();
@@ -370,7 +370,7 @@ public class Executor {
 
             } else {
                 if (VariableResolver.isWordListVariable(key, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
+                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap, apiInfoKey);
                     int index = 0;
                     for (RawApi rawApi : rawApis) {
                         if (index >= wordListVal.size()) {
@@ -383,7 +383,7 @@ public class Executor {
                         index++;
                     }
                 } else if (VariableResolver.isWordListVariable(value, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
+                    List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap, apiInfoKey);
                     int index = 0;
                     for (RawApi rawApi : rawApis) {
                         if (index >= wordListVal.size()) {
@@ -410,7 +410,7 @@ public class Executor {
         ExecutorNode childNode;
         for (int i = 0; i < childNodes.size(); i++) {
             childNode = childNodes.get(i);
-            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap, authMechanism, customAuthTypes);
+            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap, authMechanism, customAuthTypes, apiInfoKey);
             rawApis = executionResult.getRawApis();
             if (!executionResult.getSuccess()) {
                 return executionResult;
@@ -459,6 +459,13 @@ public class Executor {
 
             if (value instanceof String) {
                 value = VariableResolver.resolveExpression(varMap, value.toString());
+            }
+
+            if (keyContext instanceof ArrayList) {
+                List<String> keyContextList = (List<String>) keyContext;
+                String cKey = keyContextList.get(0);
+                ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, cKey, value.toString(), varMap, authMechanism, customAuthTypes);
+                return resp;
             }
 
             if (value instanceof List) {

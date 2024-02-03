@@ -1103,7 +1103,7 @@ public final class FilterAction {
                                 String sUrl = httpResponseParams.getRequestParams().getURL();
                                 String[] sUrlTokens = sUrl.split("/");
                                 String[] origUrlTokens = urlWithParams.split("/");
-                                if (!origUrlTokens[i].equals(sUrlTokens[i])) {
+                                if (origUrlTokens[i].equals(sUrlTokens[i])) {
                                     obj.put("key", i+"");
                                     obj.put("value", sUrlTokens[i]);
                                     if (privateValues.size() < 5) {
@@ -1163,7 +1163,7 @@ public final class FilterAction {
                     
                     Object paramVal = payloadObj.get(param);
                     Object origVal = payload.get(param);
-                    if (paramVal != null && !paramVal.equals(origVal)) {
+                    if (paramVal != null && paramVal.equals(origVal)) {
                         obj.put("key", key);
                         obj.put("value", paramVal.toString());
                         if (privateValues.size() < 5) {
