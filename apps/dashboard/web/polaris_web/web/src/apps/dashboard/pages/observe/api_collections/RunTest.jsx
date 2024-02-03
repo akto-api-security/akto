@@ -508,7 +508,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                         initial={"Default"}
                                         selected={(requests) => {
                                             let maxConcurrentRequests
-                                            console.log(requests);
                                             if (requests === "Default") maxConcurrentRequests = -1
                                             else maxConcurrentRequests = requests
 

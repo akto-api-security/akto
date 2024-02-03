@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
-  CircleTickMinor,
+  CircleTickMajor,
   ArchiveMinor,
   LinkMinor,
   ResourcesMajor,
@@ -50,7 +50,7 @@ const headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: CircleTickMinor,
+    icon: CircleTickMajor,
   },
   {
     text: 'Test category',
@@ -238,7 +238,7 @@ function TestRunResultPage(props) {
         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
-    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
+    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && testErrorComponent ,
     (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
     <SampleDataList
       key={"sampleData"}

@@ -2,9 +2,11 @@ package com.akto.utils;
 
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -14,6 +16,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -169,7 +172,7 @@ public class Utils {
                         statusCode =  res.getStatusCode()+"";
                         status =  "";
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
+                        loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
                         return null;
                     }
                 } else {
@@ -373,12 +376,16 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-                info.setPolicy(new AktoPolicyNew(false));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             info.getHttpCallParser().syncFunction(responses, true, false);
-            info.getPolicy().main(responses, true, false);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
+            info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+            APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
+            DependencyFlow dependencyFlow = new DependencyFlow();
+            dependencyFlow.run();
+            dependencyFlow.syncWithDb();
         }
     }
 
@@ -431,6 +438,27 @@ public class Utils {
         }
 
         return payload;
+    }
+
+    public static float calculateRiskValueForSeverity(String severity){
+        float riskScore = 0 ;
+        switch (severity) {
+            case "HIGH":
+                riskScore += 100;
+                break;
+
+            case "MEDIUM":
+                riskScore += 10;
+                break;
+
+            case "LOW":
+                riskScore += 1;
+        
+            default:
+                break;
+        }
+
+        return riskScore;
     }
 
 }

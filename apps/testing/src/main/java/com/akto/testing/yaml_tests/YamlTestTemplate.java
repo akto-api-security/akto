@@ -9,8 +9,10 @@ import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.YamlTestResult;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
@@ -70,9 +72,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public List<TestResult>  executor() {
+    public YamlTestResult executor() {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
-        List<TestResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
+        YamlTestResult results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
                 this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;

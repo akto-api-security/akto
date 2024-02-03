@@ -28,7 +28,9 @@ function DateRangeFilter(props){
             icon={CalendarMinor}
             onClick={() => setPopoverActive(!popoverActive)}
           >
-            {func.getDateValue(initialDispatch)}
+            <span style={{whiteSpace: "nowrap"}}>
+              {func.getDateValue(initialDispatch)}
+            </span>
           </Button>
         }
         onClose={() => setPopoverActive(false)}

@@ -24,6 +24,7 @@ import Postman from "../dashboard/pages/settings/integrations/Postman";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
+import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -53,7 +54,10 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
+import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
+import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -66,6 +70,10 @@ const router = createBrowserRouter([
         path: "",
         element: <HomePage />,
         children: [
+          {
+            path: "home",
+            element: <HomeDashboard />,
+          },
           {
             path: "testing",
             element: <PageTesting />,
@@ -95,6 +103,10 @@ const router = createBrowserRouter([
               {
                 path:"user-config",
                 element:<UserConfig/>
+              },
+              {
+                path:"dependency",
+                element:<DependencyTable/>
               }
             ]
           },
@@ -187,6 +199,10 @@ const router = createBrowserRouter([
             element: <GithubSso />
           },
           {
+            path: "integrations/github_app",
+            element: <GithubAppIntegration />
+          },
+          {
             path: "integrations/slack",
             element: <Slack />,
           },
@@ -223,6 +239,10 @@ const router = createBrowserRouter([
             element: <TagDetails/>
           },
           {
+            path: "test-library",
+            element: <TestLibrary/>
+          },
+          {
             path: "billing",
             element: <Billing/>
           },
@@ -234,6 +254,10 @@ const router = createBrowserRouter([
       },
       {
         path: "test-editor/:testId",
+        element: <TestEditor />
+      },
+      {
+        path: "test-editor",
         element: <TestEditor />
       },
       {

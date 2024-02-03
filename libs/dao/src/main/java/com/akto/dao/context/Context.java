@@ -8,7 +8,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 
 public class Context {
-    public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
+public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
@@ -74,6 +74,10 @@ public class Context {
 
     public static int now() {
         return (int) (System.currentTimeMillis()/1000l);
+    }
+
+    public static int nowInMillis() {
+        return (int) (System.currentTimeMillis() % 100000000l);
     }
 
 
