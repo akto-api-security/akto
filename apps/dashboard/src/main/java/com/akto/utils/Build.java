@@ -423,13 +423,13 @@ public class Build {
         List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
 //        modifyHostDetails.add(new ModifyHostDetail("localhost:8092", "http://localhost:8093"));
 
-        List<Integer> apiCollectionIds = Collections.singletonList(1706860608);
+        List<Integer> apiCollectionIds = Collections.singletonList(1706949165);
         List<ReplaceDetail> replaceDetailsFromDb = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
 
-        KVPair kvPairUsername = new KVPair("username", "aktotest2@ripplingdemo.com",false, false, KVPair.KVType.STRING);
-        KVPair kvPairPassword = new KVPair("password", "5793612E2620422D486D1D74B96DC477C1B0901B6BE85BA94C74611179FEDA51:$separator$:v2",false, false, KVPair.KVType.STRING);
-        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/o/token/", "POST", Arrays.asList(kvPairUsername, kvPairPassword)));
-        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/identity_sso/get_role_inbound_sso_setting/", "POST", Arrays.asList(kvPairUsername)));
+//        KVPair kvPairUsername = new KVPair("username", "aktotest2@ripplingdemo.com",false, false, KVPair.KVType.STRING);
+//        KVPair kvPairPassword = new KVPair("password", "5793612E2620422D486D1D74B96DC477C1B0901B6BE85BA94C74611179FEDA51:$separator$:v2",false, false, KVPair.KVType.STRING);
+//        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/o/token/", "POST", Arrays.asList(kvPairUsername, kvPairPassword)));
+//        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/identity_sso/get_role_inbound_sso_setting/", "POST", Arrays.asList(kvPairUsername)));
 
         Map<Integer, ReplaceDetail> replaceDetailMap = new HashMap<>();
         for (ReplaceDetail replaceDetail: replaceDetailsFromDb) {
@@ -444,7 +444,7 @@ public class Build {
             System.out.println(responseParams.requestParams.getURL() + " - " + responseParams.statusCode);
             messages.add(currentMessage);
         }
-        Utils.pushDataToKafka(103, "", messages, new ArrayList<>(), true);
+//        Utils.pushDataToKafka(103, "", messages, new ArrayList<>(), true);
         System.out.println(System.currentTimeMillis()  - start);
 
 //        System.out.println(runResults);
