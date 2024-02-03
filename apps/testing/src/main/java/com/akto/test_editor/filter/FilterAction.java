@@ -782,6 +782,10 @@ public final class FilterAction {
                         obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
                     } else {
                         obj = VariableResolver.resolveExpression(varMap, origVal);
+                        if (obj instanceof ArrayList) {
+                            List<Object> objList = (List) obj;
+                            obj = objList.get(0);
+                        }
                     }
                     listVal.set(index, obj);
                     index++;
