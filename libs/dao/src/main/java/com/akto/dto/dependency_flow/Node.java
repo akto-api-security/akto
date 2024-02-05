@@ -73,16 +73,18 @@ public class Node {
     }
 
     public void fillMaxDepth() {
-        int maxDepth = 0; // todo: change var name
+        int maxDepthLocal = 0;
+        if (this.connections == null) return;
         for (Connection connection: this.connections.values()) {
-            int minDepth = Integer.MAX_VALUE; // todo
+            int minDepth = Integer.MAX_VALUE;
+            if (connection.getEdges() == null) continue;
             for (Edge edge : connection.getEdges()) {
                 minDepth= Math.min(edge.getDepth(),minDepth); // find the minimum value for each edge.. because we want to take the shortest path
             }
             if (minDepth == Integer.MAX_VALUE) continue;
-            maxDepth = Math.max(minDepth, maxDepth); // find the max value for all the connections
+            maxDepthLocal = Math.max(minDepth, maxDepthLocal); // find the max value for all the connections
         }
-        this.maxDepth = maxDepth;
+        this.maxDepth = maxDepthLocal;
     }
 
     public int getMaxDepth() {
