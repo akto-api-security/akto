@@ -36,6 +36,7 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ContainsAllFilter;
 import com.akto.test_editor.filter.data_operands_impl.ContainsEitherFilter;
 import com.akto.test_editor.filter.data_operands_impl.ContainsJwt;
+import com.akto.test_editor.filter.data_operands_impl.CookieExpireFilter;
 import com.akto.test_editor.filter.data_operands_impl.DataOperandsImpl;
 import com.akto.test_editor.filter.data_operands_impl.EqFilter;
 import com.akto.test_editor.filter.data_operands_impl.GreaterThanEqFilter;
@@ -52,6 +53,8 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import static com.akto.dto.RawApi.convertHeaders;
+
 public final class FilterAction {
     
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
@@ -67,6 +70,7 @@ public final class FilterAction {
         put("lte", new LesserThanEqFilter());
         put("not_contains_either", new NotContainsEitherFilter());
         put("contains_jwt", new ContainsJwt());
+        put("cookie_expire_filter", new CookieExpireFilter());
     }};
 
     public FilterAction() { }
@@ -461,7 +465,7 @@ public final class FilterAction {
             return;
         }
         
-        String headerString = RedactSampleData.convertHeaders(headers);
+        String headerString = convertHeaders(headers);
         String val = null;
 
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
@@ -563,7 +567,7 @@ public final class FilterAction {
             }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null);
         } else {
-            String headerString = RedactSampleData.convertHeaders(headers);
+            String headerString = convertHeaders(headers);
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(headerString, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
             res = invokeFilter(dataOperandFilterRequest);
             return new DataOperandsFilterResponse(res, null, null);
@@ -690,6 +694,7 @@ public final class FilterAction {
                 String val = (String) objVal;
                 Boolean matches = Utils.checkIfContainsMatch(val, "\\$\\{[^}]*\\}");
                 if (matches) {
+                    String origVal = val;
                     val = val.substring(2, val.length());
                     val = val.substring(0, val.length() - 1);
 
@@ -706,10 +711,10 @@ public final class FilterAction {
                     if (params.length > 1) {
                         secondParam = params[1];
                     }
-                    if (secondParam == null) {
-                        obj = VariableResolver.resolveExpression(varMap, val);
-                    } else {
+                    if (isDynamicParamType(firstParam)) {
                         obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                    } else {
+                        obj = VariableResolver.resolveExpression(varMap, origVal);
                     }
                     listVal.set(index, obj);
                     index++;
@@ -781,7 +786,7 @@ public final class FilterAction {
         return;
     }
 
-    public Object getValue(Object obj, String parentKey, String queryKey) {
+    public static Object getValue(Object obj, String parentKey, String queryKey) {
         Object val = null;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -840,6 +845,23 @@ public final class FilterAction {
 
         return count;
 
+    }
+
+    public boolean isDynamicParamType(String param) {
+        switch (param) {
+            case "sample_request_payload":
+            case "sample_response_payload":
+            case "test_request_payload":
+            case "test_response_payload":
+            case "sample_request_headers":
+            case "sample_response_headers":
+            case "test_request_headers":
+            case "test_response_headers":
+                return true;
+            default:
+                return false;
+
+        }
     }
     
     public Object resolveDynamicValue(FilterActionRequest filterActionRequest, String firstParam, String secondParam) {

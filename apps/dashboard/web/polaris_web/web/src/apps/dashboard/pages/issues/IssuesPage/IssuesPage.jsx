@@ -55,6 +55,9 @@ const headers = [
         text:"Ignore reason",
         value:"ignoreReason",
         itemCell:2
+    },
+    {
+        value: 'collectionIds'
     }
 ]
 
@@ -109,6 +112,12 @@ let filtersOptions = [
             { label:"Last week", value:func.timeNow() - 7 * 24 * 60 * 60 },
             { label:"Last month", value:func.timeNow() + 60 - 30 * 24 * 60 * 60 },
         ]
+    },
+    {
+        key: 'collectionIds',
+        label: 'API groups',
+        title: 'API groups',
+        choices: [],
     }
 ]
 
@@ -140,6 +149,7 @@ function IssuesPage(){
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
+    const allCollections = PersistStore(state => state.allCollections);
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -150,13 +160,7 @@ function IssuesPage(){
         })
     }
 
-    filtersOptions[0].choices=[];
-    Object.keys(apiCollectionMap).forEach((key) => { 
-        filtersOptions[0].choices.push({
-            label:apiCollectionMap[key],
-            value:Number(key)
-        })
-    });
+    filtersOptions = func.getCollectionFilters(filtersOptions)
 
     let promotedBulkActions = (selectedResources) => {
         selectedResources = selectedResources.map((item) => JSON.parse(item));
@@ -234,6 +238,7 @@ function IssuesPage(){
                 return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
             case "issueCategory":
                 return func.convertToDisambiguateLabelObj(value, null, 3)
+            case "collectionIds":
             case "apiCollectionId":
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             default:
@@ -246,7 +251,7 @@ function IssuesPage(){
 
         let total =0;
         let ret = []
-        let filterCollectionsId = filters.apiCollectionId;
+        let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
         let filterSeverity = filters.severity
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {

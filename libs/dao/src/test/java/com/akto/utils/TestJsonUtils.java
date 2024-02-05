@@ -60,7 +60,7 @@ public class TestJsonUtils {
         s.add("friends#$#name");
         ConvertToArrayPayloadModifier convertToArrayPayloadModifier = new ConvertToArrayPayloadModifier();
         String modifiedPayload = JSONUtils.modify(payload, s, convertToArrayPayloadModifier);
-        assertNull(modifiedPayload);
+        assertEquals(payload, modifiedPayload);
     }
 
     @Test
