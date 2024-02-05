@@ -23,15 +23,11 @@ function OpenApiSource() {
         const formData = new FormData();
         formData.append("openAPIString", files.content)
         await api.importDataFromOpenApiSpec(formData).then((res) => {
-            let apiCollectionId = res.apiCollectionId;
             setLoading(false)
             let link = `/dashboard/observe/inventory/`
-            if(apiCollectionId){
-                link += apiCollectionId
-            }
             const forwardLink = (
                 <HorizontalStack gap={1}>
-                    <Text> File uploaded successfully. You can go to </Text>
+                    <Text> File uploaded successfully and is being processed. You can go to </Text>
                     <Link url={link}>API collections</Link>
                     <Text> to see your APIs.</Text>
                 </HorizontalStack>

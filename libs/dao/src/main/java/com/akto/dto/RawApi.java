@@ -10,12 +10,14 @@ import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
+import javax.naming.LimitExceededException;
+
 public class RawApi {
 
     private OriginalHttpRequest request;
     private OriginalHttpResponse response;
     private String originalMessage;
-    ObjectMapper om = new ObjectMapper();
+    static ObjectMapper om = new ObjectMapper();
 
     public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage) {
         this.request = request;
@@ -197,6 +199,50 @@ public class RawApi {
             return false;
         }
         return true;
+    }
+
+    public void fillOriginalMessage(int akto_account_id, int time, String type, String source) throws Exception {
+        String requestHeaders = convertHeaders(this.request.getHeaders());
+        String responseHeaders = convertHeaders(this.response.getHeaders());
+
+        String path = this.request.getFullUrlWithParams();
+        List<String> contentTypeHeaderValues = this.request.getHeaders().get("content-type");
+        String contentType = contentTypeHeaderValues != null && contentTypeHeaderValues.size() > 0 ? contentTypeHeaderValues.get(0) : null;
+
+        Map<String,String> result = new HashMap<>();
+        result.put("akto_account_id",akto_account_id+"");
+        result.put("path",path);
+        result.put("requestHeaders",requestHeaders);
+        result.put("responseHeaders",responseHeaders);
+        result.put("method", this.request.getMethod());
+        result.put("requestPayload",this.request.getBody());
+        result.put("responsePayload",this.response.getBody());
+        result.put("ip", "");
+        result.put("time",time+"");
+        result.put("statusCode", this.response.getStatusCode()+"");
+        result.put("type",type);
+        result.put("status", null);
+        result.put("contentType",contentType);
+        result.put("source", source);
+
+        this.originalMessage = om.writeValueAsString(result);
+    }
+
+    public static String convertHeaders(Map<String, List<String>> headers) {
+        Map<String, String> headerMap = new HashMap<>();
+        if (headers == null) return "{}";
+
+        for (String h: headers.keySet()) {
+            List<String> values = headers.get(h);
+            if (values == null) continue;
+            headerMap.put(h, String.join(";",values));
+        }
+
+        try {
+            return om.writeValueAsString(headerMap);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     public RawApi copy() {

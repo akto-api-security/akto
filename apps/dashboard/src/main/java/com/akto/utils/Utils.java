@@ -36,7 +36,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.akto.utils.RedactSampleData.convertHeaders;
+import static com.akto.dto.RawApi.convertHeaders;
 
 
 public class Utils {

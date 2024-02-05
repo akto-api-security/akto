@@ -276,4 +276,57 @@ export default {
             }
         })
     },
+
+    invokeDependencyTable(apiCollectionIds){
+        return request({
+            url: '/api/invokeDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
+
+    saveReplaceDetails(apiCollectionId, url, method, kvPairs){
+        return request({
+            url: '/api/saveReplaceDetails',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method, kvPairs
+            }
+        })
+    },
+
+    fetchGlobalVars(apiCollectionIds){
+        return request({
+            url: '/api/fetchGlobalVars',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
+
+    saveGlobalVars(modifyHostDetails){
+        return request({
+            url: '/api/saveGlobalVars',
+            method: 'post',
+            data: {
+                modifyHostDetails
+            }
+        })
+    },
+
+    fetchValuesForParameters(apiCollectionId, url, method, params){
+        if (typeof apiCollectionId === "string") {
+            apiCollectionId = parseInt(apiCollectionId)
+        }
+        return request({
+            url: '/api/fetchValuesForParameters',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method, params
+            }
+        })
+    },
 }
