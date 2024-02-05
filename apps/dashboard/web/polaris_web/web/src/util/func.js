@@ -1297,7 +1297,10 @@ mapCollectionIdToHostName(apiCollections){
   findLastParamField(str) {
     let paramDot = func.convertParamToDotNotation(str)
     let parmArr = paramDot.split(".")
-    return parmArr.length > 0 ? parmArr[parmArr.length-1] : paramDot
+    let lastIndex = parmArr.length-1
+    let result = parmArr.length > 0 ? parmArr[lastIndex] : paramDot
+    if (result.length > 0) return result;
+    return parmArr[lastIndex-1]
   },
 
   addPlurality(count){
