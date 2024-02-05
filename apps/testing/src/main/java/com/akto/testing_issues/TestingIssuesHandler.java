@@ -118,12 +118,12 @@ public class TestingIssuesHandler {
                     TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                             config.getSeverity(),
-                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
+                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId(), lastSeen)));
                 }else {
                     Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                             severity,
-                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId()))); // todo: take value from yaml
+                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId(), lastSeen))); // todo: take value from yaml
                 }
                 loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);
             }
