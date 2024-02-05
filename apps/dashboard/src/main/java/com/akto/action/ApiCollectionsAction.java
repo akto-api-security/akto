@@ -6,20 +6,25 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.usage.UsageMetricInfoDao;
+import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetric;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
-import com.akto.utils.usage.UsageMetricCalculator;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -44,7 +49,7 @@ public class ApiCollectionsAction extends UserAction {
     int apiCollectionId;
     List<ApiInfoKey> apiList;
 
-    private int usageEndpoints;
+    private boolean hasUsageEndpoints = true;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -369,7 +374,20 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchCustomerEndpoints(){
         try {
-            this.usageEndpoints = UsageMetricCalculator.calculateActiveEndpoints(0);
+            int accountId = Context.accountId.get();
+            Organization organization = OrganizationsDao.instance.findOne(
+                                Filters.in(Organization.ACCOUNTS, accountId)
+                        );
+            if(organization == null){
+                return Action.SUCCESS.toUpperCase();
+            }
+            String orgId = organization.getId();
+            Bson filter = UsageMetricsDao.generateFilter(orgId,accountId , MetricTypes.ACTIVE_ENDPOINTS);
+            UsageMetric usageMetric = UsageMetricsDao.instance.findOne(filter);
+
+            if(usageMetric != null){
+                this.hasUsageEndpoints = (usageMetric.getUsage() > 0);
+            }
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
@@ -445,8 +463,8 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCount = apiCount;
     }
 
-    public int getUsageEndpoints() {
-        return usageEndpoints;
+    public boolean getHasUsageEndpoints() {
+        return hasUsageEndpoints;
     }
 
 }
