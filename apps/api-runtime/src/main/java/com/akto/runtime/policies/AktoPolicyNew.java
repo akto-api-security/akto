@@ -153,8 +153,6 @@ public class AktoPolicyNew {
         if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; //todo: why?
 
         for (RuntimeFilter filter: filters) {
-            boolean filterResult = filter.process(httpResponseParams);
-            if (!filterResult) continue;
 
             RuntimeFilter.UseCase useCase = filter.getUseCase();
             boolean saveSample = false;

@@ -7,8 +7,8 @@ import {ResourcesMajor,
   MarketingMajor,
   FraudProtectMajor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
@@ -685,26 +685,6 @@ getCollapsibleRow(urls){
                 <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
-              )
-            })}
-          </VerticalStack>
-        </Box>
-      </td>
-    </tr>
-  )
-},
-
-getCollapisbleRowDependencyTable(urls){
-  return(
-    <tr style={{background: "#EDEEEF"}}>
-      <td colSpan={7}>
-        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-          <VerticalStack gap={2}>
-            {urls.map((ele,index)=>{
-              return(
-                <Text>
-                  {ele.url}
-                </Text>
               )
             })}
           </VerticalStack>

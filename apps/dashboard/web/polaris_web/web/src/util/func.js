@@ -16,6 +16,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -1305,7 +1306,10 @@ mapCollectionIdToHostName(apiCollections){
   findLastParamField(str) {
     let paramDot = func.convertParamToDotNotation(str)
     let parmArr = paramDot.split(".")
-    return parmArr.length > 0 ? parmArr[parmArr.length-1] : paramDot
+    let lastIndex = parmArr.length-1
+    let result = parmArr.length > 0 ? parmArr[lastIndex] : paramDot
+    if (result.length > 0) return result;
+    return parmArr[lastIndex-1]
   },
 
   addPlurality(count){
@@ -1329,6 +1333,13 @@ mapCollectionIdToHostName(apiCollections){
       first = false
     })
     return url;
+  },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
   }
 
 }

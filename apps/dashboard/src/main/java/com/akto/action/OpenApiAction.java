@@ -28,6 +28,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class OpenApiAction extends UserAction implements ServletResponseAware {
 
@@ -38,6 +41,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     private String lastFetchedUrl;
     private String lastFetchedMethod;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     @Override
     public String execute() {
         try {
@@ -102,48 +108,52 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private static final String OPEN_API = "OpenAPI";
     public String importDataFromOpenApiSpec(){
 
-        List<String> messages = new ArrayList<>();
-        String title = OPEN_API + " ";
-
-        try {
-            ParseOptions options = new ParseOptions();
-            options.setResolve(true);
-            options.setResolveFully(true);
-            SwaggerParseResult result = new OpenAPIParser().readContents(openAPIString, null, options);
-            OpenAPI openAPI = result.getOpenAPI();
-            if(openAPI.getInfo()!=null && openAPI.getInfo().getTitle()!=null){
-                title += openAPI.getInfo().getTitle();
-            } else {
-                title += Context.now();
+        int accountId = Context.accountId.get();
+        executorService.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                loggerMaker.infoAndAddToDb("Starting thread to process openAPI file", LogDb.DASHBOARD);
+                List<String> messages = new ArrayList<>();
+                String title = OPEN_API + " ";
+        
+                try {
+                    ParseOptions options = new ParseOptions();
+                    options.setResolve(true);
+                    options.setResolveFully(true);
+                    SwaggerParseResult result = new OpenAPIParser().readContents(openAPIString, null, options);
+                    OpenAPI openAPI = result.getOpenAPI();
+                    if(openAPI.getInfo()!=null && openAPI.getInfo().getTitle()!=null){
+                        title += openAPI.getInfo().getTitle();
+                    } else {
+                        title += Context.now();
+                    }
+                    messages = Parser.convertOpenApiToAkto(openAPI);
+                    
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "ERROR while parsing openAPI file", LogDb.DASHBOARD);
+                }
+        
+                String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        
+                if (messages.size() > 0) {
+                    apiCollectionId = title.hashCode();
+                    ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+                    if (apiCollection == null) {
+                        ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(apiCollectionId, title));
+                    }
+        
+                    try {
+                        Utils.pushDataToKafka(apiCollectionId, topic, messages, new ArrayList<>(), true);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "ERROR while creating collection from openAPI file", LogDb.DASHBOARD);
+                    }
+                }
             }
-            messages = Parser.convertOpenApiToAkto(openAPI);
-            
-        } catch (Exception e) {
-            addActionError("ERROR while parsing openAPI file.");
-            return ERROR.toUpperCase();
-        }
+        }, 0, TimeUnit.SECONDS);
 
-        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-
-        if (messages.size() > 0) {
-            apiCollectionId = title.hashCode();
-            if (ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)) == null) {
-                ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(apiCollectionId, title));
-            }
-
-            try {
-                Utils.pushDataToKafka(apiCollectionId, topic, messages, new ArrayList<>(), true);
-            } catch (Exception e) {
-                addActionError("ERROR while creating collection from openAPI file.");
-                return ERROR.toUpperCase();
-            }
-        }
         return SUCCESS.toUpperCase();
     }
 
-    public int getApiCollectionId() {
-        return apiCollectionId;
-    }
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
