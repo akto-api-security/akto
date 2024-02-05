@@ -5,13 +5,13 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Utils {
@@ -54,7 +54,10 @@ public class Utils {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.and(
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
+            Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds())
+        )));
 
         int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 

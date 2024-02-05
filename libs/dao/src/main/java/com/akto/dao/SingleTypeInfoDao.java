@@ -2,25 +2,19 @@ package com.akto.dao;
 
 import java.util.*;
 
-import javax.print.attribute.HashAttributeSet;
-
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CustomDataType;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -221,6 +215,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
         }
 
+        filters.add(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()));
+
         if (url != null) {
             filters.add(Filters.eq("url", url));
         }
@@ -299,6 +295,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         if(filter != null){
             pipeline.add(Aggregates.match(filter));
         }
+
+        pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds())));
 
         Bson projections = Projections.fields(
                 Projections.include("timestamp", "apiCollectionId", "url", "method")
