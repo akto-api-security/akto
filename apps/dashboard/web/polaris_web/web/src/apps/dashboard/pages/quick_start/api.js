@@ -85,6 +85,13 @@ const api = {
         }).then((resp) => {
             return resp
         })
+    },
+    importDataFromOpenApiSpec(formData) {
+        return request({
+            url: '/api/importDataFromOpenApiSpec',
+            method: 'post',
+            data: formData,
+        })
     }
 }
 
