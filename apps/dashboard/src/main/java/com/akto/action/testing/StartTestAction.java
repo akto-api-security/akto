@@ -714,9 +714,14 @@ public class StartTestAction extends UserAction {
 
     private int testRunsByUser;
 
+    private int getUserTestingRuns(){
+        Bson filter = Filters.ne(TestingRun.NAME, "Onboarding demo test");
+        return (int) TestingRunDao.instance.getMCollection().countDocuments(filter);
+    }
+
     public String getUsageTestRuns(){
         try {
-            this.testRunsByUser = UsageMetricCalculator.calculateTestRuns(0);
+            this.testRunsByUser = getUserTestingRuns();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
