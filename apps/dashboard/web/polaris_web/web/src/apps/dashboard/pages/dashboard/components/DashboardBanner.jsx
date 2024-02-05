@@ -30,7 +30,7 @@ function DashboardBanner() {
             icon: MarketingMinor,
             showRedirect: true,
             description: "150+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs.",
-            redirectUrl: "/dashboard/observe/inventory",
+            redirectUrl: "/dashboard/testing",
         },
         {
             title: "Configure CI/CD",

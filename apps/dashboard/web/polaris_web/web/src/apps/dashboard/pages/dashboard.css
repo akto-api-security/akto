@@ -96,3 +96,7 @@
     height: 17px !important;
     width: 17px !important;
 }
+
+.Polaris-VideoThumbnail__Thumbnail{
+    border-radius: 8px !important;
+}
