@@ -18,9 +18,10 @@ function CollectionsPageBanner() {
                 {iconsList.map((iconUrl, index) => {
                     return(
                         <div style={{display: "flex", justifyContent: 'center', alignItems: 'center', background: "var(--white)",
-                                border: "1px solid #ECECEC", width: '40px', height: '40px' , borderRadius: '32px',
-                                boxShadow: "0rem 0.125rem 0.25rem rgba(31, 33, 36, 0.1), 0rem 0.0625rem 0.375rem rgba(31, 33, 36, 0.05)",
+                                width: '40px', height: '40px' , borderRadius: '32px', zIndex: `${index + 5}`,
+                                boxShadow: "0px 2px 16px 0px rgba(33, 43, 54, 0.08), 0px 0px 0px 1px rgba(6, 44, 82, 0.10)",
                                 ...(index > 0 ? {marginLeft: '-10px'} : {})}} key={iconUrl}
+            
                         >
                             <Avatar shape="square" source={iconUrl} size="extraSmall" />
                         </div>
@@ -34,12 +35,12 @@ function CollectionsPageBanner() {
     return(
         <BannerLayout 
             title={"Upload your traffic to get started"}
-            text={"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur dignissim lacinia maximus."}
+            text={"Akto Discovers API inventory by connecting to your source of traffic. Connect a traffic connector to get started."}
             buttonText={"Go to quickstart"}
             buttonUrl={"/dashboard/quick-start"}
             bodyComponent={iconComponent}
             videoLength={COLLECTIONS_VIDEO_LENGTH}
-            videoLink={COLLECTIONS_VIDEO_URL}
+            // videoLink={COLLECTIONS_VIDEO_URL}
             videoThumbnail={COLLECTIONS_VIDEO_THUMBNAIL}
         />
     )

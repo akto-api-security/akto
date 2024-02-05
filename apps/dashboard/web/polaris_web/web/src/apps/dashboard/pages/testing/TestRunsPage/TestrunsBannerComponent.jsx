@@ -6,12 +6,10 @@ import PersistStore from '../../../../main/PersistStore'
 import { Box, Button, Popover, Text } from '@shopify/polaris'
 import { useNavigate } from 'react-router-dom'
 
-function TestrunsBannerComponent({isInventory,onButtonClick}) {
-
-    const navigate = useNavigate()
-
-    const allCollections = PersistStore(state => state.allCollections);
+function SelectCollectionComponent() {
     const [popoverActive, setPopoverActive] = useState(false)
+    const allCollections = PersistStore(state => state.allCollections);
+    const navigate = useNavigate()
     let urlsCount = 0
     const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
         .map(collection => {
@@ -21,7 +19,8 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
                 value: collection.id
             }
         })
-    const selectCollectionComponent = (
+    
+    return(
         urlsCount > 0 ?<Popover
             active={popoverActive}
             activator={(
@@ -44,15 +43,23 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
             </Popover.Pane>
         </Popover>: <Text color="subdued" variant="bodyMd" fontWeight="medium">No endpoints exist, go to inventory page to upload traffic.</Text>
     )
+}
 
+function TestrunsBannerComponent({isInventory,onButtonClick}) {
+    const allCollections = PersistStore(state => state.allCollections);
+    let urlsCount = 0
+    allCollections.filter(x => x.type !== "API_GROUP")
+        .forEach(collection => {
+            urlsCount += collection.urlsCount}
+        )
     return (
         <BannerLayout
             title={"Test your APIs"}
             text={"150+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs."}
             videoLength={TESTING_VIDEO_LENGTH}
-            videoLink={TESTING_VIDEO_URL}
+            // videoLink={TESTING_VIDEO_URL}
             videoThumbnail={TESTING_VIDEO_THUMBNAIL}
-            bodyComponent={isInventory ? null :selectCollectionComponent }
+            bodyComponent={isInventory ? null :<SelectCollectionComponent /> }
             {...isInventory ? {buttonText: "Run test"}: {}}
             {...isInventory ? {onClick: () => onButtonClick()} : {}}
             {...urlsCount === 0 ? {buttonText: "Go to inventory"}: {}} 
@@ -61,4 +68,4 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
     )
 }
 
-export default TestrunsBannerComponent
+export {TestrunsBannerComponent,SelectCollectionComponent}

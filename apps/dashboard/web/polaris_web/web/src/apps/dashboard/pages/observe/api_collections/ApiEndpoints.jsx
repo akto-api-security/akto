@@ -24,7 +24,7 @@ import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
-import TestrunsBannerComponent from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 
 const headings = [
     {

@@ -10,6 +10,7 @@ import PersistStore from "../../../../main/PersistStore";
 import { Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
+import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 
 const headers = [
     {
@@ -317,11 +318,11 @@ function IssuesPage(){
                     headingText={"No issues yet!"}
                     description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
                     buttonText={"Run test"}
-                    redirectUrl={"/dashboard/observe/inventory"}
                     infoItems={infoItems}
                     infoTitle={"Once you have issues:"}
                     learnText={"issues"}
                     docsUrl={ISSUES_PAGE_DOCS_URL}
+                    bodyComponent={<SelectCollectionComponent />}
                 />
 
             

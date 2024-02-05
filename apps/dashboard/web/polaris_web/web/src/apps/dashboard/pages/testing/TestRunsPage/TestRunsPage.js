@@ -15,7 +15,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import func from "@/util/func"
 import ChartypeComponent from "./ChartypeComponent";
 import { CellType } from "../../../components/tables/rows/GithubRow";
-import TestrunsBannerComponent from "./TestrunsBannerComponent";
+import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 
 /*
   {

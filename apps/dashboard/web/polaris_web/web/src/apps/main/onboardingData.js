@@ -67,7 +67,7 @@ const learnMoreObject = {
             }
         ]
     },
-    dashboard_observe_inventory_ids: {
+    dashboard_observe_inventory_id: {
         title: "API Endpoints",
         description: "All API endpoints across all of your services in Akto.",
         docsLink: [

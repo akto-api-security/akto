@@ -20,13 +20,13 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
                             </Box> : null}
                         </VerticalStack>
                     </Box>
-                    <Box width='340px'>
+                    {videoLink ? <Box width='340px'>
                         <VideoThumbnail
                             videoLength={videoLength}
                             thumbnailUrl={videoThumbnail}
                             onClick={() => window.open(videoLink, "_blank")}
                         />
-                    </Box>
+                    </Box> : null}
                 </div>
                 {containerComp}
             </VerticalStack>
