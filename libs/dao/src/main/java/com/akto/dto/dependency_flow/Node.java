@@ -79,6 +79,7 @@ public class Node {
             for (Edge edge : connection.getEdges()) {
                 minDepth= Math.min(edge.getDepth(),minDepth); // find the minimum value for each edge.. because we want to take the shortest path
             }
+            if (minDepth == Integer.MAX_VALUE) continue;
             maxDepth = Math.max(minDepth, maxDepth); // find the max value for all the connections
         }
         this.maxDepth = maxDepth;

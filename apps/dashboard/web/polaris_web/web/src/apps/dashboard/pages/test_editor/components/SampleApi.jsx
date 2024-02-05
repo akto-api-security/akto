@@ -199,10 +199,12 @@ const SampleApi = () => {
             apiCollectionId: selectedCollectionId
         }
 
-        await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList).then((resp)=>{
+        try {
+            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
             setTestResult(resp)
-            setLoading(false)
-        })
+        } catch (err){
+        }
+        setLoading(false)
     }
 
     const showResults = () => {

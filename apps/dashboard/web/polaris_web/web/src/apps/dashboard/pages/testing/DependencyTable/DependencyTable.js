@@ -1,11 +1,21 @@
-import { useEffect, useState } from "react";
+import { Box, Button, HorizontalStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { useEffect, useRef, useState } from "react";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import api from "../api";
-import transform from "../transform";
+import { TickMinor, CancelMinor } from "@shopify/polaris-icons"
+import TableExpand from "./TableExpand";
+import func from "../../../../../util/func";
+import EditModal from "./EditModal";
+import GlobalVarModal from "./GlobalVarModal";
 
 const headers = [
+    {
+        value: "success",
+        title: '',
+        type: CellType.TEXT,
+    },
     {
         value: "url",
         title: 'Endpoint',
@@ -27,8 +37,8 @@ const headers = [
         type: CellType.TEXT,
     },
     {
-        title: '',
-        type: CellType.COLLAPSIBLE
+        title: '  ',
+        type: CellType.COLLAPSIBLE,
     }
 ]
 
@@ -37,38 +47,90 @@ const resourceName = {
     plural: 'Dependency table',
 };
 
-function connectionToCollapsibleText(connections, params) {
-    let res = []
-    let store = new Set()
-    Object.keys(connections).forEach((ele) => {
-        let edges = connections[ele]["edges"]
-        let edge = edges[0]
-        let data =  ele + " = " + edge["method"] + " " + edge["url"] + " " + edge["param"]
-        store.add(ele)
-        res.push({"url": data})
-    })
 
-    params.forEach(x => {
-        if (store.has(x)) return
-        res.push({"url": x + " = ?" })
-    })
-
-    return res
+const generateKeyForReplaceDetailMap = (apiCollectionId, url, method, key, isHeader, isUrlParam) => {
+    return apiCollectionId + "#" + url + "#" + method + "#" + key + "#" + Boolean(isHeader) + "#" + Boolean(isUrlParam)
 }
 
 function DependencyTable() {
-    const [dependencyResults, setDependencyResults] = useState([])
     const [loading, setLoading] = useState(false)
+    const [runResults, setRunResults] = useState({})
+    const [refresh, setRefresh] = useState(false)
+    const [invokeLoading, setInvokeLoading] = useState(false)
+
+    const [active, setActive] = useState(false);
+    const [editApiCollectionId, setEditApiCollectionId] = useState(null)
+    const [editUrl, setEditUrl] = useState(null)
+    const [editMethod, setEditMethod] = useState(null)
+    const [editData, setEditData] = useState([])
+
+    const [globalVarActive, setGlobalVarActive] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const apiCollectionIdsString = queryParams.get('col_ids')
     const apiCollectionIds = JSON.parse(apiCollectionIdsString)
+
+    function connectionToCollapsibleText(childApiCollectionId, childUrl, childMethod, connections, params, replaceDetailMap) {
+        let res = []
+        let store = new Set()
+        Object.keys(connections).forEach((ele) => {
+            let edges = connections[ele]["edges"]
+            if (!edges ||edges.length === 0) return
+            let edge = edges[0]
+            store.add(ele)
+
+            let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod, ele, Boolean(connections[ele]["isHeader"], Boolean(connections[ele]["isUrlParam"])))
+            let val = replaceDetailMap.get(key)
+
+            console.log(edge, ele)
+            res.push({
+                "parentUrl": edge["url"],
+                "parentMethod": edge["method"],
+                "parentParam": edge["param"],
+                "childParam": ele,
+                "childParamIsUrlParam": Boolean(connections[ele]["isUrlParam"]),
+                "childParamIsHeader": Boolean(connections[ele]["isHeader"]),
+                "value": val
+            })
+        })
+
+        params.forEach(param => {
+            if (store.has(param)) return
+
+            let key = generateKeyForReplaceDetailMap(childApiCollectionId, childUrl, childMethod, param, false, false) // todo
+            let val = replaceDetailMap.get(key)
+
+            res.push({
+                "parentUrl": null,
+                "parentMethod": null,
+                "parentParam": null,
+                "childParam": param,
+                "childParamIsUrlParam": false, // todo
+                "childParamIsHeader": false,
+                "value": val
+            })
+        })
+
+        return res
+    }
+
 
     async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
         setLoading(true)
 
         let result = await api.buildDependencyTable(apiCollectionIds, skip)
         let dependencyTableList = result["dependencyTableList"]
+        let replaceDetails = result["replaceDetails"]
+
+        let replaceDetailMap = new Map()
+        replaceDetails.forEach((replaceDetail) => {
+            let kvPairs = replaceDetail["kvPairs"]
+            kvPairs.forEach((kvPair) => {
+                let fullKey = generateKeyForReplaceDetailMap(replaceDetail["apiCollectionId"], replaceDetail["url"], replaceDetail["method"], kvPair["key"], kvPair["isHeader"], kvPair["isUrlParam"])
+                replaceDetailMap.set(fullKey, kvPair["value"])
+            })
+        })
+
         let total = result["total"]
         let final = []
 
@@ -76,14 +138,35 @@ function DependencyTable() {
             let node = val["node"]
             let params = val["params"]
             let connections = node["connections"]
-            let data = connectionToCollapsibleText(connections, params)
+            let data = connectionToCollapsibleText(node["apiCollectionId"], node["url"], node["method"], connections, params, replaceDetailMap)
+            let icon = null
+            let key = node["method"] + " " + node["url"]
+            let runResult = runResults[key]
+            if (runResult) {
+                if (runResult["success"]) {
+                    icon = <Icon source={TickMinor} color="success" />
+                } else {
+                    icon = <Icon source={CancelMinor} color="critical" />
+                }
+            }
+
+            let headerCount = 0;
+            Object.values(connections).forEach(x => {
+                if (x["isHeader"]) headerCount += 1;
+            })
+
+            let totalParams = params.length + headerCount
+
             final.push({
+                "name": node["method"] + " " + node["url"],
+                "id": node["method"] + " " + node["url"],
+                "success": icon,
                 "url": node["method"] + " " + node["url"],
                 "level": node["maxDepth"],
-                "totalParameters": params.length,
+                "totalParameters": totalParams,
                 "dependentParameters": Object.keys(connections).length,
                 "urls": data,
-                "collapsibleRow": transform.getCollapisbleRowDependencyTable(data)
+                "collapsibleRow": <TableExpand data={data} childApiCollectionId={node["apiCollectionId"]} childUrl={node["url"]} childMethod={node["method"]} showEditModal={showEditModal}/>
             })
         })
 
@@ -91,13 +174,55 @@ function DependencyTable() {
         return { value: final, total: total };
     }
 
+    const showEditModal = (apiCollectionId, url, method, data) => {
+        setActive(true)
+        setEditApiCollectionId(apiCollectionId)
+        setEditUrl(url)
+        setEditMethod(method)
+        setEditData(data)
+    }
+
+    const modifyEditData = (childParam, value) => {
+        const newEditData = editData.map((item) => {
+            if (item.childParam === childParam) {
+                return { ...item, value: value };
+            }
+            return item;
+        });
+        setEditData(newEditData);
+    }
+
+    const convertDataToKVPairList = (data) => {
+        let kvPairs = []
+        data.forEach((x) => {
+            if (!x["value"]) return
+            kvPairs.push({
+                "key": x["childParam"],
+                "isHeader": x["childParamIsHeader"],
+                "isUrlParam": x["childParamIsUrlParam"],
+                "value": x["value"],
+                "type": "STRING"
+            })
+        })
+
+        return kvPairs
+    }
+
+    const saveEditData = async () => {
+        let kvPairs = convertDataToKVPairList(editData)
+        let resp = await api.saveReplaceDetails(editApiCollectionId, editUrl, editMethod, kvPairs)
+        setActive(false)
+        func.setToast(true, false, "Data updated successfully")
+        setRefresh(!refresh)
+    }
+
     const resultTable = (
         <GithubServerTable
-            key={"table"}
+            key={refresh}
             pageLimit={50}
             fetchData={fetchTableData}
-            sortOptions={[]} 
-            resourceName={resourceName} 
+            sortOptions={[]}
+            resourceName={resourceName}
             filters={[]}
             hideQueryField={true}
             calenderFilter={false}
@@ -106,9 +231,79 @@ function DependencyTable() {
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
-        /> 
+        />
     )
-    return resultTable
+
+    const modalComponent = (
+        <EditModal
+            key="edit-modal"
+            editData={editData} active={active} setActive={setActive} saveEditData={saveEditData} modifyEditData={modifyEditData}
+        />
+    )
+
+    const globalVarModalComponent = (
+        <GlobalVarModal
+            key="global-var-modal"
+            active={globalVarActive} setActive={setGlobalVarActive} apiCollectionIds={apiCollectionIds}
+        />
+    )
+
+    const components = [resultTable, modalComponent, globalVarModalComponent]
+
+    const invokeDependencyTable = () => {
+        if (invokeLoading) return
+        setInvokeLoading(true)
+        api.invokeDependencyTable(apiCollectionIds).then((resp) => {
+            let newCollectionId = resp["newCollectionId"]
+            // let temp = {}
+            // runResultList.forEach((runResult) => {
+            //     let apiInfoKey = runResult["apiInfoKey"]
+            //     temp[apiInfoKey["method"] + " " + apiInfoKey["url"]] = runResult
+            // })
+
+            setInvokeLoading(false)
+            // setRunResults(temp)
+            // setRefresh(!refresh)
+
+            const url = "/dashboard/observe/inventory/" + newCollectionId
+
+            const forwardLink = (
+                <HorizontalStack gap={1}>
+                    <Text> API collection created successfully. Click </Text>
+                    <Link url={url}>here</Link>
+                    <Text> to view collection.</Text>
+                </HorizontalStack>
+            )
+
+            func.setToast(true, false, forwardLink)
+        })
+    }
+
+    const secondaryActionsComponent = (
+        <Button onClick={invokeDependencyTable} primary  >
+            {invokeLoading ? <Spinner size="small" /> : "Invoke"}
+        </Button>
+    )
+
+    const globalVarsComponent = (
+        <Button onClick={() => { setGlobalVarActive(true) }} >
+            Edit Global vars
+        </Button>
+    )
+
+    return (
+        <PageWithMultipleCards
+            title={
+                <Text variant='headingLg'>
+                    Dependency Table
+                </Text>
+            }
+            isFirstPage={true}
+            components={components}
+            secondaryActions={secondaryActionsComponent}
+            primaryAction={globalVarsComponent}
+        />
+    )
 }
 
 export default DependencyTable	

@@ -1,6 +1,8 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -8,6 +10,8 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
 
 public class ApiCollection {
 
@@ -17,6 +21,7 @@ public class ApiCollection {
     String name;
     int startTs;
     Set<String> urls;
+    public static final String URLS_STRING = "urls";
     String hostName;
     public static final String HOST_NAME = "hostName";
     int vxlanId;
@@ -25,6 +30,16 @@ public class ApiCollection {
     int urlsCount;
 
     public static final String VXLAN_ID = "vxlanId";
+
+    public enum Type {
+        API_GROUP
+    }
+
+    Type type;
+    public static final String _TYPE = "type";
+
+    List<TestingEndpoints> conditions;
+    public static final String CONDITIONS_STRING = "conditions";
 
     public ApiCollection() {
     }
@@ -36,6 +51,13 @@ public class ApiCollection {
         this.urls = urls;
         this.hostName = hostName;
         this.vxlanId = vxlanId;
+    }
+
+    public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
+        this.id = id;
+        this.name = name;
+        this.conditions = conditions;
+        this.type = Type.API_GROUP;
     }
 
     public static boolean useHost = Objects.equals(System.getenv("USE_HOSTNAME"), "true");
@@ -125,6 +147,62 @@ public class ApiCollection {
     // To be called if you are creating a collection that is not from mirroring
     public static ApiCollection createManualCollection(int id, String name){
         return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
+    }
+
+    public Type getType() {
+        return type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
+    }
+    
+    public List<TestingEndpoints> getConditions() {
+        return conditions;
+    }
+
+    public void setConditions(List<TestingEndpoints> conditions) {
+        this.conditions = conditions;
+    }
+
+    private void initializeConditionsList(TestingEndpoints condition) {
+        if (this.conditions == null) {
+            this.conditions = new ArrayList<>();
+        }
+    }
+
+    private void updateConditionList(TestingEndpoints condition, boolean isAddOperation) {
+        for (TestingEndpoints it : conditions) {
+            boolean sameType = it.getType() == condition.getType();
+            if (sameType) {
+                switch (it.getType()) {
+                    case CUSTOM:
+                        // Only one CUSTOM condition should exist
+                        CustomTestingEndpoints.updateApiListCondition((CustomTestingEndpoints) it, condition.returnApis(), isAddOperation);
+                        return;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        /*
+         * Since we return if we find a condition of the same type,
+         * we can add the condition if we reach here
+         */
+        if (isAddOperation) {
+            conditions.add(condition);
+        }
+    }
+
+    public void addToConditions(TestingEndpoints condition) {
+        initializeConditionsList(condition);
+        updateConditionList(condition, true);
+    }
+
+    public void removeFromConditions(TestingEndpoints condition) {
+        initializeConditionsList(condition);
+        updateConditionList(condition, false);
     }
 
 }
