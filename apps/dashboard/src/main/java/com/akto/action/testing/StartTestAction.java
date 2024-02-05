@@ -326,7 +326,7 @@ public class StartTestAction extends UserAction {
 
     private Bson getTestingRunTypeFilter(TestingRunType testingRunType){
         if(testingRunType == null){
-            return null;
+            return Filters.empty();
         }
         switch (testingRunType) {
             case CI_CD:
@@ -342,7 +342,7 @@ public class StartTestAction extends UserAction {
                     Filters.ne(TestingRun.PERIOD_IN_SECONDS,0
                 ));
             default:
-                return null;
+                return Filters.empty();
         }
     }
 
@@ -352,7 +352,7 @@ public class StartTestAction extends UserAction {
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
-        if (testingRunTypeFilter != null) testingRunFilters.add(testingRunTypeFilter);
+        testingRunFilters.add(testingRunTypeFilter);
         testingRunFilters.addAll(prepareFilters(startTimestamp, endTimestamp));
         
 
