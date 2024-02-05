@@ -42,8 +42,10 @@ public class Build {
     private void buildParentToChildMap(List<Node> nodes) {
         parentToChildMap = new HashMap<>();
         for (Node node: nodes) {
+            if (node.getConnections() == null) continue;
             for (Connection connection: node.getConnections().values()) {
                 String requestParam = connection.getParam();
+                if (connection.getEdges() == null) continue;
                 for (Edge edge: connection.getEdges()) {
                     String responseParam = edge.getParam();
                     ReverseNode reverseNode = new ReverseNode(
@@ -162,50 +164,52 @@ public class Build {
         List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
-            List<String> samples = sampleData.getSamples();
-            if (samples.isEmpty()) continue;;
-
-            String sample = samples.get(0);
-            OriginalHttpRequest request = new OriginalHttpRequest();
-            request.buildFromSampleMessage(sample);
-            String newHost = findNewHost(request, modifyHostDetailMap);
-
-            OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
-            originalHttpResponse.buildFromSampleMessage(sample);
-
-            // do modifications
-            ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
-            modifyRequest(request, replaceDetail);
-
-            TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost);
-
-            OriginalHttpResponse response = null;
             try {
-                response = ApiExecutor.sendRequest(request,false, testingRunConfig);
-                apisReplayedSet.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
-                request.getHeaders().remove(AccountSettings.AKTO_IGNORE_FLAG);
-                ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
-                fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
-                RawApi rawApi = new RawApi(request, response, "");
-                rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "HAR");
-                RunResult runResult = new RunResult(
-                        new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
-                        rawApi.getOriginalMessage(),
-                        sample,
-                        rawApi.getResponse().getStatusCode() == originalHttpResponse.getStatusCode()
-                );
-                runResults.add(runResult);
+                List<String> samples = sampleData.getSamples();
+                if (samples.isEmpty()) continue;;
+
+                String sample = samples.get(0);
+                OriginalHttpRequest request = new OriginalHttpRequest();
+                request.buildFromSampleMessage(sample);
+                String newHost = findNewHost(request, modifyHostDetailMap);
+
+                OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
+                originalHttpResponse.buildFromSampleMessage(sample);
+
+                // do modifications
+                ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
+                modifyRequest(request, replaceDetail);
+
+                TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost);
+
+                OriginalHttpResponse response = null;
+                try {
+                    response = ApiExecutor.sendRequest(request,false, testingRunConfig);
+                    apisReplayedSet.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
+                    request.getHeaders().remove(AccountSettings.AKTO_IGNORE_FLAG);
+                    ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
+                    fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
+                    RawApi rawApi = new RawApi(request, response, "");
+                    rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "HAR");
+                    RunResult runResult = new RunResult(
+                            new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
+                            rawApi.getOriginalMessage(),
+                            sample,
+                            rawApi.getResponse().getStatusCode() == originalHttpResponse.getStatusCode()
+                    );
+                    runResults.add(runResult);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "error while sending request in invoke dependency graph" + id.getUrl(), LoggerMaker.LogDb.DASHBOARD);
+                }
             } catch (Exception e) {
-                e.printStackTrace();
-                loggerMaker.errorAndAddToDb(e, "error while sending request", LoggerMaker.LogDb.DASHBOARD);
-                e.printStackTrace();
+                loggerMaker.errorAndAddToDb(e, "error while running runPerLevel for " + id.getUrl(), LoggerMaker.LogDb.DASHBOARD);
             }
+
         }
 
         return runResults;
     }
 
-    // todo: handle all cases
     public static String findNewHost(OriginalHttpRequest request, Map<String, ModifyHostDetail> modifyHostDetailMap) {
         try {
             String url = request.getFullUrlIncludingDomain();
@@ -226,8 +230,7 @@ public class Build {
             } else {
                 return  uri.getScheme() + "://" + newHost;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Exception ignored) {
         }
         return null;
     }
@@ -270,6 +273,7 @@ public class Build {
         int limit = 1000;
         while (true) {
             List<SampleData> all = SampleDataDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionsIds), skip,limit, null);
+            if (all.isEmpty()) break;
             List<SampleData> filtered = new ArrayList<>();
             for (SampleData sampleData: all) {
                 Key key = sampleData.getId();
@@ -412,42 +416,6 @@ public class Build {
             replaceDetailsMap.put(key, replaceDetail);
         }
 
-    }
-
-    public static void main(String[] args) throws Exception {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        Build build = new Build();
-        long start = System.currentTimeMillis();
-        List<ModifyHostDetail> modifyHostDetails = ModifyHostDetailsDao.instance.findAll(Filters.empty());
-//        modifyHostDetails.add(new ModifyHostDetail("localhost:8092", "http://localhost:8093"));
-
-        List<Integer> apiCollectionIds = Collections.singletonList(1706949165);
-        List<ReplaceDetail> replaceDetailsFromDb = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
-
-//        KVPair kvPairUsername = new KVPair("username", "aktotest2@ripplingdemo.com",false, false, KVPair.KVType.STRING);
-//        KVPair kvPairPassword = new KVPair("password", "5793612E2620422D486D1D74B96DC477C1B0901B6BE85BA94C74611179FEDA51:$separator$:v2",false, false, KVPair.KVType.STRING);
-//        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/o/token/", "POST", Arrays.asList(kvPairUsername, kvPairPassword)));
-//        replaceDetailsFromDb.add(new ReplaceDetail(1706860608, "https://app.rippling.com/api/identity_sso/get_role_inbound_sso_setting/", "POST", Arrays.asList(kvPairUsername)));
-
-        Map<Integer, ReplaceDetail> replaceDetailMap = new HashMap<>();
-        for (ReplaceDetail replaceDetail: replaceDetailsFromDb) {
-            replaceDetailMap.put(replaceDetail.hashCode(), replaceDetail);
-        }
-
-        List<RunResult> runResults = build.run(apiCollectionIds, modifyHostDetails, replaceDetailMap);
-        List<String> messages = new ArrayList<>();
-        for (RunResult runResult: runResults) {
-            String currentMessage = runResult.getCurrentMessage();
-            HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(currentMessage);
-            System.out.println(responseParams.requestParams.getURL() + " - " + responseParams.statusCode);
-            messages.add(currentMessage);
-        }
-//        Utils.pushDataToKafka(103, "", messages, new ArrayList<>(), true);
-        System.out.println(System.currentTimeMillis()  - start);
-
-//        System.out.println(runResults);
     }
 
 }

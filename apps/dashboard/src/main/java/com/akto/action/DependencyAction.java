@@ -35,6 +35,8 @@ public class DependencyAction extends UserAction {
 
     private Collection<Node> result;
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAction.class);
+
     @Override
     public String execute()  {
         TreeHelper treeHelper = new TreeHelper();
@@ -83,8 +85,8 @@ public class DependencyAction extends UserAction {
         apiCollectionsAction.createCollection();
         List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();;
 
-        if (apiCollections.size() == 0) {
-            addActionError("Coulnd't create collection");
+        if (apiCollections == null || apiCollections.size() == 0) {
+            addActionError("Couldn't create collection");
             return ERROR.toUpperCase();
         }
         newCollectionId = apiCollections.get(0).getId();
@@ -112,7 +114,7 @@ public class DependencyAction extends UserAction {
                 try {
                     Utils.pushDataToKafka(newCollectionId, "", messages, new ArrayList<>(), true);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb(e, "Error while sending data to kafka in invoke dependency graph function", LoggerMaker.LogDb.DASHBOARD);
                 }
 
             }
@@ -190,20 +192,6 @@ public class DependencyAction extends UserAction {
 
         if (!bulkUpdates.isEmpty()) ModifyHostDetailsDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
         return SUCCESS.toUpperCase();
-    }
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        DependencyAction dependencyAction = new DependencyAction();
-        dependencyAction.setApiCollectionId(1706005870);
-        dependencyAction.setUrl("https://api.hcaptcha.com/getcaptcha/20000000-ffff-ffff-ffff-000000000002");
-        dependencyAction.setMethod(Method.POST);
-        dependencyAction.setParams(new HashSet<>(Arrays.asList("hl", "pdc", "host", "origin", "v", "pst")));
-
-        dependencyAction.fetchValuesForParameters();
-        System.out.println(dependencyAction.getParamToValuesMap());
     }
 
 
