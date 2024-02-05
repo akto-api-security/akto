@@ -197,7 +197,7 @@ const [severityCountMap, setSeverityCountMap] = useState({
 })
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
-const [totalTestRunsByUser, setTotalTestRunsByUser] = useState(0)
+const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -342,7 +342,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   const fetchTotalCount = () =>{
     setLoading(true)
     api.getUserTestRuns().then((resp)=> {
-      setTotalTestRunsByUser(resp)
+      setHasUserInitiatedTestRuns(resp)
     })
     setLoading(false)
     
@@ -429,7 +429,7 @@ const coreTable = (
   />   
 )
 
-const components = totalTestRunsByUser === 0 ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
+const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
     title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}

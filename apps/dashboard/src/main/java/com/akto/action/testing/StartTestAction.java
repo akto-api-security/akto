@@ -712,11 +712,11 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private int testRunsByUser;
+    private boolean testRunsByUser;
 
-    private int getUserTestingRuns(){
+    private boolean getUserTestingRuns(){
         Bson filter = Filters.ne(TestingRun.NAME, "Onboarding demo test");
-        return (int) TestingRunDao.instance.getMCollection().countDocuments(filter);
+        return TestingRunDao.instance.getMCollection().find(filter).limit(1).first() != null;
     }
 
     public String getUsageTestRuns(){
@@ -1019,7 +1019,7 @@ public class StartTestAction extends UserAction {
         this.latestSummaryIds = latestSummaryIds;
     }
 
-    public int getTestRunsByUser() {
+    public boolean getTestRunsByUser() {
         return testRunsByUser;
     }
 

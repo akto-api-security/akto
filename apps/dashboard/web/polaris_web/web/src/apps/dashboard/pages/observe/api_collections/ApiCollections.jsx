@@ -108,7 +108,7 @@ function ApiCollections() {
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
-    const [endpointsOfUser, setEndpointsOfUser] = useState(0)
+    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
     
     
     const tableTabs = [
@@ -174,8 +174,8 @@ function ApiCollections() {
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let userEndpoints = results[3].status === 'fulfilled' ? results[3].value : 0;
-        setEndpointsOfUser(userEndpoints)
+        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : 0;
+        setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
@@ -286,7 +286,7 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (endpointsOfUser === 0 ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     return(
         <PageWithMultipleCards
