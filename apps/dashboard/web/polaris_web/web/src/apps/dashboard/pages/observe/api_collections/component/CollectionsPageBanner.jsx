@@ -36,7 +36,7 @@ function CollectionsPageBanner() {
         <BannerLayout 
             title={"Upload your traffic to get started"}
             text={"Akto Discovers API inventory by connecting to your source of traffic. Connect a traffic connector to get started."}
-            buttonText={"Go to quickstart"}
+            buttonText={"Go to Quickstart"}
             buttonUrl={"/dashboard/quick-start"}
             bodyComponent={iconComponent}
             videoLength={COLLECTIONS_VIDEO_LENGTH}
