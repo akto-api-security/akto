@@ -21,10 +21,11 @@ public class FilterActionRequest {
     private Boolean keyValOperandSeen;
     private String bodyOperand;
     private String contextProperty;
+    private String collectionProperty;
 
     public FilterActionRequest(Object querySet, RawApi rawApi, RawApi testRunRawApi, ApiInfo.ApiInfoKey apiInfoKey,
             String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, List<BasicDBObject> contextEntities,
-            String operand, String context, Boolean keyValOperandSeen, String bodyOperand, String contextProperty) {
+            String operand, String context, Boolean keyValOperandSeen, String bodyOperand, String contextProperty, String collectionProperty) {
         this.querySet = querySet;
         this.rawApi = rawApi;
         this.testRunRawApi = testRunRawApi;
@@ -38,6 +39,7 @@ public class FilterActionRequest {
         this.keyValOperandSeen = keyValOperandSeen;
         this.bodyOperand = bodyOperand;
         this.contextProperty = contextProperty;
+        this.collectionProperty = collectionProperty;
     }
 
     public FilterActionRequest() { }
@@ -160,6 +162,14 @@ public class FilterActionRequest {
 
     public void setContextProperty(String contextProperty) {
         this.contextProperty = contextProperty;
+    }
+
+    public String getCollectionProperty() {
+        return collectionProperty;
+    }
+
+    public void setCollectionProperty(String collectionProperty) {
+        this.collectionProperty = collectionProperty;
     }
 
 }
