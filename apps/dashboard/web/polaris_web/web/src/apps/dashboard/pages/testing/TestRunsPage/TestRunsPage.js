@@ -9,12 +9,15 @@ import {
   ChevronUpMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
 import ChartypeComponent from "./ChartypeComponent";
 import { CellType } from "../../../components/tables/rows/GithubRow";
+import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
+import {produce} from "immer"
+import values from "@/util/values";
 
 /*
   {
@@ -95,8 +98,6 @@ function disambiguateLabel(key, value) {
   switch (key) {
     case 'severity':
       return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
-    case "dateRange":
-      return value.since.toDateString() + " - " + value.until.toDateString();
     default:
       return value;
   }
@@ -179,17 +180,21 @@ function getActions(item){
   return arr
 }
 
-const now = func.timeNow()
+const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+const getTimeEpoch = (key) => {
+    return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+}
+
+const startTimestamp = getTimeEpoch("since")
+const endTimestamp = getTimeEpoch("until")
+
 
 const [loading, setLoading] = useState(true);
 const [currentTab, setCurrentTab] = useState("oneTime");
 const [updateTable, setUpdateTable] = useState(false);
 const [countMap, setCountMap] = useState({});
 const [selected, setSelected] = useState(1);
-const [timeStamp, setTimestamp] = useState({
-  startTimestamp: now - func.recencyPeriod,
-  endTimestamp: now
-})
+
 const [severityCountMap, setSeverityCountMap] = useState({
   HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
   MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
@@ -226,22 +231,13 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     setLoading(true);
     let ret = [];
     let total = 0;
-    let dateRange = filters['dateRange'] || false;
-    delete filters['dateRange']
-    let startTimestamp = 0;
-    let endTimestamp = func.timeNow()
-    if (dateRange) {
-      startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
-      endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000);
-      setTimestamp({startTimestamp: startTimestamp, endTimestamp: endTimestamp})
-      filters.endTimestamp = [startTimestamp, endTimestamp]
-    }
+    
 
     switch (currentTab) {
 
       case "cicd":
         await api.fetchTestingDetails(
-          0, 0, true, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -249,7 +245,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          0, 0, false, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING"
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -257,7 +253,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "oneTime":
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME"
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -265,7 +261,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       default:
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, true, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -289,13 +285,13 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   }
 
   const fetchCountsMap = async() => {
-    await api.getCountsMap().then((resp)=>{
+    await api.getCountsMap(startTimestamp, endTimestamp).then((resp)=>{
       setCountMap(resp)
     })
   }
 
   const fetchSummaryInfo = async()=>{
-    await api.getSummaryInfo(timeStamp.startTimestamp, timeStamp.endTimestamp).then((resp)=>{
+    await api.getSummaryInfo(startTimestamp, endTimestamp).then((resp)=>{
       const severityObj = transform.convertSubIntoSubcategory(resp)
       setSubCategoryInfo(severityObj.subCategoryMap)
       const severityMap = severityObj.countMap;
@@ -341,7 +337,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   useEffect(()=>{
     fetchCountsMap()
     fetchSummaryInfo()
-  },[timeStamp])
+  },[currDateRange])
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -389,17 +385,17 @@ const SummaryCardComponent = () =>{
     },
   ]};
 
+  const key = currentTab + startTimestamp + endTimestamp + updateTable;
+
 const coreTable = (
 <GithubServerTable
-    key={currentTab + updateTable}
+    key={key}
     pageLimit={50}
     fetchData={fetchTableData}
     sortOptions={sortOptions} 
     resourceName={resourceName} 
     filters={filters}
     hideQueryField={true}
-    calenderFilter={true}
-    calenderLabel={"Last run"}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
     getActions = {getActions}
@@ -421,9 +417,10 @@ const coreTable = (
 const components = [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
-    title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
-    isFirstPage={true}
-    components={components}
+      title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
+      isFirstPage={true}
+      components={components}
+      primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
     />
   );
 }
