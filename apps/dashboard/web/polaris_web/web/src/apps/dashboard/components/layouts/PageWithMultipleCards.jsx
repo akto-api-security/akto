@@ -1,8 +1,7 @@
-import { ActionList, Box, Button, HorizontalStack, Icon, Page, Popover, Text, VerticalStack } from "@shopify/polaris";
+import {  HorizontalStack,  Page, VerticalStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
-import { useState } from "react";
-import { PlayMinor, NoteMinor } from "@shopify/polaris-icons"
+import LearnPopoverComponent from "./LearnPopoverComponent";
 
 const PageWithMultipleCards = (props) => {
 
@@ -11,7 +10,6 @@ const PageWithMultipleCards = (props) => {
     const location = useLocation();
     const navigate = useNavigate()
     const isNewTab = location.key==='default' || !(window.history.state && window.history.state.idx > 0)
-    const [popoverActive, setPopoverActive] = useState(false)
 
     const navigateBack = () => {
         navigate(-1)
@@ -39,47 +37,10 @@ const PageWithMultipleCards = (props) => {
     }
 
     const learnMoreObj = learnMoreObject.hasOwnProperty(transformString(location.pathname)) ? learnMoreObject[transformString(location.pathname)] : null
-    if(learnMoreObj){
-        if (learnMoreObj?.docsLink !== undefined) {
-            learnMoreObj.docsLink.forEach((doc) => {
-                doc.prefix = <Box><Icon source={NoteMinor} /></Box>;
-                doc.onAction = () => window.open(doc.value, "_blank")
-            });
-        }
-
-        if (learnMoreObj?.videoLink !== undefined) {
-            learnMoreObj.videoLink.forEach((doc) => {
-                doc.prefix = <Box><Icon source={PlayMinor} /></Box>;
-                doc.onAction = () => window.open(doc.value, "_blank")
-            });
-        }
-    }
 
     const learnMoreComp = (
         learnMoreObj ?
-        <Popover
-            active={popoverActive}
-            activator={(
-                <Button onClick={() => setPopoverActive(true)} disclosure>
-                    Learn
-                </Button>
-            )}
-            autofocusTarget="first-node"
-            onClose={() => { setPopoverActive(false) }}
-        >
-            <Box width="230px" padding={4} paddingBlockEnd={"0"}>
-                <VerticalStack gap={1}>
-                    <Text>
-                        {learnMoreObj?.title}
-                    </Text>
-                    <Text color="subdued">
-                        {learnMoreObj?.description}
-                    </Text>
-                </VerticalStack>
-            </Box>
-            <ActionList items={[...learnMoreObj?.docsLink, ...learnMoreObj?.videoLink]} />
-            
-        </Popover> : null
+        <LearnPopoverComponent learnMoreObj={learnMoreObj} /> : null
     )
 
     const useSecondaryActions = (

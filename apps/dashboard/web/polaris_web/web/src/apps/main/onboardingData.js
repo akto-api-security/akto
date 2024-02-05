@@ -38,23 +38,23 @@ const learnMoreObject = {
             {
                 content:"What is an API Collection?",
                 value:"https://docs.akto.io/api-inventory/concepts/api-collection#what-is-an-api-collection"
-            }
-             {
+            },
+            {
                 content:"How to connect API traffic source",
                 value:"https://docs.akto.io/traffic-connections/traffic-data-sources"
-            }
+            },
             {
                 content:"How to export an API Collection to Postman",
                 value:"https://docs.akto.io/api-inventory/how-to/export-an-api-collection-to-postman"
-            }
+            },
             {
                 content:"How to export an API Collection to Burp",
                 value:"https://docs.akto.io/api-inventory/how-to/export-an-api-collection-to-burp"
-            }
+            },
             {
                 content:"How to create Swagger File using Akto",
                 value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
-            }
+            },
             {
                 content:"How to delete an API Collection",
                 value:"https://docs.akto.io/api-inventory/how-to/delete-an-api-collection"
@@ -74,23 +74,23 @@ const learnMoreObject = {
             {
                 content:"What is an API endpoint",
                 value:"https://docs.akto.io/api-inventory/concepts/api-endpoints#what-is-an-api-endpoint"
-            }
+            },
             {
                 content:"Meta Properties of API Endpoint",
                 value:"https://docs.akto.io/api-inventory/concepts/meta-properties-of-api-endpoint"
-            }
+            },
             {
                 content:"How to copy API Endpoints Data",
                 value:"https://docs.akto.io/api-inventory/how-to/copy-api-endpoints-data"
-            }
+            },
             {
                 content:"How to export an API Collection to Postman",
                 value:"https://docs.akto.io/api-inventory/how-to/export-an-api-collection-to-postman"
-            }
+            },
             {
                 content:"How to export an API Collection to Burp",
                 value:"https://docs.akto.io/api-inventory/how-to/export-an-api-collection-to-burp"
-            }
+            },
             {
                 content:"How to create Swagger File using Akto",
                 value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
@@ -110,7 +110,7 @@ const learnMoreObject = {
             {
                 content:"Know API changes",
                 value:"https://docs.akto.io/api-inventory/concepts/api-changes"
-            }
+            },
             {
                 content:"How to configure alerts on API changes",
                 value:"https://docs.akto.io/api-inventory/how-to/configure-alerts-on-api-changes"
@@ -130,19 +130,19 @@ const learnMoreObject = {
             {
                 content:"What is Sensitive Parameter?",
                 value:"https://docs.akto.io/api-inventory/concepts/sensitive-data#what-is-sensitive-parameter"
-            }
+            },
             {
                 content:"What is Data Type",
                 value:"https://docs.akto.io/api-inventory/concepts/data-types#what-is-data-type"
-            }
+            },
             {
                 content:"How to create a Custom Data Type",
                 value:"https://docs.akto.io/api-inventory/how-to/create-a-custom-data-type"
-            }
+            },
             {
                 content:"How to set sensitivity of a Data Type",
                 value:"https://docs.akto.io/api-inventory/how-to/set-sensitivity-of-a-data-type"
-            }
+            },
             {
                 content:"How to De-activate a data type",
                 value:"https://docs.akto.io/api-inventory/how-to/de-activate-a-data-type"
@@ -162,11 +162,11 @@ const learnMoreObject = {
             {
                 content:"Run your first test",
                 value:"https://docs.akto.io/testing/run-test"
-            }
+            },
             {
                 content:"How to run tests in CLI using Akto",
                 value:"https://docs.akto.io/testing/run-tests-in-cli-using-akto"
-            }
+            },
             {
                 content:"How to run tests in CI/CD",
                 value:"https://docs.akto.io/testing/run-tests-in-cicd"
@@ -356,7 +356,7 @@ const learnMoreObject = {
             {
                 content:"What is Webhook Alert?",
                 value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
-            }
+            },
             {
                 content:"How to configure alerts on API changes",
                 value:"https://docs.akto.io/api-inventory/how-to/configure-alerts-on-api-changes"
@@ -444,11 +444,11 @@ const learnMoreObject = {
             {
                 content:"How to contribute to test library",
                 value:"https://docs.akto.io/test-editor/test-library#how-to-contribute-to-test-library"
-            }
+            },
             {
                 content:"How to edit built in test",
                 value:"https://docs.akto.io/test-editor/writing-custom-tests"
-            }
+            },
             {
                 content:"Test YAML Syntax",
                 value:"https://docs.akto.io/test-editor/test-yaml-syntax-one-pager"
@@ -468,15 +468,15 @@ const learnMoreObject = {
             {
                 content:"What is test editor",
                 value:"https://docs.akto.io/test-editor/overview"
-            }
+            },
             {
                 content:"How to edit built in test",
                 value:"https://docs.akto.io/test-editor/writing-custom-tests"
-            }
+            },
             {
                 content:"Test YAML Syntax",
                 value:"https://docs.akto.io/test-editor/test-yaml-syntax-one-pager"
-            }
+            },
             {
                 content:"How to write Custom Tests",
                 value:"https://docs.akto.io/test-editor/writing-custom-tests"

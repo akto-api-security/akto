@@ -24,6 +24,7 @@ import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
+import TestrunsBannerComponent from "../../testing/TestRunsPage/TestrunsBannerComponent"
 
 const headings = [
     {
@@ -112,6 +113,7 @@ function ApiEndpoints() {
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
+    const [runTests, setRunTests ] = useState(false)
 
     const [endpointData, setEndpointData] = useState([])
     const [selectedTab, setSelectedTab] = useState("All")
@@ -122,6 +124,7 @@ function ApiEndpoints() {
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
+    const coverageInfo = PersistStore(state => state.coverageMap)
 
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
@@ -407,6 +410,7 @@ function ApiEndpoints() {
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setExportOpen(false) }}
+                preferredAlignment="right"
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
@@ -464,12 +468,14 @@ function ApiEndpoints() {
                 </Popover.Pane>
             </Popover>
 
-            {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
+            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
                     
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                runTestFromOutside={runTests}
+                disabled={showEmptyScreen}
             />
         </HorizontalStack>
     )
@@ -538,6 +544,7 @@ function ApiEndpoints() {
                             learnText={"inventory"}
                             docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] :[
+                    (coverageInfo[apiCollectionId] === 0  || !(coverageInfo.hasOwnProperty(apiCollectionId))? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
                 <div className="apiEndpointsTable" key="table">
                       <GithubSimpleTable
                           key="table"
