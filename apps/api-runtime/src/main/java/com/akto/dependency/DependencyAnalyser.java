@@ -44,7 +44,7 @@ public class DependencyAnalyser {
     public void analyse(String message, int finalApiCollectionId) {
         HttpResponseParams responseParams;
 
-        // parsing the message again because we want actual data. For example urlParams are eleminated in runtime code
+        // parsing the message again because we want actual data. For example urlParams are eliminated in runtime code
         try {
             responseParams = HttpCallParser.parseKafkaMessage(message);
             responseParams.requestParams.setApiCollectionId(finalApiCollectionId);
@@ -95,20 +95,20 @@ public class DependencyAnalyser {
         Map<String, List<String>> responseHeaders = responseParams.getHeaders();
         for (String param: responseHeaders.keySet()) {
             List<String> values = responseHeaders.get(param);
-            if (param.equals("set-cookie")) {
+            if (param.equalsIgnoreCase("set-cookie")) {
                 Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
-                    paramSet.add(cookieKey);
                     if (!filterValues(cookieVal)) continue;
+                    paramSet.add(cookieKey);
                     valueStore.add(cookieVal);
                     urlValueStore.add(combinedUrl + "$" + cookieVal);
                     urlParamValueStore.add(combinedUrl + "$" + cookieKey + "$" + cookieVal);
                 }
             } else {
                 for (String val: values) {
-                    paramSet.add(param);
                     if (!filterValues(val) || param.startsWith(":") || HTTPHeadersExample.responseHeaders.contains(param)) continue;
+                    paramSet.add(param);
                     valueStore.add(val);
                     urlValueStore.add(combinedUrl + "$" + val);
                     urlParamValueStore.add(combinedUrl + "$" + param + "$" + val);

@@ -49,7 +49,10 @@ public class DependencyNodeDao extends AccountsContextDao<DependencyNode>{
         fieldNames = new String[]{
                 DependencyNode.API_COLLECTION_ID_RESP, DependencyNode.URL_RESP, DependencyNode.METHOD_RESP,
                 DependencyNode.API_COLLECTION_ID_REQ, DependencyNode.URL_REQ, DependencyNode.METHOD_REQ,
-                DependencyNode.ParamInfo.REQUEST_PARAM, DependencyNode.ParamInfo.RESPONSE_PARAM, DependencyNode.ParamInfo.IS_URL_PARAM
+                DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.REQUEST_PARAM,
+                DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.RESPONSE_PARAM,
+                DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_URL_PARAM,
+                DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_HEADER,
         };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 

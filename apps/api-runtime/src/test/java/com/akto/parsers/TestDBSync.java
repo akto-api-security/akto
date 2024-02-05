@@ -463,7 +463,9 @@ public class TestDBSync extends MongoBasedTest {
         ApiCollectionsDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "domain", 0, new HashSet<>(), null, 0));
         HttpResponseParams h1 = new HttpResponseParams();
+        h1.setSource(Source.HAR);
         h1.requestParams = new HttpRequestParams();
+        h1.requestParams.setApiCollectionId(0);
         h1.requestParams.setHeaders(new HashMap<>());
         h1.requestParams.getHeaders().put("host", Collections.singletonList("domain"));
         h1.statusCode = 200;
