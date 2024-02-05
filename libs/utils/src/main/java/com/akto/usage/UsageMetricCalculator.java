@@ -3,10 +3,7 @@ package com.akto.usage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -15,7 +12,6 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -29,6 +25,7 @@ import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
 import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -37,29 +34,10 @@ import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricCalculator.class);
-    public static List<Integer> getDemos() {
-        ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-
-        List<Integer> demos = new ArrayList<>();
-        demos.add(1111111111);
-
-        if (juiceShop != null) {
-            demos.add(juiceShop.getId());
-        }
-
-        return demos;
-    }
-
-    public static List<Integer> getDeactivated(){
-        List<ApiCollection> deactivated = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
-        List<Integer> deactivatedIds = deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
-
-        return deactivatedIds;
-    }
     
     public static Bson excludeDemosAndDeactivated(String key){
-        List<Integer> demos = getDemos();
-        List<Integer> deactivated = getDeactivated();
+        List<Integer> demos = UsageMetricCalculatorUtils.getDemoApiCollectionIds();
+        List<Integer> deactivated = UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds();
         deactivated.addAll(demos);
 
         return Filters.nin(key, deactivated);

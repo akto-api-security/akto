@@ -7,7 +7,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
@@ -25,6 +24,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.akto.util.Constants.ID;
-import static com.akto.util.enums.GlobalEnums.*;
 
 public class IssuesAction extends UserAction {
 
@@ -68,6 +67,9 @@ public class IssuesAction extends UserAction {
         if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
             filters = Filters.and(filters, Filters.in(SingleTypeInfo._COLLECTION_IDS, filterCollectionsId));
         }
+
+        Filters.and(filters , Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()));
+
         if (filterSeverity != null && !filterSeverity.isEmpty()) {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.KEY_SEVERITY, filterSeverity));
         }

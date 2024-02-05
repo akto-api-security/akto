@@ -6,7 +6,7 @@ import com.akto.action.TrafficAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.akto.util.DashboardMode;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
@@ -17,7 +17,7 @@ public class CollectionInterceptor extends AbstractInterceptor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class);
 
     boolean checkDeactivated(int apiCollectionId) {
-        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        List<Integer> deactivatedCollections = UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds();
         return deactivatedCollections.contains(apiCollectionId);
     }
 

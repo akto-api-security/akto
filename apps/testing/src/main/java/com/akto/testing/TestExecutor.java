@@ -35,7 +35,7 @@ import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
-import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -45,7 +45,6 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
@@ -605,7 +604,7 @@ public class TestExecutor {
         return true;
     }
 
-    List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+    List<Integer> deactivatedCollections = UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds();
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
