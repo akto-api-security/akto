@@ -16,7 +16,6 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
