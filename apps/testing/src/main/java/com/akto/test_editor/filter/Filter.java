@@ -49,15 +49,16 @@ public class Filter {
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
-            if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
+            if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
                 boolean resp = true;
+                boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());
                 if (node.getCollectionProperty().equalsIgnoreCase(TestEditorEnums.CollectionOperands.FOR_ONE.toString()) || node.getCollectionProperty().equalsIgnoreCase(TestEditorEnums.CollectionOperands.FOR_ALL.toString())) {
                     if (skipExtractExecution) {
                         return new DataOperandsFilterResponse(true, null, null, node);
                     }
                 }
                 if (filterActionRequest.getConcernedProperty() != null) {
-                    filterAction.extract(filterActionRequest, varMap);
+                    filterAction.extract(filterActionRequest, varMap, extractMultiple);
                 } else {
                     resp = filterAction.extractContextVar(filterActionRequest, varMap);
                 }
