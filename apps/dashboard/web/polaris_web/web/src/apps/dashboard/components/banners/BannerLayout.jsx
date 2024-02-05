@@ -2,9 +2,10 @@ import React from 'react'
 import { Box, Button, Card, Text, VerticalStack, VideoThumbnail } from "@shopify/polaris"
 import { useNavigate } from 'react-router-dom';
 
-function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoThumbnail, videoLink, videoLength, linkButton, containerComp, newTab}) {
+function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoThumbnail, videoLink, videoLength, linkButton, containerComp, newTab, onClick}) {
     const properties = linkButton ? {plain: true} : {primary: true}
     const navigate = useNavigate();
+    const handleRedirect = () =>{ newTab ? window.open(buttonUrl, "_blank") :navigate(buttonUrl)}
     return (
         <Card padding={"10"}>
             <VerticalStack gap={8}>
@@ -14,9 +15,9 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
                             <Text variant="headingLg">{title}</Text>
                             <Text color="subdued" variant="bodyMd">{text}</Text>
                             {bodyComponent}
-                            <Box paddingBlockStart={2}>
-                                <Button {...properties} onClick={() => newTab ? window.open(buttonUrl, "_blank") :navigate(buttonUrl)}>{buttonText}</Button>
-                            </Box>
+                            {buttonText ? <Box paddingBlockStart={2}>
+                                <Button {...properties} onClick={() => {handleRedirect(); onClick()}}>{buttonText}</Button>
+                            </Box> : null}
                         </VerticalStack>
                     </Box>
                     <Box width='340px'>

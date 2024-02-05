@@ -158,6 +158,8 @@ function ApiCollections() {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
+    const setCoverageMap = PersistStore(state => state.setCoverageMap)
+
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
@@ -174,6 +176,7 @@ function ApiCollections() {
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let userEndpoints = results[3].status === 'fulfilled' ? results[3].value : 0;
         setEndpointsOfUser(userEndpoints)
+        setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 

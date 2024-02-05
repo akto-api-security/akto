@@ -343,7 +343,7 @@ function IssuesPage(){
                     getStatus={func.getTestResultStatus}
                 />
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
             />
     )
 }
