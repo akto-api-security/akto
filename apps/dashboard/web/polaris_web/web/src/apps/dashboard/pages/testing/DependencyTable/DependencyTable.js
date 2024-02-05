@@ -27,8 +27,8 @@ const headers = [
         type: CellType.TEXT,
     },
     {
-        value: "missingParameters",
-        title: 'Missing parameters',
+        value: "dependentParameters",
+        title: 'Dependent parameters',
         type: CellType.TEXT,
     },
     {
@@ -164,7 +164,7 @@ function DependencyTable() {
                 "url": node["method"] + " " + node["url"],
                 "level": node["maxDepth"],
                 "totalParameters": totalParams,
-                "missingParameters": totalParams - Object.keys(connections).length,
+                "dependentParameters": Object.keys(connections).length,
                 "urls": data,
                 "collapsibleRow": <TableExpand data={data} childApiCollectionId={node["apiCollectionId"]} childUrl={node["url"]} childMethod={node["method"]} showEditModal={showEditModal}/>
             })
