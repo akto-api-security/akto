@@ -1,26 +1,28 @@
 package com.akto.dto.dependency_flow;
 
-
-public class Edge {
+public class ReverseEdge {
     private String apiCollectionId;
     private String url;
     private String method;
     private String param;
-    private boolean isHeader;
-    private int count;
-    private int depth;
 
-    public Edge() {
+    private int count;
+
+    private boolean isUrlParam;
+    private boolean isHeader;
+
+
+    public ReverseEdge() {
     }
 
-    public Edge(String apiCollectionId, String url, String method, String param, boolean isHeader, int count, int depth) {
+    public ReverseEdge(String apiCollectionId, String url, String method, String param, int count, boolean isUrlParam, boolean isHeader) {
         this.apiCollectionId = apiCollectionId;
         this.url = url;
         this.method = method;
         this.param = param;
-        this.isHeader = isHeader;
         this.count = count;
-        this.depth = depth;
+        this.isUrlParam = isUrlParam;
+        this.isHeader = isHeader;
     }
 
     public String getApiCollectionId() {
@@ -63,12 +65,12 @@ public class Edge {
         this.count = count;
     }
 
-    public int getDepth() {
-        return depth;
+    public boolean isUrlParam() {
+        return isUrlParam;
     }
 
-    public void setDepth(int depth) {
-        this.depth = depth;
+    public void setIsUrlParam(boolean urlParam) {
+        isUrlParam = urlParam;
     }
 
     public boolean getIsHeader() {
