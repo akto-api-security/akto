@@ -269,12 +269,6 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         assertEquals(4, dependencyNode3New.getParamInfos().get(0).getCount());
     }
 
-    public static void main(String[] args) {
-        UUID uuid = UUID.randomUUID();
-        System.out.println(uuid);
-    }
-
-
     @Test
     public void testUrlParameter() {
         // initial node
