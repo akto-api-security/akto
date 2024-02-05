@@ -164,7 +164,7 @@ public class HttpCallParser {
         }
 
         for (HttpResponseParams responseParam: filteredResponseParams) {
-            dependencyAnalyser.analyse(responseParam);
+            dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
         }
 
         this.sync_count += filteredResponseParams.size();
