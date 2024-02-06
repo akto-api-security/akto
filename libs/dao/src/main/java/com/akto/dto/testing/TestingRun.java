@@ -18,10 +18,12 @@ public class TestingRun {
     public static final String _TESTING_ENDPOINTS = "testingEndpoints";
     private TestingEndpoints testingEndpoints;
     private int testIdConfig;
+    public static final String PERIOD_IN_SECONDS = "periodInSeconds";
     private int periodInSeconds;
     private int testRunTime;
     private int maxConcurrentRequests;
     private String triggeredBy;
+    public static final String TRIGGERED_BY = "triggeredBy";
 
     @BsonIgnore
     private String hexId;
@@ -30,6 +32,10 @@ public class TestingRun {
 
     public static final String NAME = "name";
     private String name;
+
+    public enum TestingRunType{
+        ONE_TIME, RECURRING, CI_CD
+    }
 
     public TestingRun() { }
 
