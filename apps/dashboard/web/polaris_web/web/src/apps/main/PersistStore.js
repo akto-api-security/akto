@@ -2,7 +2,6 @@ import {create} from "zustand"
 import {devtools, persist, createJSONStorage} from "zustand/middleware"
 
 const initialState = {
-    leftNavSelected: '',
     quickstartTasksCompleted: 0,
     subCategoryMap: {},
     subCategoryFromSourceConfigMap: {},
@@ -27,7 +26,6 @@ const initialState = {
 let persistStore = (set) => ({
     ...initialState,
     accessToken: null,
-    setLeftNavSelected: (selected) => set({ leftNavSelected: selected }),
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
     setQuickstartTasksCompleted: (quickstartTasksCompleted) => set({ quickstartTasksCompleted }),
     setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
