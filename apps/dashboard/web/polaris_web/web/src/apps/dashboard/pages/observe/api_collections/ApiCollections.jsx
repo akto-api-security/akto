@@ -159,6 +159,7 @@ function ApiCollections() {
         setActive(true)
     }
 
+    const allCollections = PersistStore(state => state.allCollections)
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
@@ -224,19 +225,34 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
-    const promotedBulkActions = (selectedResources) => [
-        {
-            content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-            onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-        },
-    ];
+    const promotedBulkActions = (selectedResources) => {
+        let actions = [
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            }
+        ];
 
-    const bulkActions = (selectedResources) => [
-        {
-            content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
-            onAction: () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deleted")
-        },
-    ];
+        const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
+        const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        if (selectedResources.every(v => { return activated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deleted")
+                }
+            )
+        } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
+                }
+            )
+        }
+
+        return actions;
+    }
 
     const modalComponent = <CreateNewCollectionModal
         key="modal"
@@ -282,7 +298,6 @@ function ApiCollections() {
             headers={headers}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
-            bulkActions={bulkActions}
             mode={IndexFiltersMode.Default}
             headings={headers}
             useNewRow={true}
