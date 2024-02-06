@@ -68,8 +68,8 @@ function HomeDashboard() {
         let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
         let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
         let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
-        let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : 0 ;
-        setShowBannerComponent(userEndpoints === 0)
+        let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : true ;
+        setShowBannerComponent(!userEndpoints)
 
         setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
         setCoverageObj(coverageInfo)
