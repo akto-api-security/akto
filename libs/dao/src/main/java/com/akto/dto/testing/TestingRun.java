@@ -30,6 +30,7 @@ public class TestingRun {
     @BsonIgnore
     private TestingRunConfig testingRunConfig;
 
+    public static final String NAME = "name";
     private String name;
 
     public enum TestingRunType{

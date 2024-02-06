@@ -18,6 +18,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import {produce} from "immer"
 import values from "@/util/values";
+import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 
 /*
   {
@@ -123,7 +124,6 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
-  
 
 const getActionsList = (hexId) => {
   return [
@@ -202,6 +202,7 @@ const [severityCountMap, setSeverityCountMap] = useState({
 })
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
+const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -334,7 +335,17 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     },
   ]
 
+  const fetchTotalCount = () =>{
+    setLoading(true)
+    api.getUserTestRuns().then((resp)=> {
+      setHasUserInitiatedTestRuns(resp)
+    })
+    setLoading(false)
+    
+  }
+
   useEffect(()=>{
+    fetchTotalCount()
     fetchCountsMap()
     fetchSummaryInfo()
   },[currDateRange])
@@ -414,7 +425,7 @@ const coreTable = (
   />   
 )
 
-const components = [<SummaryCardComponent key={"summary"}/>, coreTable]
+const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
       title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}

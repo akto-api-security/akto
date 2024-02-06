@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside }) {
 
     const initialState = {
         categories: [],
@@ -34,7 +34,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     })
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
-    const [active, setActive] = useState(false);
+    const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
 
@@ -104,7 +104,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     useEffect(() => {
         fetchData()
-    }, [apiCollectionName])
+        if(runTestFromOutside === true){
+            setActive(true)
+        }
+    }, [apiCollectionName,runTestFromOutside])
 
     const toggleRunTest = () => setActive(prev => !prev)
 

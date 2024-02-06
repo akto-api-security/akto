@@ -14,6 +14,8 @@ import PersistStore from "../../../main/PersistStore"
 import testEditorRequests from "./api"
 
 import convertFunc from "./transform"
+import { learnMoreObject } from "../../../main/onboardingData"
+import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -68,6 +70,8 @@ const TestEditor = () => {
         console.log("add test")
     }
 
+    const learnMoreObjEditor = learnMoreObject['dashboard_test_editor']
+
     const headerComp = (
         <div className="header-css">
             <HorizontalStack gap="5">
@@ -78,12 +82,17 @@ const TestEditor = () => {
                 </HorizontalStack>
             </HorizontalStack>
 
-            {/* <Button onClick={addCustomTest}>Create custom test</Button> */}
+            <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
         </div>
     )
+    
+
     const headerEditor = (
         <TopBar secondaryMenu={headerComp} />
     )
+
+   
+
 
     const defaultId = "REMOVE_TOKENS";
 

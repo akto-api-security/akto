@@ -13,6 +13,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import CollectionsPageBanner from "./component/CollectionsPageBanner"
 
 const headers = [
     {
@@ -107,6 +108,7 @@ function ApiCollections() {
     const [selectedTab, setSelectedTab] = useState("All")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
+    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
     
     
     const tableTabs = [
@@ -156,12 +158,15 @@ function ApiCollections() {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
+    const setCoverageMap = PersistStore(state => state.setCoverageMap)
+
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
-            api.getLastTrafficSeen()
+            api.getLastTrafficSeen(),
+            api.getUserEndpoints(),
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -169,6 +174,9 @@ function ApiCollections() {
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
+        setHasUsageEndpoints(hasUserEndpoints)
+        setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
@@ -287,7 +295,7 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, tableComponent]
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     return(
         <PageWithMultipleCards
