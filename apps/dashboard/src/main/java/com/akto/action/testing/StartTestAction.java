@@ -713,6 +713,23 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private boolean testRunsByUser;
+
+    private boolean getUserTestingRuns(){
+        Bson filter = Filters.ne(TestingRun.NAME, "Onboarding demo test");
+        return TestingRunDao.instance.getMCollection().find(filter).limit(1).first() != null;
+    }
+
+    public String getUsageTestRuns(){
+        try {
+            this.testRunsByUser = getUserTestingRuns();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
+    }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1001,6 +1018,10 @@ public class StartTestAction extends UserAction {
 
     public void setLatestSummaryIds(List<String> latestSummaryIds) {
         this.latestSummaryIds = latestSummaryIds;
+    }
+
+    public boolean getTestRunsByUser() {
+        return testRunsByUser;
     }
 
 

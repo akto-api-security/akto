@@ -18,7 +18,7 @@ function DateRangeFilter(props){
         <Popover
         active={popoverActive}
         autofocusTarget="none"
-        preferredAlignment="left"
+        preferredAlignment="right"
         preferredPosition="below"
         fluidContent
         sectioned={false}
