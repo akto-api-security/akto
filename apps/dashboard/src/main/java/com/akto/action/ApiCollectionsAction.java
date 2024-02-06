@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
-import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
@@ -159,11 +158,6 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
-        deleteApiEndpointData(apiCollectionIds);
-        return SUCCESS.toUpperCase();
-    }
-
-    private static void deleteApiEndpointData(List<Integer> apiCollectionIds){
 
         Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
         Bson update = Updates.pullAll(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
@@ -198,6 +192,8 @@ public class ApiCollectionsAction extends UserAction {
             }
             ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
         }
+
+        return SUCCESS.toUpperCase();
     }
 
     public String addApisToCustomCollection(){
@@ -435,23 +431,6 @@ public class ApiCollectionsAction extends UserAction {
             addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String forceActivateCollections() {
-        this.apiCollections = filterDeactivatedCollections(this.apiCollections);
-        if (this.apiCollections.isEmpty()) {
-            return Action.SUCCESS.toUpperCase();
-        }
-        List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
-        ApiCollectionsDao.instance.updateMany(
-                Filters.and(
-                        Filters.in(Constants.ID, apiCollectionIds),
-                        Filters.eq(ApiCollection._DEACTIVATED, true)),
-                Updates.combine(
-                        Updates.unset(ApiCollection._DEACTIVATED),
-                        Updates.set(ApiCollection._URLS, new HashSet<>())));
-        deleteApiEndpointData(apiCollectionIds);
         return Action.SUCCESS.toUpperCase();
     }
 
