@@ -65,6 +65,12 @@ public class VariableResolver {
                     if (val == null) {
                         continue;
                     }
+                    if (val instanceof ArrayList){ 
+                        List<Object> valList = (List) val;
+                        if (valList.size() == 1) {
+                            val = valList.get(0);
+                        }
+                    }
                     if (!(val instanceof ArrayList)) {
                         for (int i = 0; i < expressionList.size(); i++) {
                             param = expressionList.get(i).toString();

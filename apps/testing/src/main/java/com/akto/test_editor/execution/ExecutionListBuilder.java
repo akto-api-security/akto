@@ -1,6 +1,5 @@
 package com.akto.test_editor.execution;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -31,29 +30,29 @@ public class ExecutionListBuilder {
             return new ExecutionOrderResp(error, true);
         }
 
-        if (reqNodes.getChildNodes().get(0).getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            try {
-                followRedirect = Boolean.valueOf(reqNodes.getChildNodes().get(0).getValues().toString());
-            } catch (Exception e) {
-            }
-        }
-
-        buildExecuteOrder(reqNodes.getChildNodes().get(0), executeOrder);
-        
+        followRedirect = buildExecuteOrder(reqNodes.getChildNodes().get(0), executeOrder);
         return new ExecutionOrderResp(error, followRedirect);
 
     }
 
 
-    public void buildExecuteOrder(ExecutorNode node, List<ExecutorNode> executionOrder) {
+    public boolean buildExecuteOrder(ExecutorNode node, List<ExecutorNode> executionOrder) {
 
         List<ExecutorNode> childNodes = node.getChildNodes();
 
+        if(node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
+            boolean redirect = true;
+            try {
+                redirect = Boolean.valueOf(node.getValues().toString());
+            } catch (Exception e) {
+            }
+            return redirect;
+        }
+
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString()) || 
             node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString()) || 
-            node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.TerminalNonExecutable.toString()) ||
-            node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
-                return;
+            node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.TerminalNonExecutable.toString())) {
+                return true;
         }
 
         if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString()) || 
@@ -61,10 +60,13 @@ public class ExecutionListBuilder {
             executionOrder.add(node);
         }
         ExecutorNode childNode;
+        boolean followRedirect = true;
         for (int i = 0; i < childNodes.size(); i++) {
             childNode = childNodes.get(i);
-            buildExecuteOrder(childNode, executionOrder);
+            boolean res = buildExecuteOrder(childNode, executionOrder);
+            followRedirect = followRedirect && res;
         }
+        return followRedirect;
     }
 
 }
