@@ -18,7 +18,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.client.model.Filters;
@@ -50,11 +50,10 @@ public class DeactivateCollections {
                 return;
             }
             int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
-            int measureEpoch = featureAccess.getMeasureEpoch();
 
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
-                overage = deactivateCollectionsForAccount(overage, measureEpoch);
+                overage = deactivateCollectionsForAccount(overage);
             }
         } catch (Exception e) {
             String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());
@@ -62,16 +61,15 @@ public class DeactivateCollections {
         }
     }
 
-    private static int deactivateCollectionsForAccount(int overage, int measureEpoch) {
+    private static int deactivateCollectionsForAccount(int overage) {
         
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
         apiCollectionsAction.fetchAllCollections();
         List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();
 
-        List<Integer> demoIds = UsageMetricCalculatorUtils.getDemoApiCollectionIds();
+        List<Integer> demoIds = UsageMetricCalculator.getDemos();
         apiCollections.removeIf(apiCollection -> demoIds.contains(apiCollection.getId()));
         apiCollections.removeIf(apiCollection -> apiCollection.isDeactivated());
-        apiCollections.removeIf(apiCollection -> ApiCollection.Type.API_GROUP.equals(apiCollection.getType()));
         
         Map<Integer, Integer> lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
 
@@ -94,16 +92,6 @@ public class DeactivateCollections {
             if (apiCollection.isDeactivated()) {
                 continue;
             }
-
-            /*
-             * Since we take only endpoints lastSeen/discovered after measureEpoch while
-             * calculating endpoints usage, 
-             * we should only deactivate the collections to which they belong.
-             */
-            if(lastTrafficSeenMap.getOrDefault(apiCollection.getId(), 0) <= measureEpoch){
-                continue;
-            }
-
             overage -= apiCollection.getUrlsCount();
             apiCollectionIds.add(apiCollection.getId());
         }

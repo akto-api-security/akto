@@ -10,10 +10,11 @@ import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
@@ -34,7 +35,6 @@ public class TrafficAction {
         List<TrafficInfo> trafficInfoList = TrafficInfoDao.instance.findAll(Filters.and(
             Filters.eq("_id.url", url),
             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-            Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()),
             Filters.eq("_id.responseCode", -1),
             Filters.eq("_id.method", method),
             Filters.gte("_id.bucketStartEpoch", startEpoch/3600/24/30),
@@ -60,7 +60,6 @@ public class TrafficAction {
         sampleDataList = SampleDataDao.instance.findAll(Filters.and(
             Filters.eq("_id.url", url),
             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-            Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()),
             Filters.eq("_id.responseCode", -1),
             Filters.eq("_id.method", method),
             Filters.gte("_id.bucketStartEpoch", 0),
@@ -71,10 +70,7 @@ public class TrafficAction {
     }
 
     public String fetchAllSampleData() {
-        sampleDataList = SampleDataDao.instance.findAll(Filters.and(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds())),
-                skip, limit == 0 ? 50 : limit, null);
+        sampleDataList = SampleDataDao.instance.findAll(Filters.eq(Constants.ID + "." + ApiInfoKey.API_COLLECTION_ID, apiCollectionId), skip, limit == 0 ? 50 : limit, null);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -84,7 +80,6 @@ public class TrafficAction {
                 Filters.and(
                         Filters.eq("_id.url", url),
                         Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                        Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()),
                         Filters.eq("_id.method", method)
                 )
         );

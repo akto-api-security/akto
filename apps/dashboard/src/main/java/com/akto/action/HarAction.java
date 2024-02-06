@@ -8,7 +8,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GzipUtils;
@@ -45,8 +45,8 @@ public class HarAction extends UserAction {
          * We need to allow the first time creation for demo collections 
          * thus calculating them before creation.
          */
-        List<Integer> demoCollections = UsageMetricCalculatorUtils.getDemoApiCollectionIds();
-        List<Integer> deactivatedCollections = UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds();
+        List<Integer> demoCollections = UsageMetricCalculator.getDemos();
+        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {

@@ -4,7 +4,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -14,6 +13,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class SampleDataDao extends AccountsContextDao<SampleData> {
@@ -69,8 +69,8 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,
                                                      String lastFetchedMethod, int limit, int sliceLimit) {
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
-        filters.add(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()));
+        filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollectionId)));
+
 
         if (lastFetchedUrl != null && lastFetchedMethod != null) {
             Bson f1 = Filters.gt("_id.url", lastFetchedUrl);
