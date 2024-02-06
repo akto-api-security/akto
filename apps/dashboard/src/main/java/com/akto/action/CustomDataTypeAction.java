@@ -46,8 +46,6 @@ public class CustomDataTypeAction extends UserAction{
     private String valueOperator;
     private List<ConditionFromUser> valueConditionFromUsers;
 
-    private String tokenOperator;
-    private List<ConditionFromUser> tokenConditionFromUsers;
     public static class ConditionFromUser {
         Predicate.Type type;
         Map<String, Object> valueMap;
@@ -488,14 +486,8 @@ public class CustomDataTypeAction extends UserAction{
             throw new AktoCustomException(e.getMessage());
         }
 
-        Conditions tokenConditions = null;
-        try {
-            tokenConditions = getValidConditionsFromUserConditions(tokenConditionFromUsers, tokenOperator, "urlToken");
-        } catch (Exception e) {
-            throw new AktoCustomException(e.getMessage());
-        }
 
-        if (isInvalidCondition(keyConditions) && isInvalidCondition(valueConditions) && isInvalidCondition(tokenConditions))  {
+        if (isInvalidCondition(keyConditions) && isInvalidCondition(valueConditions)){
 
             throw new AktoCustomException("All key, value and token conditions can't be empty");
         }
@@ -517,7 +509,6 @@ public class CustomDataTypeAction extends UserAction{
         IgnoreData ignoreData = new IgnoreData();
         CustomDataType customDataType = new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
                 true,keyConditions,valueConditions, mainOperator,ignoreData);
-        customDataType.setTokenConditions(tokenConditions);
         return customDataType;
     }
 
@@ -742,21 +733,5 @@ public class CustomDataTypeAction extends UserAction{
 
     public void setSensitivePosition(List<String> sensitivePosition) {
         this.sensitivePosition = sensitivePosition;
-    }
-
-    public List<ConditionFromUser> getTokenConditionFromUsers() {
-        return tokenConditionFromUsers;
-    }
-
-    public void setTokenConditionFromUsers(List<ConditionFromUser> tokenConditionFromUsers) {
-        this.tokenConditionFromUsers = tokenConditionFromUsers;
-    }
-
-    public String getTokenOperator() {
-        return tokenOperator;
-    }
-
-    public void setTokenOperator(String tokenOperator) {
-        this.tokenOperator = tokenOperator;
     }
 }
