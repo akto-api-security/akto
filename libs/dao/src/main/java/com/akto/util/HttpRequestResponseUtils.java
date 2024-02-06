@@ -3,9 +3,12 @@ package com.akto.util;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
+import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
@@ -18,6 +21,18 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+
+    public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
+        if (body == null) return new HashMap<>();
+        if (body.startsWith("[")) body = "{\"json\": "+body+"}";
+        BasicDBObject respPayloadObj;
+        try {
+            respPayloadObj = BasicDBObject.parse(body);
+        } catch (Exception e) {
+            respPayloadObj = BasicDBObject.parse("{}");
+        }
+        return JSONUtils.flatten(respPayloadObj);
+    }
 
     public static String rawToJsonString(String rawRequest, Map<String,List<String>> requestHeaders) {
         if (rawRequest == null) return null;
@@ -50,6 +65,7 @@ public class HttpRequestResponseUtils {
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
         List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
         List<String> contentTypeValues;
+        if (headers == null) return null;
         for (String k: headers.keySet()) {
             if (k.equalsIgnoreCase("content-type")) {
                 contentTypeValues = headers.get(k);
@@ -88,5 +104,41 @@ public class HttpRequestResponseUtils {
         }
     }
 
+    public static String jsonToFormUrlEncoded(String requestPayload) {
+        JSONObject jsonObject = new JSONObject(requestPayload);
+
+        StringBuilder formUrlEncoded = new StringBuilder();
+
+        // Iterate over the keys in the JSON object
+        for (String key : jsonObject.keySet()) {
+            // Encode the key and value, and append them to the string builder
+            try {
+                formUrlEncoded.append(encode(key))
+                        .append("=")
+                        .append(encode(jsonObject.getString(key)))
+                        .append("&");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Remove the last "&"
+        if (formUrlEncoded.length() > 0) {
+            formUrlEncoded.setLength(formUrlEncoded.length() - 1);
+        }
+
+        return formUrlEncoded.toString();
+    }
+    public static String encode(String s) throws UnsupportedEncodingException {
+        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name())
+                .replaceAll("\\+", "%20")
+                .replaceAll("\\%21", "!")
+                .replaceAll("\\%27", "'")
+                .replaceAll("\\%28", "(")
+                .replaceAll("\\%29", ")")
+                .replaceAll("\\%7E", "~")
+                .replaceAll("\\%5B", "[")
+                .replaceAll("\\%5D", "]");
+    }
 
 }

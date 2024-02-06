@@ -38,6 +38,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return (ret != null && ret.size() > 0) ? ret.get(0) : null;
     }
 
+    public List<ApiCollection> getMetaForIds(List<Integer> apiCollectionIds) {
+        return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds), Projections.exclude("urls"));
+    }
+
     public List<ApiCollection> getMetaAll() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls"));
     }
