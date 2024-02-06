@@ -157,7 +157,9 @@ public class ProfileAction extends UserAction {
 
                 organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
                 gracePeriod = organization.getGracePeriod();
-                featureWiseAllowed = organization.getFeatureWiseAllowed();
+                if (organization.getFeatureWiseAllowed() != null) {
+                    featureWiseAllowed = organization.getFeatureWiseAllowed();
+                }
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
