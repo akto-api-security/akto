@@ -174,7 +174,7 @@ function ApiCollections() {
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : 0;
+        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
