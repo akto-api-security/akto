@@ -1334,7 +1334,7 @@ mapCollectionIdToHostName(apiCollections){
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
   transformString(inputString) {
-    let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '');
+    let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
     const segments = transformedString.split('/');
     for (let i = 0; i < segments.length; i++) {
         // Check if the segment is alphanumeric
