@@ -395,7 +395,9 @@ public final class FilterAction {
                 List<Object> listVal = new ArrayList<>();
                 for (String matchKey: filterActionRequest.getMatchingKeySet()) {
                     listVal.add(getValue(reqObj, null, matchKey));
-                    break;
+                    if (!extractMultiple) {
+                        break;
+                    }
                 }
                 val = listVal;
             }
@@ -732,69 +734,79 @@ public final class FilterAction {
     }
 
     public Object resolveQuerySetValues(FilterActionRequest filterActionRequest, Object querySet, Map<String, Object> varMap) {
-        Object obj = null;
         List<Object> listVal = new ArrayList<>();
+        List<Object> updatedValues = new ArrayList<>();
+        Object returnVal = new ArrayList<>();
         try {
             listVal = (List) querySet;
-            int index = 0;
             for (Object objVal: listVal) {
-                if (!(objVal instanceof String)) {
-                    continue;
-                }
-
-                if (varMap.containsKey(objVal)) {
-                    obj = varMap.get(objVal);
-                    listVal.set(index, obj);
-                    index++;
-                    continue;
-                }
-                Object contextVal = VariableResolver.resolveContextVariable(varMap, objVal.toString());
-                if (contextVal instanceof  List) {
-                    List<String> contextList = (List<String>) contextVal;
-                    if (contextList != null && contextList.size() > 0) {
-                        listVal.set(index, contextList.get(0));
-                        index++;
-                        continue;
+                returnVal = resolveVar(filterActionRequest, querySet, varMap, objVal);
+                if (returnVal instanceof ArrayList) {
+                    List<Object> returnValList = (List) returnVal;
+                    for (Object obj: returnValList) {
+                        updatedValues.add(obj);
                     }
-                }
-
-                String val = (String) objVal;
-                Boolean matches = Utils.checkIfContainsMatch(val, "\\$\\{[^}]*\\}");
-                if (matches) {
-                    String origVal = val;
-                    val = val.substring(2, val.length());
-                    val = val.substring(0, val.length() - 1);
-
-                    if (varMap.containsKey(val)) {
-                        obj = varMap.get(val);
-                        listVal.set(index, obj);
-                        index++;
-                        continue;
-                    }
-
-                    String[] params = val.split("\\.");
-                    String firstParam = params[0];
-                    String secondParam = null;
-                    if (params.length > 1) {
-                        secondParam = params[1];
-                    }
-                    if (isDynamicParamType(firstParam)) {
-                        obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
-                    } else {
-                        obj = VariableResolver.resolveExpression(varMap, origVal);
-                        if (obj instanceof ArrayList) {
-                            List<Object> objList = (List) obj;
-                            obj = objList.get(0);
-                        }
-                    }
-                    listVal.set(index, obj);
-                    index++;
+                } else {
+                    updatedValues.add(returnVal);
                 }
             }
         } catch (Exception e) {
             return null;
         }
-        return listVal;
+        return updatedValues;
+    }
+
+    public Object resolveVar(FilterActionRequest filterActionRequest, Object querySet, Map<String, Object> varMap, Object objVal) {
+        if (!(objVal instanceof String)) {
+            return objVal;
+        }
+        Object obj;
+
+        if (varMap.containsKey(objVal)) {
+            obj = varMap.get(objVal);
+            return obj;
+        }
+
+        if (VariableResolver.isWordListVariable(objVal, varMap)) {
+            obj = (List) VariableResolver.resolveWordListVar(objVal.toString(), varMap);
+            return obj;
+        }
+
+        Object contextVal = VariableResolver.resolveContextVariable(varMap, objVal.toString());
+        if (contextVal instanceof  List) {
+            List<String> contextList = (List<String>) contextVal;
+            if (contextList != null && contextList.size() > 0) {
+                return contextList;
+            }
+        }
+
+        String val = (String) objVal;
+        Boolean matches = Utils.checkIfContainsMatch(val, "\\$\\{[^}]*\\}");
+        if (matches) {
+            String origVal = val;
+            val = val.substring(2, val.length());
+            val = val.substring(0, val.length() - 1);
+
+            if (varMap.containsKey(val)) {
+                obj = varMap.get(val);
+                return obj;
+            }
+
+            String[] params = val.split("\\.");
+            String firstParam = params[0];
+            String secondParam = null;
+            if (params.length > 1) {
+                secondParam = params[1];
+            }
+            if (isDynamicParamType(firstParam)) {
+                obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                return obj;
+            } else {
+                obj = VariableResolver.resolveExpression(varMap, origVal);
+                return obj;
+            }
+        }
+        return objVal;
     }
 
     public boolean getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys, boolean doAllSatisfy) {

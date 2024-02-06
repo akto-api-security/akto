@@ -76,8 +76,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
         List<ExecutorNode> executorNodes = new ArrayList<>();
-        ExecutionOrderResp executionOrderResp = executionListBuilder.parseExecuteOperations(executorNode, executorNodes);
-        boolean followRedirect = executionOrderResp.getFollowRedirect();
+        boolean followRedirect = executionListBuilder.buildExecuteOrder(executorNode, executorNodes);
 
         ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();

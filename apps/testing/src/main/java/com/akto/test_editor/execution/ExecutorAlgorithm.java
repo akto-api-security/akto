@@ -151,6 +151,14 @@ public class ExecutorAlgorithm {
             return (List) keyContext;
         }
 
+        if (key instanceof String) {
+            keyContext = VariableResolver.resolveContextVariable(varMap, key.toString());
+        }
+
+        if (keyContext instanceof ArrayList) {
+            return (List) keyContext;
+        }
+
         if (VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
             return varList;
@@ -163,6 +171,16 @@ public class ExecutorAlgorithm {
                 return varList;
             } else if (key instanceof ArrayList) {
                 return (List) key;
+            }
+        } else {
+            List<Object> keyList = (List) key;
+            int index = 0;
+            for (Object k: keyList) {
+                List<Object> v = VariableResolver.resolveExpression(varMap, k.toString());
+                if (v != null && v.size() > 0) {
+                    keyList.set(index, v.get(0).toString());
+                }
+                index++;
             }
         }
 
