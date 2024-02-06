@@ -245,6 +245,13 @@ export default {
         })
     },
 
+    getUserTestRuns(){
+        return request({
+            url: '/api/fetchUsageTestRuns',
+            method: 'post',
+            data: {}
+        })
+    },
     invokeDependencyTable(apiCollectionIds){
         return request({
             url: '/api/invokeDependencyTable',
