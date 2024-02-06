@@ -20,7 +20,6 @@ function GithubSimpleTable(props) {
         loading={props.loading}
         selectable = {props.selectable}
         rowClickable={props.rowClickable}
-        bulkActions={props.bulkActions}
         promotedBulkActions = {props.promotedBulkActions}
         hideQueryField={props.hideQueryField}
         tabs={props.tabs}

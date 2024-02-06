@@ -25,14 +25,6 @@ const func = {
           message: message
       })
   },
-  showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
-    Store.getState().setConfirmationModalConfig({
-      modalContent: modalContent,
-      primaryActionContent: primaryActionContent,
-      primaryAction: primaryAction,
-      show: true
-    })
-  },
   formatJsonForEditor(data){
     let res = "";
     try{
