@@ -38,6 +38,7 @@
    --color-patch: #50e3c2 ;
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
+   --white: #ffffff;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;
@@ -87,4 +88,15 @@
 
 .beamer_defaultBeamerSelector {
     display: none !important;
+}
+
+.beamer_icon.active{
+    top: -8px !important;
+    left: 6px !important;
+    height: 17px !important;
+    width: 17px !important;
+}
+
+.Polaris-VideoThumbnail__Thumbnail{
+    border-radius: 8px !important;
 }

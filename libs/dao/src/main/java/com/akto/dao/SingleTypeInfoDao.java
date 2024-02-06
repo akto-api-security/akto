@@ -1,5 +1,7 @@
 package com.akto.dao;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 import javax.print.attribute.HashAttributeSet;
@@ -529,4 +531,37 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         return result;
     }
+
+    public Set<String> fetchHosts(List<Integer> apiCollectionIds) {
+        List<Bson> pipeline = new ArrayList<>();
+        Bson filter = Filters.and(
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, apiCollectionIds),
+                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                Filters.eq(SingleTypeInfo._IS_HEADER, true)
+        );
+
+        pipeline.add(Aggregates.match(filter));
+        pipeline.add(Aggregates.project(Projections.include(SingleTypeInfo._URL)));
+
+        BasicDBObject groupedId =  new BasicDBObject("url", "$"+SingleTypeInfo._URL);
+        pipeline.add(Aggregates.group(groupedId));
+
+
+        Set<String> hosts = new HashSet<>();
+        MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (stiCursor.hasNext()) {
+            BasicDBObject next = stiCursor.next();
+            BasicDBObject id = (BasicDBObject) next.get("_id");
+            String url = id.getString("url");
+            try {
+                URI uri = new URI(url);
+                String host = uri.getHost();
+                hosts.add(host);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+            }
+        }
+        return hosts;
+    }
+
 }

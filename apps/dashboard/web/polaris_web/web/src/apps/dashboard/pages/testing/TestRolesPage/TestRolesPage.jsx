@@ -9,6 +9,8 @@ import {
     ProfileMinor,
     CalendarMinor
   } from '@shopify/polaris-icons';
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
+import { ROLES_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 
 const headers = [
     {
@@ -39,6 +41,7 @@ function TestRolesPage(){
 
     const [testRoles, setTestRoles] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const navigate = useNavigate()
 
     const handleRedirect = () => {
@@ -67,6 +70,7 @@ function TestRolesPage(){
         
         async function fetchData(){
             await api.fetchTestRoles().then((res) => {
+                setShowEmptyScreen(res.testRoles.length === 0)
                 setTestRoles(res.testRoles.map((testRole) => {
                     testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
                     testRole.id=testRole.name;
@@ -84,15 +88,27 @@ function TestRolesPage(){
         primaryAction = {<Button primary onClick={handleRedirect}>Create new test role</Button>}
         isFirstPage={true}
         components={[
-            <GithubSimpleTable
-            key="table"
-            data={testRoles} 
-            resourceName={resourceName} 
-            headers={headers}
-            loading={loading}
-            getActions={getActions}
-            hasRowActions={true}
-            />
+            showEmptyScreen ? 
+                <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/file_check.svg"}
+                    headingText={"Define your Test Roles"}
+                    description={"No test role to show yet. Create one now to test for role specific vulnerabilities such as BOLA or privilege escalation."}
+                    buttonText={"Create test role"}
+                    redirectUrl={"/dashboard/testing/roles/details"}
+                    learnText={"Creating test roles"}
+                    docsUrl={ROLES_PAGE_DOCS_URL}
+                />
+
+            
+            :    <GithubSimpleTable
+                    key="table"
+                    data={testRoles} 
+                    resourceName={resourceName} 
+                    headers={headers}
+                    loading={loading}
+                    getActions={getActions}
+                    hasRowActions={true}
+                />
         ]}
         />
     )

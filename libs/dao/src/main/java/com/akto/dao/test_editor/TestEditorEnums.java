@@ -16,7 +16,8 @@ public class TestEditorEnums {
         NEQ,
         PARAM,
         CONTAINS_JWT,
-        COOKIE_EXPIRE_FILTER
+        COOKIE_EXPIRE_FILTER,
+        DATATYPE
     }
 
     public enum CollectionOperands {
@@ -54,7 +55,8 @@ public class TestEditorEnums {
     }
 
     public enum ExtractOperator {
-        EXTRACT
+        EXTRACT,
+        EXTRACTMULTIPLE
     }
 
     public enum OperandTypes {

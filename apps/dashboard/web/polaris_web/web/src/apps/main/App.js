@@ -288,7 +288,6 @@ const router = createBrowserRouter([
 function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
-  setAllRoutes(searchData)
   const { stigg } = useStiggContext();
   useEffect(() => {
     stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
@@ -308,6 +307,7 @@ function App() {
       }
       };
     `);
+    setAllRoutes(searchData)
     script.appendChild(scriptText);
     document.body.appendChild(script)
   }, [])

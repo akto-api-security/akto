@@ -566,5 +566,13 @@ public class Utils {
         url = "/" + url;
         return fetchActualUrl(uri, url);
     }
+    
+    public static boolean evaluateResult(String operation, boolean currentRes, boolean newVal) {
+
+        if (operation == "and") {
+            return currentRes && newVal;
+        }
+        return currentRes || newVal;
+    }
 
 }
