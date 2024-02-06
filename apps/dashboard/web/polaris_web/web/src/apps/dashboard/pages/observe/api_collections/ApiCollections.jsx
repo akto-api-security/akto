@@ -1,7 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
 import api from "../api"
-import { useEffect,useState, useCallback, useRef } from "react"
+import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -232,6 +232,15 @@ function ApiCollections() {
         fetchData={fetchData}
     />
 
+    let coverage = '0%';
+    if(summaryData.totalEndpoints !== 0){
+        if(summaryData.totalEndpoints < summaryData.totalTestedEndpoints){
+            coverage = '100%'
+        }else{
+            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+        }
+    }
+
       const summaryItems = [
         {
             title: "Total APIs",
@@ -243,7 +252,7 @@ function ApiCollections() {
         },
         {
             title: "Tested APIs (Coverage)",
-            data: Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+            data: coverage
         },
         {
             title: "Sensitive in response APIs",
