@@ -168,6 +168,7 @@ public class ApiCollectionsAction extends UserAction {
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        SensitiveSampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
