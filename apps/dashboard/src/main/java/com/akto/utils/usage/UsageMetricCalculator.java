@@ -43,7 +43,8 @@ public class UsageMetricCalculator {
 
         return Filters.nin(key, demos);
     }
-    public static int calculateActiveEndpoints(int measureEpoch) {
+    public static int calculateActiveEndpoints(UsageMetric usageMetric) {
+        int measureEpoch = usageMetric.getMeasureEpoch();
         int activeEndpoints = Utils.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
@@ -53,14 +54,15 @@ public class UsageMetricCalculator {
         return activeEndpoints;
     }
 
-    public static int calculateCustomTests(int measureEpoch) {
+    public static int calculateCustomTests(UsageMetric usageMetric) {
         int customTemplates = (int) YamlTemplateDao.instance.count(
             Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM)
         );
         return customTemplates;
     }
 
-    public static int calculateTestRuns(int measureEpoch) {
+    public static int calculateTestRuns(UsageMetric usageMetric) {
+        int measureEpoch = usageMetric.getMeasureEpoch();
         Bson demoCollFilter = excludeDemos(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
         int testRuns = (int) TestingRunResultDao.instance.count(
@@ -122,13 +124,13 @@ public class UsageMetricCalculator {
         if (metricType != null) {
             switch (metricType) {
                 case ACTIVE_ENDPOINTS:
-                    usage = calculateActiveEndpoints(usageMetric.getMeasureEpoch());
+                    usage = calculateActiveEndpoints(usageMetric);
                     break;
                 case CUSTOM_TESTS:
-                    usage = calculateCustomTests(usageMetric.getMeasureEpoch());
+                    usage = calculateCustomTests(usageMetric);
                     break;
                 case TEST_RUNS:
-                    usage = calculateTestRuns(usageMetric.getMeasureEpoch());
+                    usage = calculateTestRuns(usageMetric);
                     break;
                 case ACTIVE_ACCOUNTS:
                     usage = calculateActiveAccounts(usageMetric);
