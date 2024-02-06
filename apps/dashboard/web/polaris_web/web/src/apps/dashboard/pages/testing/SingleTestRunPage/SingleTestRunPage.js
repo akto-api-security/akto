@@ -185,7 +185,7 @@ function SingleTestRunPage() {
 
   async function fetchData(setData) {
     let localSelectedTestRun = {}
-    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest }) => {
+    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
       if(testingRun==undefined){
         return {};
       }
@@ -193,11 +193,7 @@ function SingleTestRunPage() {
       if(testingRun.testIdConfig == 1){
         setWorkflowTest(workflowTest);
       }
-      let cicd = false;
-      let res = await api.fetchTestingDetails(0,0,true,false,"",1,0,10,{endTimestamp: [testingRun.endTimestamp, testingRun.endTimestamp]});
-      if(res.testingRuns.map(x=>x.hexId).includes(testingRun.hexId)){
-        cicd = true;
-      }
+      let cicd = testingRunType === "CI_CD";
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
       if(localSelectedTestRun.orderPriority === 1){
         if(setData){

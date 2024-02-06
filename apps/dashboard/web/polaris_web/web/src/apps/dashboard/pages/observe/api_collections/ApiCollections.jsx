@@ -240,6 +240,15 @@ function ApiCollections() {
         fetchData={fetchData}
     />
 
+    let coverage = '0%';
+    if(summaryData.totalEndpoints !== 0){
+        if(summaryData.totalEndpoints < summaryData.totalTestedEndpoints){
+            coverage = '100%'
+        }else{
+            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+        }
+    }
+
       const summaryItems = [
         {
             title: "Total APIs",
@@ -251,7 +260,7 @@ function ApiCollections() {
         },
         {
             title: "Tested APIs (Coverage)",
-            data: Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+            data: coverage
         },
         {
             title: "Sensitive in response APIs",

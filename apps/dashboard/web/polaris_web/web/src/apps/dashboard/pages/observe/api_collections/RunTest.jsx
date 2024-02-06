@@ -121,7 +121,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             let obj = {
                 label: x.testName,
                 value: x.name,
-                icon: "$aktoWhite"
+                author: x.author
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -198,7 +198,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         testRows = testRun.tests[testRun.selectedCategory].map(test => {
-            const isCustom = test.label.includes("Custom") || test.value.includes("CUSTOM")
+            const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
                     <Text variant="bodyMd">{test.label}</Text>

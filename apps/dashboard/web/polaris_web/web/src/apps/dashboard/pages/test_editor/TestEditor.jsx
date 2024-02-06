@@ -24,7 +24,6 @@ const TestEditor = () => {
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
-    const setLeftNavSelected = PersistStore(state => state.setLeftNavSelected)
     const setActive = PersistStore(state => state.setActive)
 
     const [loading, setLoading] = useState(true)
@@ -32,7 +31,6 @@ const TestEditor = () => {
 
     const handleExit = () => {
         navigate("/dashboard/testing")
-        setLeftNavSelected("testing-results")
         setActive('active')
     }
 
