@@ -428,37 +428,6 @@ public class CustomDataTypeAction extends UserAction{
 
     }
 
-    private Conditions getValidConditionsFromUserConditions(List<ConditionFromUser> conditionFromUsers, String operator, String key) throws AktoCustomException {
-        if (conditionFromUsers != null && operator != null) {
-
-            Conditions.Operator kOperator;
-            try {
-                kOperator = Conditions.Operator.valueOf(operator);
-            } catch (Exception ignored) {
-                throw new AktoCustomException("Invalid " + key + " operator");
-            }
-
-            List<Predicate> predicates = new ArrayList<>();
-            for (ConditionFromUser conditionFromUser: conditionFromUsers) {
-                Predicate predicate = Predicate.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
-                if (predicate == null) {
-                    throw new AktoCustomException("Invalid " + key + " conditions");
-                } else {
-                    predicates.add(predicate);
-                }
-            }
-
-            if (predicates.size() > 0) {
-                return new Conditions(predicates, kOperator);
-            }
-        }
-        return null;
-    }
-
-    private static Boolean isInvalidCondition(Conditions conditions){
-        return (conditions == null || conditions.getPredicates() == null || conditions.getPredicates().size() == 0);
-    }
-
     public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
         if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
         int maxChars = 25;
@@ -473,23 +442,58 @@ public class CustomDataTypeAction extends UserAction{
 
 
         Conditions keyConditions = null;
-        try {
-            keyConditions = getValidConditionsFromUserConditions(keyConditionFromUsers, keyOperator , "key");
-        } catch (Exception e) {
-            throw new AktoCustomException(e.getMessage());
+        if (keyConditionFromUsers != null && keyOperator != null) {
+
+            Conditions.Operator kOperator;
+            try {
+                kOperator = Conditions.Operator.valueOf(keyOperator);
+            } catch (Exception ignored) {
+                throw new AktoCustomException("Invalid key operator");
+            }
+
+            List<Predicate> predicates = new ArrayList<>();
+            for (ConditionFromUser conditionFromUser: keyConditionFromUsers) {
+                Predicate predicate = Predicate.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
+                if (predicate == null) {
+                    throw new AktoCustomException("Invalid key conditions");
+                } else {
+                    predicates.add(predicate);
+                }
+            }
+
+            if (predicates.size() > 0) {
+                keyConditions = new Conditions(predicates, kOperator);
+            }
         }
 
         Conditions valueConditions  = null;
-        try {
-            valueConditions = getValidConditionsFromUserConditions(valueConditionFromUsers, valueOperator, "value");
-        } catch (Exception e) {
-            throw new AktoCustomException(e.getMessage());
+        if (valueConditionFromUsers != null && valueOperator != null) {
+            Conditions.Operator vOperator;
+            try {
+                vOperator = Conditions.Operator.valueOf(valueOperator);
+            } catch (Exception ignored) {
+                throw new AktoCustomException("Invalid value operator");
+            }
+
+            List<Predicate> predicates = new ArrayList<>();
+            for (ConditionFromUser conditionFromUser: valueConditionFromUsers) {
+                Predicate predicate = Predicate.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
+                if (predicate == null) {
+                    throw new AktoCustomException("Invalid value conditions");
+                } else {
+                    predicates.add(predicate);
+                }
+            }
+
+            if (predicates.size() > 0) {
+                valueConditions = new Conditions(predicates, vOperator);
+            }
         }
 
+        if ((keyConditions == null || keyConditions.getPredicates() == null || keyConditions.getPredicates().size() == 0) &&
+              (valueConditions == null || valueConditions.getPredicates() ==null || valueConditions.getPredicates().size() == 0))  {
 
-        if (isInvalidCondition(keyConditions) && isInvalidCondition(valueConditions)){
-
-            throw new AktoCustomException("All key, value and token conditions can't be empty");
+            throw new AktoCustomException("Both key and value conditions can't be empty");
         }
 
         Conditions.Operator mainOperator;
@@ -507,9 +511,8 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         IgnoreData ignoreData = new IgnoreData();
-        CustomDataType customDataType = new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
+        return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
                 true,keyConditions,valueConditions, mainOperator,ignoreData);
-        return customDataType;
     }
 
     public void setCreateNew(boolean createNew) {

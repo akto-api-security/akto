@@ -626,7 +626,7 @@ public class APICatalogSync {
             }
             if (result) return customDataType.toSubType();
         }
-        return KeyTypes.findSubType(token, "", null);
+        return KeyTypes.findSubType(token, "", null,true);
     }
 
     private static Boolean isValidSubtype(SubType subType){
