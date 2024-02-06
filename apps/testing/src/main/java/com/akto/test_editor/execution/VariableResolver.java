@@ -44,35 +44,67 @@ public class VariableResolver {
         return obj;
     }
 
-    public static String resolveExpression(Map<String, Object> varMap, String expression) {
+    public static List<Object> resolveExpression(Map<String, Object> varMap, String expression) {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
-        while (matcher.find()) {
-            try {
-                String match = matcher.group(0);
-                match = match.substring(2, match.length());
-                match = match.substring(0, match.length() - 1);
-                Object val = getValue(varMap, match);
-                String valString = val.toString();
-                expression = expression.replaceFirst("(\\$\\{[^}]*\\})", valString);
-            } catch (Exception e) {
-                return expression;
+
+        List<Object> expressionList = new ArrayList<>();
+        expressionList.add(expression);
+
+        int index = 0;
+
+        while (index < expressionList.size()) {
+            while (matcher.find()) {
+                String param = expressionList.get(index).toString();
+                try {
+                    String match = matcher.group(0);
+                    match = match.substring(2, match.length());
+                    match = match.substring(0, match.length() - 1);
+                    Object val = getValue(varMap, match);
+                    if (val == null) {
+                        continue;
+                    }
+                    if (val instanceof ArrayList){ 
+                        List<Object> valList = (List) val;
+                        if (valList.size() == 1) {
+                            val = valList.get(0);
+                        }
+                    }
+                    if (!(val instanceof ArrayList)) {
+                        for (int i = 0; i < expressionList.size(); i++) {
+                            param = expressionList.get(i).toString();
+                            expressionList.set(i, param.replaceFirst("(\\$\\{[^}]*\\})", val.toString()));
+                        }
+                    } else {
+                        expressionList.remove(index);
+                        List<Object> valList = (List) val;
+                        for (int i = expressionList.size(); i < valList.size(); i++) {
+                            Object v = param.replaceFirst("(\\$\\{[^}]*\\})", valList.get(i).toString());
+                            expressionList.add(v);
+                        }
+                    }
+                    
+                } catch (Exception e) {
+                    return expressionList;
+                }
             }
+            index++;
         }
 
-        Object val = resolveExpression(expression);
-        if (val == null) {
-            val = getValue(varMap, expression);
+        for (int i = 0; i < expressionList.size(); i++) {
+            Object val = resolveExpression(expressionList.get(i).toString());
             if (val == null) {
-                return expression;
+                val = getValue(varMap, expression);
+                if (val != null) {
+                    expressionList.set(i, val);
+                }
             } else {
-                return val.toString();
+                expressionList.set(i, val);
             }
-        } else {
-            return val.toString();
         }
 
+        return expressionList;
     }
 
     public static Object resolveContextVariable(Map<String, Object> varMap, String expression) {
