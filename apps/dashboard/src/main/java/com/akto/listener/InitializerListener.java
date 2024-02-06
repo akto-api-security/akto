@@ -1999,7 +1999,44 @@ public class InitializerListener implements ServletContextListener {
 
                     for (MetricTypes metricType : MetricTypes.values()) {
 
-                        UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountId, metricType);
+                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
+                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
+                        );
+
+                        if (usageMetricInfo == null) {
+                            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
+                            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
+                        }
+
+                        int syncEpoch = usageMetricInfo.getSyncEpoch();
+                        int measureEpoch = usageMetricInfo.getMeasureEpoch();
+
+                        // Reset measureEpoch every month
+                        if (Context.now() - measureEpoch > 2629746) {
+                            if (syncEpoch > Context.now() - 86400) {
+                                measureEpoch = Context.now();
+
+                                UsageMetricInfoDao.instance.updateOne(
+                                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
+                                );
+                            }
+
+                        }
+
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                AccountSettingsDao.generateFilter()
+                        );
+                        String dashboardMode = DashboardMode.getDashboardMode().toString();
+                        String dashboardVersion = accountSettings.getDashboardVersion();
+
+                        UsageMetric usageMetric = new UsageMetric(
+                                organizationId, accountId, metricType, syncEpoch, measureEpoch,
+                                dashboardMode, dashboardVersion
+                        );
+
+                        //calculate usage for metric
+                        UsageMetricCalculator.calculateUsageMetric(usageMetric);
 
                         UsageMetricsDao.instance.insertOne(usageMetric);
                         loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);

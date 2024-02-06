@@ -5,16 +5,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
-import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.Organization;
@@ -24,15 +20,11 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
-import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-
 import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
@@ -188,48 +180,5 @@ public class UsageMetricCalculator {
 
         usageMetric.setUsage(usage);
     }      
-
-    public static UsageMetric calcUsageMetric(String organizationId, int accountId, MetricTypes metricType) {
-        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
-        );
-
-        if (usageMetricInfo == null) {
-            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-        }
-
-        int syncEpoch = usageMetricInfo.getSyncEpoch();
-        int measureEpoch = usageMetricInfo.getMeasureEpoch();
-
-        // Reset measureEpoch every month
-        if (Context.now() - measureEpoch > 2629746) {
-            if (syncEpoch > Context.now() - 86400) {
-                measureEpoch = Context.now();
-
-                UsageMetricInfoDao.instance.updateOne(
-                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
-                );
-            }
-
-        }
-
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                AccountSettingsDao.generateFilter()
-        );
-        String dashboardMode = DashboardMode.getDashboardMode().toString();
-        String dashboardVersion = accountSettings.getDashboardVersion();
-
-        UsageMetric usageMetric = new UsageMetric(
-                organizationId, accountId, metricType, syncEpoch, measureEpoch,
-                dashboardMode, dashboardVersion
-        );
-
-        //calculate usage for metric
-        UsageMetricCalculator.calculateUsageMetric(usageMetric);
-
-        return usageMetric;
-    }
 
 }

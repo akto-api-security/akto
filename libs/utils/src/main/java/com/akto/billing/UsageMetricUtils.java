@@ -18,7 +18,6 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
@@ -128,7 +127,7 @@ public class UsageMetricUtils {
     }
 
     public static boolean checkMeteredOverage(int accountId, MetricTypes metricType) {
-        FeatureAccess featureAccess = getFeatureAccess(accountId, metricType, false);
+        FeatureAccess featureAccess = getFeatureAccess(accountId, metricType);
         return featureAccess.checkInvalidAccess();
     }
 
@@ -140,27 +139,21 @@ public class UsageMetricUtils {
         return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS);
     }
 
-    public static FeatureAccess getLatestFeatureAccess(int accountId, MetricTypes metricType) {
-        return getFeatureAccess(accountId, metricType, true);
-    }
-
-    private static FeatureAccess getFeatureAccess(int accountId, MetricTypes metricType, boolean latest) {
+    public static FeatureAccess getFeatureAccess(int accountId, MetricTypes metricType) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
         try {
             if (!DashboardMode.isMetered()) {
                 return featureAccess;
             }
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-            featureAccess = getFeatureAccess(organization, metricType, latest);
-            Context.accountId.set(accountId);
-            return featureAccess;
+            featureAccess = getFeatureAccess(organization, metricType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
         }
         return featureAccess;
     }
 
-    public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType, boolean latest) {
+    public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
         try {
             if (!DashboardMode.isMetered()) {
@@ -177,20 +170,6 @@ public class UsageMetricUtils {
             featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
             int gracePeriod = organization.getGracePeriod();
             featureAccess.setGracePeriod(gracePeriod);
-            if (latest) {
-                String organizationId = organization.getId();
-                int latestUsage = 0;
-                int measureEpoch = Context.now();
-                for (int accountIdTemp : organization.getAccounts()) {
-                    Context.accountId.set(accountIdTemp);
-                    UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountIdTemp, metricType);
-                    latestUsage += usageMetric.getUsage();
-                    measureEpoch = Math.min(measureEpoch, usageMetric.getMeasureEpoch());
-                }
-                featureAccess.setMeasureEpoch(measureEpoch);
-                featureAccess.setUsage(latestUsage);
-            }
-            return featureAccess;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
         }

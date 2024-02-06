@@ -12,10 +12,13 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.usage.UsageMetricInfoDao;
+import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
@@ -45,15 +48,21 @@ public class DeactivateCollections {
 
     private static void deactivateCollectionsForOrganization(Organization organization) {
         try {
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS, true);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
             if (!featureAccess.checkInvalidAccess()) {
                 return;
             }
             int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
-            int measureEpoch = featureAccess.getMeasureEpoch();
+            String organizationId = organization.getId();
 
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
+                UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
+                        UsageMetricsDao.generateFilter(organizationId, accountId, MetricTypes.ACTIVE_ENDPOINTS));
+                int measureEpoch = Context.now();
+                if (usageMetricInfo != null) {
+                    measureEpoch = usageMetricInfo.getMeasureEpoch();
+                }
                 overage = deactivateCollectionsForAccount(overage, measureEpoch);
             }
         } catch (Exception e) {
