@@ -17,9 +17,6 @@ export default function Header() {
 
     const navigate = useNavigate()
 
-    const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
-    const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
-    const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const accounts = Store(state => state.accounts)
@@ -30,13 +27,7 @@ export default function Header() {
     const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
-    const handleLeftNavCollapse = () => {
-        if (!leftNavCollapsed) {
-            setLeftNavSelected('')
-        }
-
-        toggleLeftNavCollapsed()
-    }
+    
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
