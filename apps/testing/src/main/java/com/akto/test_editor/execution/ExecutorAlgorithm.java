@@ -172,6 +172,9 @@ public class ExecutorAlgorithm {
             } else if (key instanceof ArrayList) {
                 return (List) key;
             }
+        } else if (key instanceof Map) {
+            varList.add(key);
+            return varList;
         } else {
             List<Object> keyList = (List) key;
             int index = 0;
