@@ -1332,7 +1332,15 @@ mapCollectionIdToHostName(apiCollections){
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
-  }
+  },
+  showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+    Store.getState().setConfirmationModalConfig({
+      modalContent: modalContent,
+      primaryActionContent: primaryActionContent,
+      primaryAction: primaryAction,
+      show: true
+    })
+  },
 
 }
 
