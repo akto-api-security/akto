@@ -8,7 +8,6 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
-import ConfirmationModal from "../components/shared/ConfirmationModal";
 
 function Dashboard() {
 
@@ -19,15 +18,12 @@ function Dashboard() {
 
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
-    const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
     const allCollections = PersistStore(state => state.allCollections)
 
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-        const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
-        setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
         setAllCollections(apiCollections)
     }
@@ -65,20 +61,11 @@ function Dashboard() {
         <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
     ) : null;
 
-    const confirmationModalConfig = Store(state => state.confirmationModalConfig)
-
-    const ConfirmationModalMarkup = <ConfirmationModal
-        modalContent={confirmationModalConfig.modalContent}
-        primaryActionContent={confirmationModalConfig.primaryActionContent}
-        primaryAction={confirmationModalConfig.primaryAction}
-    />
-
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
             {toastMarkup}
-            {ConfirmationModalMarkup}
         </Frame>
         </div>
     )

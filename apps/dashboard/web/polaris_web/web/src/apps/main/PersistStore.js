@@ -21,7 +21,7 @@ const initialState = {
     lastFetchedSeverityResp: {},
     lastCalledSensitiveInfo: 0,
     lastFetchedSensitiveResp: [],
-    showUsageBanner: {testing: true, inventory: true}
+    // selectedSampleApi: {},
 };
 
 let persistStore = (set) => ({
@@ -41,7 +41,7 @@ let persistStore = (set) => ({
     setLastFetchedSeverityResp: (lastFetchedSeverityResp) => set({ lastFetchedSeverityResp }),
     setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => set({ lastCalledSensitiveInfo }),
     setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
-    setShowUsageBanner: (showUsageBanner) => set({ showUsageBanner }),
+    // setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
 
     resetAll: () => set(initialState), // Reset function
 })

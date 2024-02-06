@@ -14,12 +14,5 @@ export default {
             method: 'post',
             data: { apiCollections: items }
         })
-    },
-    forceActivateCollections(items) {
-        return request({
-            url: '/api/forceActivateCollections',
-            method: 'post',
-            data: { apiCollections: items }
-        })
     }
 }
