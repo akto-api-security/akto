@@ -19,6 +19,9 @@ public class FeatureAccess {
     @BsonIgnore
     int gracePeriod = 0;
 
+    @BsonIgnore
+    int measureEpoch;
+
     public static final FeatureAccess noAccess = new FeatureAccess(false);
     public static final FeatureAccess fullAccess = new FeatureAccess(true);
 
@@ -80,6 +83,14 @@ public class FeatureAccess {
 
     public void setGracePeriod(int gracePeriod) {
         this.gracePeriod = gracePeriod;
+    }
+
+    public int getMeasureEpoch() {
+        return measureEpoch;
+    }
+
+    public void setMeasureEpoch(int measureEpoch) {
+        this.measureEpoch = measureEpoch;
     }
 
     public boolean checkInvalidAccess() {
