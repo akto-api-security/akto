@@ -1332,7 +1332,20 @@ mapCollectionIdToHostName(apiCollections){
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
-  }
+  },
+  transformString(inputString) {
+    let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
+    const segments = transformedString.split('/');
+    for (let i = 0; i < segments.length; i++) {
+        // Check if the segment is alphanumeric
+        if (/^[0-9a-fA-F]+$/.test(segments[i]) || /^[0-9]+$/.test(segments[i])) {
+        segments[i] = 'id';
+        }
+    }
+    transformedString = segments.join('/');
+    transformedString = transformedString.replace(/[/|-]/g, '_');
+    return transformedString;
+}
 
 }
 
