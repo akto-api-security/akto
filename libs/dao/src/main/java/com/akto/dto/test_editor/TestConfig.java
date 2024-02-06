@@ -26,6 +26,7 @@ public class TestConfig {
 
     private Strategy strategy;
     private boolean inactive;
+    private String author;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation, Strategy strategy) {
@@ -137,5 +138,13 @@ public class TestConfig {
 
     public void setInactive(boolean inactive) {
         this.inactive = inactive;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
     }
 }

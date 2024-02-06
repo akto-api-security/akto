@@ -19,3 +19,14 @@
     padding-top: 8px !important;
     padding-bottom: 8px !important;
 }
+
+.icons-style {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--white);
+    width: 40px;
+    height: 40px ;
+    border-radius: 32px;
+    box-shadow: 0px 2px 16px 0px rgba(33, 43, 54, 0.08), 0px 0px 0px 1px rgba(6, 44, 82, 0.10);
+}

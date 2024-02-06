@@ -7,12 +7,10 @@ import PersistStore from "../../../main/PersistStore";
 
 function SettingsHeader() {
     const navigate = useNavigate();
-    const setLeftNavSelected = PersistStore(state => state.setLeftNavSelected)
     const setActive = PersistStore(state => state.setActive)
     
     const handleSettingsClose = () => {
         navigate('/dashboard/testing')
-        setLeftNavSelected("testing-results")
         setActive('active')
     }
 
