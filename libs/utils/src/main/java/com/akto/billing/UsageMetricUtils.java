@@ -180,14 +180,11 @@ public class UsageMetricUtils {
             if (latest) {
                 String organizationId = organization.getId();
                 int latestUsage = 0;
-                int measureEpoch = Context.now();
                 for (int accountIdTemp : organization.getAccounts()) {
                     Context.accountId.set(accountIdTemp);
                     UsageMetric usageMetric = UsageMetricCalculator.calcUsageMetric(organizationId, accountIdTemp, metricType);
                     latestUsage += usageMetric.getUsage();
-                    measureEpoch = Math.min(measureEpoch, usageMetric.getMeasureEpoch());
                 }
-                featureAccess.setMeasureEpoch(measureEpoch);
                 featureAccess.setUsage(latestUsage);
             }
             return featureAccess;

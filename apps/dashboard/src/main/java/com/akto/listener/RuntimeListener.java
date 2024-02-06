@@ -22,7 +22,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.AccountTask;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.utils.Utils;
@@ -45,10 +45,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class RuntimeListener extends AfterMongoConnectListener {
-    public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = UsageMetricCalculatorUtils.JUICE_SHOP_DEMO_COLLECTION_NAME;
+    public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
     public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
     public static final String LLM_API_COLLECTION_NAME = "llm_apis";
-    public static final int VULNERABLE_API_COLLECTION_ID = UsageMetricCalculatorUtils.VULNERABLE_API_COLLECTION_ID;
+    public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
     public static final int LLM_API_COLLECTION_ID = 1222222222;
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();

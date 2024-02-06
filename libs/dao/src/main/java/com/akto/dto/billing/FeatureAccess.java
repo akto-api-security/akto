@@ -4,23 +4,20 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import com.akto.dao.context.Context;
 
 public class FeatureAccess {
-    private boolean isGranted;
+    boolean isGranted;
     public static final String IS_GRANTED = "isGranted";
-    private int overageFirstDetected = -1;
+    int overageFirstDetected = -1;
     public static final String OVERAGE_FIRST_DETECTED = "overageFirstDetected";
 
     private static final int STANDARD_GRACE_PERIOD = 0;
 
-    private int usageLimit;
+    int usageLimit;
     public static final String USAGE_LIMIT = "usageLimit";
-    private int usage;
+    int usage;
     public static final String USAGE = "usage";
 
     @BsonIgnore
-    private int gracePeriod = 0;
-
-    @BsonIgnore
-    private int measureEpoch;
+    int gracePeriod = 0;
 
     public static final FeatureAccess noAccess = new FeatureAccess(false);
     public static final FeatureAccess fullAccess = new FeatureAccess(true);
@@ -83,14 +80,6 @@ public class FeatureAccess {
 
     public void setGracePeriod(int gracePeriod) {
         this.gracePeriod = gracePeriod;
-    }
-
-    public int getMeasureEpoch() {
-        return measureEpoch;
-    }
-
-    public void setMeasureEpoch(int measureEpoch) {
-        this.measureEpoch = measureEpoch;
     }
 
     public boolean checkInvalidAccess() {

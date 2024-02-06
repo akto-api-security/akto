@@ -11,7 +11,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
@@ -337,7 +337,7 @@ public class HttpCallParser {
 
         }
 
-        List<Integer> deactivatedCollections = UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds();
+        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         filteredResponseParams.removeIf((temp) -> {
             int apiCollectionId = temp.getRequestParams().getApiCollectionId();
             return deactivatedCollections.contains(apiCollectionId);

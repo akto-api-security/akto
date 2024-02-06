@@ -163,18 +163,14 @@ public class ApiCollectionsAction extends UserAction {
         Bson update = Updates.pullAll(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
 
         SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
+        SingleTypeInfoDao.instance.updateMany(filter, update);
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveSampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
-
-        SingleTypeInfoDao.instance.updateMany(filter, update);
         SensitiveParamInfoDao.instance.updateMany(filter, update);
-        SampleDataDao.instance.updateMany(filter, update);
-        TrafficInfoDao.instance.updateMany(filter, update);
-        ApiInfoDao.instance.updateMany(filter, update);
 
         List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
         for(ApiCollection collection: apiGroups){
@@ -401,10 +397,7 @@ public class ApiCollectionsAction extends UserAction {
 
     public String deactivateCollections() {
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
-
-        ApiCollectionsDao.instance.updateMany(
-                Filters.and(Filters.in(Constants.ID, apiCollectionIds),
-                        Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name())),
+        ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
         return Action.SUCCESS.toUpperCase();
     }

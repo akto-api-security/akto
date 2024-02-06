@@ -1,18 +1,23 @@
 package com.akto.action.observe;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.interceptor.CollectionInterceptor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.usage.UsageMetricCalculatorUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -56,7 +61,7 @@ public class InventoryAction extends UserAction {
     private int startTimestamp = 0; 
     private int endTimestamp = 0;
 
-    List <Integer> deactivatedCollections = UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds();
+    List <Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -386,8 +391,6 @@ public class InventoryAction extends UserAction {
                 filterCustomSensitiveParams.add(apiCollectionIdFilter);
             }
 
-            filterCustomSensitiveParams.add(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()));
-
             if (url != null) {
                 Bson urlFilter = Filters.eq("url", url);
                 filterCustomSensitiveParams.add(urlFilter);
@@ -474,24 +477,24 @@ public class InventoryAction extends UserAction {
         filterList.add(Filters.lt("timestamp", endTimestamp));
 
         if (sensitive) {
-            Bson sensitiveSubTypeFilter;
+            Bson sensitveSubTypeFilter;
             if (request) {
                 List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
                 sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitiveSubTypeFilter = Filters.and(
+                sensitveSubTypeFilter = Filters.and(
                         Filters.in("subType",sensitiveInRequest),
                         Filters.eq("responseCode", -1)
                 );
             } else {
                 List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
                 sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitiveSubTypeFilter = Filters.and(
+                sensitveSubTypeFilter = Filters.and(
                     Filters.in("subType",sensitiveInResponse),
                     Filters.gt("responseCode", -1)
                 );
             }
 
-            filterList.add(sensitiveSubTypeFilter);
+            filterList.add(sensitveSubTypeFilter);
         }
 
         for(Map.Entry<String, List> entry: filters.entrySet()) {
@@ -568,7 +571,6 @@ public class InventoryAction extends UserAction {
     public String loadParamsOfEndpoint() {
         Bson filters = Filters.and(
             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-            Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculatorUtils.getDeactivatedApiCollectionIds()),
             Filters.eq("url", url),  
             Filters.eq("method", method)
         );
