@@ -598,5 +598,12 @@ export default {
             method: 'post',
             data: {}
         })
-    }
+    },
+    async getUserEndpoints(){
+        return await request({
+            url: '/api/getCustomerEndpoints',
+            method: 'post',
+            data:{},
+        })
+    },
 }

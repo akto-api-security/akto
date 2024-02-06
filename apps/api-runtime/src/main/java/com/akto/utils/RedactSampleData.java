@@ -18,6 +18,8 @@ import com.mongodb.BasicDBObject;
 import java.io.IOException;
 import java.util.*;
 
+import static com.akto.dto.RawApi.convertHeaders;
+
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
@@ -162,22 +164,5 @@ public class RedactSampleData {
         return mapper.writeValueAsString(m);
     }
 
-    public static String convertHeaders(Map<String, List<String>> headers) {
-        Map<String, String> headerMap = new HashMap<>();
-        if (headers == null) return "{}";
-
-        for (String h: headers.keySet()) {
-            List<String> values = headers.get(h);
-            if (values == null) continue;
-            headerMap.put(h, String.join(";",values));
-        }
-
-        try {
-            return mapper.writeValueAsString(headerMap);
-        } catch (JsonProcessingException e) {
-            ;
-            return "{}";
-        }
-    }
 }
 

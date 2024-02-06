@@ -117,7 +117,6 @@ function formatRawNodeData(nodes, currentApiCollectionId, currentEndpoint, curre
                 }
             }
 
-            debugger
             let edgeFromMap = edgesMap.get(edgeId)
             if (edgeFromMap) {
                 edgeFromMap["data"]["parameters"].push(parameters)

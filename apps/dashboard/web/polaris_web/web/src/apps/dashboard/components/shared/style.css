@@ -104,3 +104,9 @@
 .pie-chart .highcharts-button{
     display: none !important;
 }
+
+.empty-icon-container .Polaris-Avatar__Image{
+    width: 92px !important;
+    height: 92px !important;
+    border-radius: unset !important;
+}
