@@ -30,29 +30,12 @@ public class URLAggregator {
 
     ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls;
 
-    private static SingleTypeInfo.SuperType getTokenSupertype(String tempToken, Pattern pattern, Boolean isCustom){
-        String numToken = tempToken;
-        SingleTypeInfo.SuperType defaultResult = isCustom ? SingleTypeInfo.SuperType.STRING : null;
-        if (tempToken.charAt(0) == '+') {
-            numToken = tempToken.substring(1);
-        }
-
-        if (NumberUtils.isParsable(numToken)) {
-           return SingleTypeInfo.SuperType.INTEGER;
-            
-        } else if(pattern.matcher(tempToken).matches()){
-            return SingleTypeInfo.SuperType.STRING;
-        } else if (isAlphanumericString(tempToken)) {
-            return SingleTypeInfo.SuperType.STRING;
-        }
-        return defaultResult;
-    }
-
     public static URLStatic getBaseURL(String url, String method) {
 
         if (url == null) {
             return null;
         }
+
 
         String urlStr = url.split("\\?")[0];
 
@@ -68,9 +51,20 @@ public class URLAggregator {
             if (tempToken.length() == 0) {
                 continue;
             }
-            
-            if(getTokenSupertype(tempToken, pattern, false) != null){
-                newTypes[i] = getTokenSupertype(tempToken, pattern, false);
+
+            String numToken = tempToken;
+            if (tempToken.charAt(0) == '+') {
+                numToken = tempToken.substring(1);
+            }
+
+            if (NumberUtils.isParsable(numToken)) {
+                newTypes[i] = SingleTypeInfo.SuperType.INTEGER;
+                urlTokens[i] = null;
+            } else if(pattern.matcher(tempToken).matches()){
+                newTypes[i] = SingleTypeInfo.SuperType.STRING;
+                urlTokens[i] = null;
+            } else if (isAlphanumericString(tempToken)) {
+                newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 urlTokens[i] = null;
             }
         }

@@ -186,11 +186,11 @@ public class KeyTypes {
         return SingleTypeInfo.OTHER;
     }
 
-    public static SubType findSubType(Object o,String key, ParamId paramId, Boolean executeCheckForSubtypes){
+    public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
         if(executeCheckForSubtypes){
-            return findSubType(o, key, paramId);
-        }else{
             return getSubtype(o, key, true);
+        }else{
+            return findSubType(o, key, paramId);
         }
     }
 
