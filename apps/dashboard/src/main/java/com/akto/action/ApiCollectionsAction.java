@@ -21,6 +21,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -49,7 +50,7 @@ public class ApiCollectionsAction extends UserAction {
     int apiCollectionId;
     List<ApiInfoKey> apiList;
 
-    private boolean hasUsageEndpoints = true;
+    private boolean hasUsageEndpoints;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -374,20 +375,17 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchCustomerEndpoints(){
         try {
-            int accountId = Context.accountId.get();
-            Organization organization = OrganizationsDao.instance.findOne(
-                                Filters.in(Organization.ACCOUNTS, accountId)
-                        );
-            if(organization == null){
-                return Action.SUCCESS.toUpperCase();
+            ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+            ArrayList<Integer> demos = new ArrayList<>();
+            demos.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+            demos.add(RuntimeListener.LLM_API_COLLECTION_ID);
+            if (juiceShop != null) {
+                demos.add(juiceShop.getId());
             }
-            String orgId = organization.getId();
-            Bson filter = UsageMetricsDao.generateFilter(orgId,accountId , MetricTypes.ACTIVE_ENDPOINTS);
-            UsageMetric usageMetric = UsageMetricsDao.instance.findOne(filter);
 
-            if(usageMetric != null){
-                this.hasUsageEndpoints = (usageMetric.getUsage() > 0);
-            }
+            Bson filter = Filters.nin(SingleTypeInfo._API_COLLECTION_ID, demos);
+            this.hasUsageEndpoints = SingleTypeInfoDao.instance.findOne(filter) != null;
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
