@@ -34,7 +34,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.akto.utils.RedactSampleData.convertHeaders;
+import static com.akto.dto.RawApi.convertHeaders;
 
 
 public class Utils {
@@ -372,9 +372,9 @@ public class Utils {
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            DependencyFlow dependencyFlow = new DependencyFlow();
-            dependencyFlow.run();
-            dependencyFlow.syncWithDb();
+           DependencyFlow dependencyFlow = new DependencyFlow();
+           dependencyFlow.run();
+           dependencyFlow.syncWithDb();
         }
     }
 
