@@ -4,6 +4,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.data_types.Conditions;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -617,7 +618,12 @@ public class APICatalogSync {
     private static SubType getTokenSubType(Object token){
         for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
             if (!customDataType.isActive()) continue;
-            boolean result = customDataType.validateTokenData(token);
+            boolean result = false;
+            Conditions valueConditions =  customDataType.getValueConditions();
+            
+            if(valueConditions !=null){
+                result = valueConditions.validate(token);
+            }
             if (result) return customDataType.toSubType();
         }
         return KeyTypes.findSubType(token, "", null);
@@ -1244,7 +1250,7 @@ public class APICatalogSync {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
-                if (gotDibs) {
+                                if (gotDibs) {
                     mergingCalled = true;
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                     if (backwardCompatibility == null || backwardCompatibility.getMergeOnHostInit() == 0) {

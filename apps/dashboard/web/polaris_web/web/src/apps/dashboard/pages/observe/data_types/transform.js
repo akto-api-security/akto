@@ -5,7 +5,6 @@ const func = {
         name: "",
         valueConditions: { predicates: [], operator: "OR" },
         keyConditions: { predicates: [], operator: "OR" },
-        tokenConditions: {predicates: [], operator: "OR"},
         sensitiveState: '4',
         operator: "OR",
         dataType: "Custom",
@@ -63,9 +62,6 @@ const func = {
         if(dataObj.valueConditions){
           initialObj.valueConditions = dataObj.valueConditions
         }
-        if(dataObj.tokenConditions){
-            initialObj.tokenConditions = dataObj.tokenConditions
-          }
         return initialObj;
     },
 
@@ -82,7 +78,6 @@ const func = {
 
         const keyArr = state.keyConditions.predicates.map(this.convertMapFunction)
         const valueArr = state.valueConditions.predicates.map(this.convertMapFunction)
-        const tokenArr = state.tokenConditions.predicates.map(this.convertMapFunction)
 
         let sensitiveObj = this.convertToSensitiveData(state.sensitiveState)
 
@@ -98,8 +93,6 @@ const func = {
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
-            tokenConditionFromUsers: tokenArr,
-            tokenOperator: state.tokenConditions.operator,
         }
 
         return finalObj
