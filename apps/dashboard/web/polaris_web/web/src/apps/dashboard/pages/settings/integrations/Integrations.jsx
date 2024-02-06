@@ -1,18 +1,17 @@
 import React from 'react'
 import {
-    Page,
     LegacyCard,
     ResourceList,
     Avatar,
     ResourceItem,
     Text,
     Badge,
-    Button,
   } from '@shopify/polaris';
 import {useState} from 'react';
 import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
-import { useNavigate } from 'react-router-dom'
+import { useNavigate} from 'react-router-dom'
+import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 
 function Integrations() {
 
@@ -208,19 +207,25 @@ function Integrations() {
         )
     }
 
-  const redirectDocs = () => {
-    window.open("https://docs.akto.io/readme")
-  }  
+    const cardComp = (
+      <LegacyCard key="cardComp">
+          <LayoutWithTabs tabs={tabs} currTab={handleCurrTab}/>
+      </LegacyCard>
+    )
+
+    const components = [cardComp]
   return (
-    <Page
-      title="Integrations"
-      primaryAction={<Button primary onClick={redirectDocs}>See Docs</Button>}
-      divider
-    >
-        <LegacyCard>
-            <LayoutWithTabs tabs={tabs} currTab={handleCurrTab}/>
-        </LegacyCard>
-    </Page>
+    <PageWithMultipleCards
+      divider={true}
+      components={components}
+      title={
+          <Text variant='headingLg' truncate>
+              Integrations
+          </Text>
+      }
+      isFirstPage={true}
+
+    />
   )
 }
 

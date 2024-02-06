@@ -606,5 +606,12 @@ export default {
             method: 'post',
             data: {apiCollectionId, url, method}
         })
-    }
+    },
+    async getUserEndpoints(){
+        return await request({
+            url: '/api/getCustomerEndpoints',
+            method: 'post',
+            data:{},
+        })
+    },
 }

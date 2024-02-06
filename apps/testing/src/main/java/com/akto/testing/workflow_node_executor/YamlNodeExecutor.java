@@ -18,6 +18,8 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
+import com.akto.dto.test_editor.ExecuteAlgoObj;
+import com.akto.dto.test_editor.ExecutionOrderResp;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
@@ -33,7 +35,9 @@ import com.akto.dto.testing.YamlNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.ExecutionListBuilder;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.utils.RedactSampleData;
@@ -69,8 +73,17 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         AuthMechanism authMechanism = yamlNodeDetails.getAuthMechanism();
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
-        List<RawApi> testRawApis = singleReq.getRawApis();
+
+        ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
+        List<ExecutorNode> executorNodes = new ArrayList<>();
+        boolean followRedirect = executionListBuilder.buildExecuteOrder(executorNode, executorNodes);
+
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
+        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0);
+
+        //ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
+        //List<RawApi> testRawApis = singleReq.getRawApis();
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         String logId = "";
         List<TestResult> result = new ArrayList<>();
@@ -84,7 +97,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseTimeArr = new ArrayList<>();
         List<Integer> responseLenArr = new ArrayList<>();
 
-        for (RawApi testReq: testRawApis) {
+        for (RawApi testReq: rawApis) {
             if (vulnerable) {
                 break;
             }
@@ -95,7 +108,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);                
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig);                
                 tsAfterReq = Context.nowInMillis();
                 responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);

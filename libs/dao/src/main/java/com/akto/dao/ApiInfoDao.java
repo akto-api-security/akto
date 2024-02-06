@@ -63,6 +63,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
 
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] {ApiInfo.SEVERITY_SCORE }, false);
     }
     
 
