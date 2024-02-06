@@ -2,6 +2,7 @@ import React from 'react'
 import { Avatar, HorizontalStack, Text } from "@shopify/polaris"
 import BannerLayout from '../../../../components/banners/BannerLayout'
 import { COLLECTIONS_VIDEO_LENGTH, COLLECTIONS_VIDEO_THUMBNAIL, COLLECTIONS_VIDEO_URL } from '../../../../../main/onboardingData'
+import "../api_inventory.css"
 
 function CollectionsPageBanner() {
 
@@ -17,12 +18,7 @@ function CollectionsPageBanner() {
             <HorizontalStack>
                 {iconsList.map((iconUrl, index) => {
                     return(
-                        <div style={{display: "flex", justifyContent: 'center', alignItems: 'center', background: "var(--white)",
-                                width: '40px', height: '40px' , borderRadius: '32px', zIndex: `${index + 5}`,
-                                boxShadow: "0px 2px 16px 0px rgba(33, 43, 54, 0.08), 0px 0px 0px 1px rgba(6, 44, 82, 0.10)",
-                                ...(index > 0 ? {marginLeft: '-10px'} : {})}} key={iconUrl}
-            
-                        >
+                        <div className="icons-style" style={{zIndex: `${index + 5}`,...(index > 0 ? {marginLeft: '-10px'} : {})}} key={iconUrl}>
                             <Avatar shape="square" source={iconUrl} size="extraSmall" />
                         </div>
                     )
