@@ -1,6 +1,7 @@
 package com.akto.testing.workflow_node_executor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Map;
 
 import org.json.JSONObject;
 
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiInfo;
@@ -16,6 +18,8 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
+import com.akto.dto.test_editor.ExecuteAlgoObj;
+import com.akto.dto.test_editor.ExecutionOrderResp;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
@@ -31,7 +35,9 @@ import com.akto.dto.testing.YamlNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.ExecutionListBuilder;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.utils.RedactSampleData;
@@ -67,8 +73,17 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         AuthMechanism authMechanism = yamlNodeDetails.getAuthMechanism();
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
-        List<RawApi> testRawApis = singleReq.getRawApis();
+
+        ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
+        List<ExecutorNode> executorNodes = new ArrayList<>();
+        boolean followRedirect = executionListBuilder.buildExecuteOrder(executorNode, executorNodes);
+
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
+        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0);
+
+        //ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
+        //List<RawApi> testRawApis = singleReq.getRawApis();
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         String logId = "";
         List<TestResult> result = new ArrayList<>();
@@ -79,13 +94,23 @@ public class YamlNodeExecutor extends NodeExecutor {
         //String message = null;
         String savedResponses = null;
         int statusCode = 0;
+        List<Integer> responseTimeArr = new ArrayList<>();
+        List<Integer> responseLenArr = new ArrayList<>();
 
-        for (RawApi testReq: testRawApis) {
+        for (RawApi testReq: rawApis) {
+            if (vulnerable) {
+                break;
+            }
             if (testReq.equals(sampleRawApi)) {
                 continue;
             }
+            int tsBeforeReq = 0;
+            int tsAfterReq = 0;
             try {
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);                
+                tsBeforeReq = Context.nowInMillis();
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig);                
+                tsAfterReq = Context.nowInMillis();
+                responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                 if (res != null) {
@@ -102,14 +127,22 @@ public class YamlNodeExecutor extends NodeExecutor {
                 savedResponses = testResponse.getBody();
                 statusCode = testResponse.getStatusCode();
 
+                if (testResponse.getBody() == null) {
+                    responseLenArr.add(0);
+                } else {
+                    responseLenArr.add(testResponse.getBody().length());
+                }
+
             } catch (Exception e) {
                 // TODO: handle exception
             }
         }
 
+        calcTimeAndLenStats(node.getId(), responseTimeArr, responseLenArr, varMap);
+
         if (savedResponses != null) {
-            varMap.put(node.getId() + ".response", savedResponses);
-            varMap.put(node.getId() + ".response_code", String.valueOf(statusCode));
+            varMap.put(node.getId() + ".response.body", savedResponses);
+            varMap.put(node.getId() + ".response.status_code", String.valueOf(statusCode));
         }
 
         // call executor's build request, which returns all rawapi by taking a rawapi argument
@@ -125,6 +158,57 @@ public class YamlNodeExecutor extends NodeExecutor {
 
     }
 
+    public void calcTimeAndLenStats(String nodeId, List<Integer> responseTimeArr, List<Integer> responseLenArr, Map<String, Object> varMap) {
+
+        Map<String, Double> m = new HashMap<>();
+        m = calcStats(responseTimeArr);
+        for (String k: m.keySet()) {
+            if (k.equals("last")) {
+                varMap.put(nodeId + ".response.response_time", m.getOrDefault(k, 0.0));
+            } else {
+                varMap.put(nodeId + ".response.stats." + k + "_response_time", m.getOrDefault(k, 0.0));
+            }
+        }
+
+        m = calcStats(responseLenArr);
+        for (String k: m.keySet()) {
+            if (k.equals("last")) {
+                varMap.put(nodeId + ".response.response_len", m.getOrDefault(k, 0.0));
+            } else {
+                varMap.put(nodeId + ".response.stats." + k + "_response_len", m.getOrDefault(k, 0.0));
+            }
+        }
+
+    }
+
+    public Map<String, Double> calcStats(List<Integer> arr) {
+        Map<String, Double> m = new HashMap<>();
+        if (arr.size() == 0) {
+            return m;
+        }
+        double last = 0.0;
+        double median;
+        last = arr.get(arr.size() - 1);
+        Collections.sort(arr);
+
+        int total = 0;
+        for (int i = 0; i < arr.size(); i++) {
+            total += arr.get(i);
+        }
+        
+        if (arr.size() % 2 == 0)
+            median = ((double)arr.get(arr.size()/2) + (double)arr.get(arr.size()/2 - 1))/2;
+        else
+            median = (double) arr.get(arr.size()/2);
+        
+        m.put("min", (double) arr.get(0));
+        m.put("max", (double) arr.get(arr.size() - 1));
+        m.put("average", (double) (total/arr.size()));
+        m.put("median", median);
+        m.put("last", last);
+
+        return m;
+    }
 
     public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails) {
 

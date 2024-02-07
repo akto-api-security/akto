@@ -8,6 +8,7 @@ import java.util.Map;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ContextOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
+import com.akto.dao.test_editor.TestEditorEnums.PredicateOperator;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ConfigParserValidationResult;
 import com.akto.dto.test_editor.FilterNode;
@@ -31,14 +32,14 @@ public class ConfigParser {
             return null;
         }
         
-        FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null, null, null);
-        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null, null, null);
+        FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null, null, null, null);
+        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null, null, null, null);
 
         return configParserResult;
     }
 
     public ConfigParserResult validateAndTransform(Map<String, Object> filters, FilterNode curNode, FilterNode parentNode, Boolean termNodeExists, 
-        Boolean collectionNodeExists, String concernedProperty, String subConcernedProperty, String bodyOperand, String contextProperty) {
+        Boolean collectionNodeExists, String concernedProperty, String subConcernedProperty, String bodyOperand, String contextProperty, String collectionProperty) {
 
         Object values = curNode.getValues();
 
@@ -48,6 +49,10 @@ public class ConfigParser {
         }
 
         if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Data.toString()) || curNode.getNodeType().equalsIgnoreCase(OperandTypes.Extract.toString())) {
+            return new ConfigParserResult(null, true, "");
+        }
+
+        if (curNode.getOperand().equalsIgnoreCase(PredicateOperator.COMPARE_GREATER.toString())) {
             return new ConfigParserResult(null, true, "");
         }
 
@@ -66,6 +71,7 @@ public class ConfigParser {
 
         if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Collection.toString())) {
             collectionNodeExists = true;
+            collectionProperty = curNode.getOperand();
         }
 
         if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Body.toString())) {
@@ -93,8 +99,8 @@ public class ConfigParser {
                     if (!(entry.getValue() instanceof List)) {
                         entry.setValue(Arrays.asList(entry.getValue()));
                     }
-                    FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty);
-                    ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty);
+                    FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
+                    ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
                     if (!configParserResult.getIsValid()) {
                         return configParserResult;
                     }
@@ -111,8 +117,8 @@ public class ConfigParser {
                 if (!(entry.getValue() instanceof List)) {
                     entry.setValue(Arrays.asList(entry.getValue()));
                 }
-                FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty);
-                ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty);
+                FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
+                ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty, collectionProperty);
                 if (!configParserResult.getIsValid()) {
                     return configParserResult;
                 }
@@ -183,8 +189,7 @@ public class ConfigParser {
         }
 
         // 5. Last Node should always be a data/extract node
-        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Context.toString().toLowerCase()))) {
-
+        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Context.toString().toLowerCase()) || curNode.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString()))) {
             if (isString(values) || isListOfString(values)) {
                 configParserValidationResult.setIsValid(false);
                 configParserValidationResult.setErrMsg("Last Node should always be a data/extract node");
