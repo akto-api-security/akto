@@ -3,28 +3,16 @@ package com.akto.test_editor.execution;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.GraphExecutorRequest;
-import com.akto.dto.testing.GraphExecutorResult;
-import com.akto.dto.testing.LoginWorkflowGraphEdge;
-import com.akto.dto.testing.MultiExecTestResult;
-import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.UrlModifierPayload;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.dto.testing.YamlNodeDetails;
-import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -44,7 +32,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
+
 
 public class Executor {
 
@@ -79,6 +70,25 @@ public class Executor {
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
+        }
+        if (StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            if (role != null) {
+                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                    if (role.getDefaultAuthMechanism() != null) {
+                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        overrideAuth(sampleRawApi, role.getDefaultAuthMechanism());
+                    } else {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                }
+            } else {
+                String reason = "Test role has been deleted";
+                loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+            }
         }
 
         boolean requestSent = false;
@@ -169,6 +179,26 @@ public class Executor {
         yamlTestResult = new YamlTestResult(result, workflowTest);
 
         return yamlTestResult;
+    }
+
+    private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+        if (authParams == null || authParams.isEmpty()) {
+            return;
+        }
+        AuthParam authParam = authParams.get(0);
+        String authHeader = authParam.getKey();
+        String authVal = authParam.getValue();
+        Map<String, List<String>> headersMap= rawApi.fetchReqHeaders();
+        for (Map.Entry<String, List<String>> headerKeyVal : headersMap.entrySet()) {
+            if (headerKeyVal.getKey().equalsIgnoreCase(authHeader)) {
+                headerKeyVal.setValue(Collections.singletonList(authVal));
+                rawApi.modifyReqHeaders(headersMap);
+                loggerMaker.infoAndAddToDb("overriding auth header " + authHeader, LogDb.TESTING);
+                return;
+            }
+        }
+        loggerMaker.infoAndAddToDb("auth header not found " + authHeader, LogDb.TESTING);
     }
 
     public WorkflowTest buildWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,

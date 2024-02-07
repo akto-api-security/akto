@@ -50,9 +50,14 @@ function TestRolesPage(){
 
     const getActions = (item) => {
         return [{
-            items: [{
+            items: [
+            {
                 content: 'Edit',
-                onAction: () => navigate("details", {state: {name: item.name ,endpoints: item.endpointLogicalGroup.testingEndpoints}}),
+                onAction: () => navigate("details", {state: {
+                    name: item.name,
+                    endpoints: item.endpointLogicalGroup.testingEndpoints,
+                    authWithCondList: item.authWithCondList
+                }})
             },
             {
                 content: 'Access matrix',
