@@ -317,7 +317,11 @@ public class DaoInit {
     }
 
     public static void createIndices() {
-        TestingRunResultDao.instance.convertToCappedCollection();
+        try {
+            TestingRunResultDao.instance.convertToCappedCollection();
+        } catch (Exception e) {
+                System.out.println("Error while converting TestingRunResults to capped collection: " + e.getMessage());
+        }
 
         OrganizationsDao.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
