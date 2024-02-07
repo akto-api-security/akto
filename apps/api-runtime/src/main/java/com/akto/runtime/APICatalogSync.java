@@ -573,7 +573,7 @@ public class APICatalogSync {
         return true;
     }
 
-    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, Boolean urlRegexMatchingEnabled) {
+    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, boolean urlRegexMatchingEnabled) {
 
         String[] n = tokenize(newUrl.getUrl());
         String[] o = tokenize(deltaUrl.getUrl());
@@ -582,10 +582,10 @@ public class APICatalogSync {
             SuperType c = b[idx];
             if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
                 String val = n[idx];
-                SubType newSubType = getTokenSubType(n[idx]);
-                SubType oldSubType = getTokenSubType(o[idx]);
+                SubType newSubType = KeyTypes.findSubType(n[idx], "", null,true);
+                SubType oldSubType = KeyTypes.findSubType(o[idx], "", null,true);
                 boolean isAlphaNumeric = isAlphanumericString(val) && isAlphanumericString(o[idx]);
-                boolean isUserRegex = isValidSubtype(oldSubType) && isValidSubtype(newSubType);
+                boolean isUserRegex = isValidSubtype(oldSubType) && isValidSubtype(newSubType) && oldSubType.equals(newSubType);
 
                 if(!isAlphaNumeric && !isUserRegex) {
                     return false;
@@ -615,21 +615,8 @@ public class APICatalogSync {
         return (intCount >= 3 && charCount >= 1);
     }
 
-    private static SubType getTokenSubType(Object token){
-        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
-            if (!customDataType.isActive()) continue;
-            boolean result = false;
-            Conditions valueConditions =  customDataType.getValueConditions();
-            
-            if(valueConditions !=null){
-                result = valueConditions.validate(token);
-            }
-            if (result) return customDataType.toSubType();
-        }
-        return KeyTypes.findSubType(token, "", null,true);
-    }
 
-    private static Boolean isValidSubtype(SubType subType){
+    private static boolean isValidSubtype(SubType subType){
         return !(subType.getName().equals(SingleTypeInfo.GENERIC.getName()) || subType.getName().equals(SingleTypeInfo.OTHER.getName()));
     }
 
@@ -653,8 +640,8 @@ public class APICatalogSync {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
 
-            SubType dbSubType = getTokenSubType(dbTokens[i]);
-            SubType tempSubType = getTokenSubType(newTokens[i]);
+            SubType dbSubType = KeyTypes.findSubType(dbTokens[i], "", null,true);
+            SubType tempSubType = KeyTypes.findSubType(newTokens[i], "", null,true);
 
             if (tempToken.equalsIgnoreCase(dbToken)) {
                 continue;
@@ -723,7 +710,7 @@ public class APICatalogSync {
                         if (superType == null) continue;
                         String word = delEndpoint.split("/")[i];
                         SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", SingleTypeInfo.GENERIC, apiCollectionId, true);
-                        SubType tokenSubType = getTokenSubType(word);;
+                        SubType tokenSubType = KeyTypes.findSubType(word, "", null,true);
                         stiId.setSubType(tokenSubType);
                         SingleTypeInfo sti = new SingleTypeInfo(
                             stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
