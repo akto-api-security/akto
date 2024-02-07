@@ -116,7 +116,7 @@ public class LoggerMaker  {
                 BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
                 slack.send(slackWebhookUrl, ret.toJson());
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
@@ -136,10 +136,14 @@ public class LoggerMaker  {
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
-        basicError(err, db);
+        try {
+            basicError(err, db);
 
-        if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
-            sendToSlack(err);
+            if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
+                sendToSlack(err);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -149,9 +153,18 @@ public class LoggerMaker  {
     }
     
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
-        StackTraceElement stackTraceElement = e.getStackTrace()[0];
-        err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-        errorAndAddToDb(err, db);
+        try {
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            errorAndAddToDb(err, db);
+        } catch (Exception e1) {
+            e1.printStackTrace();
+        }
     }
 
     public void infoAndAddToDb(String info, LogDb db) {
