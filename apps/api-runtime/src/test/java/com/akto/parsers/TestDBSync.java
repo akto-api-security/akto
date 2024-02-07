@@ -145,7 +145,7 @@ public class TestDBSync extends MongoBasedTest {
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(1, sd.getSamples().size());
 
-        parser.syncFunction(responseParams,true, true);
+        parser.syncFunction(responseParams,true, true, null);
         sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(10, sd.getSamples().size());
     }
