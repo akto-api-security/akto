@@ -57,6 +57,7 @@ import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
+import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -102,6 +103,10 @@ const router = createBrowserRouter([
               {
                 path:"user-config",
                 element:<UserConfig/>
+              },
+              {
+                path:"dependency",
+                element:<DependencyTable/>
               }
             ]
           },
@@ -283,7 +288,6 @@ const router = createBrowserRouter([
 function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
-  setAllRoutes(searchData)
   const { stigg } = useStiggContext();
   useEffect(() => {
     stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
@@ -303,6 +307,7 @@ function App() {
       }
       };
     `);
+    setAllRoutes(searchData)
     script.appendChild(scriptText);
     document.body.appendChild(script)
   }, [])

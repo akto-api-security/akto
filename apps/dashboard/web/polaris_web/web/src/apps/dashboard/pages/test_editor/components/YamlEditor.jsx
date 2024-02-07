@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris"
-import { tokens } from "@shopify/polaris-tokens"
 import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
-import convertFunc from "../transform";
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
@@ -43,6 +41,9 @@ const YamlEditor = ({ fetchAllTests }) => {
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
 
+    const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
+    const setSelectedSampleApi = TestEditorStore(state => state.setSelectedSampleApi)
+
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
     const editorInstanceRef = useRef(editorInstance)
@@ -71,6 +72,9 @@ const YamlEditor = ({ fetchAllTests }) => {
                 isError: false,
                 message: "Test saved successfully!"
             })
+            let newUrlObj = {...selectedSampleApi}
+            newUrlObj[addTestTemplateResponse.finalTestId] = selectedSampleApi[selectedTest.value];
+            setSelectedSampleApi(newUrlObj);
             navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
             fetchAllTests()
         } catch(error) {
@@ -145,8 +149,8 @@ const YamlEditor = ({ fetchAllTests }) => {
     return (
         <div>
             <div className="editor-header">
-                <div ref={ref} />
                 <HorizontalStack gap={"1"}>
+                    <div ref={ref} />
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>

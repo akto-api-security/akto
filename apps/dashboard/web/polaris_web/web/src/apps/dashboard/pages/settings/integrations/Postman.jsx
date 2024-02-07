@@ -17,18 +17,19 @@ function Postman() {
     }
     
     async function fetchPostmanCred() {
-      let postmanData = await settingFunctions.getPostmanCredentials();
-      let postmanCred = postmanData.postmanCred
-      if (postmanCred['api_key'] && postmanCred['workspace_id']) {
-        setPostmanKey(postmanCred.api_key);
-        setSelected(postmanCred.workspace_id);
-        fetchWorkSpaces();
-      }
+      settingFunctions.getPostmanCredentials().then((resp)=> {
+        let postmanCred = resp.postmanCred
+        if (postmanCred['api_key'] && postmanCred['workspace_id']) {
+          setPostmanKey(postmanCred.api_key);
+          setSelected(postmanCred.workspace_id);
+          fetchWorkSpaces(postmanCred.api_key);
+        }
+      })
     }
     
-    async function fetchWorkSpaces() {
-      if (postmanKey !== null && postmanKey.length > 0) {
-        let allWorkSpaces = await settingFunctions.fetchPostmanWorkspaces(postmanKey);
+    async function fetchWorkSpaces(key) {
+      if (key !== null && key.length > 0) {
+        let allWorkSpaces = await settingFunctions.fetchPostmanWorkspaces(key);
         let arr = []
         allWorkSpaces.map((val)=>{
             let obj = {
@@ -38,6 +39,12 @@ function Postman() {
             arr.push(obj)
         })
         setWorkspaces(arr);
+        if(arr.length === 0){
+          setSelected('')
+        }
+      }else{
+        setWorkspaces([])
+        setSelected('')
       }
     }
     
@@ -52,8 +59,11 @@ function Postman() {
     
     useEffect(() => {
         fetchPostmanCred()
-        fetchWorkSpaces()
-    }, [postmanKey]);
+    }, []);
+
+    useEffect(()=> {
+      fetchWorkSpaces(postmanKey)
+    },[postmanKey])
     
     const seeWork = () => {
         window.open("https://docs.akto.io/traffic-connections/postman")

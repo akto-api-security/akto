@@ -17,9 +17,6 @@ export default function Header() {
 
     const navigate = useNavigate()
 
-    const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
-    const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
-    const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const accounts = Store(state => state.accounts)
@@ -30,13 +27,7 @@ export default function Header() {
     const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
-    const handleLeftNavCollapse = () => {
-        if (!leftNavCollapsed) {
-            setLeftNavSelected('')
-        }
-
-        toggleLeftNavCollapsed()
-    }
+    
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -140,7 +131,7 @@ export default function Header() {
                 },
                 {
                     items: [
-                        { id: "switch-ui", content: <ContentWithIcon text={"Switch to legacy"} icon={ReplaceMajor} />, onAction: handleSwitchUI },
+                        // { id: "switch-ui", content: <ContentWithIcon text={"Switch to legacy"} icon={ReplaceMajor} />, onAction: handleSwitchUI },
                         { content: <ContentWithIcon text={"Documentation"} icon={NoteMinor} />, onAction: () => { window.open("https://docs.akto.io/readme") } },
                         { content: <ContentWithIcon text={"Tutorials"} icon={ResourcesMajor}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
                         { content: <ContentWithIcon icon={UpdateInventoryMajor} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },

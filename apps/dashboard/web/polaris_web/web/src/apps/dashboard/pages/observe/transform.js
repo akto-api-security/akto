@@ -348,14 +348,23 @@ const transform = {
 
     prettifyCollectionsData(newData){
         const prettifyData = newData.map((c)=>{
+            let calcCoverage = '0%';
+            if(c.endpoints > 0){
+                if(c.endpoints < c.testedEndpoints){
+                    calcCoverage= '100%'
+                }else{
+                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
+                }
+            }
             return{
+                ...c,
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
                 riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
-                coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
+                coverage: calcCoverage,
                 issuesArr: this.getIssuesList(c.severityInfo),
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,

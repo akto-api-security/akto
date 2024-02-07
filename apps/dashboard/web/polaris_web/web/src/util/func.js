@@ -14,6 +14,8 @@ import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
 import { tokens } from "@shopify/polaris-tokens" 
+import PersistStore from '../apps/main/PersistStore';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -491,6 +493,22 @@ prettifyEpoch(epoch) {
 
     return collectionsObj
   },
+  mapCollectionId(collections) {
+    let collectionsObj = {}
+    collections.forEach((collection)=>{
+      if(!collectionsObj[collection.id]){
+        collectionsObj[collection.id] = collection
+      }
+    })
+    return collectionsObj
+  },
+  reduceToCollectionName(collectionObj){
+    return Object.keys(collectionObj).reduce((acc, k) => {
+      acc[k] = collectionObj[k].displayName;
+      return acc;
+    }, {});
+  },
+  
 sortFunc: (data, sortKey, sortOrder) => {
   return data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
@@ -680,6 +698,9 @@ parameterizeUrl(x) {
   return newStr
 },
 mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+  const allCollections = PersistStore.getState().allCollections
+  const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
+
   let ret = {}
   let apiInfoMap = {}
 
@@ -713,7 +734,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
-              id: x.method+ " " + x.url + Math.random(),
+              id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
               sensitive: x.sensitive,
               tags: x.tags,
@@ -734,6 +755,11 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
+                return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
+              }).map( x => {
+                return apiGroupsMap[x]
+              }) : [],
               isSensitive: isSensitive,
               severityScore: score,
           }
@@ -1230,6 +1256,33 @@ mapCollectionIdToHostName(apiCollections){
             return KeyMajor;
     }
   },
+  getCollectionFilters(filters) {
+    const allCollections = PersistStore.getState().allCollections
+    filters.forEach((x, i) => {
+      let tmp = []
+      switch (x.key) {
+        case "collectionIds":
+          filters[i].choices = []
+          tmp = allCollections
+            .filter(x => x.type === 'API_GROUP')
+          break;
+        case "apiCollectionId":
+          filters[i].choices = []
+          tmp = allCollections
+            .filter(x => x.type !== 'API_GROUP')
+          break;
+        default:
+          break;
+      }
+      tmp.forEach(x => {
+        filters[i].choices.push({
+          label: x.displayName,
+          value: Number(x.id)
+        })
+      })
+    })
+    return filters;
+  },
   handleKeyPress (event, funcToCall) {
     const enterKeyPressed = event.keyCode === 13;
     if (enterKeyPressed) {
@@ -1237,6 +1290,20 @@ mapCollectionIdToHostName(apiCollections){
       funcToCall();
     }
   },
+
+  convertParamToDotNotation(str) {
+    return str.replace(/[#\$]+/g, '.');;
+  },
+
+  findLastParamField(str) {
+    let paramDot = func.convertParamToDotNotation(str)
+    let parmArr = paramDot.split(".")
+    let lastIndex = parmArr.length-1
+    let result = parmArr.length > 0 ? parmArr[lastIndex] : paramDot
+    if (result.length > 0) return result;
+    return parmArr[lastIndex-1]
+  },
+
   addPlurality(count){
     if(count == null || count==undefined){
       return ""
@@ -1258,7 +1325,28 @@ mapCollectionIdToHostName(apiCollections){
       first = false
     })
     return url;
-  }
+  },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  },
+  transformString(inputString) {
+    let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
+    const segments = transformedString.split('/');
+    for (let i = 0; i < segments.length; i++) {
+        // Check if the segment is alphanumeric
+        if (/^[0-9a-fA-F]+$/.test(segments[i]) || /^[0-9]+$/.test(segments[i])) {
+        segments[i] = 'id';
+        }
+    }
+    transformedString = segments.join('/');
+    transformedString = transformedString.replace(/[/|-]/g, '_');
+    return transformedString;
+}
+
 }
 
 export default func

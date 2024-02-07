@@ -497,6 +497,61 @@ export default {
         })
     },
 
+    async addApisToCustomCollection(apiList, collectionName) {
+        return await request({
+            url: '/api/addApisToCustomCollection',
+            method: 'post',
+            data: {
+                apiList, collectionName
+            }
+        })
+    },
+    async removeApisFromCustomCollection(apiList, collectionName) {
+        return await request({
+            url: '/api/removeApisFromCustomCollection',
+            method: 'post',
+            data: {
+                apiList, collectionName
+            }
+        })
+    },
+    async computeCustomCollections(collectionName) {
+        return await request({
+            url: '/api/computeCustomCollections',
+            method: 'post',
+            data: {
+                collectionName
+            }
+        })
+    },
+    async createCustomCollection(collectionName, conditions) {
+        return await request({
+            url: '/api/createCustomCollection',
+            method: 'post',
+            data: {
+                collectionName, conditions
+            }
+        })
+    },
+    async getEndpointsFromConditions(conditions) {
+        return await request({
+            url: '/api/getEndpointsFromConditions',
+            method: 'post',
+            data: {
+                conditions
+            }
+        })
+    },
+    fetchApiDependencies(apiCollectionId, url, method) {
+        return request({
+            url: '/api/fetchApiDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
+
     async getSensitiveInfoForCollections(){
         return await request({
             url: '/api/getSensitiveInfoForCollections',
@@ -543,5 +598,12 @@ export default {
             method: 'post',
             data: {}
         })
-    }
+    },
+    async getUserEndpoints(){
+        return await request({
+            url: '/api/getCustomerEndpoints',
+            method: 'post',
+            data:{},
+        })
+    },
 }

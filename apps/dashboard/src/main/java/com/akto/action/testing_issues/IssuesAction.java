@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -20,6 +21,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -65,9 +67,7 @@ public class IssuesAction extends UserAction {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, filterStatus));
         }
         if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
-            filters = Filters.and(filters, Filters.in(ID + "."
-                    + TestingIssuesId.API_KEY_INFO + "."
-                    + ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterCollectionsId));
+            filters = Filters.and(filters, Filters.in(SingleTypeInfo._COLLECTION_IDS, filterCollectionsId));
         }
         if (filterSeverity != null && !filterSeverity.isEmpty()) {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.KEY_SEVERITY, filterSeverity));
@@ -211,6 +211,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
         infoObj.put("updatedTs", testConfig.getUpdateTs());
+        infoObj.put("author", testConfig.getAuthor());
 
         superCategory.put("displayName", info.getCategory().getDisplayName());
         superCategory.put("name", info.getCategory().getName());
@@ -253,7 +254,8 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
-        Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
+        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+                                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));

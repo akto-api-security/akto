@@ -4,7 +4,6 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
-import com.akto.notifications.slack.DailyUpdate;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -13,7 +12,6 @@ import com.mongodb.client.model.Projections;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -34,8 +32,11 @@ public class LoggerMaker  {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+    protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
+            
             @Override
             public void run() {
                 try {
@@ -47,7 +48,7 @@ public class LoggerMaker  {
                     Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
                     slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
                 } catch (Exception e) {
-                    System.out.println("error in getting config: " + e.getMessage());
+                    internalLogger.error("error in getting slack config: " + e.toString());
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
@@ -56,6 +57,8 @@ public class LoggerMaker  {
     private static int logCount = 0;
     private static int logCountResetTimestamp = Context.now();
     private static final int oneMinute = 60; 
+
+    private LogDb db;
 
     public enum LogDb {
         TESTING,RUNTIME,DASHBOARD,BILLING
@@ -66,7 +69,13 @@ public class LoggerMaker  {
         logger = LoggerFactory.getLogger(c);
     }
 
-    private void sendToSlack(String err) {
+    public LoggerMaker(Class<?> c, LogDb db) {
+        aClass = c;
+        logger = LoggerFactory.getLogger(c);
+        this.db = db;
+    }
+
+    protected static void sendToSlack(String err) {
         if (slackWebhookUrl != null) {
             try {
                 Slack slack = Slack.getInstance();
@@ -78,12 +87,12 @@ public class LoggerMaker  {
                 slack.send(slackWebhookUrl, ret.toJson());
 
             } catch (IOException e) {
-                logger.error("Can't send to Slack: " + e.getMessage(), e);
+                internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
     }
 
-    public void errorAndAddToDb(String err, LogDb db) {
+    protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
         }
@@ -93,6 +102,11 @@ public class LoggerMaker  {
         } catch (Exception e){
 
         }
+        return err;
+    }
+
+    public void errorAndAddToDb(String err, LogDb db) {
+        basicError(err, db);
 
         if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
             sendToSlack(err);
@@ -114,6 +128,14 @@ public class LoggerMaker  {
         }
     }
 
+    public void errorAndAddToDb(String err) {
+        errorAndAddToDb(err, this.db);
+    }
+
+    public void infoAndAddToDb(String info) {
+        infoAndAddToDb(info, this.db);
+    }
+
     private Boolean checkUpdate(){
         if(logCount>=1000){
             if((logCountResetTimestamp + oneMinute) >= Context.now()){
@@ -130,7 +152,7 @@ public class LoggerMaker  {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         
-        if(checkUpdate()){
+        if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
                     LogsDao.instance.insertOne(log);
@@ -143,6 +165,9 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                default:
+                    break;
             }
             logCount++;
         }
@@ -172,6 +197,9 @@ public class LoggerMaker  {
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            default:
+                break;
         }
         return logs;
     }

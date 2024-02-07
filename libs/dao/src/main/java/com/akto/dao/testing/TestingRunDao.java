@@ -7,15 +7,30 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
+import com.akto.dao.context.Context;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 public class TestingRunDao extends AccountsContextDao<TestingRun> {
 
     public static final TestingRunDao instance = new TestingRunDao();
+
+    public void createIndicesIfAbsent() {
+        String dbName = Context.accountId.get()+"";
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+
+        String[] fieldNames = {TestingRun.SCHEDULE_TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        fieldNames = new String[]{TestingRun.END_TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+    }
 
     public List<Integer> getTestConfigIdsToDelete(List<ObjectId> testingRunIds){
         // this function is to get list of testConfigIds from testingRunIds for deleting from testing_run_config collection in DB.

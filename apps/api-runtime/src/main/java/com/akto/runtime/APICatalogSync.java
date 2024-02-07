@@ -643,7 +643,9 @@ public class APICatalogSync {
             SubType dbSubType = KeyTypes.findSubType(dbTokens[i], "", null,true);
             SubType tempSubType = KeyTypes.findSubType(newTokens[i], "", null,true);
 
-            if (tempToken.equalsIgnoreCase(dbToken)) {
+            
+            int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
+            if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
                 continue;
             }
             
@@ -653,17 +655,26 @@ public class APICatalogSync {
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
-            } 
+            }
             else if(isValidSubtype(tempSubType) && isValidSubtype(dbSubType) && (dbSubType.getName().equals(tempSubType.getName()))){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
-            }
-            else {
+            } else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
+                newTypes[i] = SuperType.STRING;
+                newTokens[i] = null;
+            } else {
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
                 templatizedStrTokens++;
             }
         }
+
+        boolean allNull = true;
+        for (SingleTypeInfo.SuperType superType: newTypes) {
+            allNull = allNull && (superType == null);
+        }
+
+        if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
             return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
@@ -682,6 +693,7 @@ public class APICatalogSync {
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+        ArrayList<WriteModel<DependencyNode>> bulkUpdatesForDependencyNode = new ArrayList<>();
 
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
@@ -750,6 +762,21 @@ public class APICatalogSync {
 
                 bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
                 bulkUpdatesForApiInfo.add(new DeleteManyModel<>(filterQSampleData));
+
+                Bson filterForDependencyNode = Filters.or(
+                        Filters.and(
+                                Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionId+""),
+                                Filters.eq(DependencyNode.URL_REQ, delEndpoint),
+                                Filters.eq(DependencyNode.METHOD_REQ, delMethod.name())
+                        ),
+                        Filters.and(
+                                Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionId+""),
+                                Filters.eq(DependencyNode.URL_RESP, delEndpoint),
+                                Filters.eq(DependencyNode.METHOD_RESP,delMethod.name())
+                        )
+                );
+                bulkUpdatesForDependencyNode.add(new DeleteManyModel<>(filterForDependencyNode));
+
                 // SampleDataDao.instance.deleteAll(filterQSampleData);
                 // ApiInfoDao.instance.deleteAll(filterQSampleData);
             }
@@ -770,6 +797,20 @@ public class APICatalogSync {
                 Filters.eq("_id.url", delEndpoint)
             );
 
+            Bson filterForDependencyNode = Filters.or(
+                    Filters.and(
+                            Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionId+""),
+                            Filters.eq(DependencyNode.URL_REQ, delEndpoint),
+                            Filters.eq(DependencyNode.METHOD_REQ, delMethod.name())
+                    ),
+                    Filters.and(
+                            Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionId+""),
+                            Filters.eq(DependencyNode.URL_RESP, delEndpoint),
+                            Filters.eq(DependencyNode.METHOD_RESP,delMethod.name())
+                    )
+            );
+            bulkUpdatesForDependencyNode.add(new DeleteManyModel<>(filterForDependencyNode));
+
             bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
             bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
             // SingleTypeInfoDao.instance.deleteAll(filterQ);
@@ -786,6 +827,10 @@ public class APICatalogSync {
 
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+        }
+
+        if (bulkUpdatesForDependencyNode.size() > 0) {
+            BulkWriteResult bulkWriteResult = DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdatesForDependencyNode, new BulkWriteOptions().ordered(false));
         }
     }
 
@@ -1248,7 +1293,8 @@ public class APICatalogSync {
 
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
-                        Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
@@ -1257,7 +1303,7 @@ public class APICatalogSync {
                             loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
-                        ;
+                        loggerMaker.errorAndAddToDb(e, String.format("Error while merging collections. Error: %s", e.getMessage()), LogDb.RUNTIME);
                     }
 
                     try {
@@ -1489,11 +1535,19 @@ public class APICatalogSync {
         }
 
         if (writesForSensitiveSampleData.size() > 0) {
-            SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+            try {
+                SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         if (writesForSensitiveParamInfo.size() > 0) {
-            SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+            try {
+                SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         buildFromDB(true, fetchAllSTI);

@@ -14,6 +14,8 @@ import PersistStore from "../../../main/PersistStore"
 import testEditorRequests from "./api"
 
 import convertFunc from "./transform"
+import { learnMoreObject } from "../../../main/onboardingData"
+import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -22,7 +24,6 @@ const TestEditor = () => {
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
-    const setLeftNavSelected = PersistStore(state => state.setLeftNavSelected)
     const setActive = PersistStore(state => state.setActive)
 
     const [loading, setLoading] = useState(true)
@@ -30,7 +31,6 @@ const TestEditor = () => {
 
     const handleExit = () => {
         navigate("/dashboard/testing")
-        setLeftNavSelected("testing-results")
         setActive('active')
     }
 
@@ -70,6 +70,8 @@ const TestEditor = () => {
         console.log("add test")
     }
 
+    const learnMoreObjEditor = learnMoreObject['dashboard_test_editor']
+
     const headerComp = (
         <div className="header-css">
             <HorizontalStack gap="5">
@@ -80,12 +82,17 @@ const TestEditor = () => {
                 </HorizontalStack>
             </HorizontalStack>
 
-            {/* <Button onClick={addCustomTest}>Create custom test</Button> */}
+            <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
         </div>
     )
+    
+
     const headerEditor = (
         <TopBar secondaryMenu={headerComp} />
     )
+
+   
+
 
     const defaultId = "REMOVE_TOKENS";
 

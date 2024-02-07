@@ -1,7 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal, TextField, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
 import api from "../api"
-import { useEffect,useState, useCallback, useRef } from "react"
+import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -10,8 +10,10 @@ import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import CollectionsPageBanner from "./component/CollectionsPageBanner"
 
 const headers = [
     {
@@ -19,7 +21,7 @@ const headers = [
         text: "API collection name",
         value: "displayNameComp",
         filterKey:"displayName",
-        showFilter:true,
+        showFilter:true
     },
     {
         title: "Total endpoints",
@@ -56,8 +58,8 @@ const headers = [
 ]
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'Risky first', sortKey: 'riskScore' },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Stable first', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
     { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
@@ -100,17 +102,42 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
-    const [data, setData] = useState([])
+    const [data, setData] = useState({'All':[]})
     const [active, setActive] = useState(false);
-    const [newCollectionName, setNewCollectionName] = useState('');
     const [loading, setLoading] = useState(false)
+    const [selectedTab, setSelectedTab] = useState("All")
+    const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
-    const handleNewCollectionNameChange = 
-        useCallback(
-            (newValue) => setNewCollectionName(newValue),
-        []);
+    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
     
     
+    const tableTabs = [
+        {
+            content: 'All',
+            badge: data["All"]?.length?.toString(),
+            onAction: () => { setSelectedTab('All') },
+            id: 'All',
+        },
+        {
+            content: 'Hostname',
+            badge: data["Hostname"]?.length?.toString(),
+            onAction: () => { setSelectedTab('Hostname') },
+            id: 'Hostname',
+        },
+        {
+            content: 'Groups',
+            badge: data["Groups"]?.length?.toString(),
+            onAction: () => { setSelectedTab('Groups') },
+            id: 'Groups',
+        },
+        {
+            content: 'Custom',
+            badge: data["Custom"]?.length?.toString(),
+            onAction: () => { setSelectedTab('Custom') },
+            id: 'Custom',
+        }
+    ]
+
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
@@ -131,21 +158,15 @@ function ApiCollections() {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
-    const createNewCollection = async () => {
-        let newColl = await api.createCollection(newCollectionName)
-        setNewCollectionName('')
-        //setData([convertToCollectionData(newColl.apiCollections[0]), ...data])
-        fetchData()
-        setActive(false)
-        func.setToast(true, false, "API collection created successfully")
-    }
+    const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
     async function fetchData() {
         setLoading(true)
         let apiPromises = [
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
-            api.getLastTrafficSeen()
+            api.getLastTrafficSeen(),
+            api.getUserEndpoints(),
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -153,6 +174,9 @@ function ApiCollections() {
         let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
+        setHasUsageEndpoints(hasUserEndpoints)
+        setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
 
@@ -174,7 +198,13 @@ function ApiCollections() {
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
         
-        setData(dataObj.prettify)
+        tmp = {}
+        tmp.All = dataObj.prettify
+        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
+
+        setData(tmp);
     }
 
     function disambiguateLabel(key, value) {
@@ -197,11 +227,27 @@ function ApiCollections() {
 
     const promotedBulkActions = (selectedResources) => [
         {
-          content: 'Remove collections',
+          content: `Remove collection${func.addPlurality(selectedResources.length)}`,
           onAction: () => handleRemoveCollections(selectedResources)
         },
       ];
 
+    const modalComponent = <CreateNewCollectionModal
+        key="modal"
+        active={active}
+        setActive={setActive}
+        createCollectionModalActivatorRef={createCollectionModalActivatorRef}
+        fetchData={fetchData}
+    />
+
+    let coverage = '0%';
+    if(summaryData.totalEndpoints !== 0){
+        if(summaryData.totalEndpoints < summaryData.totalTestedEndpoints){
+            coverage = '100%'
+        }else{
+            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+        }
+    }
 
       const summaryItems = [
         {
@@ -214,7 +260,7 @@ function ApiCollections() {
         },
         {
             title: "Tested APIs (Coverage)",
-            data: Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+            data: coverage
         },
         {
             title: "Sensitive in response APIs",
@@ -222,45 +268,16 @@ function ApiCollections() {
         }
     ]
 
-    const modalComponent = (
-        <Modal
-            key="modal"
-            activator={createCollectionModalActivatorRef}
-            open={active}
-            onClose={() => setActive(false)}
-            title="New collection"
-            primaryAction={{
-            id:"create-new-collection",
-            content: 'Create',
-            onAction: createNewCollection,
-            }}
-        >
-            <Modal.Section>
 
-            <TextField
-                id={"new-collection-input"}
-                label="Name"
-                helpText="Enter name for the new collection"
-                value={newCollectionName}
-                onChange={handleNewCollectionNameChange}
-                autoComplete="off"
-                maxLength="24"
-                suffix={(
-                    <Text>{newCollectionName.length}/24</Text>
-                )}
-                autoFocus
-            />
-
-
-            </Modal.Section>
-        </Modal>
-    )
+    const handleSelectedTab = (selectedIndex) => {
+        setSelected(selectedIndex)
+    }
 
     const tableComponent = (
         <GithubSimpleTable
             key="table"
             pageLimit={100}
-            data={data} 
+            data={data[selectedTab]} 
             sortOptions={sortOptions} 
             resourceName={resourceName} 
             filters={[]}
@@ -272,10 +289,13 @@ function ApiCollections() {
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
+            tableTabs={tableTabs}
+            onSelect={handleSelectedTab}
+            selected={selected}
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, modalComponent, tableComponent]
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     return(
         <PageWithMultipleCards

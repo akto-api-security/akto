@@ -1,5 +1,7 @@
 package com.akto.dao;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 import javax.print.attribute.HashAttributeSet;
@@ -7,12 +9,14 @@ import javax.print.attribute.HashAttributeSet;
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
@@ -216,7 +220,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.or(subTypeFilters));
 
         if (apiCollectionId != null && apiCollectionId != -1) {
-            filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
+            filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
         }
 
         if (url != null) {
@@ -271,14 +275,31 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+        Bson filter = null;
+        if (apiCollectionId != -1) {
+            filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        }
+        return fetchEndpointsInCollection(filter, -1);
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
+        Bson filter = null;
+        if (method != null) {
+            // the filter obtained uses index.
+            filter = MethodCondition.createMethodFilter(method);
+        }
+        return fetchEndpointsInCollection(filter, 50);
+    }
+
+    private List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter, int limit) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
 
-        if (apiCollectionId != -1) {
-            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        if(filter != null){
+            pipeline.add(Aggregates.match(filter));
         }
 
         Bson projections = Projections.fields(
@@ -288,6 +309,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+        if (limit > 0) {
+            pipeline.add(Aggregates.limit(limit));
+        }
 
         MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
@@ -429,4 +454,84 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
         
     }
+
+    public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
+        Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
+        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
+
+        List<Bson> pipeline = new ArrayList<>();
+
+        List<Bson> filters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeys) {
+            filters.add(
+                    Filters.and(
+                            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfoKey.getApiCollectionId()),
+                            Filters.eq(SingleTypeInfo._URL, apiInfoKey.getUrl()),
+                            Filters.eq(SingleTypeInfo._METHOD, apiInfoKey.getMethod().name()),
+                            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                            Filters.eq(SingleTypeInfo._IS_HEADER, false)
+                    )
+            );
+        }
+
+        pipeline.add(Aggregates.match(Filters.or(filters)));
+
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                        .append("url", "$url")
+                        .append("method", "$method");
+
+
+        Bson projections = Projections.fields(
+                Projections.include( "apiCollectionId", "url", "method", "param")
+        );
+
+        pipeline.add(Aggregates.project(projections));
+
+        pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("params", "$param")));
+
+
+        MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (stiCursor.hasNext()) {
+            BasicDBObject next = stiCursor.next();
+            BasicDBObject id = (BasicDBObject) next.get("_id");
+            List<String> params = (List<String>) next.get("params");
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(id.getInt("apiCollectionId"), id.getString("url"), URLMethods.Method.fromString(id.getString("method")));
+            result.put(apiInfoKey, params);
+        }
+
+        return result;
+    }
+
+    public Set<String> fetchHosts(List<Integer> apiCollectionIds) {
+        List<Bson> pipeline = new ArrayList<>();
+        Bson filter = Filters.and(
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, apiCollectionIds),
+                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                Filters.eq(SingleTypeInfo._IS_HEADER, true)
+        );
+
+        pipeline.add(Aggregates.match(filter));
+        pipeline.add(Aggregates.project(Projections.include(SingleTypeInfo._URL)));
+
+        BasicDBObject groupedId =  new BasicDBObject("url", "$"+SingleTypeInfo._URL);
+        pipeline.add(Aggregates.group(groupedId));
+
+
+        Set<String> hosts = new HashSet<>();
+        MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (stiCursor.hasNext()) {
+            BasicDBObject next = stiCursor.next();
+            BasicDBObject id = (BasicDBObject) next.get("_id");
+            String url = id.getString("url");
+            try {
+                URI uri = new URI(url);
+                String host = uri.getHost();
+                hosts.add(host);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+            }
+        }
+        return hosts;
+    }
+
 }

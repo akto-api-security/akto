@@ -18,7 +18,7 @@ function DateRangeFilter(props){
         <Popover
         active={popoverActive}
         autofocusTarget="none"
-        preferredAlignment="left"
+        preferredAlignment="right"
         preferredPosition="below"
         fluidContent
         sectioned={false}
@@ -28,7 +28,9 @@ function DateRangeFilter(props){
             icon={CalendarMinor}
             onClick={() => setPopoverActive(!popoverActive)}
           >
-            {func.getDateValue(initialDispatch)}
+            <span style={{whiteSpace: "nowrap"}}>
+              {func.getDateValue(initialDispatch)}
+            </span>
           </Button>
         }
         onClose={() => setPopoverActive(false)}

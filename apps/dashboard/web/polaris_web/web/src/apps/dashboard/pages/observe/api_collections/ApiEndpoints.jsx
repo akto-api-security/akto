@@ -4,7 +4,7 @@ import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { useParams } from "react-router-dom"
+import {useLocation, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
 
 import "./api_inventory.css"
@@ -12,6 +12,7 @@ import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
 import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
+import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import dashboardFunc from "../../transform"
@@ -19,7 +20,11 @@ import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
+import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
+import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 
 const headings = [
     {
@@ -94,17 +99,21 @@ const sortOptions = [
 function ApiEndpoints() {
 
     const params = useParams()
+    const location = useLocation()
     const apiCollectionId = params.apiCollectionId
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const allCollections = PersistStore(state => state.allCollections);
 
     const pageTitle = collectionsMap[apiCollectionId]
 
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
+    const [runTests, setRunTests ] = useState(false)
 
     const [endpointData, setEndpointData] = useState([])
     const [selectedTab, setSelectedTab] = useState("All")
@@ -115,11 +124,15 @@ function ApiEndpoints() {
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
+    const coverageInfo = PersistStore(state => state.coverageMap)
 
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
 
+    const queryParams = new URLSearchParams(location.search);
+    const selectedUrl = queryParams.get('selected_url')
+    const selectedMethod = queryParams.get('selected_method')
     const tableTabs = [
         {
             content: 'All',
@@ -161,6 +174,7 @@ function ApiEndpoints() {
     async function fetchData() {
         setLoading(true)
         let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
+        setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
         let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiCollectionData.data.apiInfoList
         let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
@@ -201,6 +215,21 @@ function ApiEndpoints() {
 
         setLoading(false)
     }
+
+    useEffect(() => {
+        if (!endpointData || !endpointData["All"] || !selectedUrl || !selectedMethod) return
+        let allData = endpointData["All"]
+
+        const selectedApiDetail = allData.filter((x) => {
+            return selectedUrl === x.endpoint && selectedMethod === x.method
+        })
+
+        if (!selectedApiDetail || selectedApiDetail.length === 0)  return
+
+        setApiDetail(selectedApiDetail[0])
+        setShowDetails(true)
+
+    }, [selectedUrl, selectedMethod, endpointData])
 
     const checkGptActive = async() => {
         await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
@@ -245,6 +274,11 @@ function ApiEndpoints() {
         func.setToast(true, false, "Endpoints refreshed")
     }
 
+    function computeApiGroup() {
+        api.computeCustomCollections(pageTitle);
+        func.setToast(true, false, "API group is being computed.")
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -286,6 +320,12 @@ function ApiEndpoints() {
         const result = await api.exportToPostman(apiCollectionId)
         if (result)
         func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
+    }
+
+    const [showWorkflowTests, setShowWorkflowTests] = useState(false)
+
+    function toggleWorkflowTests() {
+        setShowWorkflowTests(!showWorkflowTests)
     }
 
     function disambiguateLabel(key, value) {
@@ -370,6 +410,7 @@ function ApiEndpoints() {
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setExportOpen(false) }}
+                preferredAlignment="right"
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
@@ -377,13 +418,26 @@ function ApiEndpoints() {
                             <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
-                            <UploadFile
+                            {
+                                allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length > 0 ?
+                                    <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
+                                        <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
+                                    </div> :
+                                    null
+                            }
+                            { allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length == 0 ?
+                                <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}
                                 tooltipText="Upload traffic(.har)"
                                 label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
                                 primary={false} 
-                            />
+                                /> : null
+                            }
                         </VerticalStack>
                     </Popover.Section>
                     <Popover.Section>
@@ -402,15 +456,26 @@ function ApiEndpoints() {
                             </VerticalStack>
                         </VerticalStack>
                     </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
+                                <Text fontWeight="regular" variant="bodyMd">
+                                    {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
+                                </Text>
+                            </div>
+                        </VerticalStack>
+                    </Popover.Section>
                 </Popover.Pane>
             </Popover>
 
-            {isGptActive ? <Button onClick={displayGPT}>Ask AktoGPT</Button>: null}
+            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
                     
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                runTestFromOutside={runTests}
+                disabled={showEmptyScreen}
             />
         </HorizontalStack>
     )
@@ -423,6 +488,114 @@ function ApiEndpoints() {
         },200)
     }
 
+    const [showApiGroupModal, setShowApiGroupModal] = useState(false)
+    const [apis, setApis] = useState([])
+    const [actionOperation, setActionOperation] = useState(Operation.ADD)
+
+    function handleApiGroupAction(selectedResources, operation){
+
+        setActionOperation(operation)
+        setApis(selectedResources)
+        setShowApiGroupModal(true);
+    }
+
+    function toggleApiGroupModal(){
+        setShowApiGroupModal(false);
+    }
+
+    const promotedBulkActions = (selectedResources) => {
+
+        let isApiGroup = allCollections.filter(x => {
+            return x.id == apiCollectionId && x.type == "API_GROUP"
+        }).length > 0
+
+        let ret = []
+        if (isApiGroup) {
+            ret.push(
+                {
+                    content: 'Remove from API group',
+                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
+                }
+            )
+        } else {
+            ret.push({
+                content: 'Add to API group',
+                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
+            })
+        }
+        return ret;
+    }
+
+      const components = [
+        loading ? [<SpinnerCentered key="loading" />] : (
+            showWorkflowTests ? [
+                <WorkflowTests
+                key={"workflow-tests"}
+                apiCollectionId={apiCollectionId}
+                endpointsList={loading ? [] : endpointData["All"]}
+            />
+             ] : showEmptyScreen ? [
+                <EmptyScreensLayout key={"emptyScreen"}
+                            iconSrc={"/public/file_plus.svg"}
+                            headingText={"Discover APIs to get started"}
+                            description={"Your API collection is currently empty. Import APIs from other collections now."}
+                            buttonText={"Import from other collections"}
+                            redirectUrl={"/dashboard/observe/inventory"}
+                            learnText={"inventory"}
+                            docsUrl={ENDPOINTS_PAGE_DOCS_URL}
+                />] :[
+                    (coverageInfo[apiCollectionId] === 0  || !(coverageInfo.hasOwnProperty(apiCollectionId))? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
+                <div className="apiEndpointsTable" key="table">
+                      <GithubSimpleTable
+                          key="table"
+                          pageLimit={50}
+                          data={endpointData[selectedTab]}
+                          sortOptions={sortOptions}
+                          resourceName={resourceName}
+                          filters={[]}
+                          disambiguateLabel={disambiguateLabel}
+                          headers={headers}
+                          getStatus={() => { return "warning" }}
+                          selected={selected}
+                          onRowClick={handleRowClick}
+                          onSelect={handleSelectedTab}
+                          getFilteredItems={getFilteredItems}
+                          mode={IndexFiltersMode.Default}
+                          headings={headings}
+                          useNewRow={true}
+                          condensedHeight={true}
+                          tableTabs={tableTabs}
+                          selectable={true}
+                          promotedBulkActions={promotedBulkActions}
+                      />
+                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                          <Modal.Section flush>
+                              <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
+                          </Modal.Section>
+                      </Modal>
+                  </div>,
+                  <ApiDetails
+                      key="details"
+                      showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+                      setShowDetails={setShowDetails}
+                      apiDetail={apiDetail}
+                      headers={transform.getDetailsHeaders()}
+                      getStatus={() => { return "warning" }}
+                      isGptActive={isGptActive}
+                  />,
+                  <ApiGroupModal
+                      key="api-group-modal"
+                      showApiGroupModal={showApiGroupModal}
+                      toggleApiGroupModal={toggleApiGroupModal}
+                      apis={apis}
+                      operation={actionOperation}
+                      currentApiGroupName={pageTitle}
+                      fetchData={fetchData}
+                  />
+            ]
+        )
+      ]
+
     return (
         <PageWithMultipleCards
             title={
@@ -432,46 +605,7 @@ function ApiEndpoints() {
             }
             backUrl="/dashboard/observe/inventory"
             secondaryActions={secondaryActionsComponent}
-            components={
-                loading ? [<SpinnerCentered key="loading" />] :
-                    [
-                        <div className="apiEndpointsTable" key="table">
-                            <GithubSimpleTable
-                                key="table"
-                                pageLimit={50}
-                                data={endpointData[selectedTab]}
-                                sortOptions={sortOptions}
-                                resourceName={resourceName}
-                                filters={[]}
-                                disambiguateLabel={disambiguateLabel}
-                                headers={headers}
-                                getStatus={() => { return "warning" }}
-                                selected={selected}
-                                onRowClick={handleRowClick}
-                                onSelect={handleSelectedTab}
-                                getFilteredItems={getFilteredItems}
-                                mode={IndexFiltersMode.Default}
-                                headings={headings}
-                                useNewRow={true}
-                                condensedHeight={true}
-                                tableTabs={tableTabs}
-                            />
-                            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
-                                <Modal.Section flush>
-                                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)}/>
-                                </Modal.Section>
-                            </Modal>
-                        </div>,
-                        <ApiDetails
-                            key="details"
-                            showDetails={showDetails}
-                            setShowDetails={setShowDetails}
-                            apiDetail={apiDetail}
-                            headers={transform.getDetailsHeaders()}
-                            getStatus={() => { return "warning" }}
-                            isGptActive={isGptActive}
-                        />
-                    ]}
+            components={components}
         />
     )
 }
