@@ -20,7 +20,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
     public static final TestingRunResultDao instance = new TestingRunResultDao();
     public static final int maxDocuments = 5_000_000;
-    public static final long sizeInBytes = 100_000_000_000L;
+    public static final long sizeInBytes = 50_000_000_000L;
 
     @Override
     public String getCollName() {
