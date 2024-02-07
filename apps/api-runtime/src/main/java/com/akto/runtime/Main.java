@@ -245,7 +245,7 @@ public class Main {
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                          
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while parsing kafka message " + e, LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
                     }
                     String accountId = httpResponseParams.getAccountId();

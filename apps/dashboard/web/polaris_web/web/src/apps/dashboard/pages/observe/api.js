@@ -438,20 +438,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl }
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId }
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId}
         }).then((resp) => {
             return resp
         })        
@@ -598,5 +598,12 @@ export default {
             method: 'post',
             data: {}
         })
-    }
+    },
+    async getUserEndpoints(){
+        return await request({
+            url: '/api/getCustomerEndpoints',
+            method: 'post',
+            data:{},
+        })
+    },
 }

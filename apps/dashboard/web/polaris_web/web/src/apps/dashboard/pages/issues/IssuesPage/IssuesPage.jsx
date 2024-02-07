@@ -5,9 +5,12 @@ import api from "../api"
 import Store from "../../../store";
 import transform from "../transform";
 import func from "@/util/func";
-import { ClockMinor,DynamicSourceMinor,LinkMinor } from '@shopify/polaris-icons';
+import { ClockMinor,DynamicSourceMinor,LinkMinor, MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
 import { Button } from "@shopify/polaris";
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
+import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
+import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 
 const headers = [
     {
@@ -150,6 +153,7 @@ function IssuesPage(){
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const allCollections = PersistStore(state => state.allCollections);
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -274,20 +278,55 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
+        if(total === 0){
+            setShowEmptyScreen(true)
+        }
         return {value:ret , total:total};
     }
 
     const openVulnerabilityReport = () => {
         let summaryId = btoa(JSON.stringify(issuesFilters))
-    window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+        window.open('/dashboard/issues/summary/' + summaryId, '_blank');
     }
+
+    const infoItems = [
+        {
+            title: "Triage",
+            icon: MarkFulfilledMinor,
+            description: "Prioritize, assign them to team members and manage API issues effectively.",
+        },
+        {
+            title: "Download vulnerability report",
+            icon: ReportMinor,
+            description: "Export and share detailed report of vulnerabilities in your APIs.",
+        },
+        {
+            title: "Send them to GitHub",
+            icon: ExternalMinor,
+            description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
+        }
+    ]
     
     return (
         <PageWithMultipleCards
             title="Issues"
             isFirstPage={true}
             components = {[
-                <GithubServerTable
+                showEmptyScreen ? 
+                <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/alert_hexagon.svg"}
+                    headingText={"No issues yet!"}
+                    description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                    buttonText={"Run test"}
+                    infoItems={infoItems}
+                    infoTitle={"Once you have issues:"}
+                    learnText={"issues"}
+                    docsUrl={ISSUES_PAGE_DOCS_URL}
+                    bodyComponent={<SelectCollectionComponent />}
+                />
+
+            
+            : <GithubServerTable
                     key={key}
                     headers={headers}
                     resourceName={resourceName} 
@@ -305,7 +344,7 @@ function IssuesPage(){
                     getStatus={func.getTestResultStatus}
                 />
             ]}
-            primaryAction={<Button monochrome removeUnderline plain onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
             />
     )
 }

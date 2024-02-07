@@ -10,7 +10,7 @@ import api from '../api';
 import { v4 as uuidv4 } from 'uuid';
 import AuthParams from './AuthParams';
 
-function LoginStepBuilder() {
+function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     const initialStepState = {
         id: "step1",
@@ -44,21 +44,26 @@ function LoginStepBuilder() {
     const authMechanism = TestingStore(state => state.authMechanism)
 
     const [selectedStep, setSelectedStep] = useState(0)
-    const [isLoading, setIsLoading] = useState(true)
+    const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
-        setIsLoading(true)
-        if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
-            setSteps(authMechanism.requestData.map((step, index) => ({
-                ...step,
-                id: `step${index + 1}`,
-                content: `Step ${index + 1}`,
-                testResponse: ''
-            })))
-            setAuthParams(authMechanism.authParams)
+
+        if(!extractInformation){
+            setIsLoading(true)
+            if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
+                setSteps(authMechanism.requestData.map((step, index) => ({
+                    ...step,
+                    id: `step${index + 1}`,
+                    content: `Step ${index + 1}`,
+                    testResponse: ''
+                })))
+                setAuthParams(authMechanism.authParams)
+            }
+            setSelectedStep(0)
+            setIsLoading(false)
+        }else{
+            return;
         }
-        setSelectedStep(0)
-        setIsLoading(false)
     }, [])
 
     const stepOptions = [
@@ -100,7 +105,7 @@ function LoginStepBuilder() {
             }
             : step))
         }
-       
+
     }
 
     function handleAddStep () {
@@ -139,6 +144,17 @@ function LoginStepBuilder() {
         setToastConfig({ isActive: true, isError: false, message: "Login flow saved successfully!" })
     }
 
+    useEffect(() => {
+        if(extractInformation){
+            setStoreData({
+                steps:steps,
+                authParams: authParams
+            })
+        }else{
+            return;
+        }
+    },[steps,authParams])
+
     return (
         <div>
             <Text variant="headingMd">Login Step Builder</Text>
@@ -156,9 +172,9 @@ function LoginStepBuilder() {
                         <Divider />
 
                         <LegacyCard.Section>
-                            <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                        {showOnlyApi !==null && showOnlyApi ? null : <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
                                 <Text>Select step type:</Text>
-                                <DropdownSearch
+                                 <DropdownSearch
                                     id={"select-step-type-menu"}
                                     placeholder="Select step type"
                                     optionsList={stepOptions}
@@ -167,6 +183,7 @@ function LoginStepBuilder() {
                                     value={getStepDropdownLabel()}
                                 />
                             </div>
+                        }
                             <br />
                             <div>
                                 {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
@@ -181,7 +198,7 @@ function LoginStepBuilder() {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    <Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>
+                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>}
 
                 </div>
             }

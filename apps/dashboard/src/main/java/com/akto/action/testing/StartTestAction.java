@@ -3,14 +3,12 @@ package com.akto.action.testing;
 import com.akto.DaoInit;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -20,19 +18,18 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.LastCronRunInfo;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -63,17 +60,17 @@ public class StartTestAction extends UserAction {
     private int endTimestamp;
     private String testName;
     private Map<String, String> metadata;
-    private boolean fetchCicd;
     private String triggeredBy;
     private boolean isTestRunByTestEditor;
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
-    private boolean fetchAllTestRuns;
+    private TestingRunType testingRunType;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    private String testRoleId;
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters) {
         Bson projections = Projections.fields(
@@ -146,7 +143,7 @@ public class StartTestAction extends UserAction {
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
             TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,
-                    authMechanism.getId(), this.overriddenTestAppUrl);
+                    authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -206,7 +203,7 @@ public class StartTestAction extends UserAction {
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null,
-                        this.overriddenTestAppUrl);
+                        this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -277,8 +274,12 @@ public class StartTestAction extends UserAction {
     private Map<String, List> filters;
     private long testingRunsCount;
 
-    private ArrayList<Bson> prepareFilters() {
+    private ArrayList<Bson> prepareFilters(int startTimestamp, int endTimestamp) {
         ArrayList<Bson> filterList = new ArrayList<>();
+
+        filterList.add(Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTimestamp));
+        filterList.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+        filterList.add(Filters.ne(TestingRun.TRIGGERED_BY, "test_editor"));
 
         if (filters == null) {
             return filterList;
@@ -293,13 +294,6 @@ public class StartTestAction extends UserAction {
                     continue;
 
                 switch (key) {
-
-                    case "endTimestamp":
-                        List<Long> ll = Utils.castList(Long.class, value);
-                        filterList.add(Filters.gte(key, ll.get(0)));
-                        filterList.add(Filters.lte(key, ll.get(1)));
-                        break;
-
                     case "severity":
                         List<String> severities = Utils.castList(String.class, value);
                         filterList.add(Filters.in(Constants.ID, getTestsWithSeverity(severities)));
@@ -327,36 +321,37 @@ public class StartTestAction extends UserAction {
         return sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
     }
 
-    public String retrieveAllCollectionTests() {
-        if (this.startTimestamp == 0) {
-            this.startTimestamp = Context.now();
+    private Bson getTestingRunTypeFilter(TestingRunType testingRunType){
+        if(testingRunType == null){
+            return Filters.empty();
         }
+        switch (testingRunType) {
+            case CI_CD:
+                return Filters.in(Constants.ID, getCicdTests());
+            case ONE_TIME:
+                return Filters.and(
+                    Filters.nin(Constants.ID, getCicdTests()),
+                    Filters.eq(TestingRun.PERIOD_IN_SECONDS,0
+                ));
+            case RECURRING:
+                return Filters.and(
+                    Filters.nin(Constants.ID, getCicdTests()),
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0
+                ));
+            default:
+                return Filters.empty();
+        }
+    }
 
-        if (this.endTimestamp == 0) {
-            this.endTimestamp = Context.now() + 86400;
-        }
+    public String retrieveAllCollectionTests() {
 
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
-
-        if(fetchCicd){
-            // filters for test runs to be only CI/CD pipeline
-            testingRunFilters.add(Filters.in(Constants.ID, getCicdTests()));
-        } else if(fetchAllTestRuns){
-            // get All test runs which are not run by test editor
-            testingRunFilters.add(Filters.ne("triggeredBy", "test_editor"));
-        } else {
-            // the left test are the scheduled one
-            Collections.addAll(testingRunFilters, 
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
-                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
-                Filters.nin(Constants.ID,getCicdTests()),
-                Filters.ne("triggeredBy", "test_editor")
-            );
-        }
-
-        testingRunFilters.addAll(prepareFilters());
+        Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
+        testingRunFilters.add(testingRunTypeFilter);
+        testingRunFilters.addAll(prepareFilters(startTimestamp, endTimestamp));
+        
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
 
@@ -409,6 +404,21 @@ public class StartTestAction extends UserAction {
         this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(Filters.and(filterQ), 0,
                 limitForTestingRunResultSummary, sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
+
+        long cicdCount =  TestingRunDao.instance.getMCollection().countDocuments(
+            Filters.and(
+                Filters.eq(Constants.ID, testingRunId),
+                getTestingRunTypeFilter(TestingRunType.CI_CD)
+            )
+        );
+
+        this.testingRunType = TestingRunType.ONE_TIME;
+        if(cicdCount > 0){
+            this.testingRunType = TestingRunType.CI_CD;
+        }
+        else if(this.testingRun.getPeriodInSeconds() > 0){
+            this.testingRunType = TestingRunType.RECURRING;
+        }
 
         if (this.testingRun != null && this.testingRun.getTestIdConfig() == 1) {
             WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun
@@ -611,23 +621,22 @@ public class StartTestAction extends UserAction {
     // needed for new ui as the table was server table.
     public String computeAllTestsCountMap(){
         Map<String,Long> result = new HashMap<>();
+        ArrayList<Bson> filters = new ArrayList<>();
+        filters.addAll(prepareFilters(startTimestamp, endTimestamp));
+        
+        long totalCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
+        
+        ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
+        filterForCicd.add(getTestingRunTypeFilter(TestingRunType.CI_CD));
+        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filterForCicd));
 
-        long totalCount = TestingRunDao.instance.getMCollection().countDocuments();
-        List<Bson> filtersForCiCd = new ArrayList<>();
-        filtersForCiCd.add(Filters.in(Constants.ID, getCicdTests()));
-        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForCiCd));
+        filters.add(getTestingRunTypeFilter(TestingRunType.ONE_TIME));
 
-        int startTime = Context.now();
-        int endTime = Context.now() + 86400;
-        List<Bson> filtersForSchedule = new ArrayList<>();
-        Collections.addAll(filtersForSchedule,
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTime),
-                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTime),
-                Filters.nin(Constants.ID,getCicdTests())
-        );
-        long scheduleCount =  TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filtersForSchedule));
+        long oneTimeCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
 
-        long oneTimeCount = totalCount - cicdCount - scheduleCount;
+        long scheduleCount = totalCount - oneTimeCount - cicdCount;
+
+        
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
@@ -683,13 +692,6 @@ public class StartTestAction extends UserAction {
             DeleteTestRuns DeleteTestRuns = new DeleteTestRuns(testRunIdsCopy, Context.now(), new HashMap<>(),
                     testConfigIds, latestSummaryIds);
             executeDelete(DeleteTestRuns);
-
-            // set timestamp for last calculated severity score as 0. then severity score of apiinfo will get updated automatically
-            AccountSettingsDao.instance.getMCollection().updateOne(
-                                AccountSettingsDao.generateFilter(),
-                                Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SEVERITY), 0),
-                                new UpdateOptions().upsert(true)
-                            );
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -711,6 +713,23 @@ public class StartTestAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private boolean testRunsByUser;
+
+    private boolean getUserTestingRuns(){
+        Bson filter = Filters.ne(TestingRun.NAME, "Onboarding demo test");
+        return TestingRunDao.instance.getMCollection().find(filter).limit(1).first() != null;
+    }
+
+    public String getUsageTestRuns(){
+        try {
+            this.testRunsByUser = getUserTestingRuns();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
     }
 
 
@@ -858,14 +877,6 @@ public class StartTestAction extends UserAction {
         this.metadata = metadata;
     }
 
-    public boolean isFetchCicd() {
-        return fetchCicd;
-    }
-
-    public void setFetchCicd(boolean fetchCicd) {
-        this.fetchCicd = fetchCicd;
-    }
-
     public CallSource getSource() {
         return this.source;
     }
@@ -971,12 +982,12 @@ public class StartTestAction extends UserAction {
         return metadataFilters;
     }
 
-    public boolean isFetchAllTestRuns() {
-        return fetchAllTestRuns;
+    public TestingRunType getTestingRunType() {
+        return testingRunType;
     }
 
-    public void setFetchAllTestRuns(boolean fetchAllTestRuns) {
-        this.fetchAllTestRuns = fetchAllTestRuns;
+    public void setTestingRunType(TestingRunType testingRunType) {
+        this.testingRunType = testingRunType;
     }
     
     public Map<String, Integer> getIssuesSummaryInfoMap() {
@@ -1003,6 +1014,10 @@ public class StartTestAction extends UserAction {
         this.latestSummaryIds = latestSummaryIds;
     }
 
+    public boolean getTestRunsByUser() {
+        return testRunsByUser;
+    }
+
 
     public enum CallSource {
         TESTING_UI,
@@ -1022,5 +1037,14 @@ public class StartTestAction extends UserAction {
         public boolean isCallFromAktoGpt() {
             return AKTO_GPT.equals(this);
         }
+    }
+
+
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }
