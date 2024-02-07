@@ -97,6 +97,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public void convertToCappedCollection() {
+        if (this.isCapped()) return;
         this.convertToCappedCollection(sizeInBytes);
         this.createIndicesIfAbsent();
     }
