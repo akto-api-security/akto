@@ -38,6 +38,7 @@ import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPag
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
+import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import Billing from "../dashboard/pages/settings/billing/Billing";
@@ -225,6 +226,10 @@ const router = createBrowserRouter([
           {
             path: "auth-types",
             element:<AuthTypes/>
+          },
+          {
+            path: "default-payloads",
+            element:<DefaultPayloads/>
           },
           {
             path: "auth-types/details",

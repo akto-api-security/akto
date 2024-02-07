@@ -1,7 +1,9 @@
 package com.akto.utils;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -368,13 +370,15 @@ public class Utils {
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-            info.getHttpCallParser().syncFunction(responses, true, false);
+
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-           DependencyFlow dependencyFlow = new DependencyFlow();
-           dependencyFlow.run();
-           dependencyFlow.syncWithDb();
+            DependencyFlow dependencyFlow = new DependencyFlow();
+            dependencyFlow.run();
+            dependencyFlow.syncWithDb();
         }
     }
 
