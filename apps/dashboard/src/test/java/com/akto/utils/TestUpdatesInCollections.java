@@ -68,7 +68,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
             httpResponseParamsList.add(httpResponseParam);
         }
 
-        httpCallParser.syncFunction(httpResponseParamsList, false, true);
+        httpCallParser.syncFunction(httpResponseParamsList, false, true, null);
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
     }
 
