@@ -112,7 +112,7 @@ public class JSONUtils {
     public static String modify(String jsonBody, Set<String> values, PayloadModifier payloadModifier) {
         try {
             BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
-            if (payload.isEmpty()) return null;
+            if (payload.isEmpty()) return jsonBody;
             BasicDBObject modifiedPayload = modify(payload, values, payloadModifier);
             if (modifiedPayload.containsKey("json")) {
                 return new Gson().toJson(modifiedPayload.get("json"));
@@ -120,7 +120,7 @@ public class JSONUtils {
             return new Gson().toJson(modifiedPayload);
         } catch (Exception e) {
             ;
-            return null;
+            return jsonBody;
         }
     }
 
@@ -140,7 +140,7 @@ public class JSONUtils {
                 String fullKey = prefix + (prefix.isEmpty() ? "" : "#") + key;
                 Object value = basicDBObject.get(key);
                 if (values.contains(fullKey)) {
-                    basicDBObject.put(key, payloadModifier.modify(key, value));
+                    basicDBObject.put(key, payloadModifier.modify(fullKey, value));
                 }
                 modify(value, fullKey, values, payloadModifier);
             }

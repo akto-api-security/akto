@@ -108,30 +108,28 @@ function InitialSteps({initialSteps}) {
     }
 
     return (
-        <div style={{paddingTop: '76px'}}>
-            <Card padding={0}>
-                <VerticalStack gap={3}>
-                    <Box padding={5} background="bg-info-subdued-hover">
-                        <VerticalStack gap={3}>
-                            <Text variant="bodyLg" fontWeight="semibold">Get started checklist</Text>
-                            <HorizontalStack gap={1}>
-                                <Box width='85%'>
-                                    <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} color="primary" />
-                                </Box>
-                                <Text color="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </Box>
-                    <Box padding={3} paddingInlineEnd={5} paddingInlineStart={5}>
-                        {steps.map((step, index)=>(
-                            <StepConnection step={step} index={index} key={step.title}/>
-                        ))}
-                    </Box>
-                    <Divider/>
-                </VerticalStack>
-            
-            </Card>
-        </div>
+        <Card padding={0}>
+            <VerticalStack gap={3}>
+                <Box padding={5} background="bg-info-subdued-hover">
+                    <VerticalStack gap={3}>
+                        <Text variant="bodyLg" fontWeight="semibold">Get started checklist</Text>
+                        <HorizontalStack gap={1}>
+                            <Box width='85%'>
+                                <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} color="primary" />
+                            </Box>
+                            <Text color="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
+                        </HorizontalStack>
+                    </VerticalStack>
+                </Box>
+                <Box padding={3} paddingInlineEnd={5} paddingInlineStart={5}>
+                    {steps.map((step, index)=>(
+                        <StepConnection step={step} index={index} key={step.title}/>
+                    ))}
+                </Box>
+                <Divider/>
+            </VerticalStack>
+        
+        </Card>
     )
 }
 
