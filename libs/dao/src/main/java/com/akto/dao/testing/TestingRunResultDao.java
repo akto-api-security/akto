@@ -19,6 +19,8 @@ import java.util.List;
 public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
     public static final TestingRunResultDao instance = new TestingRunResultDao();
+    public static final int maxDocuments = 5_000_000;
+    public static final long sizeInBytes = 50_000_000_000L;
 
     @Override
     public String getCollName() {
@@ -83,7 +85,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     public void createIndicesIfAbsent() {
         
         String dbName = Context.accountId.get()+"";
-        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
+        createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
 
         Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
         createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name("testRunResultSummaryId_-1__id_-1"));
@@ -92,6 +94,12 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
+    }
+
+    public void convertToCappedCollection() {
+        if (this.isCapped()) return;
+        this.convertToCappedCollection(sizeInBytes);
+        this.createIndicesIfAbsent();
     }
 
 }
