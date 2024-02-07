@@ -1649,7 +1649,11 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        TestingRunResultDao.instance.convertToCappedCollection();
+        try {
+            TestingRunResultDao.instance.convertToCappedCollection();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"error while converting to capped collection: " + e, LogDb.DASHBOARD);
+        }
         OrganizationsDao.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
 
