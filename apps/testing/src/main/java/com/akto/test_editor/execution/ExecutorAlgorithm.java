@@ -175,7 +175,7 @@ public class ExecutorAlgorithm {
         } else if (key instanceof Map) {
             varList.add(key);
             return varList;
-        } else {
+        } else if (key instanceof ArrayList) {
             List<Object> keyList = (List) key;
             int index = 0;
             for (Object k: keyList) {
@@ -185,6 +185,9 @@ public class ExecutorAlgorithm {
                 }
                 index++;
             }
+        } else {
+            varList.add(key);
+            return varList;
         }
 
         varList.add(key);
