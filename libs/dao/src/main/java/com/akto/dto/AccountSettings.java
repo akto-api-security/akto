@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import com.akto.dto.settings.DefaultPayload;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,21 +54,17 @@ public class AccountSettings {
     public static final String TRAFFIC_ALERT_THRESHOLD_SECONDS = "trafficAlertThresholdSeconds";
     public static final int defaultTrafficAlertThresholdSeconds = 60*60*4;
 
+    public static final String DEFAULT_PAYLOADS = "defaultPayloads";
+    private Map<String, DefaultPayload> defaultPayloads;
+
     public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
     private LastCronRunInfo lastUpdatedCronInfo;
     
     public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
     private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
-    private List<TestLibrary> testLibraries;
+
     public static final String TEST_LIBRARIES = "testLibraries";
-
-    public List<TestLibrary> getTestLibraries() {
-        return testLibraries;
-    }
-
-    public void setTestLibraries(List<TestLibrary> testLibraries) {
-        this.testLibraries = testLibraries;
-    }
+    private List<TestLibrary> testLibraries;
 
     public AccountSettings() {
     }
@@ -219,6 +217,22 @@ public class AccountSettings {
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
+    }
+
+    public Map<String, DefaultPayload> getDefaultPayloads() {
+        return defaultPayloads;
+    }
+
+    public void setDefaultPayloads(Map<String, DefaultPayload> defaultPayloads) {
+        this.defaultPayloads = defaultPayloads;
+    }
+  
+    public List<TestLibrary> getTestLibraries() {
+        return testLibraries;
+    }
+
+    public void setTestLibraries(List<TestLibrary> testLibraries) {
+        this.testLibraries = testLibraries;
     }
 
     public LastCronRunInfo getLastUpdatedCronInfo() {
