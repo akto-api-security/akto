@@ -58,14 +58,6 @@ function TestRolesPage(){
                     endpoints: item.endpointLogicalGroup.testingEndpoints,
                     authWithCondList: item.authWithCondList
                 }})
-            },
-            {
-                content: 'Access matrix',
-                onAction: () => console.log("access matrix")
-            },
-            {
-                content: 'Validate',
-                onAction: () => console.log("validate")
             }]
         }]
     }
