@@ -215,6 +215,22 @@ export default {
             }
         })
     },
+
+        addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData) {
+            return request({
+                url: '/api/addAuthToRole',
+                method: 'post',
+                data: {roleName, apiCond, authParamData, authAutomationType, reqData}
+            })
+        },
+        deleteAuthFromRole(roleName, index) {
+            return request({
+                url: '/api/deleteAuthFromRole',
+                method: 'post',
+                data: {roleName, index}
+            })
+        },
+
     deleteTestRuns(testRunIds){
         return request({
             url: '/api/deleteTestRuns',
