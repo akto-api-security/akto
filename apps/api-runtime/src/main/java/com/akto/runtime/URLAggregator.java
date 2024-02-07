@@ -36,43 +36,7 @@ public class URLAggregator {
             return null;
         }
 
-
-        String urlStr = url.split("\\?")[0];
-
-        String[] urlTokens = tokenize(urlStr);
-
-        Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
-
-        SingleTypeInfo.SuperType[] newTypes = new SingleTypeInfo.SuperType[urlTokens.length];
-
-        for(int i = 0; i < urlTokens.length; i ++) {
-            String tempToken = urlTokens[i];
-
-            if (tempToken.length() == 0) {
-                continue;
-            }
-
-            String numToken = tempToken;
-            if (tempToken.charAt(0) == '+') {
-                numToken = tempToken.substring(1);
-            }
-
-            if (NumberUtils.isParsable(numToken)) {
-                newTypes[i] = SingleTypeInfo.SuperType.INTEGER;
-                urlTokens[i] = null;
-            } else if(pattern.matcher(tempToken).matches()){
-                newTypes[i] = SingleTypeInfo.SuperType.STRING;
-                urlTokens[i] = null;
-            } else if (isAlphanumericString(tempToken)) {
-                newTypes[i] = SingleTypeInfo.SuperType.STRING;
-                urlTokens[i] = null;
-            }
-        }
-
-        Method m = Method.valueOf(method);
-        URLStatic ret = new URLStatic(new URLTemplate(urlTokens, newTypes, m).getTemplateString(), m);
-
-        return ret;
+        return new URLStatic(url.split("\\?")[0], Method.fromString(method));
     }
 
 

@@ -584,8 +584,8 @@ public class APICatalogSync {
                 SubType newSubType = KeyTypes.findSubType(n[idx], "", null,true);
                 SubType oldSubType = KeyTypes.findSubType(o[idx], "", null,true);
                 boolean isAlphaNumeric = isAlphanumericString(val) && isAlphanumericString(o[idx]);
-                boolean isUserRegex = isValidSubtype(oldSubType) && isValidSubtype(newSubType) && oldSubType.equals(newSubType);
-
+                boolean isUserRegex = isValidSubtype(oldSubType) && isValidSubtype(newSubType) && oldSubType.getName().equals(newSubType.getName());
+                
                 if(!isAlphaNumeric && !isUserRegex) {
                     return false;
                 }
@@ -641,7 +641,6 @@ public class APICatalogSync {
 
             SubType dbSubType = KeyTypes.findSubType(dbTokens[i], "", null,true);
             SubType tempSubType = KeyTypes.findSubType(newTokens[i], "", null,true);
-
             
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
@@ -719,7 +718,8 @@ public class APICatalogSync {
                     for (int i = 0; i < urlTemplate.getTypes().length; i++) {
                         SuperType superType = urlTemplate.getTypes()[i];
                         if (superType == null) continue;
-                        String word = delEndpoint.split("/")[i];
+                        int idx = delEndpoint.startsWith("http") ? i:i+1;
+                        String word = delEndpoint.split("/")[idx];
                         SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", SingleTypeInfo.GENERIC, apiCollectionId, true);
                         SubType tokenSubType = KeyTypes.findSubType(word, "", null,true);
                         stiId.setSubType(tokenSubType);
