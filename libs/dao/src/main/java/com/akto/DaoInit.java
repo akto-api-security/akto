@@ -317,6 +317,8 @@ public class DaoInit {
     }
 
     public static void createIndices() {
+        TestingRunResultDao.instance.convertToCappedCollection();
+
         OrganizationsDao.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
