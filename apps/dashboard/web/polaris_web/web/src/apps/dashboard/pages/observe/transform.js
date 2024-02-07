@@ -479,7 +479,8 @@ const transform = {
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
                 riskScore: score,
-                isNew: this.isNewEndpoint(url.lastSeenTs)
+                isNew: this.isNewEndpoint(url.lastSeenTs),
+                sensitiveDataTags: url?.sensitiveTags.join(" "),
             }
         })
 
