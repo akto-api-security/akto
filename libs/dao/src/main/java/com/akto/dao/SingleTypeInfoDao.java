@@ -16,6 +16,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -269,10 +270,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         Bson filter = null;
-        if (apiCollectionId != -1) {
+        if (apiCollectionId < 0) {
             filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         }
-        return fetchEndpointsInCollection(filter, -1);
+        return fetchEndpoints(filter, null, -1);
     }
 
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
@@ -281,44 +282,23 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             // the filter obtained uses index.
             filter = MethodCondition.createMethodFilter(method);
         }
-        return fetchEndpointsInCollection(filter, 50);
+        return fetchEndpoints(filter, null, 50);
     }
 
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
-        Bson matchCriteria = null;
-        if (apiCollectionId != -1) {
-            matchCriteria = Filters.eq("apiCollectionId", apiCollectionId);
-        }
-        return fetchEndpoints(matchCriteria, "startTs");
-    }
 
     public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
-        return fetchEndpoints(Filters.eq("subType", subType.getName()), "timestamp", skip, limit);
+        return fetchEndpoints(Filters.eq("subType", subType.getName()), "timestamp", limit, skip);
     }
 
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
-        Bson matchCriteria = null;
-        if (apiCollectionId != -1) {
-            matchCriteria = Filters.eq("apiCollectionId", apiCollectionId);
-        }
-        return fetchEndpoints(matchCriteria, "startTs");
-    }
-
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
-        return fetchEndpoints(Filters.eq("subType", subType.getName()), "timestamp", skip, limit);
-    }
-
-
-
-    private List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter, int limit) {
+    private List<ApiInfo.ApiInfoKey> fetchEndpoints(Bson matchCriteria, String sortField, int... limitSkip) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
 
-        if(filter != null){
-            pipeline.add(Aggregates.match(filter));
+        if(matchCriteria != null) {
+            pipeline.add(Aggregates.match(matchCriteria));
         }
 
         Bson projections = Projections.fields(
@@ -327,15 +307,15 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
-        pipeline.add(Aggregates.sort(Sorts.descending(sortField)));
-
-        if (skipLimit.length == 2) {
-            pipeline.add(Aggregates.limit(skipLimit[1]));
-            pipeline.add(Aggregates.skip(skipLimit[0]));
+        if(StringUtils.isNotEmpty(sortField)) {
+            pipeline.add(Aggregates.sort(Sorts.descending(sortField)));
         }
 
-        if (limit > 0) {
-            pipeline.add(Aggregates.limit(limit));
+        if (limitSkip.length == 2) {
+            pipeline.add(Aggregates.limit(limitSkip[0]));
+            pipeline.add(Aggregates.skip(limitSkip[1]));
+        } else if(limitSkip.length == 1){
+            pipeline.add(Aggregates.limit(limitSkip[0]));
         }
 
         MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
