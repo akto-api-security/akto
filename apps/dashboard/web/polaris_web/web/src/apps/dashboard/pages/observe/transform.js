@@ -189,6 +189,7 @@ const transform = {
     prepareSampleData: (res, subType) => {
         let paths = []
         for (const c in res.sensitiveSampleData) {
+            if(c === "") continue
             let paramInfoList = res.sensitiveSampleData[c]
             if (!paramInfoList) {
                 paramInfoList = []

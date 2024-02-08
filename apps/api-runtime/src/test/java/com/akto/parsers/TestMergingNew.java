@@ -120,7 +120,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false,true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(1, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(1,2), false,true);
         parser.apiCatalogSync.syncWithDB(false,true);
@@ -179,7 +179,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(1, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(1,2), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
@@ -216,7 +216,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "link/";
+        String url = "/link/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (String x: Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H")) {
@@ -290,7 +290,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
 
-        String a = "{\"path\": \"http://killdill.mpl.internal:8080/1.0/kb/paymentGateways/hosted/form/bbb-bbbb-bbb?paymentMethodId=qq-qqq-qqq\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"X-Killbill-ApiKey\\\": \\\"mplgaming\\\", \\\"Authorization\\\": \\\"Basic somerandom=\\\", \\\"X-Killbill-ApiSecret\\\": \\\"something\\\", \\\"Accept\\\": \\\"application/json\\\", \\\"X-MPL-COUNTRYCODE\\\": \\\"IN\\\", \\\"X-Killbill-CreatedBy\\\": \\\"test-payment\\\", \\\"Content-type\\\": \\\"application/json\\\"}\", \"requestPayload\": \"{\\\"formFields\\\":[{\\\"key\\\":\\\"amount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"netAmount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"currency\\\",\\\"value\\\":\\\"INR\\\"},{\\\"key\\\":\\\"orderId\\\",\\\"value\\\":\\\"ASGARD\\\"},{\\\"key\\\":\\\"paymentMethodId\\\",\\\"value\\\":\\\"zzzz-zzz-zzz-zzzz-zzzz\\\"},{\\\"key\\\":\\\"mobileNumber\\\",\\\"value\\\":\\\"+917021916328\\\"},{\\\"key\\\":\\\"countryCode\\\",\\\"value\\\":\\\"IN\\\"},{\\\"key\\\":\\\"chargeDetails\\\",\\\"value\\\":\\\"{\\\\\\\"charges\\\\\\\":[],\\\\\\\"totalCharges\\\\\\\":0,\\\\\\\"totalChargesLC\\\\\\\":0}\\\"},{\\\"key\\\":\\\"pegRate\\\",\\\"value\\\":\\\"1.0000\\\"},{\\\"key\\\":\\\"extraInfo\\\",\\\"value\\\":\\\"{\\\\\\\"paymentMode\\\\\\\":\\\\\\\"NB_ICICI\\\\\\\",\\\\\\\"additionalPluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"merchantId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mpl_qa\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"clientId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mplgaming\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentModePluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"code\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"NB_ICICI\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentMethodType\\\\\\\":\\\\\\\"netbanking\\\\\\\",\\\\\\\"paymentFlow\\\\\\\":\\\\\\\"JP2_AT_R4\\\\\\\"}\\\"},{\\\"key\\\":\\\"appVersion\\\",\\\"value\\\":\\\"1000174\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"},{\\\"key\\\":\\\"appType\\\",\\\"value\\\":\\\"CASH\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"}]}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"Date\\\": \\\"Mon, 18 Apr 2022 13:05:16 GMT\\\", \\\"Content-Type\\\": \\\"application/json\\\", \\\"Transfer-Encoding\\\": \\\"chunked\\\", \\\"Connection\\\": \\\"keep-alive\\\", \\\"Server\\\": \\\"Apache-Coyote/1.1\\\", \\\"Access-Control-Allow-Origin\\\": \\\"*\\\", \\\"Access-Control-Allow-Methods\\\": \\\"GET, POST, DELETE, PUT, OPTIONS\\\", \\\"Access-Control-Allow-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Expose-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Allow-Credentials\\\": \\\"true\\\"}\", \"status\": \"OK\", \"responsePayload\": \"\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"OTHER\"}";
+        String a = "{\"path\": \"http://killdill.mpl.internal:8080/1/kb/paymentGateways/hosted/form/bbb-bbbb-bbb?paymentMethodId=qq-qqq-qqq\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"X-Killbill-ApiKey\\\": \\\"mplgaming\\\", \\\"Authorization\\\": \\\"Basic somerandom=\\\", \\\"X-Killbill-ApiSecret\\\": \\\"something\\\", \\\"Accept\\\": \\\"application/json\\\", \\\"X-MPL-COUNTRYCODE\\\": \\\"IN\\\", \\\"X-Killbill-CreatedBy\\\": \\\"test-payment\\\", \\\"Content-type\\\": \\\"application/json\\\"}\", \"requestPayload\": \"{\\\"formFields\\\":[{\\\"key\\\":\\\"amount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"netAmount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"currency\\\",\\\"value\\\":\\\"INR\\\"},{\\\"key\\\":\\\"orderId\\\",\\\"value\\\":\\\"ASGARD\\\"},{\\\"key\\\":\\\"paymentMethodId\\\",\\\"value\\\":\\\"zzzz-zzz-zzz-zzzz-zzzz\\\"},{\\\"key\\\":\\\"mobileNumber\\\",\\\"value\\\":\\\"+917021916328\\\"},{\\\"key\\\":\\\"countryCode\\\",\\\"value\\\":\\\"IN\\\"},{\\\"key\\\":\\\"chargeDetails\\\",\\\"value\\\":\\\"{\\\\\\\"charges\\\\\\\":[],\\\\\\\"totalCharges\\\\\\\":0,\\\\\\\"totalChargesLC\\\\\\\":0}\\\"},{\\\"key\\\":\\\"pegRate\\\",\\\"value\\\":\\\"1.0000\\\"},{\\\"key\\\":\\\"extraInfo\\\",\\\"value\\\":\\\"{\\\\\\\"paymentMode\\\\\\\":\\\\\\\"NB_ICICI\\\\\\\",\\\\\\\"additionalPluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"merchantId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mpl_qa\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"clientId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mplgaming\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentModePluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"code\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"NB_ICICI\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentMethodType\\\\\\\":\\\\\\\"netbanking\\\\\\\",\\\\\\\"paymentFlow\\\\\\\":\\\\\\\"JP2_AT_R4\\\\\\\"}\\\"},{\\\"key\\\":\\\"appVersion\\\",\\\"value\\\":\\\"1000174\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"},{\\\"key\\\":\\\"appType\\\",\\\"value\\\":\\\"CASH\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"}]}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"Date\\\": \\\"Mon, 18 Apr 2022 13:05:16 GMT\\\", \\\"Content-Type\\\": \\\"application/json\\\", \\\"Transfer-Encoding\\\": \\\"chunked\\\", \\\"Connection\\\": \\\"keep-alive\\\", \\\"Server\\\": \\\"Apache-Coyote/1.1\\\", \\\"Access-Control-Allow-Origin\\\": \\\"*\\\", \\\"Access-Control-Allow-Methods\\\": \\\"GET, POST, DELETE, PUT, OPTIONS\\\", \\\"Access-Control-Allow-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Expose-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Allow-Credentials\\\": \\\"true\\\"}\", \"status\": \"OK\", \"responsePayload\": \"\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"OTHER\"}";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(a);
@@ -315,7 +315,7 @@ public class TestMergingNew extends MongoBasedTest {
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(0).getTemplateURLToMethods();
         Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(0).getStrictURLToMethods();
 
-        assertEquals(urlTemplateMap.size(), 1);
+        assertEquals(urlTemplateMap.size(), 30);
         assertEquals(urlStaticMap.size(), 0);
 
     }
@@ -326,7 +326,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "api/books/";
+        String url = "/api/books/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 50; i++) {
@@ -366,7 +366,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "api/";
+        String url = "/api/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 50; i++) {
@@ -569,7 +569,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "api/";
+        String url = "/api/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 300; i++) {
@@ -587,7 +587,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
 
         // dbState doesn't have any template URLs initially so no urlParams are considered
-        testSampleSizeAndDomainOfSti(parser,0, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+        testSampleSizeAndDomainOfSti(parser,10, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.syncFunction(responseParams.subList(10,55), false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
@@ -596,14 +596,14 @@ public class TestMergingNew extends MongoBasedTest {
 
         // Now dbState has template URLs so urlParam values are now stored
         assertEquals(0,getStaticURLsSize(parser));
-        testSampleSizeAndDomainOfSti(parser,1, 1, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+        testSampleSizeAndDomainOfSti(parser,55, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.apiCatalogSync.syncWithDB(false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
 
-        testSampleSizeAndDomainOfSti(parser, 1, 1, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+        testSampleSizeAndDomainOfSti(parser, 55, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         // changing the parser symbolizes instance restart
         // using the new or old parser shouldn't change the result
@@ -623,7 +623,7 @@ public class TestMergingNew extends MongoBasedTest {
         parserNew.apiCatalogSync.buildFromDB(false, true);
 
         // both now range
-        testSampleSizeAndDomainOfSti(parserNew, 50, 50, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
+        testSampleSizeAndDomainOfSti(parserNew, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
 
 
     }
@@ -649,7 +649,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "api/";
+        String url = "/api/";
 
         // test for 1 url
         HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
@@ -818,7 +818,7 @@ public class TestMergingNew extends MongoBasedTest {
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
 
         Bson filter2 = Filters.and(
-                Filters.eq("_id.url", "https://petstore.swagger.io/v2/books/1"),
+                Filters.eq("_id.url", "https://petstore.swagger.io/v2/books/INTEGER"),
                 Filters.eq("_id.method", "POST")
         );
 
