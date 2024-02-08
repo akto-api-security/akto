@@ -12,10 +12,7 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.User;
+import com.akto.dto.*;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.AccountDataTypesInfo;
@@ -23,9 +20,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
-import com.akto.dto.IgnoreData;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
@@ -145,7 +140,7 @@ public class TestDBSync extends MongoBasedTest {
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(1, sd.getSamples().size());
 
-        parser.syncFunction(responseParams,true, true);
+        parser.syncFunction(responseParams,true, true, new AccountSettings());
         sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(10, sd.getSamples().size());
     }

@@ -3,6 +3,7 @@ package com.akto.dependency;
 import com.akto.MongoBasedTest;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.dependency_flow.Connection;
@@ -48,7 +49,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         }
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
-        httpCallParser.syncFunction(httpResponseParamsList, true,true);
+        httpCallParser.syncFunction(httpResponseParamsList, true,true, new AccountSettings());
         APICatalogSync.mergeUrlsAndSave(1000, true);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());

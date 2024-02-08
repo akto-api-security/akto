@@ -5,10 +5,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
+import com.akto.dto.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
@@ -874,7 +871,7 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, new AccountSettings());
         parser.apiCatalogSync.syncWithDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true);
         parser.apiCatalogSync.buildFromDB(false, true);
