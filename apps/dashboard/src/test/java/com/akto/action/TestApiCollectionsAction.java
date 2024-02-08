@@ -84,15 +84,15 @@ public class TestApiCollectionsAction extends MongoBasedTest {
 
         // mirroring collection with host
         Set<String> urls1 = new HashSet<>(Arrays.asList("1", "2", "3", "4", "5", "6"));
-        apiCollectionList.add(new ApiCollection(1000, "one", 1000, urls1, "one.com", 1000));
+        apiCollectionList.add(new ApiCollection(1000, "one", 1000, urls1, "one.com", 1000, false, true));
 
         // mirroring collections without hosts
         Set<String> urls2 = new HashSet<>(Arrays.asList("1", "2", "3"));
-        apiCollectionList.add(new ApiCollection(2000, "two", 2000, urls2, null,2000));
+        apiCollectionList.add(new ApiCollection(2000, "two", 2000, urls2, null,2000, false, true));
 
         // manually created collections
         Set<String> urls3 = new HashSet<>(Arrays.asList("1", "2", "3", "4"));
-        apiCollectionList.add(new ApiCollection(3000, "three", 3000, urls3, null,0));
+        apiCollectionList.add(new ApiCollection(3000, "three", 3000, urls3, null,0, false, true));
 
         ApiCollectionsDao.instance.insertMany(apiCollectionList);
 

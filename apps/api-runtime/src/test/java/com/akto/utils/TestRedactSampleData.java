@@ -1,5 +1,7 @@
 package com.akto.utils;
 
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.parsers.HttpCallParser;
@@ -203,7 +205,7 @@ public class TestRedactSampleData {
                 "type", 200, "OK", respHeaders, respPayload, httpRequestParams, 0, "1000000", false, HttpResponseParams.Source.MIRRORING, "orig","172.0.0.1"
         );
 
-        String redactedValue = RedactSampleData.redact(httpResponseParams);
+        String redactedValue = RedactSampleData.redact(httpResponseParams, true);
 
         HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
 
@@ -271,7 +273,7 @@ public class TestRedactSampleData {
         HttpResponseParams originalHttpResponseParams = HttpCallParser.parseKafkaMessage(originalString);
 
 
-        String redactedValue = RedactSampleData.redact(httpResponseParams);
+        String redactedValue = RedactSampleData.redact(httpResponseParams, true);
 
         HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
 

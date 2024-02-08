@@ -174,8 +174,9 @@ public class KeyTypes {
 
         if (o instanceof String) {
             String str = o.toString();
-            for(SubType subType: patternToSubType.keySet()) {
-                Pattern pattern = patternToSubType.get(subType);
+            for(Map.Entry<SubType, Pattern> entry: patternToSubType.entrySet()) {
+                Pattern pattern = entry.getValue();
+                SubType subType = entry.getKey();
                 if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(str).matches()) {
                     return subType;
                 }
