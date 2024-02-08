@@ -97,6 +97,20 @@ public class Executor {
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
+
+        List<String> error_messages = new ArrayList<>();
+
+        ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
+
+        if (modifyExecutionOrderResp.getError() != null) {
+            error_messages.add(modifyExecutionOrderResp.getError());
+            invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null);
+            result.add(invalidExecutionResult);
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
+        }
+        executorNodes = modifyExecutionOrderResp.getExecutorNodes();
+
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
         RawApi origRawApi = rawApi.copy();
@@ -127,8 +141,6 @@ public class Executor {
         }
 
         boolean requestSent = false;
-
-        List<String> error_messages = new ArrayList<>();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple")) {
