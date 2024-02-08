@@ -195,7 +195,8 @@ function DataTypes() {
         <HorizontalGrid gap="4" columns={2}>
           <TextField id={"name-field"} label="Name" helpText="Name the data type"
             value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
-            onChange={(val) => { pageTitle === "Add data type" ? handleChange({ name: val }) : {} }} />
+            {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}} 
+            />
           {currState.dataType === 'Custom' ?
             <Dropdown id={"active-dropdown"} menuItems={statusItems}
               selected={(val) => { handleChange({ active: val }) }}
@@ -269,8 +270,8 @@ function DataTypes() {
       </div>
     </VerticalStack>
   )
-
-  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard, requestCard]
+  
+  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard] : [descriptionCard, conditionsCard,requestCard]
 
   return (
     <DetailsPage

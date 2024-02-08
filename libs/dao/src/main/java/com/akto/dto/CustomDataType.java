@@ -88,8 +88,7 @@ public class CustomDataType {
         }
 
     }
-
-
+        
     public ObjectId getId() {
         return id;
     }

@@ -7,7 +7,7 @@ const func = {
         keyConditions: { predicates: [], operator: "OR" },
         sensitiveState: '4',
         operator: "OR",
-        dataType: "Custom"
+        dataType: "Custom",
       },
 
     convertToSensitiveData: function(state) {
@@ -65,25 +65,19 @@ const func = {
         return initialObj;
     },
 
+    convertMapFunction :(element)=> {
+        return{
+            type: element.type,
+            valueMap:{
+                value: element.value
+            }
+        }
+    },
+
     convertDataForCustomPayload : function(state){
 
-        const keyArr = state.keyConditions.predicates.map((element)=> {
-            return{
-                type: element.type,
-                valueMap:{
-                    value: element.value
-                }
-            }
-        })
-
-        const valueArr = state.valueConditions.predicates.map((element)=> {
-            return{
-                type: element.type,
-                valueMap:{
-                    value: element.value
-                }
-            }
-        })
+        const keyArr = state.keyConditions.predicates.map(this.convertMapFunction)
+        const valueArr = state.valueConditions.predicates.map(this.convertMapFunction)
 
         let sensitiveObj = this.convertToSensitiveData(state.sensitiveState)
 
