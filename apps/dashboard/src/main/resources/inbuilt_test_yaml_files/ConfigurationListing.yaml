@@ -23,19 +23,46 @@ api_selection_filters:
   response_code:
     gte: 200
     lt: 300
+  response_payload:
+    not_contains_either:
+      - "Index of /configs"
+      - "Parent Directory"
+      - "DATABASE_URL="
+      - "API_KEY="
+      - "SECRET_KEY="
+      - "password="
+      - "aws_access_key_id="
+      - "aws_secret_access_key="
   url:
     extract: urlVar
-  
+
+wordLists:
+  subURLPaths:
+    - ${urlVar}/.env 
+    - ${urlVar}/config/
+    - ${urlVar}/config/appsettings.json
+    - ${urlVar}/config/database.yml 
 execute:
   type: single
   requests:
     - req:
-      - modify_url: ${urlVar}/config/
+      - modify_url: ${subURLPaths}
 
 validate:
   response_code:
-    eq: 200
+    gte: 200
+    lt: 300
   response_payload:
-    contains_all:
+    contains_either:
       - "Index of /configs"
       - "Parent Directory"
+      - "DATABASE_URL="
+      - "API_KEY="
+      - "SECRET_KEY="
+      - "password="
+      - "aws_access_key_id="
+      - "aws_secret_access_key="
+    not_contains_either:
+      - "Error"
+      - "Not Found"
+      - "Access Denied"

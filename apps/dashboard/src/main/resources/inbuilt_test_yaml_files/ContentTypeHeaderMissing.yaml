@@ -54,3 +54,6 @@ validate:
     for_one:
       key:
         not_contains: Content-Type
+  response_payload:
+    - length:
+        gt: 0

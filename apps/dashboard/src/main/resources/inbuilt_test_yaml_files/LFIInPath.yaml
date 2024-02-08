@@ -31,6 +31,8 @@ api_selection_filters:
   response_payload:
     contains_either:
       - <!doctype html>
+    not_contains_either:
+      - root
 
 wordLists:
   filePaths: 

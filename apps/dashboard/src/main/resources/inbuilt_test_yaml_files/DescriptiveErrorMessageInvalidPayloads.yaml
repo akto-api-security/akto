@@ -31,6 +31,16 @@ api_selection_filters:
       - "PUT"
       - "POST"
       - "PATCH"
+  response_payload:
+    not_contains_either:
+      - column
+      - row
+      - line
+      - function
+      - class
+      - stack
+      - trace   
+
 
 execute:
   type: single

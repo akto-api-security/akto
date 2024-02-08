@@ -29,6 +29,11 @@ info:
     - CWE-215
 
 api_selection_filters:
+  response_payload:
+    not_contains_either:
+      - "<debug>"
+      - "<struts.actionMapping>"
+      - "Stacktraces"
   response_code:
     gte: 200
     lt: 300

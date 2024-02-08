@@ -23,6 +23,10 @@ api_selection_filters:
   response_code:
     gte: 200
     lt: 300
+  response_payload:
+    not_contains_either:
+      - 'AWSEBDockerrunVersion'
+      - 'containerDefinitions'
   url:
     extract: urlVar
   

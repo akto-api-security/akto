@@ -44,4 +44,9 @@ validate:
   response_payload:
     contains_either:
       - "The install worked successfully! Congratulations!"
+      - "Congratulations"
+      - "Django-powered"
+      - "It worked!"
+      - "The install worked successfully"
+      - "Django"
         

@@ -34,6 +34,18 @@ api_selection_filters:
     lt: 300
   url:
     extract: urlVar
+  response_payload:
+    not_contains_either:
+      - "Django tried these url patterns"
+      - "Django version"
+      - "Exception Type"
+      - "Template rendering"
+      - "Request Method"
+      - "Request URL"
+      - "Django Settings"
+      - "Python Executable"
+      - "Python Path"
+      - "Server time"
 
 execute:
   type: single
@@ -43,4 +55,15 @@ execute:
 
 validate:
   response_payload:
-    contains_either: "Django tried these url patterns"
+    contains_either: 
+      - "Django tried these url patterns"
+      - "Django version"
+      - "Exception Type"
+      - "Template rendering"
+      - "Request Method"
+      - "Request URL"
+      - "Django Settings"
+      - "Python Executable"
+      - "Python Path"
+      - "Server time"
+

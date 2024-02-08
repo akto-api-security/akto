@@ -30,6 +30,15 @@ info:
     - CVE-2023-27163
 
 api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    not_contains_either:
+      - daemon
+      - Linux
+      - Ubuntu
+      - /proc/self/cmdline
   or:
     - request_payload:
         for_one:
@@ -56,7 +65,7 @@ wordLists:
     - /proc/self/cmdline
     - /proc/self/cwd/index.php
     - /proc/self/cwd/application.py
-    - /proc/self/cwd/main.py"
+    - /proc/self/cwd/main.py
     - /proc/self/exe
 
 execute:

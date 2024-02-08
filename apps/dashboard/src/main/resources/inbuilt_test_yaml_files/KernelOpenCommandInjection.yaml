@@ -52,3 +52,5 @@ validate:
   response_payload:
     contains_either:
       - "hello world"
+    not_contains_either:
+      - "| echo 'hello world'"

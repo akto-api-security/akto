@@ -30,6 +30,16 @@ api_selection_filters:
   response_code:
     gte: 200
     lt: 300
+  response_payload:
+    not_contains_either:
+      - "Active connections:"
+      - "server version nginx"
+      - "active connections"
+      - "server accepts"
+      - "handled requests"
+      - "reading"
+      - "writing"
+      - "waiting"
 
   method:
     contains_either:
@@ -54,4 +64,12 @@ execute:
 
 validate:
   response_payload:
-    contains_either: "Active connections:"
+    contains_either: 
+      - "Active connections:"
+      - "server version nginx"
+      - "active connections"
+      - "server accepts"
+      - "handled requests"
+      - "reading"
+      - "writing"
+      - "waiting"

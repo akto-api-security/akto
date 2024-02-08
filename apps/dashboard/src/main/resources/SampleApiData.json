@@ -1477,6 +1477,7 @@
             "statusCode": 200
         }
     },
+
     {
         "id": "INVALID_FILE_INPUT",
         "sampleData": {
@@ -1520,7 +1521,7 @@
             "url": "/api/college/registrations",
             "responsePayload": {
                 "errors": "Validation failed",
-                "stack-trace": "At row 1 col 1 expected a valid input, function exited with returning 0"
+                "stack-trace": "java.lang.ArrayIndexOutOfBoundsException: Index 5 out of bounds for length 5"
             },
             "responseHeaders": {
                 "Content-Type": "application/json"
@@ -2454,7 +2455,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/network-info",
-            "responsePayload": "Sensitive Info ....",
+            "responsePayload": "Linux daemon",
             "responseHeaders": {},
             "statusCode": 200
         }

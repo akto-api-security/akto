@@ -26,6 +26,9 @@ info:
     - CVE-2022-29597
 
 api_selection_filters:
+  response_payload:
+    not_contains_either:
+      - root
   or:
     - request_payload:
         for_one:
