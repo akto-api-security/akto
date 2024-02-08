@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import com.akto.dto.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -20,10 +21,6 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -68,7 +65,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
             httpResponseParamsList.add(httpResponseParam);
         }
 
-        httpCallParser.syncFunction(httpResponseParamsList, false, true);
+        httpCallParser.syncFunction(httpResponseParamsList, false, true, new AccountSettings());
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
     }
 
