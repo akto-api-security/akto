@@ -44,6 +44,62 @@ public class VariableResolver {
         return obj;
     }
 
+    public static List<Object> resolveExpression(Map<String, Object> varMap, Object key) {
+
+        Object keyContext = null;
+        List<Object> varList = new ArrayList<>();
+        if (key instanceof String) {
+            keyContext = VariableResolver.resolveContextKey(varMap, key.toString());
+        }
+
+        if (keyContext instanceof ArrayList) {
+            return (List) keyContext;
+        }
+
+        if (key instanceof String) {
+            keyContext = VariableResolver.resolveContextVariable(varMap, key.toString());
+        }
+
+        if (keyContext instanceof ArrayList) {
+            return (List) keyContext;
+        }
+
+        if (VariableResolver.isWordListVariable(key, varMap)) {
+            varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
+            return varList;
+        }
+
+        if (key instanceof String) {
+            key = VariableResolver.resolveExpression(varMap, key.toString());
+            if (key instanceof String) {
+                varList.add(key.toString());
+                return varList;
+            } else if (key instanceof ArrayList) {
+                return (List) key;
+            }
+        } else if (key instanceof Map) {
+            varList.add(key);
+            return varList;
+        } else if (key instanceof ArrayList) {
+            List<Object> keyList = (List) key;
+            int index = 0;
+            for (Object k: keyList) {
+                List<Object> v = VariableResolver.resolveExpression(varMap, k.toString());
+                if (v != null && v.size() > 0) {
+                    keyList.set(index, v.get(0).toString());
+                }
+                index++;
+            }
+        } else {
+            varList.add(key);
+            return varList;
+        }
+
+        varList.add(key);
+        return varList;
+
+    }
+
     public static List<Object> resolveExpression(Map<String, Object> varMap, String expression) {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
