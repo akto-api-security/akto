@@ -7,14 +7,15 @@ const func = {
         keyConditions: { predicates: [], operator: "OR" },
         sensitiveState: '4',
         operator: "OR",
-        dataType: "Custom"
+        dataType: "Custom",
+        redacted: 'false'
       },
 
-    convertToSensitiveData: function(state) {
+    convertToSensitiveData: function(obj) {
         let sensitiveAlways = false;
         let sensitivePosition = [] ;
 
-        switch (state){
+        switch (obj.sensitiveState){
             case '1':
                 sensitivePosition = ["REQUEST_PAYLOAD", "REQUEST_HEADER"];
                 break;
@@ -32,7 +33,8 @@ const func = {
         }
         let resultObj= {
             sensitiveAlways: sensitiveAlways,
-            sensitivePosition: sensitivePosition
+            sensitivePosition: sensitivePosition,
+            redacted: obj.redacted
         }
 
         return resultObj;
@@ -50,6 +52,7 @@ const func = {
         initialObj.id = dataObj.id;
         initialObj.name = dataObj.name
         initialObj.dataType = type
+        initialObj.redacted = dataObj.redacted.toString()
         let state = func.convertDataToState(dataObj.sensitiveAlways, dataObj.sensitivePosition)
         initialObj.sensitiveState = state
         if(type === 'Custom'){
@@ -99,6 +102,7 @@ const func = {
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
+            redacted: state.redacted
         }
 
         return finalObj

@@ -37,7 +37,7 @@ public class TestInventoryAction extends MongoBasedTest {
         ApiCollectionsDao.instance.getMCollection().drop();
 
 
-        ApiCollection apiCollection = new ApiCollection(0, "petstore-lb",0, new HashSet<>(), "petstore.com", 0);
+        ApiCollection apiCollection = new ApiCollection(0, "petstore-lb",0, new HashSet<>(), "petstore.com", 0, false, true);
         ApiCollectionsDao.instance.insertOne(apiCollection);
 
         SingleTypeInfo sti1 = buildHostSti("url1", "GET", "host", 0);

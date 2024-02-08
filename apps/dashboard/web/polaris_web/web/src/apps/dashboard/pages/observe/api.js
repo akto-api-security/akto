@@ -218,6 +218,15 @@ export default {
             return resp
         })
     },
+    redactCollection(apiCollectionId, redacted){
+        return request({
+            url: '/api/redactCollection',
+            method: 'post',
+            data:{
+                apiCollectionId,redacted
+            }
+        })
+    },
 
     async fetchAllUrlsAndMethods (apiCollectionId) {
         const resp = await request({

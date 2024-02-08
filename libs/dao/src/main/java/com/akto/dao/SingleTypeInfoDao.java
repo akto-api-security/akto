@@ -4,25 +4,18 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 
-import javax.print.attribute.HashAttributeSet;
-
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CustomDataType;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -291,6 +284,32 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return fetchEndpointsInCollection(filter, 50);
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+        Bson matchCriteria = null;
+        if (apiCollectionId != -1) {
+            matchCriteria = Filters.eq("apiCollectionId", apiCollectionId);
+        }
+        return fetchEndpoints(matchCriteria, "startTs");
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
+        return fetchEndpoints(Filters.eq("subType", subType.getName()), "timestamp", skip, limit);
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+        Bson matchCriteria = null;
+        if (apiCollectionId != -1) {
+            matchCriteria = Filters.eq("apiCollectionId", apiCollectionId);
+        }
+        return fetchEndpoints(matchCriteria, "startTs");
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
+        return fetchEndpoints(Filters.eq("subType", subType.getName()), "timestamp", skip, limit);
+    }
+
+
+
     private List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter, int limit) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
@@ -308,7 +327,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
-        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+        pipeline.add(Aggregates.sort(Sorts.descending(sortField)));
+
+        if (skipLimit.length == 2) {
+            pipeline.add(Aggregates.limit(skipLimit[1]));
+            pipeline.add(Aggregates.skip(skipLimit[0]));
+        }
 
         if (limit > 0) {
             pipeline.add(Aggregates.limit(limit));
@@ -329,7 +353,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 endpoints.add(apiInfoKey);
             } catch (Exception e) {
                 ;
-
             }
         }
 
@@ -452,7 +475,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }else{
             return 0;
         }
-        
+
     }
 
     public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
