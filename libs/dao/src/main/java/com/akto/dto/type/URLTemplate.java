@@ -75,6 +75,9 @@ public class URLTemplate {
                         if (!"true".equals(thatToken.toLowerCase()) && !"false".equals(thatToken.toLowerCase())) return false;
                         break;
                     case INTEGER:
+                        if (thatToken.charAt(0) == '+') {
+                            thatToken = thatToken.substring(1);
+                        }
                         if (!NumberUtils.isParsable(thatToken) || thatToken.contains(".")) return false;
                         break;
                     case FLOAT:

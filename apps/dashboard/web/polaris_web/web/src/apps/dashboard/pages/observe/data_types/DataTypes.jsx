@@ -196,7 +196,8 @@ function DataTypes() {
         <HorizontalGrid gap="4" columns={2}>
           <TextField id={"name-field"} label="Name" helpText="Name the data type"
             value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
-            onChange={(val) => { pageTitle === "Add data type" ? handleChange({ name: val }) : {} }} />
+            {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
+            />
           {currState.dataType === 'Custom' ?
             <Dropdown id={"active-dropdown"} menuItems={statusItems}
               selected={(val) => { handleChange({ active: val }) }}
@@ -279,7 +280,7 @@ function DataTypes() {
           <p>Redact this data type</p>
           <br/>
           <HorizontalGrid columns="4">
-            <Dropdown id={"redact-position"} menuItems = {statusItems} initial={currState.redacted} 
+            <Dropdown id={"redact-position"} menuItems = {statusItems} initial={currState.redacted}
             selected={(val) => { handleChange({ redacted: val }) }}/>
           </HorizontalGrid >
         </LegacyCard.Section>

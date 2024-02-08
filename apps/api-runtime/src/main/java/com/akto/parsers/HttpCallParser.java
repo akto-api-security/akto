@@ -274,6 +274,10 @@ public class HttpCallParser {
             }
 
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN)) {
+                cond = true;
+            }
+
             if (!cond) continue;
             
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), AccountSettings.AKTO_IGNORE_FLAG);
