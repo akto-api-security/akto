@@ -275,23 +275,42 @@ const transform = {
     getStandardHeaderList(){
         return standardHeaders
     },
+    isValidString(string){
+        try {
+            const val = JSON.parse(string)
+            return {type:true, val: val}
+        } catch (error) {
+            return {type:false, val: ""}
+        }
+    },
     getCommonSamples(nonSensitiveData, sensitiveData){
         let sensitiveSamples = this.prepareSampleData(sensitiveData, '')
         const samples = new Set()
         const highlightPathsObj ={}
         sensitiveSamples.forEach((x) => {
-            samples.add(JSON.parse(x.message))
-            highlightPathsObj[JSON.parse(x.message)] = x.highlightPaths
+            const validObj = this.isValidString(x.message)
+            if(validObj.type){
+                samples.add(validObj.val)
+                highlightPathsObj[validObj.val] = x.highlightPaths 
+            }
+            
         })
 
         let uniqueNonSensitive = []
         nonSensitiveData.forEach((x) => {
-            let parsed = JSON.parse(x)
-            if(!samples.has(parsed)){
-                uniqueNonSensitive.push({message: x, highlightPaths: []})
+            try {
+                let parsed = JSON.parse(x)
+                if(samples.size === 0 || !samples.has(parsed)){
+                    uniqueNonSensitive.push({message: x, highlightPaths: []})
+                }
+            } catch (e) {
             }
+            
         })
-        const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
+        let finalArr = [...uniqueNonSensitive]
+        if(samples.size > 0){
+            finalArr = [...sensitiveSamples, ...finalArr]
+        }
         return finalArr
     },
     getColor(key){
