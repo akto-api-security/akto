@@ -129,14 +129,14 @@ public class TestDBSync extends MongoBasedTest {
 
         HttpCallParser parser = new HttpCallParser("access-token", 1,40,10, true);
 
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
         
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         assertFalse(parser.getSyncCount() == 0);
 
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
         APICatalogSync.mergeUrlsAndSave(123, true);
@@ -145,7 +145,7 @@ public class TestDBSync extends MongoBasedTest {
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(1, sd.getSamples().size());
 
-        parser.syncFunction(responseParams,true, true);
+        parser.syncFunction(responseParams,true, true, null);
         sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(10, sd.getSamples().size());
     }
@@ -166,11 +166,11 @@ public class TestDBSync extends MongoBasedTest {
         HttpCallParser parser = new HttpCallParser("access-token", 10,40,10, true);
 
         /* tryMergingWithKnownStrictURLs - put in delta-static */
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
         /* processKnownStaticURLs */
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
 
         /* tryMergingWithKnownStrictURLs - merge with delta-static */        
         responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
@@ -178,11 +178,11 @@ public class TestDBSync extends MongoBasedTest {
 
         /* tryMergingWithKnownStrictURLs - merge with delta-template */  
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
         
         /* tryMergingWithKnownTemplates */
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownStrictURLs - merge with Db url */
@@ -190,14 +190,14 @@ public class TestDBSync extends MongoBasedTest {
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
 
         /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams, false, true);
+        parser.syncFunction(responseParams, false, true, null);
 
     }  
 
