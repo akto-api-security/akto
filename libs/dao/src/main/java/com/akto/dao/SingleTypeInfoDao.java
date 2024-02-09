@@ -270,10 +270,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         Bson filter = null;
-        if (apiCollectionId < 0) {
+        if (apiCollectionId != -1) {
             filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         }
-        return fetchEndpoints(filter, null, -1);
+        return fetchEndpoints(filter, null);
     }
 
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
