@@ -99,6 +99,9 @@ public class ExecutorAlgorithm {
                 }
             }
 
+            if (keyIndex >= keyList.size()) {
+                return new ExecutorSingleRequest(false, "empty arg at left side for operation no " + operationIndex, null, false);
+            }
             Object key = keyList.get(keyIndex);
             Object val = null;
             if (valList != null && valList.size() > 0) {
