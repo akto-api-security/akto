@@ -107,6 +107,9 @@ public class ExecutionListBuilder {
                             Object dataValues = dataNode.getValues();
                             if (dataValues != null && dataValues instanceof String) {
                                 dataValues = dataValues.toString().replace("${iteratorKey}", values.get(i).toString());
+                                if (!dataValues.toString().startsWith("${")) {
+                                    dataValues = "${" + dataValues.toString() + "}";
+                                }
                             }
                             List<ExecutorNode> newChildNodes = new ArrayList<>();
                             ExecutorNode newDataNode = new ExecutorNode(dataNode.getNodeType(), dataNode.getChildNodes(), dataValues, opType);

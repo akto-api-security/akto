@@ -102,6 +102,9 @@ public class Executor {
 
         ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
 
+        Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
+        varMap = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+
         if (modifyExecutionOrderResp.getError() != null) {
             error_messages.add(modifyExecutionOrderResp.getError());
             invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null);
