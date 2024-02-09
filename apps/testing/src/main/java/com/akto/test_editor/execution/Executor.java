@@ -82,7 +82,7 @@ public class Executor {
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
                     if (role.getDefaultAuthMechanism() != null) {
                         loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        overrideAuth(sampleRawApi, role.getDefaultAuthMechanism());
+                        modifyAuthTokenInRawApi(role, sampleRawApi);
                     } else {
                         loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
                     }
@@ -352,6 +352,55 @@ public class Executor {
         return removed;
     }
 
+    private ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+        Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
+        for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
+
+            boolean allSatisfied = true;
+            for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
+                String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
+
+                List<String> rawHeaderValue = rawHeaders.getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
+                if (!rawHeaderValue.contains(headerVal)) {
+                    allSatisfied = false;
+                    break;
+                }
+            }
+
+            if (allSatisfied) {
+                AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
+
+                if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+                    try {
+                        LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authWithCond.getAuthMechanism(), null);
+                        if (!loginFlowResponse.getSuccess())
+                            throw new Exception(loginFlowResponse.getError());
+
+                        authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                    } catch (Exception e) {
+                        return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
+                    }
+                }
+
+                if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
+                    return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
+                }
+
+                List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
+                if (!authParamList.isEmpty()) {
+                    ExecutorSingleOperationResp ret = null;
+                    for (AuthParam authParam1: authParamList) {
+                        ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                    }
+
+                    return ret;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
         switch (operationType.toLowerCase()) {
             case "add_body_param":
@@ -384,51 +433,11 @@ public class Executor {
 
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-
                     TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
-                    Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
-                    for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
 
-                        boolean allSatisfied = true;
-                        for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
-                            String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
-
-                            List<String> rawHeaderValue = rawHeaders.getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
-                            if (!rawHeaderValue.contains(headerVal)) {
-                                allSatisfied = false;
-                                break;
-                            }
-                        }
-
-                        if (allSatisfied) {
-                            AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
-
-                            if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
-                                try {
-                                    LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authWithCond.getAuthMechanism(), null);
-                                    if (!loginFlowResponse.getSuccess())
-                                        throw new Exception(loginFlowResponse.getError());
-
-                                    authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                                } catch (Exception e) {
-                                    return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
-                                }
-                            }
-
-                            if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
-                                return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
-                            }
-
-                            List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
-                            if (!authParamList.isEmpty()) {
-                                ExecutorSingleOperationResp ret = null;
-                                for (AuthParam authParam1: authParamList) {
-                                    ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
-                                }
-
-                                return ret;
-                            }
-                        }
+                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    if (insertedAuthResp != null) {
+                        return insertedAuthResp;
                     }
 
                     return new ExecutorSingleOperationResp(true, "Unable to match request headers " + key);
