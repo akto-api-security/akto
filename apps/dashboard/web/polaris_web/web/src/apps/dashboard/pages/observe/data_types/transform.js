@@ -11,11 +11,11 @@ const func = {
         redacted: 'false'
       },
 
-    convertToSensitiveData: function(obj) {
+    convertToSensitiveData: function(state) {
         let sensitiveAlways = false;
         let sensitivePosition = [] ;
 
-        switch (obj.sensitiveState){
+        switch (state){
             case '1':
                 sensitivePosition = ["REQUEST_PAYLOAD", "REQUEST_HEADER"];
                 break;
@@ -34,7 +34,6 @@ const func = {
         let resultObj= {
             sensitiveAlways: sensitiveAlways,
             sensitivePosition: sensitivePosition,
-            redacted: obj.redacted
         }
 
         return resultObj;
