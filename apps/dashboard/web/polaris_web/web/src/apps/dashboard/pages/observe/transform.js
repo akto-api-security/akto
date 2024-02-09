@@ -277,28 +277,33 @@ const transform = {
     },
     isValidString(string){
         try {
-            JSON.parse(string)
-            return true
+            const val = JSON.parse(string)
+            return {type:true, val: val}
         } catch (error) {
-            return false
+            return {type:false, val: ""}
         }
     },
     getCommonSamples(nonSensitiveData, sensitiveData){
         let sensitiveSamples = this.prepareSampleData(sensitiveData, '')
         const samples = new Set()
         const highlightPathsObj ={}
-        sensitiveSamples.filter((x) => this.isValidString(x.message)).forEach((x) => {
-            samples.add(JSON.parse(x.message))
-            highlightPathsObj[JSON.parse(x.message)] = x.highlightPaths 
+        sensitiveSamples.forEach((x) => {
+            const validObj = this.isValidString(x.message)
+            if(validObj.type){
+                samples.add(validObj.val)
+                highlightPathsObj[validObj.val] = x.highlightPaths 
+            }
+            
         })
 
         let uniqueNonSensitive = []
         nonSensitiveData.forEach((x) => {
-            if(this.isValidString(x)){
+            try {
                 let parsed = JSON.parse(x)
                 if(samples.size === 0 || !samples.has(parsed)){
                     uniqueNonSensitive.push({message: x, highlightPaths: []})
                 }
+            } catch (e) {
             }
             
         })
