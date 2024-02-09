@@ -208,7 +208,7 @@ public class TestDBSync extends MongoBasedTest {
         APICatalogSync sync = new APICatalogSync("access-token", 1, true);
 
         for (int i = 1; i <= 30; i ++ ) {
-            aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));
+            aggr.addURL(TestDump2.createSampleParams("user"+i, "/payment/id"+i));
         }
         sync.computeDelta(aggr, true, 123);
         sync.syncWithDB(false, true);
@@ -217,7 +217,7 @@ public class TestDBSync extends MongoBasedTest {
         assertEquals(30, sync.getDbState(123).getStrictURLToMethods().size());
         assertEquals(0, sync.getDbState(123).getTemplateURLToMethods().size());
 
-        HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "payment/history");
+        HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "/payment/history");
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
         resp2.getHeaders().put("new header", newHeader);

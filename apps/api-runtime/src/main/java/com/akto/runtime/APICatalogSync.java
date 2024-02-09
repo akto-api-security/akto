@@ -654,7 +654,9 @@ public class APICatalogSync {
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
         boolean allNull = true;
         SuperType[] newTypes = new SuperType[tokens.length];
-        for(int i = 0; i < tokens.length; i ++) {
+
+        int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
+        for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
 
             if (NumberUtils.isParsable(tempToken)) {
