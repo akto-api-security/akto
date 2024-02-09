@@ -405,6 +405,10 @@ public class VariableResolver {
     public static Map<String, List<String>> resolveWordList(Map<String, List<String>> wordListsMap, ApiInfo.ApiInfoKey infoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
 
         for (String k: wordListsMap.keySet()) {
+
+            if (k.contains("${") && k.contains("}")) {
+                continue;
+            }
             Map<String, String> m = new HashMap<>();
             Object keyObj;
             String key, location;
@@ -472,11 +476,88 @@ public class VariableResolver {
 
     }
 
+    public static Map<String, Object> resolveDynamicWordList(Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
+
+        Map<String, Object> updatedVarMap = new HashMap<>();
+
+        for (String k: varMap.keySet()) {
+            if (!k.contains("wordList_") || !(k.startsWith("wordList_${"))) {
+                updatedVarMap.put(k, varMap.get(k));
+                continue;
+            }
+            Object kObj = k.substring(9);
+            List<Object> keyList = VariableResolver.resolveExpression(varMap, kObj);
+            for (Object iteratorKey: keyList) {
+                newSampleDataMap = new HashMap<>();
+                Map<String, Object> m = (Map) varMap.get(k);
+                Map<String, Object> loopMap = (Map) m.get("for_all");
+                Map.Entry<String,Object> entry = loopMap.entrySet().iterator().next();
+                String mapKey = entry.getKey().replace("${iteratorKey}", iteratorKey.toString());
+                Map<String, Object> mapValue = (Map) entry.getValue();
+                Object key = mapValue.get("key");
+                String location = null;
+                boolean isRegex = false;
+                boolean allApis = false;
+                if (key instanceof Map) {
+                    Map<String, String> kMap = (Map) key;
+                    key = (String) kMap.get("regex");
+                    key =  key.toString().replace("${iteratorKey}", iteratorKey.toString());
+                    isRegex = true;
+                } else {
+                    key = (String) mapValue.get("key");
+                    key = key.toString().replace("${iteratorKey}", iteratorKey.toString());
+                }
+            
+                if (mapValue.get("location") != null) {
+                    location = mapValue.get("location").toString();
+                }
+            
+                if (mapValue.containsKey("all_apis")) {
+                    allApis = Objects.equals(m.get("all_apis"), true);
+                }
+
+                Bson filters = Filters.and(
+                    Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+                    Filters.or(
+                        Filters.regex("param", key.toString()),
+                        Filters.regex("param", key.toString().toLowerCase())
+                        )
+                );
+
+                List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
+
+                for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                    ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
+                    if (!allApis && !infKey.equals(apiInfoKey)) {
+                        continue;
+                    }
+                    Bson sdfilters = Filters.and(
+                        Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
+                        Filters.eq("_id.method", singleTypeInfo.getMethod()),
+                        Filters.in("_id.url", singleTypeInfo.getUrl())
+                    );
+
+                    SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                    newSampleDataMap.put(infKey, sd.getSamples());
+
+                }
+                
+                List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key.toString(), location, isRegex);
+                updatedVarMap.put(mapKey, wordListVal);
+
+            }
+
+        }
+
+        return updatedVarMap;
+
+    }
+
 
     public static void resolveWordList(Map<String, Object> varMap, Map<ApiInfoKey, List<String>> sampleDataMap, ApiInfo.ApiInfoKey apiInfoKey) {
 
         for (String k: varMap.keySet()) {
-            if (!k.contains("wordList_")) {
+            if (!k.contains("wordList_") || (k.contains("${") && k.contains("}"))) {
                 continue;
             }
             Map<String, String> m = new HashMap<>();
@@ -524,11 +605,6 @@ public class VariableResolver {
             }
 
             List<String> wordListVal = fetchWordList(modifiedSampleDataMap, key, location, isRegex);
-
-            if (wordListVal.size() >= 10) {
-                break;
-            }
-
             varMap.put(k, wordListVal);
         }
 
