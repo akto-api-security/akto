@@ -180,7 +180,7 @@ public class Build {
                 ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
                 modifyRequest(request, replaceDetail);
 
-                TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost);
+                TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost, null);
 
                 OriginalHttpResponse response = null;
                 try {

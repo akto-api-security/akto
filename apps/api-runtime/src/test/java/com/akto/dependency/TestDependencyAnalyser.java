@@ -48,7 +48,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         }
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
-        httpCallParser.syncFunction(httpResponseParamsList, true,true);
+        httpCallParser.syncFunction(httpResponseParamsList, true,true, null);
         APICatalogSync.mergeUrlsAndSave(1000, true);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());

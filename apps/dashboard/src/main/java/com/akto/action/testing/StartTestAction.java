@@ -70,6 +70,7 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    private String testRoleId;
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters) {
         Bson projections = Projections.fields(
@@ -142,7 +143,7 @@ public class StartTestAction extends UserAction {
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
             TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,
-                    authMechanism.getId(), this.overriddenTestAppUrl);
+                    authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -202,7 +203,7 @@ public class StartTestAction extends UserAction {
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null,
-                        this.overriddenTestAppUrl);
+                        this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -1036,5 +1037,14 @@ public class StartTestAction extends UserAction {
         public boolean isCallFromAktoGpt() {
             return AKTO_GPT.equals(this);
         }
+    }
+
+
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }
