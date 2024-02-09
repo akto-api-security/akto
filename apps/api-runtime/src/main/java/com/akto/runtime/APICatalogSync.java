@@ -205,7 +205,10 @@ public class APICatalogSync {
             for (URLStatic pending: pendingRequests.keySet()) {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
 
-                URLTemplate parameterisedTemplate = tryParamteresingUrl(pending);
+                URLTemplate parameterisedTemplate = null;
+                if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
+                    parameterisedTemplate = tryParamteresingUrl(pending);
+                }
 
                 if(parameterisedTemplate != null){
                     RequestTemplate rt = deltaCatalog.getTemplateURLToMethods().get(parameterisedTemplate);
@@ -387,6 +390,16 @@ public class APICatalogSync {
             if (matchedInDeltaTemplate) {
                 continue;
             }
+
+            URLStatic newStaticUrl = new URLStatic(newEndpoint, newMethod);
+
+            URLTemplate tempUrlTemplate = tryParamteresingUrl(newStaticUrl);
+            if(tempUrlTemplate != null){
+                Set<String> matchedStaticURLs = templateToStaticURLs.getOrDefault(tempUrlTemplate, new HashSet<>());
+                matchedStaticURLs.add(newUrl);
+                templateToStaticURLs.put(tempUrlTemplate, matchedStaticURLs);
+            }
+
 
             int countSimilarURLs = 0;
             Map<URLTemplate, Map<String, Set<String>>> potentialMerges = new HashMap<>();

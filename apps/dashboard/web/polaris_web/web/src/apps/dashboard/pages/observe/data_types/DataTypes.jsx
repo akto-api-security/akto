@@ -154,10 +154,13 @@ function DataTypes() {
   }, [currState])
 
   const saveAction = async () => {
+    console.log(currState)
     if (currState.dataType === 'Akto') {
       let obj = {
         name: currState.name,
-        ...transform.convertToSensitiveData(currState)
+        redacted:currState.redacted,
+        ...transform.convertToSensitiveData(currState.sensitiveState),
+        
       }
       api.saveAktoDataType(obj).then((response) => {
         func.setToast(true, false, "Data type updated successfully");
