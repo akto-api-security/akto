@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -210,6 +211,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
         infoObj.put("updatedTs", testConfig.getUpdateTs());
+        infoObj.put("author", testConfig.getAuthor());
 
         superCategory.put("displayName", info.getCategory().getDisplayName());
         superCategory.put("name", info.getCategory().getName());
@@ -252,7 +254,8 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
-        Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
+        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+                                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));

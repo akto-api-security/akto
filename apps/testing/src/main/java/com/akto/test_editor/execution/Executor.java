@@ -3,28 +3,17 @@ package com.akto.test_editor.execution;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.GraphExecutorRequest;
-import com.akto.dto.testing.GraphExecutorResult;
-import com.akto.dto.testing.LoginWorkflowGraphEdge;
-import com.akto.dto.testing.MultiExecTestResult;
-import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.UrlModifierPayload;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.dto.testing.YamlNodeDetails;
-import com.akto.dto.testing.YamlTestResult;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -32,6 +21,9 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.testing.TestExecutor;
+import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +36,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
+
 
 public class Executor {
 
@@ -56,6 +51,12 @@ public class Executor {
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
         List<GenericTestResult> result = new ArrayList<>();
         
+        ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
+        List<ExecutorNode> executorNodes = new ArrayList<>();
+        ExecutionOrderResp executionOrderResp = executionListBuilder.parseExecuteOperations(node, executorNodes);
+
+        boolean followRedirect = executionOrderResp.getFollowRedirect();
+        
         TestResult invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.INVALID_EXECUTION_BLOCK.getMessage()), 0, false, TestResult.Confidence.HIGH, null);
         YamlTestResult yamlTestResult;
         WorkflowTest workflowTest = null;
@@ -65,20 +66,53 @@ public class Executor {
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
+
+        List<String> error_messages = new ArrayList<>();
+
+        ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
+
+        Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
+        varMap = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+
+        if (modifyExecutionOrderResp.getError() != null) {
+            error_messages.add(modifyExecutionOrderResp.getError());
+            invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null);
+            result.add(invalidExecutionResult);
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
+        }
+        executorNodes = modifyExecutionOrderResp.getExecutorNodes();
+
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
         RawApi origRawApi = rawApi.copy();
         RawApi sampleRawApi = rawApi.copy();
-        ExecutorSingleRequest singleReq = null;
         if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
+        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            if (role != null) {
+                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                    if (role.getDefaultAuthMechanism() != null) {
+                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        modifyAuthTokenInRawApi(role, sampleRawApi);
+                    } else {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                }
+            } else {
+                String reason = "Test role has been deleted";
+                loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+            }
+        }
 
         boolean requestSent = false;
-
-        List<String> error_messages = new ArrayList<>();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple")) {
@@ -89,78 +123,69 @@ public class Executor {
             return yamlTestResult;
         }
 
-        for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
-            // make copy of varMap as well
-            List<RawApi> sampleRawApis = new ArrayList<>();
-            sampleRawApis.add(sampleRawApi);
-            List<RawApi> testRawApis = new ArrayList<>();
-            boolean modifications = false;
-            if (reqNode.getChildNodes() == null || reqNode.getChildNodes().size() == 0) {
-                testRawApis.add(sampleRawApi.copy());
-                singleReq = new ExecutorSingleRequest(true, "", testRawApis, true);;
-            } else {
-                modifications = true;
-                singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, customAuthTypes);
-                testRawApis = singleReq.getRawApis();
-                if (testRawApis == null) {
-                    error_messages.add(singleReq.getErrMsg());
-                    continue;
-                }
-            }
-            
-            boolean vulnerable = false;
-            for (RawApi testReq: testRawApis) {
-                if (modifications && testReq.equals(origRawApi)) {
-                    continue;
-                }
-                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
-                    break;
-                }
-                try {
-
-                    // change host header in case of override URL ( if not already changed by test template )
-                    try {
-                        List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
-                        List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
-
-                        if (!originalHostHeaders.isEmpty()
-                            && originalHostHeaders.get(0) != null
-                            && !attemptHostHeaders.isEmpty()
-                            && attemptHostHeaders.get(0) != null
-                            && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
-                            && testingRunConfig != null
-                            && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
-
-                            String url = ApiExecutor.prepareUrl(testReq.getRequest(), testingRunConfig);
-                            URI uri = new URI(url);
-                            String host = uri.getHost();
-                            if (uri.getPort() != -1) {
-                                host += ":" + uri.getPort();
-                            }
-                            testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
-                        }
-
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
-                                LogDb.TESTING);
-                    }
-                        
-                    // follow redirects = true for now
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect(), testingRunConfig);
-                    requestSent = true;
-                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                    TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
-                    if (res != null) {
-                        result.add(res);
-                    }
-                    vulnerable = res.getVulnerable();
-                } catch(Exception e) {
-                    error_messages.add("Error executing test request: " + e.getMessage());
-                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
-                }
-            }
+        List<RawApi> testRawApis = new ArrayList<>();
+        testRawApis.add(sampleRawApi.copy());
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
+        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, testRawApis, false, 0);
+        
+        if (!singleReq.getSuccess()) {
+            testRawApis = new ArrayList<>();
+            error_messages.add(singleReq.getErrMsg());
         }
 
+        boolean vulnerable = false;
+        for (RawApi testReq: testRawApis) {
+            if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                continue;
+            }
+            if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+                break;
+            }
+            try {
+
+                // change host header in case of override URL ( if not already changed by test template )
+                try {
+                    List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+                    List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+
+                    if (!originalHostHeaders.isEmpty()
+                        && originalHostHeaders.get(0) != null
+                        && !attemptHostHeaders.isEmpty()
+                        && attemptHostHeaders.get(0) != null
+                        && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
+                        && testingRunConfig != null
+                        && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+
+                        String url = ApiExecutor.prepareUrl(testReq.getRequest(), testingRunConfig);
+                        URI uri = new URI(url);
+                        String host = uri.getHost();
+                        if (uri.getPort() != -1) {
+                            host += ":" + uri.getPort();
+                        }
+                        testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
+                    }
+
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
+                            LogDb.TESTING);
+                }
+                    
+                // follow redirects = true for now
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig);
+                requestSent = true;
+                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                if (res != null) {
+                    result.add(res);
+                }
+                vulnerable = res.getVulnerable();
+            } catch(Exception e) {
+                error_messages.add("Error executing test request: " + e.getMessage());
+                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+        
         if(result.isEmpty()){
             if(requestSent){
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
@@ -173,6 +198,26 @@ public class Executor {
         yamlTestResult = new YamlTestResult(result, workflowTest);
 
         return yamlTestResult;
+    }
+
+    private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+        if (authParams == null || authParams.isEmpty()) {
+            return;
+        }
+        AuthParam authParam = authParams.get(0);
+        String authHeader = authParam.getKey();
+        String authVal = authParam.getValue();
+        Map<String, List<String>> headersMap= rawApi.fetchReqHeaders();
+        for (Map.Entry<String, List<String>> headerKeyVal : headersMap.entrySet()) {
+            if (headerKeyVal.getKey().equalsIgnoreCase(authHeader)) {
+                headerKeyVal.setValue(Collections.singletonList(authVal));
+                rawApi.modifyReqHeaders(headersMap);
+                loggerMaker.infoAndAddToDb("overriding auth header " + authHeader, LogDb.TESTING);
+                return;
+            }
+        }
+        loggerMaker.infoAndAddToDb("auth header not found " + authHeader, LogDb.TESTING);
     }
 
     public WorkflowTest buildWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
@@ -296,184 +341,8 @@ public class Executor {
         return testResult;
     }
 
-    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
-
-        List<ExecutorNode> childNodes = node.getChildNodes();
-        if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
-            operation = node.getOperationType();
-        }
-
-        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutorSingleRequest(true, "", null, true);
-        }
-
-        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString())) {
-            return new ExecutorSingleRequest(true, "", rawApis, true);
-        }
-
-        if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.TerminalNonExecutable.toString())) {
-            return new ExecutorSingleRequest(true, "", rawApis, true);
-        }
-
-        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
-            boolean redirect = true;
-            try {
-                redirect = Boolean.valueOf(node.getValues().toString());
-            } catch (Exception e) {
-            }
-            return new ExecutorSingleRequest(true, "", rawApis, redirect);
-        }
-        Boolean followRedirect = true;
-        List<RawApi> newRawApis = new ArrayList<>();
-        if (childNodes.size() == 0) {
-            Object key = node.getOperationType();
-            Object value = node.getValues();
-            if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
-                if (node.getValues() instanceof Boolean) {
-                    key = Boolean.toString((Boolean) node.getValues());
-                } else if (node.getValues() instanceof String) {
-                    key = (String) node.getValues();
-                } else {
-                    key = (Map) node.getValues();
-                }
-                value = null;
-            }
-            // if rawapi size is 1, var type is wordlist, iterate on values
-            RawApi rApi = rawApis.get(0).copy();
-            if (rawApis.size() == 1 && VariableResolver.isWordListVariable(key, varMap)) {
-                List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
-
-                for (int i = 0; i < wordListVal.size(); i++) {
-                    RawApi copyRApi = rApi.copy();
-                    ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap, authMechanism, customAuthTypes);
-                    if (!resp.getSuccess()) {
-                        return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
-                    }
-                    if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
-                        newRawApis.add(copyRApi);
-                    }
-                }
-
-            } else if (rawApis.size() == 1 && VariableResolver.isWordListVariable(value, varMap)) {
-                List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
-
-                for (int i = 0; i < wordListVal.size(); i++) {
-                    RawApi copyRApi = rApi.copy();
-                    ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap, authMechanism, customAuthTypes);
-                    if (!resp.getSuccess()) {
-                        return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
-                    }
-                    if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
-                        newRawApis.add(copyRApi);
-                    }
-                }
-
-            } else {
-                if (VariableResolver.isWordListVariable(key, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
-                    int index = 0;
-                    for (RawApi rawApi : rawApis) {
-                        if (index >= wordListVal.size()) {
-                            break;
-                        }
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(index), value, rawApi, varMap, authMechanism, customAuthTypes);
-                        if (!resp.getSuccess()) {
-                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
-                        }
-                        index++;
-                    }
-                } else if (VariableResolver.isWordListVariable(value, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
-                    int index = 0;
-                    for (RawApi rawApi : rawApis) {
-                        if (index >= wordListVal.size()) {
-                            break;
-                        }
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(index), rawApi, varMap, authMechanism, customAuthTypes);
-                        if (!resp.getSuccess()) {
-                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
-                        }
-                        index++;
-                    }
-                } else {
-                    for (RawApi rawApi : rawApis) {
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap, authMechanism, customAuthTypes);
-                        if (!resp.getSuccess()) {
-                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
-                        }
-                    }
-                }
-                
-            }
-        }
-
-        ExecutorNode childNode;
-        for (int i = 0; i < childNodes.size(); i++) {
-            childNode = childNodes.get(i);
-            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap, authMechanism, customAuthTypes);
-            rawApis = executionResult.getRawApis();
-            if (!executionResult.getSuccess()) {
-                return executionResult;
-            }
-            followRedirect = followRedirect && executionResult.getFollowRedirect();
-        }
-
-        if (newRawApis.size() > 0) {
-            return new ExecutorSingleRequest(true, "", newRawApis, followRedirect);
-        } else {
-            return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
-        }
-    }
-
     public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
         try {
-
-            if (key == null) {
-                return new ExecutorSingleOperationResp(false, "error executing executor operation, key is null " + key);
-            }
-            Object keyContext = null, valContext = null;
-            if (key instanceof String) {
-                keyContext = VariableResolver.resolveContextKey(varMap, key.toString());
-            }
-            if (value instanceof String) {
-                valContext = VariableResolver.resolveContextVariable(varMap, value.toString());
-            }
-
-            if (keyContext instanceof ArrayList && valContext instanceof ArrayList) {
-                List<String> keyContextList = (List<String>) keyContext;
-                List<String> valueContextList = (List<String>) valContext;
-
-                for (int i = 0; i < keyContextList.size(); i++) {
-                    String v1 = valueContextList.get(i);
-                    ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, keyContextList.get(i), v1, varMap, authMechanism, customAuthTypes);
-                    if (!resp.getSuccess()) {
-                        return resp;
-                    }
-                }
-                return new ExecutorSingleOperationResp(true, "");
-            }
-
-            if (key instanceof String) {
-                key = VariableResolver.resolveExpression(varMap, key.toString());
-            }
-
-            if (value instanceof String) {
-                value = VariableResolver.resolveExpression(varMap, value.toString());
-            }
-
-            if (value instanceof List) {
-                try {
-                    int index = 0;
-                    List<Object> valList = (List<Object>) value;
-                    for (Object v: valList) {
-                        v = VariableResolver.resolveExpression(varMap, v.toString());
-                        valList.set(index, v);
-                        index++;
-                    }
-                } catch (Exception e) {
-                }
-            }
-
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes);
             return resp;
         } catch(Exception e) {
@@ -496,6 +365,55 @@ public class Executor {
             }
         }
         return removed;
+    }
+
+    private ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+        Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
+        for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
+
+            boolean allSatisfied = true;
+            for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
+                String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
+
+                List<String> rawHeaderValue = rawHeaders.getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
+                if (!rawHeaderValue.contains(headerVal)) {
+                    allSatisfied = false;
+                    break;
+                }
+            }
+
+            if (allSatisfied) {
+                AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
+
+                if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+                    try {
+                        LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authWithCond.getAuthMechanism(), null);
+                        if (!loginFlowResponse.getSuccess())
+                            throw new Exception(loginFlowResponse.getError());
+
+                        authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                    } catch (Exception e) {
+                        return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
+                    }
+                }
+
+                if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
+                    return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
+                }
+
+                List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
+                if (!authParamList.isEmpty()) {
+                    ExecutorSingleOperationResp ret = null;
+                    for (AuthParam authParam1: authParamList) {
+                        ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                    }
+
+                    return ret;
+                }
+            }
+        }
+
+        return null;
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
@@ -522,7 +440,25 @@ public class Executor {
             case "add_header":
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
-                return Operations.modifyHeader(rawApi, key.toString(), value.toString());
+                String keyStr = key.toString();
+                String valStr = value.toString();
+
+                String ACCESS_ROLES_CONTEXT = "${roles_access_context.";
+                if (keyStr.startsWith(ACCESS_ROLES_CONTEXT)) {
+
+                    keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
+                    keyStr = keyStr.substring(0,keyStr.length()-1).trim();
+                    TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+
+                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    if (insertedAuthResp != null) {
+                        return insertedAuthResp;
+                    }
+
+                    return new ExecutorSingleOperationResp(true, "Unable to match request headers " + key);
+                } else {
+                    return Operations.modifyHeader(rawApi, keyStr, valStr);
+                }
             case "delete_header":
                 return Operations.deleteHeader(rawApi, key.toString());
             case "add_query_param":

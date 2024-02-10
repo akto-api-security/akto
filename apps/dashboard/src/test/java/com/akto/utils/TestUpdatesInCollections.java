@@ -68,7 +68,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
             httpResponseParamsList.add(httpResponseParam);
         }
 
-        httpCallParser.syncFunction(httpResponseParamsList, false, true);
+        httpCallParser.syncFunction(httpResponseParamsList, false, true, null);
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
     }
 
@@ -81,7 +81,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         ApiInfoKey apiInfoKey = apiInfo.getId();
 
         TestingIssuesId testingIssuesId = new TestingIssuesId(apiInfoKey, GlobalEnums.TestErrorSource.AUTOMATED_TESTING ,testSubCategory);
-        TestingRunIssues testingRunIssues = new TestingRunIssues(testingIssuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(), new ObjectId(new Date()));
+        TestingRunIssues testingRunIssues = new TestingRunIssues(testingIssuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(), new ObjectId(new Date()), Context.now());
 
         return testingRunIssues;
     }
@@ -212,7 +212,15 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.FIXED),
             Updates.set(TestingRunIssues.LAST_SEEN, Context.now())
         );
-        TestingRunIssuesDao.instance.updateOne(Filters.in("_id", issue1.getId()), update);
+        
+        IssuesAction issuesAction = new IssuesAction();
+        issuesAction.setIssueId(issue1.getId());
+        issuesAction.setStatusToBeUpdated(GlobalEnums.TestRunIssueStatus.FIXED);
+        issuesAction.setIgnoreReason("Fixed");
+
+        String resp1 = issuesAction.updateIssueStatus();
+        assertEquals(resp1, "SUCCESS");
+
         TestingRunIssuesDao.instance.updateOne(Filters.in("_id", issue3.getId()), update);
         TestingRunIssuesDao.instance.updateOne(Filters.in("_id", issue5.getId()), update);
 
@@ -240,6 +248,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         ApiInfo apiInfo7 = ApiInfoDao.instance.findOne(filter2);
         assertEquals((double) 20 , apiInfo7.getSeverityScore(), 0);
+
 
     }
 }

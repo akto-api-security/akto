@@ -38,6 +38,7 @@ import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPag
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
+import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
 import Billing from "../dashboard/pages/settings/billing/Billing";
@@ -227,6 +228,10 @@ const router = createBrowserRouter([
             element:<AuthTypes/>
           },
           {
+            path: "default-payloads",
+            element:<DefaultPayloads/>
+          },
+          {
             path: "auth-types/details",
             element: <AuthTypeDetails/>
           },
@@ -293,7 +298,6 @@ const router = createBrowserRouter([
 function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
-  setAllRoutes(searchData)
   const { stigg } = useStiggContext();
   useEffect(() => {
     stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
@@ -313,6 +317,7 @@ function App() {
       }
       };
     `);
+    setAllRoutes(searchData)
     script.appendChild(scriptText);
     document.body.appendChild(script)
   }, [])
