@@ -26,6 +26,13 @@ public class ApiCollection {
     public static final String HOST_NAME = "hostName";
     int vxlanId;
 
+    boolean redact;
+    public static final String REDACT = "redact";
+
+    boolean sampleCollectionsDropped;
+
+    public static final String SAMPLE_COLLECTIONS_DROPPED = "sampleCollectionsDropped";
+
     @BsonIgnore
     int urlsCount;
 
@@ -44,13 +51,15 @@ public class ApiCollection {
     public ApiCollection() {
     }
 
-    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId) {
+    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped) {
         this.id = id;
         this.name = name;
         this.startTs = startTs;
         this.urls = urls;
         this.hostName = hostName;
         this.vxlanId = vxlanId;
+        this.redact = redact;
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
     public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
@@ -146,7 +155,15 @@ public class ApiCollection {
 
     // To be called if you are creating a collection that is not from mirroring
     public static ApiCollection createManualCollection(int id, String name){
-        return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
+        return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0, false, true);
+    }
+
+    public boolean getRedact() {
+        return redact;
+    }
+
+    public void setRedact(boolean redact) {
+        this.redact = redact;
     }
 
     public Type getType() {
@@ -156,7 +173,7 @@ public class ApiCollection {
     public void setType(Type type) {
         this.type = type;
     }
-    
+
     public List<TestingEndpoints> getConditions() {
         return conditions;
     }
@@ -205,4 +222,11 @@ public class ApiCollection {
         updateConditionList(condition, false);
     }
 
+    public boolean isSampleCollectionsDropped() {
+        return sampleCollectionsDropped;
+    }
+
+    public void setSampleCollectionsDropped(boolean sampleCollectionsDropped) {
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
+    }
 }
