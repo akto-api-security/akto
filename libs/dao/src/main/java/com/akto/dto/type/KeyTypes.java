@@ -110,19 +110,7 @@ public class KeyTypes {
         return true;
     }
 
-    public static SubType findSubType(Object o,String key, ParamId paramId) {
-
-        int accountId = Context.accountId.get();
-        boolean checkForSubtypes = true ;
-        for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
-            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
-        }
-        for (String keyType : SingleTypeInfo.getAktoDataTypeMap(accountId).keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
-            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
-        }
-
+    private static SubType getSubtype(Object o,String key, boolean checkForSubtypes){
         if (o == null) {
             return SingleTypeInfo.NULL;
         }
@@ -174,8 +162,9 @@ public class KeyTypes {
 
         if (o instanceof String) {
             String str = o.toString();
-            for(SubType subType: patternToSubType.keySet()) {
-                Pattern pattern = patternToSubType.get(subType);
+            for(Map.Entry<SubType, Pattern> entry: patternToSubType.entrySet()) {
+                Pattern pattern = entry.getValue();
+                SubType subType = entry.getKey();
                 if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(str).matches()) {
                     return subType;
                 }
@@ -196,6 +185,30 @@ public class KeyTypes {
         }
 
         return SingleTypeInfo.OTHER;
+    }
+
+    public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
+        if(executeCheckForSubtypes){
+            return getSubtype(o, key, true);
+        }else{
+            return findSubType(o, key, paramId);
+        }
+    }
+
+    public static SubType findSubType(Object o,String key, ParamId paramId) {
+
+        int accountId = Context.accountId.get();
+        boolean checkForSubtypes = true ;
+        for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
+            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
+        }
+        for (String keyType : SingleTypeInfo.getAktoDataTypeMap(accountId).keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
+            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
+        }
+
+        return getSubtype(o, key, checkForSubtypes);
     }
 
     public Map<SubType,SingleTypeInfo> getOccurrences() {

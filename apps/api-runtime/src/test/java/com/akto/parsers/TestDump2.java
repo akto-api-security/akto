@@ -34,14 +34,14 @@ public class TestDump2 extends MongoBasedTest {
     public void testInitializer(){
         Context.accountId.set(ACCOUNT_ID);
         Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
-        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
         if (info == null) {
             info = new AccountDataTypesInfo();
         }
@@ -130,10 +130,10 @@ public class TestDump2 extends MongoBasedTest {
 
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false, 0);
-        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false);
+        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false);
         assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());
-        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),false,true).size());
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),true, false, false).size());
     }
 
 
@@ -159,7 +159,7 @@ public class TestDump2 extends MongoBasedTest {
             RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
             assertEquals(1, respTemplate.getUserIds().size());
             assertEquals(3, respTemplate.getParameters().size());
-            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false);
+            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false, false);
             assertEquals(24, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
             assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());
         }
@@ -172,9 +172,9 @@ public class TestDump2 extends MongoBasedTest {
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
         simpleTestForSingleCollection(2, sync);
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0),false).bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false).bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0),false, false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false, false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false, false).bulkUpdatesForSingleTypeInfo.size());
     }
 
     @Test
@@ -280,7 +280,7 @@ public class TestDump2 extends MongoBasedTest {
 
         respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
 
-        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false).bulkUpdatesForSingleTypeInfo;
+        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false).bulkUpdatesForSingleTypeInfo;
     }
 
     @Test

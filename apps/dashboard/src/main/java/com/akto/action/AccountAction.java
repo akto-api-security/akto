@@ -292,7 +292,7 @@ public class AccountAction extends UserAction {
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(newAccountId);
-                ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
+                ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0, false, true));
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if (backwardCompatibility == null) {
                     backwardCompatibility = new BackwardCompatibility();
