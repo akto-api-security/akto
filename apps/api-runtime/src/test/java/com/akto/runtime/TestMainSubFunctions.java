@@ -38,7 +38,7 @@ public class TestMainSubFunctions extends MongoBasedTest{
         String group_name = "bb";
 
         ApiCollectionsDao.instance.insertOne(new ApiCollection(
-                vxlan_id, null, 0, new HashSet<>(), null, vxlan_id
+                vxlan_id, null, 0, new HashSet<>(), null, vxlan_id, false, true
         ));
 
         Map<String, Object> m = new HashMap<>();
@@ -65,7 +65,7 @@ public class TestMainSubFunctions extends MongoBasedTest{
         List<String> vpc_cidr = Arrays.asList("192.1.1.1/16", "193.1.1.1/16");
 
         ApiCollectionsDao.instance.insertOne(new ApiCollection(
-                vxlan_id, null, 0, new HashSet<>(), null, vxlan_id
+                vxlan_id, null, 0, new HashSet<>(), null, vxlan_id, false, true
         ));
 
         Map<String, Object> m = new HashMap<>();

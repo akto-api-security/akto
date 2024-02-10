@@ -176,8 +176,15 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
+    public T updateOneNoUpsert(Bson q, Bson obj) {
+        return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(false));
+    }
+
     public UpdateResult updateMany (Bson q, Bson obj) {
         return this.getMCollection().updateMany(q, obj);
+    }
+    public UpdateResult updateManyNoUpsert (Bson q, Bson obj) {
+        return this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
     }
     public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList, BulkWriteOptions options) {
         return this.getMCollection().bulkWrite(modelList, options);
