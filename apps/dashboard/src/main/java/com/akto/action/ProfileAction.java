@@ -124,7 +124,6 @@ public class ProfileAction extends UserAction {
             boolean isOverage = false;
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
             int gracePeriod = organization.getGracePeriod();
-            boolean expired = false;
             try {
 
                 organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
@@ -133,7 +132,6 @@ public class ProfileAction extends UserAction {
                 if (featureWiseAllowed == null) {
                     featureWiseAllowed = new HashMap<>();
                 }
-                expired = organization.isExpired();
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
@@ -161,7 +159,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerId", organizationId);
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
-            userDetails.append("expired", expired);
+            userDetails.append("expired", organization.checkExpirationWithAktoSync());
         }
 
         if (versions.length > 2) {
