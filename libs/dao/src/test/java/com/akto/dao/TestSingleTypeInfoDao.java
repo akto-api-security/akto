@@ -69,7 +69,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         Conditions valueConditions = new Conditions(Collections.singletonList(new EndsWithPredicate("something")), Conditions.Operator.OR);
         CustomDataType customDataType = new CustomDataType(
                 "custom1", false, Arrays.asList(SingleTypeInfo.Position.REQUEST_PAYLOAD, SingleTypeInfo.Position.RESPONSE_PAYLOAD),
-                0,true, keyConditions, valueConditions, Conditions.Operator.OR,ignoreData
+                0,true, keyConditions, valueConditions, Conditions.Operator.OR,ignoreData, false, true
         );
 
         CustomDataTypeDao.instance.insertOne(customDataType);
@@ -116,8 +116,8 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         bulkWrites.add(createSingleTypeInfoUpdate("C", "GET", SingleTypeInfo.JWT, 0,200));
         bulkWrites.add(createSingleTypeInfoUpdate("D", "POST", SingleTypeInfo.JWT, 0,-1));
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-        CustomDataType customDataType1 = new CustomDataType("CUSTOM_DATA_1", true, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND,ignoreData);
-        CustomDataType customDataType2 = new CustomDataType("CUSTOM_DATA_2",false, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND,ignoreData);
+        CustomDataType customDataType1 = new CustomDataType("CUSTOM_DATA_1", true, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND,ignoreData, false, true);
+        CustomDataType customDataType2 = new CustomDataType("CUSTOM_DATA_2",false, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND,ignoreData, false, true);
         CustomDataTypeDao.instance.insertMany(Arrays.asList(customDataType1, customDataType2));
 
         bulkWrites.add(createSingleTypeInfoUpdate("E", "POST",customDataType1.toSubType(), 0,200));
