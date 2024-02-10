@@ -87,7 +87,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
                             line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
                             yamlCopy[i] = line;
                         }
-                        setYaml(yaml)
+                        setYaml(yamlCopy)
                     }
                 })
             }, 5000)
