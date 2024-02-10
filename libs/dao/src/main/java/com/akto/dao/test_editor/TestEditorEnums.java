@@ -227,6 +227,11 @@ public class TestEditorEnums {
         Validate
     }
 
+    public enum LoopExecutorOperands {
+        FOR_ALL,
+        FOR_ONE
+    }
+
     public enum ExecutorOperandTypes {
         Parent,
         Req,
@@ -234,7 +239,9 @@ public class TestEditorEnums {
         NonTerminal,
         Data,
         TerminalNonExecutable,
-        Validate
+        Validate,
+        Loop,
+        Dynamic
     }
 
     public String getExecutorOperandValue(String key) {
@@ -272,7 +279,7 @@ public class TestEditorEnums {
         return key;
     }
 
-    public String getExecutorOperandType(String key) {
+    public String getExecutorOperandType(String key, String parentNodeType) {
 
         for (ExecutorParentOperands operand: ExecutorParentOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
@@ -307,6 +314,26 @@ public class TestEditorEnums {
         for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return ExecutorOperandTypes.Validate.toString().toLowerCase();
+            }
+        }
+
+        for (LoopExecutorOperands operand: LoopExecutorOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.Loop.toString().toLowerCase();
+            }
+        }
+
+        for (RequestParentOperand operand: RequestParentOperand.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.Req.toString().toLowerCase();
+            }
+        }
+
+        if (key.startsWith("${") && key.endsWith("}")) {
+            if (parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Req.toString())) {
+                return ExecutorOperandTypes.Dynamic.toString().toLowerCase();
+            } else {
+                return ExecutorOperandTypes.Data.toString().toLowerCase();
             }
         }
 
