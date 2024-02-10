@@ -312,7 +312,7 @@ public class OrganizationUtils {
 
     public static boolean fetchExpired(BasicDBObject additionalMetaData) {
         String expiredStr = (String) additionalMetaData.getOrDefault(OrgMetaData.EXPIRED.name(), "false");
-        boolean expired = Boolean.parseBoolean(expiredStr);
+        boolean expired = Boolean.TRUE.toString().equalsIgnoreCase(expiredStr);
         return expired;
     }
 }

@@ -292,10 +292,7 @@ public class UserDetailsFilter implements Filter {
             int accountId = Context.accountId.get();
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
 
-            if (organization == null ||
-                    organization.isExpired() ||
-                    organization.getFeatureWiseAllowed() == null ||
-                    organization.getFeatureWiseAllowed().isEmpty()) {
+            if (organization == null || organization.checkExpirationWithAktoSync()) {
                 httpServletResponse.sendError(403);
                 return;
             }

@@ -16,10 +16,7 @@ let expired = false;
 
 if (window.DASHBOARD_MODE == 'ON_PREM' && (
   !window.STIGG_CUSTOMER_ID ||
-  window.EXPIRED=='true' ||
-  !window.STIGG_FEATURE_WISE_ALLOWED ||
-  (typeof window.STIGG_FEATURE_WISE_ALLOWED) !== 'object' ||
-  Object.keys(window.STIGG_FEATURE_WISE_ALLOWED).length == 0)) {
+  window.EXPIRED == 'true')) {
 
   expired = true;
 }

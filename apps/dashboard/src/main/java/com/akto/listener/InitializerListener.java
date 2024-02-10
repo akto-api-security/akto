@@ -1687,7 +1687,14 @@ public class InitializerListener implements ServletContextListener {
             organization.setFeatureWiseAllowed(featureWiseAllowed);
             organization.setExpired(expired);
 
-            lastFeatureMapUpdate = Context.now();
+            /*
+             * only update this field if we were able to update
+             * i.e. if we were able to reach akto
+             * or this is the first time being updated.
+             */
+            if (lastFeatureMapUpdate == 0 || (featureWiseAllowed != null && !featureWiseAllowed.isEmpty())) {
+                lastFeatureMapUpdate = Context.now();
+            }
             organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
 
             OrganizationsDao.instance.updateOne(
