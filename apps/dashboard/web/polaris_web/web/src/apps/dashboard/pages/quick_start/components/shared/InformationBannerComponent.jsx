@@ -10,7 +10,7 @@ function InformationBannerComponent({docsUrl,content}) {
         <div className='card-items'>
             <Banner status="info">
                 <span>{content}</span>
-                <Button plain onClick={() => openLink()}>here</Button>
+                {docsUrl !== '' ?  <Button plain onClick={() => openLink()}>here</Button>: ""}
             </Banner>
         </div>
     )

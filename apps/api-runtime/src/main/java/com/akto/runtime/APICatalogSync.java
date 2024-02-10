@@ -3,7 +3,6 @@ package com.akto.runtime;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
-import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -14,7 +13,6 @@ import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
@@ -27,6 +25,7 @@ import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,12 +204,33 @@ public class APICatalogSync {
         } else {
             for (URLStatic pending: pendingRequests.keySet()) {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
-                RequestTemplate rt = deltaCatalog.getStrictURLToMethods().get(pending);
-                if (rt != null) {
-                    rt.mergeFrom(pendingTemplate);
-                } else {
-                    deltaCatalog.getStrictURLToMethods().put(pending, pendingTemplate);
+
+                URLTemplate parameterisedTemplate = null;
+                if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
+                    parameterisedTemplate = tryParamteresingUrl(pending);
                 }
+
+                if(parameterisedTemplate != null){
+                    RequestTemplate rt = deltaCatalog.getTemplateURLToMethods().get(parameterisedTemplate);
+                    if (rt != null) {
+                        rt.mergeFrom(pendingTemplate);
+                    } else {
+                        deltaCatalog.getTemplateURLToMethods().put(parameterisedTemplate, pendingTemplate);
+                    }
+
+                    rt = deltaCatalog.getTemplateURLToMethods().get(parameterisedTemplate);
+                    rt.fillUrlParams(tokenize(pending.getUrl()), parameterisedTemplate, apiCollectionId);
+
+                }else{
+                    RequestTemplate rt = deltaCatalog.getStrictURLToMethods().get(pending);
+                    if (rt != null) {
+                        rt.mergeFrom(pendingTemplate);
+                    } else {
+                        deltaCatalog.getStrictURLToMethods().put(pending, pendingTemplate);
+                    }
+                }
+
+                
             }
         }
     }
@@ -370,6 +390,16 @@ public class APICatalogSync {
             if (matchedInDeltaTemplate) {
                 continue;
             }
+
+            URLStatic newStaticUrl = new URLStatic(newEndpoint, newMethod);
+
+            URLTemplate tempUrlTemplate = tryParamteresingUrl(newStaticUrl);
+            if(tempUrlTemplate != null){
+                Set<String> matchedStaticURLs = templateToStaticURLs.getOrDefault(tempUrlTemplate, new HashSet<>());
+                matchedStaticURLs.add(newUrl);
+                templateToStaticURLs.put(tempUrlTemplate, matchedStaticURLs);
+            }
+
 
             int countSimilarURLs = 0;
             Map<URLTemplate, Map<String, Set<String>>> potentialMerges = new HashMap<>();
@@ -572,11 +602,7 @@ public class APICatalogSync {
         return true;
     }
 
-    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, Boolean urlRegexMatchingEnabled) {
-
-        if (!urlRegexMatchingEnabled) {
-            return false;
-        }
+    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, boolean urlRegexMatchingEnabled) {
 
         String[] n = tokenize(newUrl.getUrl());
         String[] o = tokenize(deltaUrl.getUrl());
@@ -585,7 +611,9 @@ public class APICatalogSync {
             SuperType c = b[idx];
             if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
                 String val = n[idx];
-                if(!isAlphanumericString(val) || !isAlphanumericString(o[idx])) {
+                boolean isAlphaNumeric = isAlphanumericString(val) && isAlphanumericString(o[idx]);
+    
+                if(!isAlphaNumeric) {
                     return false;
                 }
             }
@@ -611,6 +639,55 @@ public class APICatalogSync {
             }
         }
         return (intCount >= 3 && charCount >= 1);
+    }
+
+
+    private static boolean isValidSubtype(SubType subType){
+        return !(subType.getName().equals(SingleTypeInfo.GENERIC.getName()) || subType.getName().equals(SingleTypeInfo.OTHER.getName()));
+    }
+
+    public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
+        String[] tokens = tokenize(newUrl.getUrl());
+        if(tokens.length < 2){
+            return null;
+        }
+        Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
+        boolean allNull = true;
+        SuperType[] newTypes = new SuperType[tokens.length];
+
+        int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
+        for(int i = start; i < tokens.length; i ++) {
+            String tempToken = tokens[i];
+
+            if (NumberUtils.isParsable(tempToken)) {
+                newTypes[i] = SuperType.INTEGER;
+                tokens[i] = null;
+            } else if(ObjectId.isValid(tempToken)){
+                newTypes[i] = SuperType.OBJECT_ID;
+                tokens[i] = null;
+            }else if(pattern.matcher(tempToken).matches()){
+                newTypes[i] = SuperType.STRING;
+                tokens[i] = null;
+            }
+
+            if(tokens[i] != null){
+                SubType tempSubType = KeyTypes.findSubType(tokens[i], ""+i, null,true);
+                if(isValidSubtype(tempSubType)){
+                    newTypes[i] = SuperType.STRING;
+                    tokens[i] = null;
+                }else if(isAlphanumericString(tempToken)){
+                    newTypes[i] = SuperType.STRING;
+                    tokens[i] = null;
+                }
+            }
+            
+            if(newTypes[i] != null){
+                allNull = false;
+            }
+        }
+
+        if (allNull) return null;
+        return new URLTemplate(tokens, newTypes, newUrl.getMethod());
     }
 
 
@@ -644,7 +721,7 @@ public class APICatalogSync {
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
-            } else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
+            }else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
             } else {
@@ -669,6 +746,29 @@ public class APICatalogSync {
 
     }
 
+    public static List<SingleTypeInfo> getSTIListForUrlTemplate(URLTemplate urlTemplate, String orginalUrl, int apiCollectionId){
+
+        List<SingleTypeInfo> stiList = new ArrayList<>();
+
+        Method extractedMethod = Method.fromString(orginalUrl.split(" ")[0]);
+        String extractedUrl = orginalUrl.split(" ")[1];  
+        String newTemplateUrl = urlTemplate.getTemplateString();
+        for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+            SuperType superType = urlTemplate.getTypes()[i];
+            if (superType == null) continue;
+            int idx = extractedUrl.startsWith("http") ? i:i+1;
+            String word = extractedUrl.split("/")[idx];
+            SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, extractedMethod.name(), -1, false, i+"", SingleTypeInfo.GENERIC, apiCollectionId, true);
+            SubType tokenSubType = KeyTypes.findSubType(word, "", null,true);
+            stiId.setSubType(tokenSubType);
+            SingleTypeInfo sti = new SingleTypeInfo(
+                stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
+                SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MIN_VALUE, SingleTypeInfo.ACCEPTED_MAX_VALUE);
+
+            stiList.add(sti);
+        }
+        return stiList;
+    }
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
 
@@ -686,42 +786,30 @@ public class APICatalogSync {
             boolean isFirst = true;
             for (String matchedURL: matchStaticURLs) {
                 Method delMethod = Method.fromString(matchedURL.split(" ")[0]);
-                String delEndpoint = matchedURL.split(" ")[1];  
+                String originalUrl = matchedURL.split(" ")[1];  
                 Bson filterQ = Filters.and(
                     Filters.eq("apiCollectionId", apiCollectionId),
                     Filters.eq("method", delMethod.name()),
-                    Filters.eq("url", delEndpoint)
+                    Filters.eq("url", originalUrl)
                 );
 
                 Bson filterQSampleData = Filters.and(
                     Filters.eq("_id.apiCollectionId", apiCollectionId),
                     Filters.eq("_id.method", delMethod.name()),
-                    Filters.eq("_id.url", delEndpoint)
+                    Filters.eq("_id.url", originalUrl)
                 );
 
                 if (isFirst) {
 
-                    String newTemplateUrl = urlTemplate.getTemplateString();
-                    for (int i = 0; i < urlTemplate.getTypes().length; i++) {
-                        SuperType superType = urlTemplate.getTypes()[i];
-                        if (superType == null) continue;
-
-                        SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", SingleTypeInfo.GENERIC, apiCollectionId, true);
-                        SubType subType = KeyTypes.findSubType(i, i+"",stiId);
-                        stiId.setSubType(subType);
-                        SingleTypeInfo sti = new SingleTypeInfo(
-                            stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
-                            SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MIN_VALUE, SingleTypeInfo.ACCEPTED_MAX_VALUE);
-
-
-                        // SingleTypeInfoDao.instance.insertOne(sti);
-                        bulkUpdatesForSti.add(new InsertOneModel<>(sti));
+                    List<SingleTypeInfo> urlTemplateStis = getSTIListForUrlTemplate(urlTemplate, matchedURL, apiCollectionId);
+                    for(SingleTypeInfo sti: urlTemplateStis) {
+                            bulkUpdatesForSti.add(new InsertOneModel<>(sti));
                     }
 
-                    // SingleTypeInfoDao.instance.getMCollection().updateMany(filterQ, Updates.set("url", newTemplateUrl));
+                    String newTemplateUrl = urlTemplate.getTemplateString();
+                    SingleTypeInfoDao.instance.getMCollection().updateMany(filterQ, Updates.set("url", newTemplateUrl));
 
                     bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, Updates.set("url", newTemplateUrl), new UpdateOptions()));
-
 
                     SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
                     if (sd != null) {
@@ -751,12 +839,12 @@ public class APICatalogSync {
                 Bson filterForDependencyNode = Filters.or(
                         Filters.and(
                                 Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionId+""),
-                                Filters.eq(DependencyNode.URL_REQ, delEndpoint),
+                                Filters.eq(DependencyNode.URL_REQ, originalUrl),
                                 Filters.eq(DependencyNode.METHOD_REQ, delMethod.name())
                         ),
                         Filters.and(
                                 Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionId+""),
-                                Filters.eq(DependencyNode.URL_RESP, delEndpoint),
+                                Filters.eq(DependencyNode.URL_RESP, originalUrl),
                                 Filters.eq(DependencyNode.METHOD_RESP,delMethod.name())
                         )
                 );
@@ -957,7 +1045,7 @@ public class APICatalogSync {
         return ret;
     }
 
-    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog ,boolean redactSampleData, boolean forceUpdate ) {
+    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
         List<SampleData> sampleData = new ArrayList<>();
         Map<URLStatic, RequestTemplate> deltaStrictURLToMethods = currentDelta.getStrictURLToMethods();
         Map<URLStatic, RequestTemplate> dbStrictURLToMethods = dbCatalog.getStrictURLToMethods();
@@ -986,26 +1074,11 @@ public class APICatalogSync {
             }
             List<String> finalSamples = new ArrayList<>();
             for (String s: sample.getSamples()) {
-                boolean finalRedact = redactSampleData;
-                if (finalRedact) {
-                    try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                        Source source = httpResponseParams.getSource();
-                        if (source.equals(Source.HAR) || source.equals(Source.PCAP)) finalRedact = false;
-                    } catch (Exception e1) {
-                        e1.printStackTrace();
-                        continue;
-                    }
-                }
-
                 try {
-                    if (finalRedact) {
-                        String redact = RedactSampleData.redact(s);
-                        finalSamples.add(redact);
-                    } else {
-                        finalSamples.add(s);
-                    }
+                    String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
+                    finalSamples.add(redactedSample);
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" , LogDb.RUNTIME)
                     ;
                 }
             }
@@ -1053,7 +1126,7 @@ public class APICatalogSync {
         return bulkUpdates;
     }
 
-    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData) {
+    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
         Map<String, SingleTypeInfo> dbInfoMap = convertToMap(currentState.getAllTypeInfo());
         Map<String, SingleTypeInfo> deltaInfoMap = convertToMap(currentDelta.getAllTypeInfo());
 
@@ -1121,7 +1194,7 @@ public class APICatalogSync {
                 if (values != null) {
                     Set<String> elements = new HashSet<>();
                     for (String el: values.getElements()) {
-                        if (redactSampleData) {
+                        if (redactSampleData || collectionLevelRedact) {
                             elements.add(el.hashCode()+"");
                         } else {
                             elements.add(el);
@@ -1134,7 +1207,18 @@ public class APICatalogSync {
             }
 
 
-            if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+            if (!(redactSampleData || collectionLevelRedact) && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+                Set<Object> updatedSampleData = new HashSet<>();
+                for (Object example : deltaInfo.getExamples()) {
+                    try{
+                        String exampleStr = (String) example;
+                        String s = RedactSampleData.redactDataTypes(exampleStr);
+                        updatedSampleData.add(s);
+                    } catch (Exception e) {
+                        ;
+                    }
+                }
+                deltaInfo.setExamples(updatedSampleData);
                 Bson bson = Updates.combine(
                     Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap)),
                     Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()))
@@ -1267,7 +1351,7 @@ public class APICatalogSync {
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
-                if (gotDibs) {
+                                if (gotDibs) {
                     mergingCalled = true;
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                     if (backwardCompatibility == null || backwardCompatibility.getMergeOnHostInit() == 0) {
@@ -1457,6 +1541,11 @@ public class APICatalogSync {
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
         List<WriteModel<SampleData>> writesForSampleData = new ArrayList<>();
         List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo = new ArrayList<>();
+        Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
+        List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for(ApiCollection apiCollection: all) {
+            apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
+        }
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
@@ -1469,7 +1558,8 @@ public class APICatalogSync {
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
-            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact);
+            boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
+            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
@@ -1477,7 +1567,7 @@ public class APICatalogSync {
             deltaCatalog.setDeletedInfo(new ArrayList<>());
 
             boolean forceUpdate = syncImmediately || counter % 10 == 0;
-            writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, redact, forceUpdate));
+            writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, forceUpdate, redact, redactCollectionLevel));
         }
 
         loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
