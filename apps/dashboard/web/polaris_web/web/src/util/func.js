@@ -15,6 +15,7 @@ import Store from '../apps/dashboard/store';
 import { current } from 'immer';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -1297,7 +1298,10 @@ mapCollectionIdToHostName(apiCollections){
   findLastParamField(str) {
     let paramDot = func.convertParamToDotNotation(str)
     let parmArr = paramDot.split(".")
-    return parmArr.length > 0 ? parmArr[parmArr.length-1] : paramDot
+    let lastIndex = parmArr.length-1
+    let result = parmArr.length > 0 ? parmArr[lastIndex] : paramDot
+    if (result.length > 0) return result;
+    return parmArr[lastIndex-1]
   },
 
   addPlurality(count){
@@ -1321,7 +1325,27 @@ mapCollectionIdToHostName(apiCollections){
       first = false
     })
     return url;
-  }
+  },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  },
+  transformString(inputString) {
+    let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
+    const segments = transformedString.split('/');
+    for (let i = 0; i < segments.length; i++) {
+        // Check if the segment is alphanumeric
+        if (/^[0-9a-fA-F]+$/.test(segments[i]) || /^[0-9]+$/.test(segments[i])) {
+        segments[i] = 'id';
+        }
+    }
+    transformedString = segments.join('/');
+    transformedString = transformedString.replace(/[/|-]/g, '_');
+    return transformedString;
+}
 
 }
 

@@ -9,6 +9,8 @@ import {
     ProfileMinor,
     CalendarMinor
   } from '@shopify/polaris-icons';
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
+import { TAGS_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 
 function Tags(){
 
@@ -39,6 +41,7 @@ function Tags(){
 
     const [tags, setTags] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const navigate = useNavigate()
 
     const handleRedirect = () => {
@@ -59,6 +62,7 @@ function Tags(){
         setLoading(true);
         async function fetchData() {
             await tagsApi.fetchTagConfigs().then((res) => {
+                setShowEmptyScreen(res.tagConfigs.tagConfigs.length === 0)
                 let usersMap = res.tagConfigs.usersMap;
                 setTags(res.tagConfigs.tagConfigs.map((tag) => {
                     tag.id = tag.name
@@ -78,7 +82,20 @@ function Tags(){
         primaryAction={<Button primary onClick={handleRedirect}>Create new tags</Button>}
         isFirstPage={true}
         components={[
-            <GithubSimpleTable
+
+            showEmptyScreen ? 
+                <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/tag_icon.svg"}
+                    headingText={"No tags created"}
+                    description={"Tag your APIs with business keywords for easier grouping."}
+                    buttonText={"Create tag"}
+                    redirectUrl={"/dashboard/settings/tags/details"}
+                    learnText={"Creating tags"}
+                    docsUrl={TAGS_PAGE_DOCS_URL}
+                />
+
+            
+            :<GithubSimpleTable
                 key="table"
                 data={tags}
                 resourceName={resourceName}

@@ -25,6 +25,11 @@ public class OrganizationUtils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
     public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
+
+        if (featureWiseAllowed == null) {
+            return false;
+        }
+
         return featureWiseAllowed.entrySet().stream()
                 .anyMatch(e -> e.getValue().getIsGranted()
                         && e.getValue().getOverageFirstDetected() != -1);
