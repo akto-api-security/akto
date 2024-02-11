@@ -95,11 +95,6 @@
             <version>4.2.1</version>
         </dependency>
         <dependency>
-            <groupId>com.akto.libs.oas-security</groupId>
-            <artifactId>oas-security</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>com.akto.apps.api-runtime</groupId>
             <artifactId>api-runtime</artifactId>
             <version>${project.version}</version>
