@@ -13,9 +13,9 @@ import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -257,8 +257,8 @@ prettifyEpoch(epoch) {
       let a = testSubType.superCategory["severity"]["_name"]
       return a
     }
-  }
-  ,
+  },
+
   copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
@@ -730,6 +730,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+          let authTypeTag = authType.replace(",", "");
           let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
@@ -755,6 +756,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              authTypeTag: (authTypeTag || "").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
@@ -1289,6 +1291,13 @@ mapCollectionIdToHostName(apiCollections){
       event.preventDefault();
       funcToCall();
     }
+  },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
 
   convertParamToDotNotation(str) {

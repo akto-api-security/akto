@@ -20,7 +20,9 @@ import org.junit.Test;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
@@ -62,6 +64,9 @@ public class TestExecutorTest extends MongoBasedTest {
         data.setId(key);
         SampleDataDao.instance.insertOne(data);
         SampleMessageStore messageStore = SampleMessageStore.create();
+        Set<Integer> apiCollectionSet = new HashSet<>();
+        apiCollectionSet.add(0);
+        messageStore.fetchSampleMessages(apiCollectionSet);
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
         TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "", new ArrayList<>());
 

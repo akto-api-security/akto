@@ -8,14 +8,16 @@ import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
-import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiCollectionTestStatus;
+import com.akto.dto.testing.TestingEndpoints;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Aggregates;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
@@ -26,17 +28,19 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
+import org.apache.commons.lang3.tuple.Pair;
+import org.bson.Document;
 
 public class ApiCollectionsAction extends UserAction {
 
     List<ApiCollection> apiCollections = new ArrayList<>();
+    List<ApiCollectionTestStatus> apiCollectionTestStatus = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
     Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
     Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
@@ -62,8 +66,27 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        this.apiCollectionTestStatus = new ArrayList<>();
 
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+        Map<Integer, Pair<String,Integer>> map = new HashMap<>();
+        try (MongoCursor<BasicDBObject> cursor = TestingRunDao.instance.getMCollection().aggregate(
+                Arrays.asList(
+                        Aggregates.match(Filters.eq("testingEndpoints.type", TestingEndpoints.Type.COLLECTION_WISE.name())),
+                        Aggregates.sort(Sorts.descending(Arrays.asList("testingEndpoints.apiCollectionId", "endTimestamp"))),
+                        new Document("$group", new Document("_id", "$testingEndpoints.apiCollectionId")
+                                .append("latestRun", new Document("$first", "$$ROOT")))
+                ), BasicDBObject.class
+        ).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject basicDBObject = cursor.next();
+                BasicDBObject latestRun = (BasicDBObject) basicDBObject.get("latestRun");
+                String state = latestRun.getString("state");
+                int endTimestamp = latestRun.getInt("endTimestamp", -1);
+                int collectionId = ((BasicDBObject)latestRun.get("testingEndpoints")).getInt("apiCollectionId");
+                map.put(collectionId, Pair.of(state, endTimestamp));
+            }
+        }
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -77,6 +100,13 @@ public class ApiCollectionsAction extends UserAction {
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
             }
+            if(map.containsKey(apiCollectionId)) {
+                Pair<String, Integer> pair = map.get(apiCollectionId);
+                apiCollectionTestStatus.add(new ApiCollectionTestStatus(apiCollection.getId(), pair.getRight(), pair.getLeft()));
+            } else {
+                apiCollectionTestStatus.add(new ApiCollectionTestStatus(apiCollection.getId(), -1, null));
+            }
+
             apiCollection.setUrls(new HashSet<>());
         }
 
@@ -444,6 +474,14 @@ public class ApiCollectionsAction extends UserAction {
 
     public LastCronRunInfo getTimerInfo() {
         return timerInfo;
+    }
+
+    public List<ApiCollectionTestStatus> getApiCollectionTestStatus() {
+        return apiCollectionTestStatus;
+    }
+
+    public void setApiCollectionTestStatus(List<ApiCollectionTestStatus> apiCollectionTestStatus) {
+        this.apiCollectionTestStatus = apiCollectionTestStatus;
     }
 
     public List<ConditionUtils> getConditions() {

@@ -201,6 +201,7 @@ public class HttpCallParser {
     }
 
     public void syncTrafficMetricsWithDB() {
+        loggerMaker.infoAndAddToDb("Starting syncing traffic metrics", LogDb.RUNTIME);
         try {
             syncTrafficMetricsWithDBHelper();
         } catch (Exception e) {
@@ -208,6 +209,7 @@ public class HttpCallParser {
         } finally {
             trafficMetricsMap = new HashMap<>();
         }
+        loggerMaker.infoAndAddToDb("Finished syncing traffic metrics", LogDb.RUNTIME);
     }
 
     public void syncTrafficMetricsWithDBHelper() {
@@ -285,6 +287,7 @@ public class HttpCallParser {
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
+        int originalSize = httpResponseParamsList.size();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -354,7 +357,8 @@ public class HttpCallParser {
             }
 
         }
-
+        int filteredSize = filteredResponseParams.size();
+        loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;
     }
 
@@ -371,10 +375,20 @@ public class HttpCallParser {
     public boolean aggregate(List<HttpResponseParams> responses) {
         int count = 0;
         boolean ret = false;
+        Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
             if (responseParams.getSource() == HttpResponseParams.Source.HAR || responseParams.getSource() == HttpResponseParams.Source.PCAP) {
                 ret = true;
             }
+
+            HttpRequestParams requestParams = responseParams.requestParams;
+            if (requestParams != null) {
+                String path = requestParams.getMethod() + " " + requestParams.url;
+                if (urlSet.size() < 50) {
+                    urlSet.add(path);
+                }
+            }
+
             try {
                 int collId = responseParams.getRequestParams().getApiCollectionId();
                 URLAggregator aggregator = aggregatorMap.get(collId);
@@ -389,7 +403,8 @@ public class HttpCallParser {
                 
             }
         }
-        
+
+        loggerMaker.debugInfoAddToDb("URLs: " + urlSet.toString(), LogDb.RUNTIME);
         loggerMaker.infoAndAddToDb("added " + count + " urls", LogDb.RUNTIME);
         return ret;
     }

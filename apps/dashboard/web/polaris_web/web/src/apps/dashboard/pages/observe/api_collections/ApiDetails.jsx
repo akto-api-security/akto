@@ -1,9 +1,9 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Modal } from "@shopify/polaris"
+import { Box, Button, Modal, Popover } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
 import dashboardFunc from "../../transform";
@@ -11,6 +11,8 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
+
+import { HorizontalDotsMinor } from "@shopify/polaris-icons"
 
 function ApiDetails(props) {
 
@@ -23,6 +25,7 @@ function ApiDetails(props) {
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [badgeActive, setBadgeActive] = useState(false)
+    const [showDemerge, setShowDemerge] = useState(false)
 
     const fetchData = async() => {
         if(showDetails){
@@ -92,6 +95,16 @@ function ApiDetails(props) {
         setPrompts(activePrompts)
     }
 
+    function isDeMergeAllowed(){
+        const { endpoint } = apiDetail
+        if(!endpoint || endpoint === undefined){
+            return false;
+        }
+        return (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("OBJECT_ID"))
+    }
+
+    const isDemergingActive = isDeMergeAllowed() ;
+
 
     const SchemaTab = {
         id: 'schema',
@@ -128,11 +141,41 @@ function ApiDetails(props) {
             />
         </Box>,
     }
+
+    const deMergeApis = () => {
+        const { apiCollectionId, endpoint, method } = apiDetail
+        api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
+            func.setToast(true, false, "De-merging successful!!.")
+            window.location.reload()
+        })
+    }
+
+    const DeMergeButton = () => {
+        return(
+            <div className="button-fixed" style={{right: '24px', marginTop: '8px'}}>
+                <Popover 
+                    active={showDemerge}
+                    activator={
+                        <Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} />
+                    }
+                    autofocusTarget="first-node"
+                    onClose={() => setShowDemerge(false)}
+                >
+                    <Popover.Pane fixed>
+                        <Popover.Section>
+                            <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button>
+                        </Popover.Section>
+                    </Popover.Pane>
+                </Popover>
+            </div>
+        )
+    }
+
     const components = [
             <GithubCell
             key="heading"
-            width="30vw"
-            nameWidth="27vw"
+            width="27vw"
+            nameWidth="24vw"
             data={apiDetail}
             headers={headers}
             getStatus={getStatus}
@@ -146,16 +189,19 @@ function ApiDetails(props) {
         />
     ]
 
+    const componentsArr = isDemergingActive ? [...components, <DeMergeButton key={"demerge"} />] : components
+ 
     const aktoGptButton = (
         <div 
-            className={"gpt-button-fixed"}
+            className={"button-fixed"}
             key="akto-gpt"
+            style={{right: isDemergingActive ? "48px" : '24px'}}
         >
             <Button onClick={displayGPT}>Ask AktoGPT</Button> 
         </div>
     )
 
-    const currentComponents = isGptActive ? [...components, aktoGptButton] : components
+    const currentComponents = isGptActive ? [...componentsArr, aktoGptButton] : componentsArr
 
     return ( 
         <div>

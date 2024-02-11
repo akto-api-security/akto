@@ -17,6 +17,7 @@ public class TestingRunConfig {
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
 
+    private String testRoleId;
     private String overriddenTestAppUrl;
     private String testRoleId;
 
@@ -103,5 +104,13 @@ public class TestingRunConfig {
         if(this.testRoleId == null) {
             this.testRoleId = that.testRoleId;
         }
+    }
+    
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }

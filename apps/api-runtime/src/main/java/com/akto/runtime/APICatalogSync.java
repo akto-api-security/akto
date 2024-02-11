@@ -1,5 +1,10 @@
 package com.akto.runtime;
 
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -21,12 +26,15 @@ import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +84,7 @@ public class APICatalogSync {
     }
 
     public void processResponse(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
+        int timestamp = responseParams.getTimeOrNow();
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
         String methodStr = requestParams.getMethod();
@@ -95,10 +104,10 @@ public class APICatalogSync {
                 reqPayload = "{}";
             }
 
-            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
+            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
             if (payload != null) {
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
             }
             requestTemplate.recordMessage(responseParams.getOrig());
         }
@@ -130,8 +139,8 @@ public class APICatalogSync {
                 payload = BasicDBObject.parse("{}");
             }
 
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
-            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
+            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
             }
@@ -175,6 +184,7 @@ public class APICatalogSync {
         } 
 
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
+        System.out.println("aggregator: " + (System.currentTimeMillis() - start));
         origAggregator.urls = new ConcurrentHashMap<>();
 
         Set<Map.Entry<URLStatic, Set<HttpResponseParams>>> entries = aggregator.urls.entrySet();
@@ -192,16 +202,20 @@ public class APICatalogSync {
 
         start = System.currentTimeMillis();
         processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        System.out.println("processKnownStaticURLs: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
         Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
+        System.out.println("pendingRequests: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
         tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
+        System.out.println("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
         if (!mergeAsyncOutside) {
             start = System.currentTimeMillis();
             tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
+            System.out.println("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
         } else {
             for (URLStatic pending: pendingRequests.keySet()) {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
@@ -213,30 +227,35 @@ public class APICatalogSync {
                 }
             }
         }
+
+        System.out.println("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
+
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
             filterQ = Filters.eq("apiCollectionId", apiCollectionId);
         } else {
-            filterQ = Filters.and(
-                Filters.eq("apiCollectionId", apiCollectionId),
-                Filters.or(Filters.eq("isHeader", false), Filters.eq("param", "host"))
-            );            
+            Bson hostFilter = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+            Bson normalFilter = Filters.and(
+                    Filters.eq("apiCollectionId", apiCollectionId),
+                    Filters.or(Filters.eq("isHeader", false), Filters.eq("param", "host"))
+            );
+            filterQ = mergeUrlsBasic ? hostFilter : normalFilter;
         }
 
         int offset = 0;
-        int limit = 1_000_000;
+        int limit = mergeUrlsBasic ? 10_000 : 1_000_000;
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
         do {
             singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, Projections.exclude("values"));
-
+            System.out.println(singleTypeInfos.size());
 
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
             Set<String> templateUrlSet = new HashSet<>();
@@ -268,7 +287,9 @@ public class APICatalogSync {
                 templateUrls.add(s);
             }
 
-            for(String staticURL: staticUrlToSti.keySet()) {
+            Iterator<String> iterator = staticUrlToSti.keySet().iterator();
+            while (iterator.hasNext()) {
+                String staticURL = iterator.next();
                 Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
                 String staticEndpoint = staticURL.split(" ")[1];
 
@@ -279,6 +300,7 @@ public class APICatalogSync {
                     URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
                     if (urlTemplate.match(staticEndpoint, staticMethod)) {
                         finalResult.deleteStaticUrls.add(staticURL);
+                        iterator.remove();
                         break;
                     }
                 }
@@ -291,7 +313,7 @@ public class APICatalogSync {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled);    
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled, !mergeUrlsBasic);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -344,7 +366,7 @@ public class APICatalogSync {
     }
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(
-        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled
+        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled, boolean doBodyMatch
     ) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
@@ -384,7 +406,8 @@ public class APICatalogSync {
                     continue;
                 }
 
-                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate, urlRegexMatchingEnabled) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
+                boolean compareKeys = doBodyMatch && RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate);
+                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate, urlRegexMatchingEnabled) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || compareKeys) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();
@@ -641,6 +664,9 @@ public class APICatalogSync {
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
                 newTypes[i] = SuperType.INTEGER;
                 newTokens[i] = null;
+            } else if(ObjectId.isValid(tempToken) && ObjectId.isValid(dbToken)){
+                newTypes[i] = SuperType.OBJECT_ID;
+                newTokens[i] = null;
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
@@ -670,11 +696,40 @@ public class APICatalogSync {
     }
 
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
-
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
+        
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic);
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
+        String deletedStaticUrlsString = "";
+        int counter = 0;
+        if (result.deleteStaticUrls != null) {
+            for (String dUrl: result.deleteStaticUrls) {
+                if (counter >= 50) break;
+                if (dUrl == null) continue;
+                deletedStaticUrlsString += dUrl + ", ";
+                counter++;
+            }
+        }
+        loggerMaker.debugInfoAddToDb("deleteStaticUrls: " + deletedStaticUrlsString, LogDb.RUNTIME);
+
+        loggerMaker.debugInfoAddToDb("merged URLs: ", LogDb.RUNTIME);
+        if (result.templateToStaticURLs != null) {
+            for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
+                String tempUrl = urlTemplate.getTemplateString() + " : ";
+                counter = 0;
+                if (result.templateToStaticURLs == null) continue;
+                for (String url: result.templateToStaticURLs.get(urlTemplate)) {
+                    if (counter >= 5) break;
+                    if (url == null) continue;
+                    tempUrl += url + ", ";
+                    counter++;
+                }
+
+                loggerMaker.debugInfoAddToDb( tempUrl, LogDb.RUNTIME);
+            }
+        }
+
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
@@ -682,26 +737,18 @@ public class APICatalogSync {
 
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
+            String newTemplateUrl = urlTemplate.getTemplateString();
+            if (!APICatalog.isTemplateUrl(newTemplateUrl)) continue;
 
             boolean isFirst = true;
             for (String matchedURL: matchStaticURLs) {
                 Method delMethod = Method.fromString(matchedURL.split(" ")[0]);
                 String delEndpoint = matchedURL.split(" ")[1];  
-                Bson filterQ = Filters.and(
-                    Filters.eq("apiCollectionId", apiCollectionId),
-                    Filters.eq("method", delMethod.name()),
-                    Filters.eq("url", delEndpoint)
-                );
-
-                Bson filterQSampleData = Filters.and(
-                    Filters.eq("_id.apiCollectionId", apiCollectionId),
-                    Filters.eq("_id.method", delMethod.name()),
-                    Filters.eq("_id.url", delEndpoint)
-                );
+                Bson filterQ = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, delEndpoint, delMethod);
+                Bson filterQSampleData = SampleDataDao.filterForSampleData(apiCollectionId, delEndpoint, delMethod);
 
                 if (isFirst) {
 
-                    String newTemplateUrl = urlTemplate.getTemplateString();
                     for (int i = 0; i < urlTemplate.getTypes().length; i++) {
                         SuperType superType = urlTemplate.getTypes()[i];
                         if (superType == null) continue;
@@ -803,15 +850,27 @@ public class APICatalogSync {
         }
 
         if (bulkUpdatesForSti.size() > 0) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+            try {
+                SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("STI bulkWrite error: " + e.getMessage(),LogDb.RUNTIME);
+            }
         }
 
         if (bulkUpdatesForSampleData.size() > 0) {
-            SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
+            try {
+                SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("SampleData bulkWrite error: " + e.getMessage(),LogDb.RUNTIME);
+            }
         }
 
         if (bulkUpdatesForApiInfo.size() > 0) {
-            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            try {
+                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("ApiInfo bulkWrite error: " + e.getMessage(),LogDb.RUNTIME);
+            }
         }
 
         if (bulkUpdatesForDependencyNode.size() > 0) {
@@ -1006,7 +1065,7 @@ public class APICatalogSync {
                         finalSamples.add(s);
                     }
                 } catch (Exception e) {
-                    ;
+                    e.printStackTrace();
                 }
             }
             Bson bson = Updates.combine(
@@ -1080,58 +1139,57 @@ public class APICatalogSync {
 
             update = Updates.inc("count", inc);
 
-            if (oldTs == 0) {
-                update = Updates.combine(update, Updates.setOnInsert("timestamp", now));
-            }
+            int timestamp = deltaInfo.getTimestamp() > 0 ? deltaInfo.getTimestamp() : now;
+            update = Updates.combine(update, Updates.setOnInsert("timestamp", timestamp));
 
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
 
-            if (dbInfo != null) {
-                SingleTypeInfo.Domain domain = dbInfo.getDomain();
-                if (domain ==  SingleTypeInfo.Domain.ENUM) {
-                    CappedSet<String> values = dbInfo.getValues();
-                    Set<String> elements = new HashSet<>();
-                    if (values != null) {
-                        elements = values.getElements();
-                    }
-                    int valuesSize = elements.size();
-                    if (valuesSize >= SingleTypeInfo.VALUES_LIMIT) {
-                        SingleTypeInfo.Domain newDomain;
-                        if (dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_32) || dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_64) || dbInfo.getSubType().equals(SingleTypeInfo.FLOAT)) {
-                            newDomain = SingleTypeInfo.Domain.RANGE;
-                        } else {
-                            newDomain = SingleTypeInfo.Domain.ANY;
-                        }
-                        update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
-                    }
-                } else {
-                    deltaInfo.setDomain(dbInfo.getDomain());
-                    deltaInfo.setValues(new CappedSet<>());
-                    if (!dbInfo.getValues().getElements().isEmpty()) {
-                        Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
-                        update = Updates.combine(update, bson);
-                    }
-                }
-            }
+           if (dbInfo != null) {
+               SingleTypeInfo.Domain domain = dbInfo.getDomain();
+               if (domain ==  SingleTypeInfo.Domain.ENUM) {
+                   CappedSet<String> values = dbInfo.getValues();
+                   Set<String> elements = new HashSet<>();
+                   if (values != null) {
+                       elements = values.getElements();
+                   }
+                   int valuesSize = elements.size();
+                   if (valuesSize >= SingleTypeInfo.VALUES_LIMIT) {
+                       SingleTypeInfo.Domain newDomain;
+                       if (dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_32) || dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_64) || dbInfo.getSubType().equals(SingleTypeInfo.FLOAT)) {
+                           newDomain = SingleTypeInfo.Domain.RANGE;
+                       } else {
+                           newDomain = SingleTypeInfo.Domain.ANY;
+                       }
+                       update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
+                   }
+               } else {
+                   deltaInfo.setDomain(dbInfo.getDomain());
+                   deltaInfo.setValues(new CappedSet<>());
+                   if (!dbInfo.getValues().getElements().isEmpty()) {
+                       Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
+                       update = Updates.combine(update, bson);
+                   }
+               }
+           }
 
-            if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
-                CappedSet<String> values = deltaInfo.getValues();
-                if (values != null) {
-                    Set<String> elements = new HashSet<>();
-                    for (String el: values.getElements()) {
-                        if (redactSampleData) {
-                            elements.add(el.hashCode()+"");
-                        } else {
-                            elements.add(el);
-                        }
-                    }
-                    Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
-                    update = Updates.combine(update, bson);
-                    deltaInfo.setValues(new CappedSet<>());
-                }
-            }
+           if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
+               CappedSet<String> values = deltaInfo.getValues();
+               if (values != null) {
+                   Set<String> elements = new HashSet<>();
+                   for (String el: values.getElements()) {
+                       if (redactSampleData) {
+                           elements.add(el.hashCode()+"");
+                       } else {
+                           elements.add(el);
+                       }
+                   }
+                   Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
+                   update = Updates.combine(update, bson);
+                   deltaInfo.setValues(new CappedSet<>());
+               }
+           }
 
 
             if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
@@ -1264,16 +1322,20 @@ public class APICatalogSync {
         boolean mergingCalled = false;
         if (mergeAsyncOutside && fetchAllSTI ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
+                loggerMaker.infoAndAddToDb("Started mergeAsyncOutside", LogDb.RUNTIME);
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
                 if (gotDibs) {
+                    loggerMaker.infoAndAddToDb("Got dibs", LogDb.RUNTIME);
                     mergingCalled = true;
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                     if (backwardCompatibility == null || backwardCompatibility.getMergeOnHostInit() == 0) {
+                        loggerMaker.infoAndAddToDb("Merging hosts...", LogDb.RUNTIME);
                         new MergeOnHostOnly().mergeHosts();
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
                         BackwardCompatibilityDao.instance.getMCollection().updateMany(new BasicDBObject(), update);
+                        loggerMaker.infoAndAddToDb("Merging hosts completed", LogDb.RUNTIME);
                     }
 
                     try {
@@ -1284,11 +1346,25 @@ public class APICatalogSync {
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
-                            mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
-                            loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                            try {
+                                mergeUrlsAndSave(apiCollection.getId(), true, true);
+                                loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
+                            }
+
+                            try {
+                                mergeUrlsAndSave(apiCollection.getId(), true, false);
+                                loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
+                            }
+
                         }
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, String.format("Error while merging collections. Error: %s", e.getMessage()), LogDb.RUNTIME);
+                        String err = e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : e.getMessage() ;
+                        loggerMaker.errorAndAddToDb("error in mergeUrlsAndSave: " + err, LogDb.RUNTIME);
+                        e.printStackTrace();
                     }
 
                     try {
@@ -1299,19 +1375,29 @@ public class APICatalogSync {
                         loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
                     }
                 }
+                loggerMaker.infoAndAddToDb("Finished mergeAsyncOutside", LogDb.RUNTIME);
             }
         }
 
+        loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
-            allParams = SingleTypeInfoDao.instance.fetchAll();
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
+            Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+            allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
+            allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
         }
+        loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
+        this.dbState.clear();
+        loggerMaker.infoAndAddToDb("Starting building dbState", LogDb.RUNTIME);
         this.dbState = build(allParams);
+        loggerMaker.infoAndAddToDb("Done building dbState", LogDb.RUNTIME);
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = SensitiveParamInfoDao.instance.getUnsavedSensitiveParamInfos();
+        loggerMaker.infoAndAddToDb("Done fetching sensitiveParamInfos", LogDb.RUNTIME);
         for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfos) {
             this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
         }
@@ -1335,6 +1421,7 @@ public class APICatalogSync {
             loggerMaker.errorAndAddToDb("Error while filling urls in apiCollection: " + e.getMessage(), LogDb.RUNTIME);
         }
 
+        loggerMaker.infoAndAddToDb("Building from db completed", LogDb.RUNTIME);
         aktoPolicyNew.buildFromDb(fetchAllSTI);
     }
 
@@ -1452,6 +1539,7 @@ public class APICatalogSync {
     int counter = 0;
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
+        loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
@@ -1522,20 +1610,24 @@ public class APICatalogSync {
         if (writesForSensitiveSampleData.size() > 0) {
             try {
                 SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+                loggerMaker.infoAndAddToDb("successfully added " + writesForSensitiveSampleData.size() + " updates for sensitive sample data" , LogDb.RUNTIME);
             } catch (Exception e) {
-                e.printStackTrace();
+                loggerMaker.errorAndAddToDb(e, "error while adding SensitiveSampleData",LogDb.RUNTIME);
             }
         }
 
         if (writesForSensitiveParamInfo.size() > 0) {
             try {
                 SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+                loggerMaker.infoAndAddToDb("successfully added " + writesForSensitiveParamInfo.size() + " updates for sensitive sample param info" , LogDb.RUNTIME);
             } catch (Exception e) {
-                e.printStackTrace();
+                loggerMaker.errorAndAddToDb(e, "error while adding SensitiveParamInfo",LogDb.RUNTIME);
             }
         }
 
+        loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb", LogDb.RUNTIME);
         buildFromDB(true, fetchAllSTI);
+        loggerMaker.infoAndAddToDb("Finished syncing with db", LogDb.RUNTIME);
     }
 
     public void printNewURLsInDelta(APICatalog deltaCatalog) {

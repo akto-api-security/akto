@@ -11,7 +11,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -81,6 +80,10 @@ public class OtpAction extends UserAction {
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
+            System.out.println("****");
+            System.out.println(result);
+            System.out.println("****");
+
             List<Map> messages = (List<Map>) result.get("messages");
             if (messages.size() == 0) return SUCCESS.toUpperCase();
 
@@ -96,6 +99,10 @@ public class OtpAction extends UserAction {
     public String fetchOtpFromMySms() {
         try {
             BasicDBObject result = makeRequestToMySms();
+
+            System.out.println("((((");
+            System.out.println(result);
+            System.out.println("((((");
 
             List<Map> messages = (List<Map>) result.get("messages");
 
@@ -142,6 +149,7 @@ public class OtpAction extends UserAction {
             os.write(json.getBytes(StandardCharsets.UTF_8));
         }
 
+        System.out.println(http.getResponseCode());
         InputStream inputStream = http.getInputStream();
 
 

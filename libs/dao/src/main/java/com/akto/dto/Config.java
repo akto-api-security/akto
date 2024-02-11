@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE;
     }
 
     ConfigType configType;
@@ -326,6 +326,57 @@ public abstract class Config {
         }
     }
 
+    @BsonDiscriminator
+    public static class OktaConfig extends Config {
+        private String clientId;
+        private String clientSecret;
+        private String oktaDomainUrl;
+        private String authorisationServerId;
+        private String redirectUri;
+        
+        public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
+
+        public OktaConfig() {
+            this.configType = ConfigType.OKTA;
+            this.id = CONFIG_ID;
+        }
+        
+        public String getClientId() {
+            return clientId;
+        }
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+        
+        public String getClientSecret() {
+            return clientSecret;
+        }
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+        
+        public String getOktaDomainUrl() {
+            return oktaDomainUrl;
+        }
+        public void setOktaDomainUrl(String oktaDomainUrl) {
+            this.oktaDomainUrl = oktaDomainUrl;
+        }
+
+        public String getAuthorisationServerId() {
+            return authorisationServerId;
+        }
+        public void setAuthorisationServerId(String authorisationServerId) {
+            this.authorisationServerId = authorisationServerId;
+        }
+
+        public String getRedirectUri() {
+            return redirectUri;
+        }
+
+        public void setRedirectUri(String redirectUri) {
+            this.redirectUri = redirectUri;
+        }
+    }
 
     @BsonDiscriminator
     public static class StiggConfig extends Config {
@@ -422,6 +473,62 @@ public abstract class Config {
         }
     }
 
+    @BsonDiscriminator
+    public static class AzureConfig extends Config{
+        
+        private String x509Certificate ;
+        private String azureEntityId ;
+        private String loginUrl ;
+        private String acsUrl ;
+        private String applicationIdentifier;
+
+        public static final String CONFIG_ID = ConfigType.AZURE.name() + CONFIG_SALT;
+
+        public AzureConfig() {
+            this.configType = ConfigType.AZURE;
+            this.id = CONFIG_ID;
+        }
+
+        public String getX509Certificate() {
+            return x509Certificate;
+        }
+
+        public void setX509Certificate(String x509Certificate) {
+            this.x509Certificate = x509Certificate;
+        }
+
+        public String getAzureEntityId() {
+            return azureEntityId;
+        }
+
+        public void setAzureEntityId(String azureEntityId) {
+            this.azureEntityId = azureEntityId;
+        }
+
+        public String getLoginUrl() {
+            return loginUrl;
+        }
+
+        public void setLoginUrl(String loginUrl) {
+            this.loginUrl = loginUrl;
+        }
+
+        public String getAcsUrl() {
+            return acsUrl;
+        }
+
+        public void setAcsUrl(String acsUrl) {
+            this.acsUrl = acsUrl;
+        }
+
+        public String getApplicationIdentifier() {
+            return applicationIdentifier;
+        }
+
+        public void setApplicationIdentifier(String applicationIdentifier) {
+            this.applicationIdentifier = applicationIdentifier;
+        }
+    }
     @BsonDiscriminator
     public static class MixpanelConfig extends Config {
         private String projectToken;

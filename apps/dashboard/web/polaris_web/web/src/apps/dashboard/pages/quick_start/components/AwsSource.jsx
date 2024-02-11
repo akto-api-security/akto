@@ -130,7 +130,7 @@ function AwsSource() {
     }
 
     const copyRequest = () => {
-        func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
+      func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
 
     const saveFunc = async() => {

@@ -2,6 +2,7 @@ package com.akto.log;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
 import com.mongodb.BasicDBList;
@@ -61,7 +62,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
     }
 
     public LoggerMaker(Class<?> c) {
@@ -117,6 +118,10 @@ public class LoggerMaker  {
         }
     }
 
+    public void debugInfoAddToDb(String info, LogDb db) {
+        infoAndAddToDb(info, db);
+    }
+    
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
         try {
             if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
@@ -176,6 +181,9 @@ public class LoggerMaker  {
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
                     break;
+                case ANALYSER:
+                    AnalyserLogsDao.instance.insertOne(log);
+                    break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
                     break;
@@ -196,7 +204,7 @@ public class LoggerMaker  {
         
         Bson filters = Filters.and(
             Filters.gte(Log.TIMESTAMP, logFetchStartTime),
-            Filters.lte(Log.TIMESTAMP, logFetchEndTime)
+            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
         );
         switch(db){
             case TESTING: 
@@ -207,6 +215,9 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case ANALYSER:
+                logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));

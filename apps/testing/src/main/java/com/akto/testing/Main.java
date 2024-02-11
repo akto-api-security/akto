@@ -4,13 +4,21 @@ import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.SetupDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.Setup;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
@@ -26,6 +34,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -35,8 +44,11 @@ import org.json.JSONObject;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -46,6 +58,7 @@ public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
 
     public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
@@ -73,6 +86,7 @@ public class Main {
         return summaryId;
     }
 
+
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -94,6 +108,14 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
     }
 
+    public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        Set<Integer> ret = new HashSet<>();
+        for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            ret.add(apiInfoKey.getApiCollectionId());
+        }
+
+        return ret;
+    }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
 
     private static TestingRun findPendingTestingRun() {
@@ -171,16 +193,11 @@ public class Main {
 
         boolean connectedToMongo = false;
         do {
+            connectedToMongo = MCollection.checkConnection();
             try {
-                AccountsDao.instance.getStats();
-                connectedToMongo = true;
-            } catch (Exception ignored) {
-            } finally {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         } while (!connectedToMongo);
 
@@ -188,6 +205,25 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
+        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(account -> {
+                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
+                },"matrix-analyser-task");
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+
+
+
+        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+        
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
         while (true) {
@@ -311,8 +347,16 @@ public class Main {
         {
             testType = "SCHEDULED DAILY";
         }
+        if (testingRunResultSummary.getMetadata() != null) {
+            testType = "CI_CD";
+        }
+
+        Setup setup = SetupDao.instance.findOne(new BasicDBObject());
 
         String dashboardMode = "saas";
+        if (setup != null) {
+            dashboardMode = setup.getDashboardMode();
+        }
 
         String userEmail = testingRun.getUserEmail();
         String distinct_id = userEmail + "_" + dashboardMode.toUpperCase();
@@ -327,6 +371,37 @@ public class Main {
         props.put("Test type", testType);
         props.put("Total APIs tested", totalApis);
 
+        if (testingRun.getTestIdConfig() > 1) {
+            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            if (testingRunConfig != null && testingRunConfig.getTestSubCategoryList() != null) {
+                props.put("Total Tests", testingRunConfig.getTestSubCategoryList().size());
+                props.put("Tests Ran", testingRunConfig.getTestSubCategoryList());
+            }
+        }
+
+        Bson filters = Filters.and(
+            Filters.eq("latestTestingRunSummaryId", summaryId),
+            Filters.eq("testRunIssueStatus", "OPEN")
+        );
+        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(filters);
+
+        Map<String, Integer> severityCount = new HashMap<>();
+        for (TestingRunIssues testingRunIssues: testingRunIssuesList) {
+            String key = testingRunIssues.getSeverity().toString();
+            if (!severityCount.containsKey(key)) {
+                severityCount.put(key, 0);
+            }
+            int val = severityCount.get(key);
+            severityCount.put(key, val+1);
+        }
+
+        props.put("Vulnerabilities Found", testingRunIssuesList.size());
+
+        Iterator<Map.Entry<String, Integer>> iterator = severityCount.entrySet().iterator();
+        while(iterator.hasNext()) {
+            Map.Entry<String, Integer> entry = iterator.next();
+            props.put(entry.getKey() + " Vulnerabilities", entry.getValue());
+        }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);

@@ -33,6 +33,8 @@ public class SendgridEmail {
                     Config config = ConfigsDao.instance.findOne(Filters.eq(ConfigsDao.ID, Config.SendgridConfig.CONFIG_ID));
                     if (config == null) {
                         config = new Config.SendgridConfig();
+                        //todo: shivam this change only for mono
+                        ((Config.SendgridConfig) config).setSendgridSecretKey(Constants.SENDGRID_TOKEN_KEY);
                     }
                     sendgridConfig = (Config.SendgridConfig) config;
                     lastRefreshTs = now;

@@ -16,6 +16,7 @@ import org.bson.conversions.Bson;
 public class Cluster {
     
     public static final String RUNTIME_MERGER = "runtime-merger";
+    public static final String TELEMETRY_CRON = "telemetry-cron";
     public static final String MAP_SENSITIVE_IN_INFO = "map-sensitiveInfo-in-ApiInfo";
     public static final String SYNC_CRON_INFO = "sync-cron-info";
 
@@ -45,6 +46,7 @@ public class Cluster {
 
         try {    
             dibs = DibsDao.instance.getMCollection().findOneAndUpdate(findKeyQ, updates, options);
+            System.out.println("try" + dibs);
         } catch (MongoCommandException e) {
             // already present
             Bson findExpiredKeyQ = Filters.and(
@@ -54,10 +56,15 @@ public class Cluster {
     
             try {
                 dibs = DibsDao.instance.getMCollection().findOneAndUpdate(findExpiredKeyQ, updates, options);
+                System.out.println("catch1" + dibs);
             } catch (MongoCommandException eInside) {
                 dibs = DibsDao.instance.findOne(Filters.eq("_id", prize));
+                System.out.println("catch2" + dibs);
             }
         }
+
+        System.out.println("final: " + dibs);
+
         return (dibs == null || (dibs.getWinner().equals(winnerId) && dibs.getExpiryTs() == expiryTs));
     }
 

@@ -98,41 +98,8 @@ public class RequestTemplate {
         return allParams.paramNames;
     }
 
-    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
-
-        prefix += ("#"+root.getPathElem());
-        if (prefix.startsWith("#")) {
-            prefix = prefix.substring(1);
-        }
-
-        if (obj instanceof BasicDBObject) {
-            BasicDBObject basicDBObject = (BasicDBObject) obj;
-            for(String key: basicDBObject.keySet()) {
-                Object value = basicDBObject.get(key);
-                Trie.Node<String, Pair<KeyTypes, Set<String>>> curr = root.get(key);
-
-                if (curr == null) {
-                    curr = root.getOrCreate(key, new Pair<>(new KeyTypes(new HashMap<>(), false), new HashSet<String>()));
-                    // logger.info("creating new node for " + key + " in " + url);
-                }
-
-                add(curr.getValue().getSecond(), userId);
-                insert(value, userId, curr, url, method, responseCode, prefix, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
-            }
-        } else if (obj instanceof BasicDBList) {
-            for(Object elem: (BasicDBList) obj) {
-                Trie.Node<String, Pair<KeyTypes, Set<String>>> listNode = root.getOrCreate("$", new Pair<>(new KeyTypes(new HashMap<>(), false), new HashSet<String>()));
-                add(listNode.getValue().getSecond(), userId);
-                insert(elem, userId, listNode, url, method, responseCode, prefix, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
-            }
-        } else {
-            //url, method, responseCode, true, header, value, userId
-            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false);
-            add(root.getValue().getSecond(), userId);   
-        }
-    }
-
-    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
+    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId,
+                               int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
         for (String header: headerPayload.keySet()) {
             KeyTypes keyTypes = this.headers.get(header);
             if (keyTypes == null) {
@@ -141,7 +108,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false);
+                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false, timestamp);
             }
         }
     }
@@ -158,7 +125,8 @@ public class RequestTemplate {
 
     public static long insertTime = 0, processTime = 0, deleteTime = 0;
 
-    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
+    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId,
+                                         int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
         
             if(userIds.size() < 10) userIds.add(userId);
@@ -200,7 +168,7 @@ public class RequestTemplate {
                 }
 
                 for (Object obj: flattened.get(param)) {
-                    keyTypes.process(url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false);
+                    keyTypes.process(url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false, timestamp);
                 }
             }
 
@@ -776,7 +744,7 @@ public class RequestTemplate {
             }
 
             String userId = "";
-            keyTypes.process(url, method, -1, false, idx+"", val,userId, apiCollectionId, "", new HashMap<>(), true);
+            keyTypes.process(url, method, -1, false, idx+"", val,userId, apiCollectionId, "", new HashMap<>(), true, Context.now());
 
         }
     }

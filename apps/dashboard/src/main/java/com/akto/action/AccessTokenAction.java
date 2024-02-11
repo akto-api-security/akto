@@ -2,7 +2,6 @@ package com.akto.action;
 
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
-import com.akto.utils.HttpUtils;
 import com.akto.utils.Token;
 import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
@@ -30,7 +29,6 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         }
         String accessToken = token.getAccessToken();
 
-        // deepcode ignore HttpResponseSplitting: <please specify a reason of ignoring this>
         servletResponse.setHeader(ACCESS_TOKEN_HEADER_NAME, accessToken);
 
         return Action.SUCCESS.toUpperCase();
@@ -41,7 +39,6 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         cookie.setMaxAge(0);
         cookie.setHttpOnly(true);
         cookie.setPath("/dashboard");
-        cookie.setSecure(HttpUtils.isHttpsEnabled());
         return cookie;
     }
 
@@ -68,7 +65,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         Token token ;
         try {
             token = new Token(refreshToken);
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             return null;
         }
 
@@ -86,7 +83,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         if (refreshTokens != null && refreshTokens.contains(refreshToken)) {
             return token;
         } else {
-
+            System.out.println("NOT FOUND");
             return null;
         }
 
