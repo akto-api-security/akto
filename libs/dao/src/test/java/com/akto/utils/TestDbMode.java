@@ -12,7 +12,7 @@ public class TestDbMode {
     public void testRefreshDbType() throws Exception {
         assertEquals(DbMode.DbType.MONGO_DB, DbMode.dbType); // default
 
-        refreshDbType("mongodb://user:pass@akto.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@akto@");
+        refreshDbType("mongodb://user:pass@blabla.mongo.cosmos.azure.com:324/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@akto@");
         assertEquals(DbMode.DbType.COSMOS_DB, DbMode.dbType); // default
 
         refreshDbType("mongodb://localhost:27017/admini");

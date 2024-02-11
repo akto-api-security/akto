@@ -28,19 +28,19 @@ import java.util.*;
 public class MoveSampleDataToSTI {
 
     public static void main1(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://:27017/admini"));
         System.out.println("START A");
         Context.accountId.set(1_000_000);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
         System.out.println("END A");
-        DaoInit.init(new ConnectionString("mongodb://3.218.244.163:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://:27017/admini"));
         System.out.println("START B");
         SampleDataDao.instance.insertMany(sampleDataList);
         System.out.println("END B");
     }
 
     public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://:27017/admini"));
         Context.accountId.set(1_000_000);
 
         MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection().find().projection(null).cursor();
@@ -72,7 +72,7 @@ public class MoveSampleDataToSTI {
 
 
     public static void main4(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://:27017/admini"));
         Context.accountId.set(1_000_000);
         TestingRunResultDao.instance.getMCollection().drop();
 

@@ -19,7 +19,7 @@ import java.util.*;
 
 public class VCDemoData {
     public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://52.91.42.30:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://:27017/admini"));
         Context.accountId.set(1_000_000);
         RuntimeFilterDao.instance.initialiseFilters();
 
