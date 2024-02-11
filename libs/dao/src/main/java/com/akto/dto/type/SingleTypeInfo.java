@@ -14,6 +14,7 @@ import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,16 +92,12 @@ public class SingleTypeInfo {
         Map<String, CustomDataType> newMap = new HashMap<>();
         List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
         List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
-        Set<String> redactedDataTypes = new HashSet<>();
         for (CustomDataType customDataType: customDataTypes) {
             newMap.put(customDataType.getName(), customDataType);
             if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
                 sensitiveCustomDataType.add(customDataType);
             } else {
                 nonSensitiveCustomDataType.add(customDataType);
-            }
-            if (customDataType.isRedacted()) {
-                redactedDataTypes.add(customDataType.getName());
             }
         }
 
@@ -118,21 +115,9 @@ public class SingleTypeInfo {
                 newAktoMap.put(aktoDataType.getName(), aktoDataType);
                 subTypeMap.get(aktoDataType.getName()).setSensitiveAlways(aktoDataType.getSensitiveAlways());
                 subTypeMap.get(aktoDataType.getName()).setSensitivePosition(aktoDataType.getSensitivePosition());
-                if(aktoDataType.isRedacted()){
-                    redactedDataTypes.add(aktoDataType.getName());
-                }
             }
         }
         info.setAktoDataTypeMap(newAktoMap);
-        info.setRedactedDataTypes(redactedDataTypes);
-    }
-
-    public static boolean isRedacted(String dataTypeName){
-        if (accountToDataTypesInfo.containsKey(Context.accountId.get())) {
-            return accountToDataTypesInfo.get(Context.accountId.get()).getRedactedDataTypes().contains(dataTypeName);
-        } else {
-            return false;
-        }
     }
 
     public static void fetchCustomAuthTypes(int accountId) {
@@ -140,7 +125,7 @@ public class SingleTypeInfo {
     }
 
     public enum SuperType {
-        BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM, OBJECT_ID
+        BOOLEAN, INTEGER, FLOAT, STRING, OBJECT_ID, NULL, OTHER, CUSTOM
     }
 
     public enum Position {
@@ -390,6 +375,7 @@ public class SingleTypeInfo {
                 if (customDataType != null) {
                     this.subType = customDataType.toSubType();
                 } else {
+                    // TODO:
                     this.subType = GENERIC;
                 }
             }
@@ -427,6 +413,7 @@ public class SingleTypeInfo {
         }
     }
 
+    ObjectId id;
     public static final String _URL = "url";
     String url;
     public static final String _METHOD = "method";
@@ -751,6 +738,7 @@ public String composeKeyWithCustomSubType(SubType s) {
             if (customDataType != null) {
                 this.subType = customDataType.toSubType();
             } else {
+                // TODO:
                 this.subType = GENERIC;
             }
         }
@@ -875,5 +863,13 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setPublicCount(long publicCount) {
         this.publicCount = publicCount;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
     }
 }

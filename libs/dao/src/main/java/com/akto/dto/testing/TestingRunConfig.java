@@ -17,8 +17,8 @@ public class TestingRunConfig {
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
 
-    private String overriddenTestAppUrl;
     private String testRoleId;
+    private String overriddenTestAppUrl;
 
     public TestingRunConfig() {}
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
@@ -104,4 +104,5 @@ public class TestingRunConfig {
             this.testRoleId = that.testRoleId;
         }
     }
+    
 }

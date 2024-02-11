@@ -115,7 +115,7 @@ public class ExportSampleDataAction extends UserAction {
             try {
                 url = OriginalHttpRequest.makeUrlAbsolute(url,host, protocol);
             } catch (Exception e) {
-
+                System.out.println(e.getMessage());
             }
         } else {
             if (!originalHttpRequest.getHeaders().containsKey("host")) {

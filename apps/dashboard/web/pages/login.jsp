@@ -60,11 +60,15 @@
                     window.ACCOUNT_NAME = '${requestScope.accountName}';
                     window.RELEASE_VERSION = '${requestScope.releaseVersion}';
                     window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
-                    window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
-                    window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
+                    window.AKTO_UI_MODE = '${requestScope.aktoUIMode}' ;
+                    window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}');
+                    window.OKTA_AUTH_URL = atob('${requestScope.oktaAuthUrl}');
+                    window.AZURE_REQUEST_URL = atob('${requestScope.azureRequestUrl}');
+                    window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
                     window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
+
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');

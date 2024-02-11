@@ -18,6 +18,7 @@ public class TokenPayloadModifier {
                 String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, value);
                 request.setBody(resp);
             } catch(Exception e) {
+                System.out.println("error adding auth param to body" + e.getMessage());
                 return false;
             }
         }

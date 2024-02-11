@@ -218,15 +218,6 @@ export default {
             return resp
         })
     },
-    redactCollection(apiCollectionId, redacted){
-        return request({
-            url: '/api/redactCollection',
-            method: 'post',
-            data:{
-                apiCollectionId,redacted
-            }
-        })
-    },
 
     async fetchAllUrlsAndMethods (apiCollectionId) {
         const resp = await request({
@@ -606,6 +597,14 @@ export default {
             url: '/api/getLastCalculatedInfo',
             method: 'post',
             data: {}
+        })
+    },
+    
+    async deMergeApi(apiCollectionId, url, method){
+        return await request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
         })
     },
     async getUserEndpoints(){

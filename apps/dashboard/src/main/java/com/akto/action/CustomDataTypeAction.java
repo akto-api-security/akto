@@ -23,25 +23,17 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
-import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.EnumUtils;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
-import static com.akto.dto.type.SingleTypeInfo.fetchCustomDataTypes;
-import static com.akto.dto.type.SingleTypeInfo.subTypeMap;
 import static com.akto.utils.Utils.extractJsonResponse;
 
 public class CustomDataTypeAction extends UserAction{
     private static LoggerMaker loggerMaker = new LoggerMaker(CustomDataTypeAction.class);
-
-    private static final ExecutorService service = Executors.newFixedThreadPool(1);
     private boolean createNew;
     private String name;
     private boolean sensitiveAlways;
@@ -53,7 +45,6 @@ public class CustomDataTypeAction extends UserAction{
 
     private String valueOperator;
     private List<ConditionFromUser> valueConditionFromUsers;
-    private boolean redacted;
 
     public static class ConditionFromUser {
         Predicate.Type type;
@@ -117,7 +108,7 @@ public class CustomDataTypeAction extends UserAction{
         for (CustomDataType cdt: customDataTypes) {
             allDataTypes.add(cdt.getName());
         }
-        for (SingleTypeInfo.SubType subType: subTypeMap.values()) {
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
             allDataTypes.add(subType.getName());
         }
 
@@ -191,9 +182,7 @@ public class CustomDataTypeAction extends UserAction{
                     Updates.set(CustomDataType.VALUE_CONDITIONS,customDataType.getValueConditions()),
                     Updates.set(CustomDataType.OPERATOR,customDataType.getOperator()),
                     Updates.set(CustomDataType.TIMESTAMP,Context.now()),
-                    Updates.set(CustomDataType.ACTIVE,active),
-                    Updates.set(CustomDataType.REDACTED,customDataType.isRedacted()),
-                    Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed())
+                    Updates.set(CustomDataType.ACTIVE,active)
                 ),
                 options
             );
@@ -206,14 +195,6 @@ public class CustomDataTypeAction extends UserAction{
 
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
-        if(redacted){
-            int accountId = Context.accountId.get();
-            service.submit(() ->{
-                Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered a job to fix existing custom data types", LogDb.DASHBOARD);
-                handleDataTypeRedaction();
-            });
-        }
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -244,9 +225,7 @@ public class CustomDataTypeAction extends UserAction{
             Updates.combine(
                 Updates.set("sensitiveAlways",sensitiveAlways),
                 Updates.set("sensitivePosition",sensitivePositions),
-                Updates.set("timestamp",Context.now()),
-                Updates.set("redacted",redacted),
-                Updates.set(AktoDataType.SAMPLE_DATA_FIXED, !redacted)
+                Updates.set("timestamp",Context.now())
             ),
             options
         );
@@ -257,78 +236,8 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
-        if(redacted){
-            int accountId = Context.accountId.get();
-            service.submit(() ->{
-                Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered a job to fix existing akto data types", LogDb.DASHBOARD);
-                handleDataTypeRedaction();
-            });
-        }
 
         return Action.SUCCESS.toUpperCase();
-    }
-
-    public static void handleDataTypeRedaction(){
-        try{
-            fetchCustomDataTypes(Context.accountId.get());
-            loggerMaker.infoAndAddToDb("Dropping redacted data types for custom data types", LogDb.DASHBOARD);
-            List<CustomDataType> customDataTypesToBeFixed = CustomDataTypeDao.instance.findAll(Filters.eq(AktoDataType.SAMPLE_DATA_FIXED, false));
-            loggerMaker.infoAndAddToDb("Found " + customDataTypesToBeFixed.size() + " custom data types to be fixed", LogDb.DASHBOARD);
-
-            List<AktoDataType> aktoDataTypesToBeFixed = AktoDataTypeDao.instance.findAll(Filters.eq(AktoDataType.SAMPLE_DATA_FIXED, false));
-            loggerMaker.infoAndAddToDb("Found " + aktoDataTypesToBeFixed.size() + " akto data types to be fixed", LogDb.DASHBOARD);
-
-            Set<SingleTypeInfo.SubType> subTypesToBeFixed = new HashSet<>();
-            customDataTypesToBeFixed.forEach(cdt -> {
-                SingleTypeInfo.SubType st = cdt.toSubType();
-                subTypesToBeFixed.add(st);
-            });
-            aktoDataTypesToBeFixed.forEach(adt -> {
-                SingleTypeInfo.SubType st = subTypeMap.get(adt.getName());
-                subTypesToBeFixed.add(st);
-            });
-            subTypesToBeFixed.forEach(st -> {
-                loggerMaker.infoAndAddToDb("Dropping redacted data types for subType:" + st.getName(), LogDb.DASHBOARD);
-                handleRedactionForSubType(st);
-                loggerMaker.infoAndAddToDb("Dropped redacted data types for subType:" + st.getName(), LogDb.DASHBOARD);
-            });
-            loggerMaker.infoAndAddToDb("Dropped redacted data types successfully!", LogDb.DASHBOARD);
-        } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Failed to drop redacted data types", LogDb.DASHBOARD);
-        }
-
-    }
-
-    private static void handleRedactionForSubType(SingleTypeInfo.SubType subType) {
-        loggerMaker.infoAndAddToDb("Dropping redacted data types for subType:" + subType.getName(), LogDb.DASHBOARD);
-        int skip = 0;
-        int limit = 100;
-        while (true) {
-            List<ApiInfo.ApiInfoKey> apiInfoKeys = SingleTypeInfoDao.instance.fetchEndpointsBySubType(subType, skip, limit);
-            if(apiInfoKeys.isEmpty()){
-                loggerMaker.infoAndAddToDb("No apiInfoKeys left for subType:" + subType.getName(), LogDb.DASHBOARD);
-                break;
-            }
-
-            loggerMaker.infoAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
-            List<Bson> query = apiInfoKeys.stream().map(key -> Filters.and(
-                    Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq("_id.url", key.getUrl()),
-                    Filters.eq("_id.method", key.getMethod())
-            )).collect(Collectors.toList());
-
-            UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("samples", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb("Redacted samples in sd for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
-
-            updateResult = SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("sampleData", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb("Redacted samples in ssd for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
-
-            skip += limit;
-        }
-        UpdateResult updateResult = SingleTypeInfoDao.instance.updateManyNoUpsert(Filters.and(Filters.eq("subType", subType.getName()), Filters.exists("values.elements", true)), Updates.set("values.elements", Collections.emptyList()));
-        loggerMaker.infoAndAddToDb("Redacted values in sti for subType:" + subType.getName() + ", modified:" + updateResult.getModifiedCount(), LogDb.DASHBOARD);
-
     }
 
     public List<SingleTypeInfo.Position> generatePositions(List<String> sensitivePosition){
@@ -438,7 +347,7 @@ public class CustomDataTypeAction extends UserAction{
                     boolean skip4 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey) : false;
                     skip = skip1 || skip2 || skip3 || skip4;
                 } catch (Exception e) {
-                    ;
+                    e.printStackTrace();
                 }
 
                 if (skip) break;
@@ -520,6 +429,7 @@ public class CustomDataTypeAction extends UserAction{
     }
 
     public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
+        // TODO: handle errors
         if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
         int maxChars = 25;
         if (name.length() > maxChars) throw new AktoCustomException("Maximum length allowed is "+maxChars+" characters");
@@ -527,7 +437,7 @@ public class CustomDataTypeAction extends UserAction{
         name = name.toUpperCase();
         if (!(name.matches("[A-Z_0-9 ]+"))) throw new AktoCustomException("Name can only contain alphabets, spaces, numbers and underscores");
 
-        if (subTypeMap.containsKey(name)) {
+        if (SingleTypeInfo.subTypeMap.containsKey(name)) {
             throw new AktoCustomException("Data type name reserved");
         }
 
@@ -603,7 +513,7 @@ public class CustomDataTypeAction extends UserAction{
 
         IgnoreData ignoreData = new IgnoreData();
         return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
-                true,keyConditions,valueConditions, mainOperator,ignoreData, redacted, !redacted);
+                true,keyConditions,valueConditions, mainOperator,ignoreData);
     }
 
     public void setCreateNew(boolean createNew) {
@@ -827,13 +737,5 @@ public class CustomDataTypeAction extends UserAction{
 
     public void setSensitivePosition(List<String> sensitivePosition) {
         this.sensitivePosition = sensitivePosition;
-    }
-
-    public boolean getRedacted() {
-        return redacted;
-    }
-
-    public void setRedacted(boolean redacted) {
-        this.redacted = redacted;
     }
 }

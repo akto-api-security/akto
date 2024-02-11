@@ -27,7 +27,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
-
     }
 
     const navigate = useNavigate()
@@ -37,8 +36,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     })
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
-    const [active, setActive] = useState(runTestFromOutside || false);
     const [testRolesArr, setTestRolesArr] = useState([])
+    const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
 
@@ -75,7 +74,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
@@ -537,6 +535,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </ButtonGroup>
+                                
                             </Box>
                             <Box>
                                 <ButtonGroup>

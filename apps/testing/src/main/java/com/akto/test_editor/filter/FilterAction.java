@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 import org.bson.conversions.Bson;
 
@@ -75,6 +77,10 @@ public final class FilterAction {
                 return evaluateParamContext(filterActionRequest);
             case "endpoint_in_traffic_context":
                 return endpointInTraffic(filterActionRequest);
+            case "include_roles_access":
+                return evaluateRolesAccessContext(filterActionRequest, true);
+            case "exclude_roles_access":
+                return evaluateRolesAccessContext(filterActionRequest, false);                
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
         }
@@ -1153,6 +1159,27 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(res, null, null, null);
     }
 
+    private DataOperandsFilterResponse evaluateRolesAccessContext(FilterActionRequest filterActionRequest, boolean include) {
+
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        Bson filterQ = Filters.eq("_id", apiInfoKey);
+        List<String> querySet = (List) filterActionRequest.getQuerySet();
+        String roleName = querySet.get(0);
+
+        AccessMatrixUrlToRole accessMatrixUrlToRole = AccessMatrixUrlToRolesDao.instance.findOne(filterQ);
+
+        List<String> rolesThatHaveAccessToApi = new ArrayList<>();
+        if (accessMatrixUrlToRole != null) {
+            rolesThatHaveAccessToApi = accessMatrixUrlToRole.getRoles();
+        }
+
+        int indexOfRole = rolesThatHaveAccessToApi.indexOf(roleName);
+
+        boolean res = include == (indexOfRole != -1);
+
+        return new DataOperandsFilterResponse(res, null, null, null);
+    }
+
     public BasicDBObject getPrivateResourceCount(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
         String urlWithParams = originalHttpRequest.getFullUrlWithParams();
         String url = apiInfoKey.url;
@@ -1166,8 +1193,6 @@ public final class FilterAction {
         if (APICatalog.isTemplateUrl(url)) {
             URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
             String[] tokens = urlTemplate.getTokens();
-
-            String[] urlWithParamsTokens = APICatalogSync.createUrlTemplate(urlWithParams, method).getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);
@@ -1176,15 +1201,7 @@ public final class FilterAction {
                     if (singleTypeInfo != null && singleTypeInfo.getIsPrivate()) {
                         privateCnt++;
                     }
-                    if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate() || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
-                        if (urlWithParamsTokens.length > i) {
-                            obj.put("key", i+"");
-                            obj.put("value", urlWithParamsTokens[i]);
-                            if (privateValues.size() < 5) {
-                                privateValues.add(obj);
-                            }
-                            privateCnt++;
-                        }
+                    if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate()) {
                         continue;
                     }
                     if (singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {

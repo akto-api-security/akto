@@ -20,6 +20,7 @@ function About() {
     const [newMerging, setNewMerging] = useState(false)
     const [trafficThreshold, setTrafficThreshold] = useState(trafficAlertDurations[0].value)
     const setupOptions = settingFunctions.getSetupOptions()
+    const [enableTelemetry, setEnableTelemetry] = useState(false)
 
     async function fetchDetails(){
         const {arr, resp} = await settingFunctions.fetchAdminInfo()
@@ -28,6 +29,7 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
+        setEnableTelemetry(resp.telemetrySettings.customerEnabled)
     }
 
     useEffect(()=>{
@@ -69,6 +71,11 @@ function About() {
     const handleNewMerging = async(val) => {
         setNewMerging(val);
         await settingRequests.toggleNewMergingEnabled(val);
+    }
+
+    const toggleTelemetry = async(val) => {
+        setEnableTelemetry(val);
+        await settingRequests.toggleTelemetry(val);
     }
 
     const handleSelectTraffic = async(val) => {
@@ -114,6 +121,7 @@ function About() {
                     </VerticalStack>
                     <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                     <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
+                    <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                     <VerticalStack gap={1}>
                         <Text color="subdued">Traffic alert threshold</Text>
                         <Box width='15%'>

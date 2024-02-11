@@ -31,14 +31,10 @@ public class CustomDataType {
     Conditions.Operator operator;
     public static final String IGNORE_DATA = "ignoreData";
     private IgnoreData ignoreData;
-    private boolean redacted;
-    public static final String REDACTED = "redacted";
-    private boolean sampleDataFixed;
-    public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
 
     public CustomDataType() { }
 
-    public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
+    public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData) {
         this.name = name;
         this.sensitiveAlways = sensitiveAlways;
         this.sensitivePosition = sensitivePosition;
@@ -49,8 +45,6 @@ public class CustomDataType {
         this.valueConditions = valueConditions;
         this.operator = operator;
         this.ignoreData = ignoreData;
-        this.redacted = redacted;
-        this.sampleDataFixed = sampleDataFixed;
     }
 
     public SingleTypeInfo.SubType toSubType() {
@@ -89,12 +83,14 @@ public class CustomDataType {
                 case OR:
                     return keyResult || valueResult;
                 default:
+                    // TODO:
                     return false;
             }
         }
 
     }
-        
+
+
     public ObjectId getId() {
         return id;
     }
@@ -196,25 +192,6 @@ public class CustomDataType {
             ", keyConditions='" + getKeyConditions() + "'" +
             ", valueConditions='" + getValueConditions() + "'" +
             ", operator='" + getOperator() + "'" +
-            ", ignoreData='" + getIgnoreData() + "'" +
-            ", redacted='" + isRedacted() + "'" +
-            ", sampleDataFixed='" + isSampleDataFixed() + "'" +
             "}";
-    }
-
-    public boolean isRedacted() {
-        return redacted;
-    }
-
-    public void setRedacted(boolean redacted) {
-        this.redacted = redacted;
-    }
-
-    public boolean isSampleDataFixed() {
-        return sampleDataFixed;
-    }
-
-    public void setSampleDataFixed(boolean sampleDataFixed) {
-        this.sampleDataFixed = sampleDataFixed;
     }
 }

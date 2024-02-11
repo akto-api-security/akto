@@ -180,7 +180,9 @@ public class Main {
                 String content = testConfigMap.get(obj).getContent();
                 if(content.contains(ContextOperator.ENDPOINT_IN_TRAFFIC_CONTEXT.toString().toLowerCase()) 
                     || content.contains(ContextOperator.PARAM_CONTEXT.toString().toLowerCase())
-                    || content.contains(ContextOperator.PRIVATE_VARIABLE_CONTEXT.toString().toLowerCase())){
+                    || content.contains(ContextOperator.PRIVATE_VARIABLE_CONTEXT.toString().toLowerCase())
+                    || content.contains(ContextOperator.INCLUDE_ROLES_ACCESS.toString().toLowerCase())
+                    || content.contains(ContextOperator.EXCLUDE_ROLES_ACCESS.toString().toLowerCase())){
                         String info = "Cannot run context tests. Skipping " + obj;
                         logger.info(info);
                         return false;
@@ -374,7 +376,7 @@ public class Main {
         }
 
         if(outputLevel.equals(OUTPUT_LEVEL.NONE)){
-            return;
+            System.exit(0);
         }
 
         String fileDir = "../out/";
@@ -439,5 +441,8 @@ public class Main {
             String error = "Error writing to file " + filePath + " due to " + e.getMessage();
             logger.error(error);
         }
+
+        System.exit(0);
+
     }
 }

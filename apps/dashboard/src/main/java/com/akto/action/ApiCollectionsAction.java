@@ -8,14 +8,16 @@ import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
-import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiCollectionTestStatus;
+import com.akto.dto.testing.TestingEndpoints;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Aggregates;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
@@ -24,30 +26,21 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
-import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
-import com.akto.utils.RedactSampleData;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.UpdateResult;
+import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
-import org.bson.conversions.Bson;
+import org.apache.commons.lang3.tuple.Pair;
+import org.bson.Document;
 
 public class ApiCollectionsAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
-
     List<ApiCollection> apiCollections = new ArrayList<>();
+    List<ApiCollectionTestStatus> apiCollectionTestStatus = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
     Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
     Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
@@ -57,6 +50,7 @@ public class ApiCollectionsAction extends UserAction {
     LastCronRunInfo timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
     int apiCollectionId;
     List<ApiInfoKey> apiList;
 
@@ -70,12 +64,29 @@ public class ApiCollectionsAction extends UserAction {
         this.apiList = apiList;
     }
 
-    boolean redacted;
-
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        this.apiCollectionTestStatus = new ArrayList<>();
 
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+        Map<Integer, Pair<String,Integer>> map = new HashMap<>();
+        try (MongoCursor<BasicDBObject> cursor = TestingRunDao.instance.getMCollection().aggregate(
+                Arrays.asList(
+                        Aggregates.match(Filters.eq("testingEndpoints.type", TestingEndpoints.Type.COLLECTION_WISE.name())),
+                        Aggregates.sort(Sorts.descending(Arrays.asList("testingEndpoints.apiCollectionId", "endTimestamp"))),
+                        new Document("$group", new Document("_id", "$testingEndpoints.apiCollectionId")
+                                .append("latestRun", new Document("$first", "$$ROOT")))
+                ), BasicDBObject.class
+        ).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject basicDBObject = cursor.next();
+                BasicDBObject latestRun = (BasicDBObject) basicDBObject.get("latestRun");
+                String state = latestRun.getString("state");
+                int endTimestamp = latestRun.getInt("endTimestamp", -1);
+                int collectionId = ((BasicDBObject)latestRun.get("testingEndpoints")).getInt("apiCollectionId");
+                map.put(collectionId, Pair.of(state, endTimestamp));
+            }
+        }
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -89,6 +100,13 @@ public class ApiCollectionsAction extends UserAction {
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
             }
+            if(map.containsKey(apiCollectionId)) {
+                Pair<String, Integer> pair = map.get(apiCollectionId);
+                apiCollectionTestStatus.add(new ApiCollectionTestStatus(apiCollection.getId(), pair.getRight(), pair.getLeft()));
+            } else {
+                apiCollectionTestStatus.add(new ApiCollectionTestStatus(apiCollection.getId(), -1, null));
+            }
+
             apiCollection.setUrls(new HashSet<>());
         }
 
@@ -138,13 +156,13 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String createCollection() {
-
+        
         if(!isValidApiCollectionName()){
             return ERROR.toUpperCase();
         }
 
         // do not change hostName or vxlanId here
-        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0, false, true);
+        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0);
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
@@ -157,7 +175,7 @@ public class ApiCollectionsAction extends UserAction {
     public String deleteCollection() {
         
         this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0, false, true));
+        this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0));
         return this.deleteMultipleCollections();
     } 
 
@@ -213,7 +231,7 @@ public class ApiCollectionsAction extends UserAction {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
         if(apiCollection == null){
-
+            
             if(!isValidApiCollectionName()){
                 return ERROR.toUpperCase();
             }
@@ -255,7 +273,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
         fetchAllCollections();
-
+    
         return SUCCESS.toUpperCase();
     }
 
@@ -285,9 +303,9 @@ public class ApiCollectionsAction extends UserAction {
 
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
         ApiCollectionsDao.instance.insertOne(apiCollection);
-
+        
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-
+        
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
@@ -300,12 +318,12 @@ public class ApiCollectionsAction extends UserAction {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
         apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions);
-
+    
         return SUCCESS.toUpperCase();
     }
 
     public String computeCustomCollections(){
-
+        
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(collectionName);
         if(apiCollection == null || !ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
             addActionError("Invalid api collection group");
@@ -314,44 +332,6 @@ public class ApiCollectionsAction extends UserAction {
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
-        return SUCCESS.toUpperCase();
-    }
-
-    public static void dropSampleDataForApiCollection() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, false));
-        if(apiCollections.isEmpty()) {
-            loggerMaker.infoAndAddToDb("No api collections to fix sample data for", LoggerMaker.LogDb.DASHBOARD);
-            return;
-        }
-        loggerMaker.infoAndAddToDb(String.format("Fixing sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
-        for (ApiCollection apiCollection: apiCollections) {
-            int apiCollectionId = apiCollection.getId();
-            UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("samples", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
-            updateResult = SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("sampleData", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sensitive sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
-            updateResult = SingleTypeInfoDao.instance.updateManyNoUpsert(Filters.and(Filters.eq("apiCollectionId", apiCollectionId), Filters.exists("values", true)), Updates.set("values.elements", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sti for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
-            ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true));
-        }
-        loggerMaker.infoAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
-    }
-
-    public String redactCollection() {
-        List<Bson> updates = Arrays.asList(
-            Updates.set(ApiCollection.REDACT, redacted),
-            Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, !redacted)
-        );
-        ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.combine(updates));
-        if(redacted){
-            int accountId = Context.accountId.get();
-            Runnable r = () -> {
-                Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered job to delete sample data", LoggerMaker.LogDb.DASHBOARD);
-                dropSampleDataForApiCollection();
-            };
-            new Thread(r).start();
-        }
         return SUCCESS.toUpperCase();
     }
 
@@ -390,8 +370,8 @@ public class ApiCollectionsAction extends UserAction {
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
-        pipeline.add(Aggregates.group(groupId,
-            Accumulators.max("riskScore", "$riskScore"),
+        pipeline.add(Aggregates.group(groupId, 
+            Accumulators.max("riskScore", "$riskScore"), 
             Accumulators.sum("criticalCounts", new BasicDBObject("$cond", Arrays.asList(new BasicDBObject("$gte", Arrays.asList("$riskScore", 4)), 1, 0)))
         ));
 
@@ -412,7 +392,7 @@ public class ApiCollectionsAction extends UserAction {
         this.riskScoreOfCollectionsMap = riskScoreMap;
         return Action.SUCCESS.toUpperCase();
     }
-
+    
     public String fetchTimersInfo(){
         try {
             LastCronRunInfo timeInfo = AccountSettingsDao.instance.getLastCronRunInfo();
@@ -463,11 +443,11 @@ public class ApiCollectionsAction extends UserAction {
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
-
+    
     public int getSensitiveUrlsInResponse() {
         return sensitiveUrlsInResponse;
     }
-
+ 
     public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
         return sensitiveSubtypesInCollection;
     }
@@ -496,6 +476,14 @@ public class ApiCollectionsAction extends UserAction {
         return timerInfo;
     }
 
+    public List<ApiCollectionTestStatus> getApiCollectionTestStatus() {
+        return apiCollectionTestStatus;
+    }
+
+    public void setApiCollectionTestStatus(List<ApiCollectionTestStatus> apiCollectionTestStatus) {
+        this.apiCollectionTestStatus = apiCollectionTestStatus;
+    }
+
     public List<ConditionUtils> getConditions() {
         return conditions;
     }
@@ -516,11 +504,4 @@ public class ApiCollectionsAction extends UserAction {
         return hasUsageEndpoints;
     }
 
-    public boolean isRedacted() {
-        return redacted;
-    }
-
-    public void setRedacted(boolean redacted) {
-        this.redacted = redacted;
-    }
 }

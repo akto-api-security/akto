@@ -102,7 +102,6 @@ function TestRoleSettings() {
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
                 })
-
                 if(!updatedAuth){
                     func.setToast(true, false, "Test role updated successfully.")
                 }
@@ -227,7 +226,6 @@ function TestRoleSettings() {
             steps: obj.steps,
             authParams: obj.authParams
         }))
-
     }
 
     const addAuthButton = (
@@ -251,7 +249,6 @@ function TestRoleSettings() {
             const automationType = "HardCoded";
             const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
             resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
-
         }else{
             const automationType = "LOGIN_REQUEST";
             resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps)
@@ -320,7 +317,6 @@ function TestRoleSettings() {
                             <HardCoded showOnlyApi={true} extractInformation={true} setInformation={setHardCodedInfo}/>
                         </Collapsible>
                     </LegacyStack>
-
                     <LegacyStack vertical>
                         <Button
                             id={"automated-token-expand-button"}

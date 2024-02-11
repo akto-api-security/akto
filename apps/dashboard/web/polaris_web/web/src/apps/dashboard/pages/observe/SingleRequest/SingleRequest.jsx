@@ -48,15 +48,8 @@ function SingleRequest(){
             await api.loadSensitiveParameters(apiCollectionId, url, method, subType).then((res) => {
                 setEndpointData(transform.prepareEndpointData(collectionsMap, res));
             })
-            await api.fetchSensitiveSampleData(url, apiCollectionId, method).then(async(res) => {
-                if(res.sampleDataList && Object.keys(res.sampleDataList).length > 0){
-                    setSampleData(transform.prepareSampleData(res, subType))
-                }else{
-                    await api.fetchSampleData(url, apiCollectionId, method).then((resp) => {
-                        const commonMessages = transform.getCommonSamples(resp.sampleDataList[0].samples,resp)
-                        setSampleData(commonMessages)
-                    })
-                }
+            await api.fetchSensitiveSampleData(url, apiCollectionId, method).then((res) => {
+                setSampleData(transform.prepareSampleData(res, subType))
             })
         } 
         fetchData();

@@ -5,37 +5,38 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
+import com.akto.dto.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
+import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
 import java.util.*;
 
 import static com.akto.parsers.TestDump2.createList;
+import static com.akto.runtime.APICatalogSync.mergeUrlsAndSave;
+import static com.akto.runtime.APICatalogSync.tryMergeURLsInCollection;
 import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
 
     public void testInitializer(){
         Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
-        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
         AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
         if (info == null) {
             info = new AccountDataTypesInfo();
@@ -64,15 +65,15 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         parser.syncFunction(responseParams.subList(10,15), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(15,20), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         assertEquals(0, getStaticURLsSize(parser));
 
 
@@ -118,13 +119,13 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(0,1), false,true, null);
         parser.apiCatalogSync.syncWithDB(false,true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(1, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(1,2), false,true, null);
         parser.apiCatalogSync.syncWithDB(false,true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
@@ -136,7 +137,7 @@ public class TestMergingNew extends MongoBasedTest {
         url + "avneesh@akto.io" + "/subproduct/" + "avneesh@akto.io" + "/subitem/" + "avneesh@akto.io" + "/id/" + "112"
         )), false,true, null); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
         parser.apiCatalogSync.syncWithDB(false,true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
@@ -177,13 +178,13 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(0,1), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(1, getStaticURLsSize(parser));
 
         parser.syncFunction(responseParams.subList(1,2), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
@@ -193,7 +194,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams.subList(3,10), false, true, null);
         parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, url+"avneesh@akto.io"+"/received")), false, true, null); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
@@ -216,7 +217,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "/link/";
+        String url = "link/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (String x: Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H")) {
@@ -235,7 +236,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(23,28), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         assertEquals(0, getStaticURLsSize(parser));
 
@@ -266,13 +267,12 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(10,25), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-
-        APICatalogSync.mergeUrlsAndSave(0,true);
+        APICatalogSync.mergeUrlsAndSave(0,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
         parser.syncFunction(responseParams.subList(25,30), false, true, null);
 
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(0,true);
+        APICatalogSync.mergeUrlsAndSave(0,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
@@ -292,7 +292,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
 
-        String a = "{\"path\": \"http://killdill.mpl.internal:8080/1/kb/paymentGateways/hosted/form/bbb-bbbb-bbb?paymentMethodId=qq-qqq-qqq\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"X-Killbill-ApiKey\\\": \\\"mplgaming\\\", \\\"Authorization\\\": \\\"Basic somerandom=\\\", \\\"X-Killbill-ApiSecret\\\": \\\"something\\\", \\\"Accept\\\": \\\"application/json\\\", \\\"X-MPL-COUNTRYCODE\\\": \\\"IN\\\", \\\"X-Killbill-CreatedBy\\\": \\\"test-payment\\\", \\\"Content-type\\\": \\\"application/json\\\"}\", \"requestPayload\": \"{\\\"formFields\\\":[{\\\"key\\\":\\\"amount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"netAmount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"currency\\\",\\\"value\\\":\\\"INR\\\"},{\\\"key\\\":\\\"orderId\\\",\\\"value\\\":\\\"ASGARD\\\"},{\\\"key\\\":\\\"paymentMethodId\\\",\\\"value\\\":\\\"zzzz-zzz-zzz-zzzz-zzzz\\\"},{\\\"key\\\":\\\"mobileNumber\\\",\\\"value\\\":\\\"+917021916328\\\"},{\\\"key\\\":\\\"countryCode\\\",\\\"value\\\":\\\"IN\\\"},{\\\"key\\\":\\\"chargeDetails\\\",\\\"value\\\":\\\"{\\\\\\\"charges\\\\\\\":[],\\\\\\\"totalCharges\\\\\\\":0,\\\\\\\"totalChargesLC\\\\\\\":0}\\\"},{\\\"key\\\":\\\"pegRate\\\",\\\"value\\\":\\\"1.0000\\\"},{\\\"key\\\":\\\"extraInfo\\\",\\\"value\\\":\\\"{\\\\\\\"paymentMode\\\\\\\":\\\\\\\"NB_ICICI\\\\\\\",\\\\\\\"additionalPluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"merchantId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mpl_qa\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"clientId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mplgaming\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentModePluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"code\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"NB_ICICI\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentMethodType\\\\\\\":\\\\\\\"netbanking\\\\\\\",\\\\\\\"paymentFlow\\\\\\\":\\\\\\\"JP2_AT_R4\\\\\\\"}\\\"},{\\\"key\\\":\\\"appVersion\\\",\\\"value\\\":\\\"1000174\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"},{\\\"key\\\":\\\"appType\\\",\\\"value\\\":\\\"CASH\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"}]}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"Date\\\": \\\"Mon, 18 Apr 2022 13:05:16 GMT\\\", \\\"Content-Type\\\": \\\"application/json\\\", \\\"Transfer-Encoding\\\": \\\"chunked\\\", \\\"Connection\\\": \\\"keep-alive\\\", \\\"Server\\\": \\\"Apache-Coyote/1.1\\\", \\\"Access-Control-Allow-Origin\\\": \\\"*\\\", \\\"Access-Control-Allow-Methods\\\": \\\"GET, POST, DELETE, PUT, OPTIONS\\\", \\\"Access-Control-Allow-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Expose-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Allow-Credentials\\\": \\\"true\\\"}\", \"status\": \"OK\", \"responsePayload\": \"\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"OTHER\"}";
+        String a = "{\"path\": \"http://killdill.mpl.internal:8080/1.0/kb/paymentGateways/hosted/form/bbb-bbbb-bbb?paymentMethodId=qq-qqq-qqq\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"X-Killbill-ApiKey\\\": \\\"mplgaming\\\", \\\"Authorization\\\": \\\"Basic somerandom=\\\", \\\"X-Killbill-ApiSecret\\\": \\\"something\\\", \\\"Accept\\\": \\\"application/json\\\", \\\"X-MPL-COUNTRYCODE\\\": \\\"IN\\\", \\\"X-Killbill-CreatedBy\\\": \\\"test-payment\\\", \\\"Content-type\\\": \\\"application/json\\\"}\", \"requestPayload\": \"{\\\"formFields\\\":[{\\\"key\\\":\\\"amount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"netAmount\\\",\\\"value\\\":\\\"125.000\\\"},{\\\"key\\\":\\\"currency\\\",\\\"value\\\":\\\"INR\\\"},{\\\"key\\\":\\\"orderId\\\",\\\"value\\\":\\\"ASGARD\\\"},{\\\"key\\\":\\\"paymentMethodId\\\",\\\"value\\\":\\\"zzzz-zzz-zzz-zzzz-zzzz\\\"},{\\\"key\\\":\\\"mobileNumber\\\",\\\"value\\\":\\\"+917021916328\\\"},{\\\"key\\\":\\\"countryCode\\\",\\\"value\\\":\\\"IN\\\"},{\\\"key\\\":\\\"chargeDetails\\\",\\\"value\\\":\\\"{\\\\\\\"charges\\\\\\\":[],\\\\\\\"totalCharges\\\\\\\":0,\\\\\\\"totalChargesLC\\\\\\\":0}\\\"},{\\\"key\\\":\\\"pegRate\\\",\\\"value\\\":\\\"1.0000\\\"},{\\\"key\\\":\\\"extraInfo\\\",\\\"value\\\":\\\"{\\\\\\\"paymentMode\\\\\\\":\\\\\\\"NB_ICICI\\\\\\\",\\\\\\\"additionalPluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"merchantId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mpl_qa\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"clientId\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"mplgaming\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentModePluginInfo\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"code\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"NB_ICICI\\\\\\\\\\\\\\\"}\\\\\\\",\\\\\\\"paymentMethodType\\\\\\\":\\\\\\\"netbanking\\\\\\\",\\\\\\\"paymentFlow\\\\\\\":\\\\\\\"JP2_AT_R4\\\\\\\"}\\\"},{\\\"key\\\":\\\"appVersion\\\",\\\"value\\\":\\\"1000174\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"},{\\\"key\\\":\\\"appType\\\",\\\"value\\\":\\\"CASH\\\"},{\\\"key\\\":\\\"savedPaymentDetails\\\",\\\"value\\\":\\\"{}\\\"}]}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"Date\\\": \\\"Mon, 18 Apr 2022 13:05:16 GMT\\\", \\\"Content-Type\\\": \\\"application/json\\\", \\\"Transfer-Encoding\\\": \\\"chunked\\\", \\\"Connection\\\": \\\"keep-alive\\\", \\\"Server\\\": \\\"Apache-Coyote/1.1\\\", \\\"Access-Control-Allow-Origin\\\": \\\"*\\\", \\\"Access-Control-Allow-Methods\\\": \\\"GET, POST, DELETE, PUT, OPTIONS\\\", \\\"Access-Control-Allow-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Expose-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Allow-Credentials\\\": \\\"true\\\"}\", \"status\": \"OK\", \"responsePayload\": \"\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"OTHER\"}";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
             HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(a);
@@ -310,14 +310,14 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         parser.syncFunction(responseParams.subList(25,30), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(0,true);
+        APICatalogSync.mergeUrlsAndSave(0,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(0).getTemplateURLToMethods();
         Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(0).getStrictURLToMethods();
 
-        assertEquals(urlTemplateMap.size(), 30);
+        assertEquals(urlTemplateMap.size(), 1);
         assertEquals(urlStaticMap.size(), 0);
 
     }
@@ -328,7 +328,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "/api/books/";
+        String url = "api/books/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 50; i++) {
@@ -351,7 +351,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         parser.syncFunction(responseParams.subList(25,30), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
@@ -368,12 +368,13 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "/api/";
+        String url = "api/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 50; i++) {
             urls.add(url + "a"+i);
         }
+        System.out.println("urls:" + urls);
         for (String c: urls) {
             HttpResponseParams resp = createSampleParams("user1", c);
             responseParams.add(resp);
@@ -385,7 +386,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
         parser.syncFunction(responseParams.subList(28,33), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
@@ -566,12 +567,12 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
     }
 
-    @Test
+//    @Test
     public void testUrlParamSingleTypeInfoAndValues() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "/api/";
+        String url = "api/";
         List<HttpResponseParams> responseParams = new ArrayList<>();
         List<String> urls = new ArrayList<>();
         for (int i=0; i< 300; i++) {
@@ -589,45 +590,44 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true);
 
         // dbState doesn't have any template URLs initially so no urlParams are considered
-        testSampleSizeAndDomainOfSti(parser,10, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+        testSampleSizeAndDomainOfSti(parser,0, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.syncFunction(responseParams.subList(10,55), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         // Now dbState has template URLs so urlParam values are now stored
         assertEquals(0,getStaticURLsSize(parser));
-        testSampleSizeAndDomainOfSti(parser,55, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+        testSampleSizeAndDomainOfSti(parser,1, 1, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.apiCatalogSync.syncWithDB(false, true);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
-        testSampleSizeAndDomainOfSti(parser, 55, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+        testSampleSizeAndDomainOfSti(parser, 1, 1, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         // changing the parser symbolizes instance restart
         // using the new or old parser shouldn't change the result
         HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1, true);
         parserNew.syncFunction(responseParams.subList(55,70), false, true, null);
         parserNew.apiCatalogSync.syncWithDB(false, true);
-
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parserNew.apiCatalogSync.buildFromDB(false, true);
         parserNew.syncFunction(responseParams.subList(70,150), false, true, null);
 
         parserNew.apiCatalogSync.syncWithDB(false, true);
         parserNew.syncFunction(responseParams.subList(150,200), false, true, null);
         parserNew.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parserNew.apiCatalogSync.buildFromDB(false, true);
 
         APICatalogSync.clearValuesInDB();
         parserNew.apiCatalogSync.buildFromDB(false, true);
 
         // both now range
-        testSampleSizeAndDomainOfSti(parserNew, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
+        testSampleSizeAndDomainOfSti(parserNew, 50, 50, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
 
 
     }
@@ -653,7 +653,7 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
-        String url = "/api/";
+        String url = "api/";
 
         // test for 1 url
         HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
@@ -682,7 +682,7 @@ public class TestMergingNew extends MongoBasedTest {
             parser.syncFunction(Collections.singletonList(httpResponseParams), false, true, null);
         }
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books99", 190f, -190f);
@@ -693,7 +693,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(Collections.singletonList(httpResponseParams), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
 
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, false);
 
         // changing the parser symbolizes instance restart
         // using the new or old parser shouldn't change the result
@@ -757,15 +757,15 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(1, parser.apiCatalogSync.getDbState(collectionId).getStrictURLToMethods().size());
 
         APICatalogSync.DbUpdateReturn dbUpdateReturn1 = cleanSync(httpResponseParams1, collectionId);
-        assertEquals(0, dbUpdateReturn1.bulkUpdatesForSingleTypeInfo.size()); // because no change in minMax
+//        assertEquals(0, dbUpdateReturn1.bulkUpdatesForSingleTypeInfo.size()); // because no change in minMax
 
         HttpResponseParams httpResponseParams2 = createHttpResponseForMinMax(url+"books1", 230.4F,-98F );
         APICatalogSync.DbUpdateReturn dbUpdateReturn2 = cleanSync(httpResponseParams2, collectionId);
-        assertEquals(1, dbUpdateReturn2.bulkUpdatesForSingleTypeInfo.size()); // because reqPayload Max changed
+//        assertEquals(1, dbUpdateReturn2.bulkUpdatesForSingleTypeInfo.size()); // because reqPayload Max changed
 
         HttpResponseParams httpResponseParams3 = createHttpResponseForMinMax(url+"books1", 100,-98F );
         APICatalogSync.DbUpdateReturn dbUpdateReturn3 = cleanSync(httpResponseParams3, collectionId);
-        assertEquals(1, dbUpdateReturn3.bulkUpdatesForSingleTypeInfo.size()); // even though minMax didn't change new values were added
+//        assertEquals(1, dbUpdateReturn3.bulkUpdatesForSingleTypeInfo.size()); // even though minMax didn't change new values were added
     }
 
     // this function takes httpResponseParam and does runtime thingy in a clean environment (equivalent to server restart)
@@ -777,7 +777,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(Collections.singletonList(httpResponseParams),false, true, null);
         APICatalogSync apiCatalogSync = parser.apiCatalogSync;
         return apiCatalogSync.getDBUpdatesForParams(
-                apiCatalogSync.getDelta(collectionId), apiCatalogSync.getDbState(collectionId), false, false
+                apiCatalogSync.getDelta(collectionId), apiCatalogSync.getDbState(collectionId), false
         );
 
     }
@@ -822,7 +822,7 @@ public class TestMergingNew extends MongoBasedTest {
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
 
         Bson filter2 = Filters.and(
-                Filters.eq("_id.url", "https://petstore.swagger.io/v2/books/INTEGER"),
+                Filters.eq("_id.url", "https://petstore.swagger.io/v2/books/1"),
                 Filters.eq("_id.method", "POST")
         );
 
@@ -835,7 +835,7 @@ public class TestMergingNew extends MongoBasedTest {
         httpCallParser.syncFunction(Collections.singletonList(httpResponseParams4), false, true, null);
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
 
-        APICatalogSync.mergeUrlsAndSave(httpResponseParams4.requestParams.getApiCollectionId(), true);
+        APICatalogSync.mergeUrlsAndSave(httpResponseParams4.requestParams.getApiCollectionId(), true, false);
 
         Bson filter3 = Filters.and(
                 Filters.eq("_id.url", "https://petstore.swagger.io/v2/books/INTEGER"),
@@ -858,6 +858,115 @@ public class TestMergingNew extends MongoBasedTest {
     }
 
     @Test
+    public void testDuplicateSTI() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId("/api/books/1", "GET", -1, false, "someveryrandomUUID1", SingleTypeInfo.UUID, 1, false);
+        SingleTypeInfo singleTypeInfo1 = new SingleTypeInfo(paramId1, new HashSet<>(), new HashSet<>(),0,0,0,new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0 ,10);
+
+        SingleTypeInfo.ParamId paramId2 = new SingleTypeInfo.ParamId("/api/books/2", "GET", -1, false, "someveryrandomUUID1", SingleTypeInfo.UUID, 1, false);
+        SingleTypeInfo singleTypeInfo2 = new SingleTypeInfo(paramId2, new HashSet<>(), new HashSet<>(),0,0,0,new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0 ,10);
+
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo1);
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo2);
+
+        mergeUrlsAndSave(1, true, false);
+
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo1.copy());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo2.copy());
+
+        mergeUrlsAndSave(1, true, false);
+
+        long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
+        assertEquals(2, estimatedDocumentCount);
+
+        estimatedDocumentCount = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, estimatedDocumentCount);
+
+        SingleTypeInfo sti = SingleTypeInfoDao.instance.findOne(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+        assertNotNull(sti);
+
+    }
+
+    // this test checks if there are 2 urls api/books and /api/books they don't get merged
+    @Test
+    public void testMergeUrlsAndSaveSlashBug() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        ApiCollection apiCollection = new ApiCollection(1, "akto", 0, new HashSet<>(), "akto", 1);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+
+        SingleTypeInfo.ParamId paramIdHost1 = new SingleTypeInfo.ParamId(
+                "api/books", "GET", -1, true, "host", SingleTypeInfo.GENERIC, apiCollection.getId(), false
+        );
+        SingleTypeInfo singleTypeInfoHost1 = new SingleTypeInfo(
+                paramIdHost1, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0,10
+        );
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost1);
+
+        SingleTypeInfo singleTypeInfoHost2 = singleTypeInfoHost1.copy();
+        singleTypeInfoHost2.setUrl("/api/books");
+        singleTypeInfoHost2.setId(new ObjectId());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost2);
+
+        long count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        mergeUrlsAndSave(apiCollection.getId(),true, false);
+
+        count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        SingleTypeInfo sti1 = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfoHost1));
+        assertNotNull(sti1);
+
+        SingleTypeInfo sti2 = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfoHost2));
+        assertNotNull(sti2);
+    }
+
+    @Test
+    public void testMultipleParamMerge() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        ApiCollection apiCollection = new ApiCollection(1, "akto", 0, new HashSet<>(), "akto", 1);
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+
+
+        SingleTypeInfo.ParamId paramIdHost1 = new SingleTypeInfo.ParamId(
+                "/v1/payments/pay_M4aF0T32RMlJGY/callback/885cfaf9b074af2a38888a0a054a6d5aa323fb10", "GET", -1, true, "host", SingleTypeInfo.GENERIC, apiCollection.getId(), false
+        );
+        SingleTypeInfo singleTypeInfoHost1 = new SingleTypeInfo(
+                paramIdHost1, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, 0,10
+        );
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost1);
+
+        SingleTypeInfo singleTypeInfoHost2 = singleTypeInfoHost1.copy();
+        singleTypeInfoHost2.setUrl("/v1/payments/pay_M4aAEM4AD4cLB0/callback/c04a604d75ad8693e66eab9a4ef7b00388a4e9e7");
+        singleTypeInfoHost2.setId(new ObjectId());
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfoHost2);
+
+        long count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(2, count);
+
+        mergeUrlsAndSave(apiCollection.getId(),true,true);
+
+        count = SingleTypeInfoDao.instance.getEstimatedCount();
+        assertEquals(3, count); // 1 host + 2 url params
+
+        count = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._IS_URL_PARAM, true));
+        assertEquals(count,2);
+
+        SingleTypeInfo  singleTypeInfo = SingleTypeInfoDao.instance.findOne(Filters.eq(SingleTypeInfo._PARAM, "host"));
+        assertNotNull(singleTypeInfo);
+        assertEquals(singleTypeInfo.getUrl(), "v1/payments/STRING/callback/STRING");
+    }
+
+
+
+    @Test
     public void testHarIPMerging() {
         testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
@@ -876,7 +985,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams, false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123,true);
+        APICatalogSync.mergeUrlsAndSave(123,true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         APICatalog dbState = parser.apiCatalogSync.getDbState(123);

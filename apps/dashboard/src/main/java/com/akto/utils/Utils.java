@@ -1,8 +1,9 @@
 package com.akto.utils;
 
-import com.akto.dao.AccountSettingsDao;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
@@ -19,7 +20,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -181,18 +181,7 @@ public class Utils {
                     return null;
                 }
             } else {
-                JsonNode respHeaders = response.get("header");
-                Map<String, String> responseHeadersMap = new HashMap<>();
-                if (respHeaders == null) {
-                    responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
-                }
-
-                JsonNode originalRequest = response.get("originalRequest");
-
-                if (originalRequest != null) {
-                    result.put("path", getPath(originalRequest, variables));
-                }
-
+                Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
                 responseHeadersString = mapper.writeValueAsString(responseHeadersMap);
 
                 JsonNode responsePayloadNode = response.get("body");
@@ -363,6 +352,7 @@ public class Utils {
             }
         }
 
+        //todo:shivam handle resource analyser in AccountHTTPCallParserAktoPolicyInfo
         if(skipKafka) {
             String accountIdStr = responses.get(0).accountId;
             if (!StringUtils.isNumeric(accountIdStr)) {
@@ -378,18 +368,28 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
+                info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            DependencyFlow dependencyFlow = new DependencyFlow();
-            dependencyFlow.run();
-            dependencyFlow.syncWithDb();
+            for (HttpResponseParams responseParams: responses)  {
+                responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
+                info.getResourceAnalyser().analyse(responseParams);
+            }
+            info.getResourceAnalyser().syncWithDb();
+            try {
+                DependencyFlow dependencyFlow = new DependencyFlow();
+                dependencyFlow.run();
+                dependencyFlow.syncWithDb();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+            }
         }
     }
 

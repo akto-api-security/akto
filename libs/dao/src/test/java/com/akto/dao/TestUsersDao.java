@@ -18,12 +18,12 @@ public class TestUsersDao extends MongoBasedTest {
         UsersDao.instance.getMCollection().drop();
         Map<String, UserAccountEntry> accounts = new HashMap<>();
         accounts.put(ACCOUNT_ID+"", new UserAccountEntry(ACCOUNT_ID));
-        UsersDao.instance.insertOne(new User("avneesh", "avneesh@akto.io", accounts,null));
+        UsersDao.instance.insertOne(new User("avneesh", "avneesh@akto.io", accounts,null, null));
 
         User firstUser = UsersDao.instance.getFirstUser(ACCOUNT_ID);
         assertEquals(firstUser.getLogin(), "avneesh@akto.io");
 
-        User secondUser = new User("ankush", "ankush@akto.io", accounts,null);
+        User secondUser = new User("ankush", "ankush@akto.io", accounts,null,null);
         secondUser.setId(Context.now()+1000);
         UsersDao.instance.insertOne(secondUser);
         firstUser = UsersDao.instance.getFirstUser(ACCOUNT_ID);

@@ -153,12 +153,13 @@ public class PostmanAction extends UserAction {
 
         Main main = new Main(postmanCredential.getApiKey());
         JsonNode postmanCollection = main.fetchPostmanCollectionString(postmanCollectionId);
+        // TODO: error handling
         String collectionName = postmanCollection.get("collection").get("info").get("name").asText();
         String postmanCollectionString = postmanCollection.get("collection").toString();
 
         String node_url = System.getenv("AKTO_NODE_URL");
         if (node_url == null) {
-
+            // TODO:
         }
         String url =  node_url+ "/api/postman/endpoints";
 
