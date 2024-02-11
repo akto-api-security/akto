@@ -97,7 +97,7 @@ public class ResourceAnalyserTest extends MongoBasedTest {
         Collections.shuffle(responseParams);
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, true);
-        httpCallParser.syncFunction(responseParams, true, true);
+        httpCallParser.syncFunction(responseParams, true, true, null);
 
         // to add new single type info of urlParams
         httpCallParser.syncFunction(responseParams, true, true, null);
