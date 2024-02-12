@@ -12,6 +12,7 @@ import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.Organization;
+import com.akto.listener.InitializerListener;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
@@ -292,10 +293,21 @@ public class UserDetailsFilter implements Filter {
             int accountId = Context.accountId.get();
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
 
-            if (organization == null || organization.checkExpirationWithAktoSync()) {
+            if (organization == null) {
                 httpServletResponse.sendError(403);
                 return;
             }
+
+            if (organization.checkExpirationWithAktoSync()) {
+
+                // attempt to sync with billing once more
+                organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
+                if (organization.checkExpirationWithAktoSync()) {
+                    httpServletResponse.sendError(403);
+                    return;
+                }
+            }
+
         }
 
         filterChain.doFilter(servletRequest, servletResponse);
