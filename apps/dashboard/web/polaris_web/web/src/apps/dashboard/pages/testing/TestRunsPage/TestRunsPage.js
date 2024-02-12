@@ -114,15 +114,12 @@ function TestRunsPage() {
     });
   }
 
-  const rerunTest = (hexId) =>{
-    api.rerunTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test re-run")
+  const rerunTest = async (hexId) =>{
+    await api.rerunTest(hexId)
+    func.setToast(true, false, "Test re-run")
       setTimeout(() => {
         refreshSummaries();
       }, 2000)
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to re-run test")
-    });
   }
 
 const getActionsList = (hexId) => {

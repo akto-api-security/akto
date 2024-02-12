@@ -1,7 +1,7 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
-import com.akto.billing.UsageMetricUtils;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
@@ -11,6 +11,8 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
@@ -19,6 +21,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -188,8 +191,6 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
-
         while (true) {
             AccountTask.instance.executeTask(account -> {
 
@@ -210,13 +211,10 @@ public class Main {
                 }
 
                 int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
+                FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
+
+                if (featureAccess.checkOverageAfterGrace()) {
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
@@ -224,9 +222,10 @@ public class Main {
                     TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, summaryId),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-
                     return;
                 }
+
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -267,7 +266,7 @@ public class Main {
 
                         }
                     }
-                    testExecutor.init(testingRun, summaryId);
+                    testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);

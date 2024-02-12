@@ -4,6 +4,7 @@ import java.util.*;
 
 import org.bson.conversions.Bson;
 
+import com.akto.billing.UsageMetricHandler;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
@@ -12,6 +13,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
@@ -19,7 +21,6 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -28,7 +29,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.MongoCursor;
@@ -38,10 +38,8 @@ import com.akto.utils.RedactSampleData;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
-import org.bson.conversions.Bson;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -84,7 +82,7 @@ public class ApiCollectionsAction extends UserAction {
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-                count = Utils.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+                count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 apiCollection.setUrlsCount(count);
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
@@ -185,6 +183,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
         for(ApiCollection collection: apiGroups){
             List<TestingEndpoints> conditions = collection.getConditions();

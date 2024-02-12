@@ -8,9 +8,11 @@ import java.util.function.Consumer;
 
 import org.bson.types.ObjectId;
 
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.testing.DeleteTestRunsDao;
 import com.akto.dto.Account;
 import com.akto.dto.testing.DeleteTestRuns;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.util.AccountTask;
 import com.mongodb.client.model.Filters;
 
@@ -36,6 +38,8 @@ public class Crons {
                                     }
                                 }
                             }
+                            int accountId = t.getId();
+                            UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
