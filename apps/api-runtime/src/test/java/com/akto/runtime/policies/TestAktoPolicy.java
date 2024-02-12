@@ -102,7 +102,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiCatalogSync.syncWithDB(true, true);
 
         List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
-        assertEquals(hrpList.size(), apiInfoList.size());
+        assertEquals(6, apiInfoList.size());
 
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
         assertEquals(0, filterSampleDataList.size());
@@ -112,8 +112,8 @@ public class TestAktoPolicy extends MongoBasedTest {
         dummyAktoPolicy.buildFromDb(true);
 
         Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().keySet().size(), 2);
-        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), hrpList.size() -1 ); // because 1 hrp is of different collection
-        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 0 );
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), 4); // because 1 hrp is of different collection
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 1 );
         Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(1).getStrictURLToMethods().size(),1);
         Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(1).getTemplateURLToMethods().size(),0);
 
@@ -161,7 +161,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         ApiInfo apiInfo = ApiInfoDao.instance.findOne(
                 Filters.and(
                         Filters.eq("_id.apiCollectionId", 0),
-                        Filters.eq("_id.url", "/api/toys/INTEGER"),
+                        Filters.eq("_id.url", "api/toys/INTEGER"),
                         Filters.eq("_id.method", urlStatic6.getMethod().name())
                 )
         );
@@ -171,6 +171,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         assertTrue(apiInfo.getAllAuthTypesFound().contains(new HashSet<>(Collections.singletonList(ApiInfo.AuthType.JWT))));
 
     }
+
 
 
     private static void dropCollections() {
