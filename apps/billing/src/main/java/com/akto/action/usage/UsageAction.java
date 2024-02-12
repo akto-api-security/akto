@@ -50,7 +50,7 @@ public class UsageAction implements ServletRequestAware {
             // Check if organization exists
             Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organizationId));
             if (organization == null) {
-                loggerMaker.errorAndAddToDb(String.format("Organization %s does not exist", organizationId), LogDb.BILLING);
+                loggerMaker.errorAndAddToDb(String.format("Organization %s does not exist, called from %s", organizationId, ipAddress), LogDb.BILLING);
                 return Action.ERROR.toUpperCase();
             }
 
