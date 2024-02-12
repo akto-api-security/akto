@@ -18,7 +18,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -270,13 +269,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
-
         Bson filter = null;
         if (apiCollectionId != -1) {
             filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         }
         List<Bson> pipeline = getPipelineForEndpoints(filter);
-
         return processPipelineForEndpoint(pipeline);
     }
 
@@ -300,22 +297,23 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return processPipelineForEndpoint(pipeline);
     }
 
-    // Bson matchCriteria, String sortField, int... limitSkip
-    private List<Bson> getPipelineForEndpoints(Bson filters) {
+    private List<Bson> getPipelineForEndpoints(Bson matchCriteria) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
-                new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, Util.prefixDollar(SingleTypeInfo._API_COLLECTION_ID))
-                        .append(SingleTypeInfo._URL, Util.prefixDollar(SingleTypeInfo._URL))
-                        .append(SingleTypeInfo._METHOD, Util.prefixDollar(SingleTypeInfo._METHOD));
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                        .append("url", "$url")
+                        .append("method", "$method");
+
+        if(matchCriteria != null) {
+            pipeline.add(Aggregates.match(matchCriteria));
+        }
 
         Bson projections = Projections.fields(
-                Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo.LAST_SEEN, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD)
+                Projections.include("timestamp", "apiCollectionId", "url", "method")
         );
 
         pipeline.add(Aggregates.project(projections));
-        if (filters != null) {
-            pipeline.add(Aggregates.match(filters));
-        }
+
         pipeline.add(Aggregates.group(groupedId, Accumulators.min(_START_TS, Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
         /*
          * we are sorting in ascending order so that
