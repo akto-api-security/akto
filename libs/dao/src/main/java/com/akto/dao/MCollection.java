@@ -7,6 +7,7 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
+import com.mongodb.BasicDBObject;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -29,10 +30,32 @@ public abstract class MCollection<T> {
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
+    public static final Bson noMatchFilter = Filters.nor(new BasicDBObject());;
 
     public Document getStats() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
         return mongoDatabase.runCommand(new Document("serverStatus",1));
+    }
+
+    public boolean isCapped() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+
+        for (Document collection: mongoDatabase.listCollections()) {
+            if (collection.getString("name").equals(getCollName())) {
+                return collection.get("options", new Document()).getBoolean("capped", false);
+            }
+        }
+        return false;
+    }
+    public Document convertToCappedCollection(long sizeInBytes) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        for (Document collection: mongoDatabase.listCollections()) {
+            if (collection.getString("name").equals(getCollName())) {
+                return mongoDatabase.runCommand(new Document("convertToCapped", getCollName())
+                        .append("size", sizeInBytes));
+            }
+        }
+        return null;
     }
 
     public MongoCollection<T> getMCollection() {
@@ -154,8 +177,15 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
+    public T updateOneNoUpsert(Bson q, Bson obj) {
+        return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(false));
+    }
+
     public UpdateResult updateMany (Bson q, Bson obj) {
         return this.getMCollection().updateMany(q, obj);
+    }
+    public UpdateResult updateManyNoUpsert (Bson q, Bson obj) {
+        return this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
     }
     public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList, BulkWriteOptions options) {
         return this.getMCollection().bulkWrite(modelList, options);

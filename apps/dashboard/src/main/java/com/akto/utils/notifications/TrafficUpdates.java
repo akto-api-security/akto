@@ -70,7 +70,7 @@ public class TrafficUpdates {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             if (count ==  null) continue;
-            if (count > 20) allowedHosts.add(apiCollection.getHostName()) ;
+            if (count > 20 && apiCollection.getHostName()!=null) allowedHosts.add(apiCollection.getHostName()) ;
         }
 
         List<TrafficMetricsAlert> filteredTrafficMetricsAlertsList = new ArrayList<>();

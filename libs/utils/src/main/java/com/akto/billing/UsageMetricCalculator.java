@@ -68,7 +68,6 @@ public class UsageMetricCalculator {
 
     public static int calculateTestRuns(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
-
         Bson demoCollFilter = excludeDemos(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
         List<Bson> filters = new ArrayList<Bson>(){{

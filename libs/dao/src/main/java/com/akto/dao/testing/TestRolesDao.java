@@ -10,6 +10,8 @@ import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
+
 public class TestRolesDao extends AccountsContextDao<TestRoles> {
     @Override
     public String getCollName() {
@@ -50,7 +52,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
 
     public TestRoles createTestRole (String roleName, ObjectId endpointLogicalGroupId, String userName) {
         int createdTs = Context.now();
-        TestRoles role = new TestRoles(new ObjectId(), roleName, endpointLogicalGroupId, null,userName,createdTs, createdTs);
+        TestRoles role = new TestRoles(new ObjectId(), roleName, endpointLogicalGroupId, new ArrayList<>(), null,userName,createdTs, createdTs);
 
         this.insertOne(role);
         this.getLogger().info("Created test role with name :{}, and logical group id : {}", roleName, endpointLogicalGroupId.toHexString());

@@ -105,7 +105,8 @@ function AllSensitiveData() {
                         icon: CircleTickMajor,
                         iconColor: "success",
                         iconTooltip: "Active",
-                        sensitiveCount:0
+                        sensitiveCount:0,
+                        redacted: type.redacted
                     })
                 })
                 res.dataTypes.customDataTypes.forEach((type) => {
@@ -120,7 +121,8 @@ function AllSensitiveData() {
                         icon: type.active ? CircleTickMajor : CircleCancelMajor,
                         iconColor: type.active ? "success" : "critical",
                         iconTooltip: type.active ? "Active" : "Inactive",
-                        sensitiveCount:0
+                        sensitiveCount:0,
+                        redacted: type.redacted
                     })
                 })
                 setMapData(mapDataToKey)

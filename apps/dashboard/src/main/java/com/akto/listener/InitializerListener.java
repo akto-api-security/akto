@@ -2,6 +2,8 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
+import com.akto.action.ApiCollectionsAction;
+import com.akto.action.CustomDataTypeAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
@@ -37,8 +39,10 @@ import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
+import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -51,6 +55,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
@@ -107,11 +112,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
+import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -566,10 +573,117 @@ public class InitializerListener implements ServletContextListener {
                 (piiType.getOnKey() ? conditions : null),
                 (piiType.getOnKey() ? null : conditions),
                 Operator.OR,
-                ignoreData
+                ignoreData,
+                false,
+                true
         );
 
         return ret;
+    }
+
+    private void setUpDefaultPayloadRemover() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        Map<String, DefaultPayload> defaultPayloadMap = accountSettings.getDefaultPayloads();
+                        if (defaultPayloadMap == null || defaultPayloadMap.isEmpty()) {
+                            return;
+                        }
+
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+                        Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
+
+                        for(Map.Entry<String, DefaultPayload> entry: defaultPayloadMap.entrySet()) {
+                            DefaultPayload dp = entry.getValue();
+                            String base64Url = entry.getKey();
+                            if (!dp.getScannedExistingData()) {
+                                try {
+                                    List<SampleData> sampleDataList = new ArrayList<>();
+                                    Bson filters = Filters.empty();
+                                    int skip = 0;
+                                    int limit = 100;
+                                    Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
+                                    do {
+                                        sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
+                                        skip += limit;
+                                        List<Key> toBeDeleted = new ArrayList<>();
+                                        for(SampleData sampleData: sampleDataList) {
+                                            try {
+                                                List<String> samples = sampleData.getSamples();
+                                                ApiCollection apiCollection = apiCollectionMap.get(sampleData.getId().getApiCollectionId());
+                                                if (apiCollection == null) continue;
+                                                if (apiCollection.getHostName() != null && !dp.getId().equalsIgnoreCase(apiCollection.getHostName())) continue;
+                                                if (samples == null || samples.isEmpty()) continue;
+
+                                                boolean allMatchDefault = true;
+
+                                                for (String sample : samples) {
+                                                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                                    if (!matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
+                                                        allMatchDefault = false;
+                                                        break;
+                                                    }
+                                                }
+
+                                                if (allMatchDefault) {
+                                                    loggerMaker.errorAndAddToDb("Deleting API that matches default payload: " + toBeDeleted, LogDb.DASHBOARD);
+                                                    toBeDeleted.add(sampleData.getId());
+                                                }
+                                            } catch (Exception e) {
+                                                loggerMaker.errorAndAddToDb("Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
+                                            }
+                                        }
+
+                                        deleteApis(toBeDeleted);
+
+                                    } while (!sampleDataList.isEmpty());
+
+                                    Bson completedScan = Updates.set(AccountSettings.DEFAULT_PAYLOADS+"."+base64Url+"."+DefaultPayload.SCANNED_EXISTING_DATA, true);
+                                    AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), completedScan);
+
+                                } catch (Exception e) {
+
+                                    loggerMaker.errorAndAddToDb("Couldn't complete scan for default payload: " + e.getMessage(), LogDb.DASHBOARD);
+                                }
+                            }
+                        }
+                    }
+                }, "setUpDefaultPayloadRemover");
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    private <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDao<T> dao, String prefix) {
+        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
+        List<WriteModel<T>> stiList = new ArrayList<>();
+
+        for(Key key: toBeDeleted) {
+            stiList.add(new DeleteManyModel<>(Filters.and(
+                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
+                    Filters.eq(prefix + "method", key.getMethod()),
+                    Filters.eq(prefix + "url", key.getUrl())
+            )));
+        }
+
+        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+    }
+
+    private void deleteApis(List<Key> toBeDeleted) {
+
+        String id = "_id.";
+
+        deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+        deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
+        deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
+        deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
+        deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
+        deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
+        deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
+
     }
 
     private void setUpDailyScheduler() {
@@ -990,6 +1104,8 @@ public class InitializerListener implements ServletContextListener {
         if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
             AdminSettingsAction.dropCollections(Context.accountId.get());
         }
+        ApiCollectionsAction.dropSampleDataForApiCollection();
+        CustomDataTypeAction.handleDataTypeRedaction();
 
     }
 
@@ -1057,14 +1173,14 @@ public class InitializerListener implements ServletContextListener {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
             IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData));
-            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true));
             AktoDataTypeDao.instance.getMCollection().drop();
             AktoDataTypeDao.instance.insertMany(aktoDataTypes);
 
@@ -1273,6 +1389,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setUpFillCollectionIdArrayJob() {
+        scheduler.schedule(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        fillCollectionIdArray();
+                    }
+                }, "fill-collection-id");
+            }
+        }, 0, TimeUnit.SECONDS);
+    }
 
     public void fillCollectionIdArray() {
         Map<CollectionType, List<String>> matchKeyMap = new HashMap<CollectionType, List<String>>() {{
@@ -1301,6 +1429,32 @@ public class InitializerListener implements ServletContextListener {
                 ApiCollectionUsers.updateCollections(collections.getValue(), filter, update);
             }
         }
+    }
+
+    public void updateCustomCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for (ApiCollection apiCollection : apiCollections) {
+            if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
+                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            }
+        }
+    }
+
+    public void setUpUpdateCustomCollections() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            updateCustomCollections();
+                        } catch (Exception e){
+                            loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "update-custom-collections");
+            }
+        }, 0, 24, TimeUnit.HOURS);
     }
 
     public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
@@ -1406,6 +1560,7 @@ public class InitializerListener implements ServletContextListener {
                         SingleTypeInfo.init();
                         setUpDailyScheduler();
                         setUpWebhookScheduler();
+                        setUpDefaultPayloadRemover();
                         setUpTestEditorTemplatesScheduler();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
@@ -1428,7 +1583,10 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                             }
                         }
-                        fillCollectionIdArray();
+
+                        setUpUpdateCustomCollections();
+
+                        setUpFillCollectionIdArrayJob();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -1610,6 +1768,11 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
+        try {
+            TestingRunResultDao.instance.convertToCappedCollection();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"error while converting to capped collection: " + e, LogDb.DASHBOARD);
+        }
         OrganizationsDao.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
 

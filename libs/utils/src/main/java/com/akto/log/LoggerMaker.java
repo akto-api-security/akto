@@ -58,6 +58,8 @@ public class LoggerMaker  {
     private static int logCountResetTimestamp = Context.now();
     private static final int oneMinute = 60; 
 
+    private LogDb db;
+
     public enum LogDb {
         TESTING,RUNTIME,DASHBOARD,BILLING
     }
@@ -65,6 +67,12 @@ public class LoggerMaker  {
     public LoggerMaker(Class<?> c) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
+    }
+
+    public LoggerMaker(Class<?> c, LogDb db) {
+        aClass = c;
+        logger = LoggerFactory.getLogger(c);
+        this.db = db;
     }
 
     protected static void sendToSlack(String err) {
@@ -78,7 +86,7 @@ public class LoggerMaker  {
                 BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
                 slack.send(slackWebhookUrl, ret.toJson());
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
@@ -98,17 +106,30 @@ public class LoggerMaker  {
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
-        basicError(err, db);
+        try {
+            basicError(err, db);
 
-        if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
-            sendToSlack(err);
+            if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
+                sendToSlack(err);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
-        StackTraceElement stackTraceElement = e.getStackTrace()[0];
-        err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-        errorAndAddToDb(err, db);
+        try {
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            errorAndAddToDb(err, db);
+        } catch (Exception e1) {
+            e1.printStackTrace();
+        }
     }
 
     public void infoAndAddToDb(String info, LogDb db) {
@@ -118,6 +139,14 @@ public class LoggerMaker  {
         } catch (Exception e){
 
         }
+    }
+
+    public void errorAndAddToDb(String err) {
+        errorAndAddToDb(err, this.db);
+    }
+
+    public void infoAndAddToDb(String info) {
+        infoAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){
@@ -136,7 +165,7 @@ public class LoggerMaker  {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         
-        if(checkUpdate()){
+        if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
                     LogsDao.instance.insertOne(log);
@@ -149,6 +178,9 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                default:
+                    break;
             }
             logCount++;
         }
@@ -178,6 +210,9 @@ public class LoggerMaker  {
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            default:
+                break;
         }
         return logs;
     }

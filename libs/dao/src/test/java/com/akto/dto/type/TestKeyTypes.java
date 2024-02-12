@@ -21,13 +21,13 @@ public class TestKeyTypes {
     public void testInitializer() {
         Context.accountId.set(ACCOUNT_ID);
         Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
-        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
         AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
         if (info == null) {
             info = new AccountDataTypesInfo();
@@ -53,9 +53,9 @@ public class TestKeyTypes {
         HashMap<String, CustomDataType> customDataTypeMap = new HashMap<>();
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType customDataType1 = new CustomDataType("SHIPPING", true, Collections.emptyList(),
-                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("ship")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData);
+                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("ship")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData,  false, true);
         CustomDataType customDataType2 = new CustomDataType("CAPTAIN", false, Collections.emptyList(),
-                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("captain")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData);
+                1, true, new Conditions(Collections.singletonList(new StartsWithPredicate("captain")), Conditions.Operator.AND), null, Conditions.Operator.AND, ignoreData, false, true);
 
         customDataTypeMap.put("SHIPPING", customDataType1);
         customDataTypeMap.put("CAPTAIN", customDataType2);

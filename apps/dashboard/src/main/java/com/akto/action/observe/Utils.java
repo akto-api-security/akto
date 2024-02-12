@@ -22,6 +22,10 @@ public class Utils {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
+        if(apiCollection == null){
+            return new ArrayList<>();
+        }
+
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId, skip);
         } else {
@@ -39,9 +43,6 @@ public class Utils {
         }
     }
 
-    public final static String _START_TS = "startTs";
-    public final static String _LAST_SEEN_TS = "lastSeenTs";
-
     public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
@@ -49,7 +50,7 @@ public class Utils {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
 
         int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 
