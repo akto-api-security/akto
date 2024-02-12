@@ -40,12 +40,14 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                 </HorizontalStack>
             </Box>
         </Card>
+        { learnText ? 
         <HorizontalStack align="center">
             <HorizontalStack gap="1">
                 Learn more about
                 <Link url={docsUrl} target="_blank">{learnText}</Link>
             </HorizontalStack>
         </HorizontalStack>
+        : <></>}
         {infoItems ? <InfoComponent title={infoTitle} items={infoItems} /> : null}
     </VerticalStack>
   )
