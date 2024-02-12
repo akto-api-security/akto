@@ -580,6 +580,7 @@ public class TestExecutor {
                     String testSubType = testConfig.getInfo().getSubCategory();
                     testResults.add(new TestResult(null, null, Collections.singletonList(TestError.USAGE_EXCEEDED.getMessage()), 0, false, Confidence.HIGH, null));
                     testingRunResult = new TestingRunResult( testRunId, apiInfoKey, testSuperType, testSubType, testResults, false, new ArrayList<>(), 100, Context.now(), Context.now(), testRunResultSummaryId, null);
+                    loggerMaker.infoAndAddToDb("Skipping test, usage exceeded", LogDb.TESTING);
                 } else {
                     testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
                 }

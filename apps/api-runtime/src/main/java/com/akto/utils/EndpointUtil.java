@@ -22,12 +22,16 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 public class EndpointUtil {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(EndpointUtil.class, LogDb.RUNTIME);
 
     public static void calcAndDeleteEndpoints() {
         // check if overage happened and delete over the limit data
@@ -36,6 +40,7 @@ public class EndpointUtil {
 
         if (featureAccess.checkOverageAfterGrace()) {
 
+            loggerMaker.infoAndAddToDb("overage detected while processing endpoints, running overage function");
             int usageLimit = featureAccess.getUsageLimit();
             int measureEpoch = featureAccess.getMeasureEpoch();
 
