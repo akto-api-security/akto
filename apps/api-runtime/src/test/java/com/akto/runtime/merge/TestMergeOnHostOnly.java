@@ -61,12 +61,12 @@ public class TestMergeOnHostOnly extends MongoBasedTest {
 
         Set<String> url1 = new HashSet<>();
         Set<String> url2 = new HashSet<>();
-        ApiCollection ap1 = new ApiCollection(1, "something-red", 0, url1, "http://www.akto.io", 1, false, true);
-        ApiCollection ap2 = new ApiCollection(2, "something-blue", 0, url2, "http://www.akto.io", 2, false, true);
+        ApiCollection ap1 = new ApiCollection(1, "something-red", 0, url1, "http://www.akto.io", 1);
+        ApiCollection ap2 = new ApiCollection(2, "something-blue", 0, url2, "http://www.akto.io", 2);
 
-        ApiCollection ap3 = new ApiCollection(3, "something-red", 0, url1, "http://www.notakto.io", 1, false, true);
-        ApiCollection ap4 = new ApiCollection(4, "something-blue", 0, url2, "http://www.notakto.io", 2, false, true);
-        ApiCollection ap5 = new ApiCollection(5, "something-yellow", 0, url2, "http://www.notakto.io", 2, false, true);
+        ApiCollection ap3 = new ApiCollection(3, "something-red", 0, url1, "http://www.notakto.io", 1);
+        ApiCollection ap4 = new ApiCollection(4, "something-blue", 0, url2, "http://www.notakto.io", 2);
+        ApiCollection ap5 = new ApiCollection(5, "something-yellow", 0, url2, "http://www.notakto.io", 2);
         ApiCollectionsDao.instance.getMCollection().insertOne(ap1);
         ApiCollectionsDao.instance.getMCollection().insertOne(ap2);
         ApiCollectionsDao.instance.getMCollection().insertOne(ap3);

@@ -40,6 +40,7 @@ public class TestGraph {
         assertNotNull(nodes.get("x1659328241"));
 
         List<Node> sortedNodes = graph.sort();
+        System.out.println(sortedNodes);
     }
 
     @Test
@@ -81,6 +82,7 @@ public class TestGraph {
 
 
         List<Node> nodes = graph.sort();
+        System.out.println(nodes);
     }
 
 

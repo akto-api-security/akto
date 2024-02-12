@@ -1,28 +1,19 @@
 package com.akto.runtime;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.regex.Pattern;
 
-import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.dao.context.Context;
-import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.type.URLTemplate;
-import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.mongodb.BasicDBObject;
 
-import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.akto.dto.type.KeyTypes.patternToSubType;
-import static com.akto.runtime.APICatalogSync.isAlphanumericString;
-import static com.akto.runtime.APICatalogSync.tokenize;
 
 public class URLAggregator {
 
@@ -31,7 +22,6 @@ public class URLAggregator {
     ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls;
 
     public static URLStatic getBaseURL(String url, String method) {
-
         if (url == null) {
             return null;
         }

@@ -21,6 +21,8 @@
 <script>
 import DetailExpansionPanel from './DetailExpansionPanel'
 import AwsTrafficMirroring from './AwsTrafficMirroring'
+import KubernetesDaemonset from './KubernetesDaemonset'
+import Fargate from './Fargate'
 import GcpTrafficMirroring from './GcpTrafficMirroring'
 import BurpsuiteSource from './BurpsuiteSource'
 import PostmanSource from './PostmanSource'
@@ -38,8 +40,10 @@ export default {
         GcpTrafficMirroring,
         BurpsuiteSource,
         PostmanSource,
-        NginxSource,
-        Spinner
+        Spinner,
+        KubernetesDaemonset,
+        Fargate,
+        NginxSource
     },
     data() {
         return {
@@ -52,6 +56,22 @@ export default {
                     title: "AWS Traffic Mirroring",
                     subtitle: 'Recommended',
                     detailComponent: 'AwsTrafficMirroring',
+                    connected: "More"
+                },
+                "DATA_PROCESSORS": {
+                    icon: "$fargateIcon",
+                    key: "DATA_PROCESSORS",
+                    title: "Data processors",
+                    subtitle: '',
+                    detailComponent: 'Fargate',
+                    connected: "More"
+                },
+                "KUBERNETES": {
+                    icon: "$k8s",
+                    key: "KUBERNETES",
+                    title: "Kubernetes Daemonset",
+                    subtitle: '',
+                    detailComponent: 'KubernetesDaemonset',
                     connected: "More"
                 },
                 "GCP": {
@@ -93,9 +113,9 @@ export default {
         getSourcesInOrder(){
             let order = []
             if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-                order = ['BURP', 'POSTMAN', 'AWS', 'GCP', 'NGINX']
+                order = ['BURP', 'POSTMAN','AWS','GCP', 'KUBERNETES', 'DATA_PROCESSORS', 'NGINX']
             } else {
-                order = ['AWS', 'BURP', 'POSTMAN', 'GCP', 'NGINX']
+                order = [ 'AWS','KUBERNETES', 'DATA_PROCESSORS', 'NGINX', 'BURP', 'POSTMAN', 'GCP']
             }
             let final_order = []
             order.forEach(item => {

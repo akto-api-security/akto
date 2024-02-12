@@ -1,6 +1,7 @@
 package com.akto.listener;
 
 
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -45,6 +46,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class RuntimeListener extends AfterMongoConnectListener {
+
+    public static HttpCallParser httpCallParser = null;
+    public static AktoPolicyNew aktoPolicyNew = null;
+    public static ResourceAnalyser resourceAnalyser = null;
+    //todo add resource analyser in AccountHttpCallParserAktoPolicyInfo
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
     public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
     public static final String LLM_API_COLLECTION_NAME = "llm_apis";
@@ -65,7 +71,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
+                info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 accountHTTPParserMap.put(account.getId(), info);
+
 
                 try {
                     initialiseDemoCollections();
@@ -121,7 +129,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         harAction.setSession(session);
         // todo: skipKafka = true for onPrem also
         try {
-            harAction.execute();
+            harAction.executeWithSkipKafka(true);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb(e,"Error: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
@@ -150,7 +158,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(VULNERABLE_API_COLLECTION_NAME);
         if (sameNameCollection == null){
-            ApiCollection apiCollection = new ApiCollection(VULNERABLE_API_COLLECTION_ID, VULNERABLE_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, VULNERABLE_API_COLLECTION_ID, false, true);
+            ApiCollection apiCollection = new ApiCollection(VULNERABLE_API_COLLECTION_ID, VULNERABLE_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, VULNERABLE_API_COLLECTION_ID);
             ApiCollectionsDao.instance.insertOne(apiCollection);
         }
 
@@ -232,7 +240,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         loggerMaker.infoAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(LLM_API_COLLECTION_NAME);
         if (sameNameCollection == null){
-            ApiCollection apiCollection = new ApiCollection(LLM_API_COLLECTION_ID, LLM_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, LLM_API_COLLECTION_ID, false, true);
+            ApiCollection apiCollection = new ApiCollection(LLM_API_COLLECTION_ID, LLM_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, LLM_API_COLLECTION_ID);
             ApiCollectionsDao.instance.insertOne(apiCollection);
         }
 

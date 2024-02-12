@@ -35,7 +35,7 @@ public class TestCustomDataType {
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
 
         CustomDataType customDataType = new CustomDataType("name", true, Collections.emptyList(),
-                0,true, conditions2, conditions1, Conditions.Operator.AND,ignoreData, false, true);
+                0,true, conditions2, conditions1, Conditions.Operator.AND,ignoreData);
 
         assertTrue(customDataType.validate("w13rd_something_a55", "Dope_shit"));
         assertFalse(customDataType.validate("w13rd_something_a55", "BDope_shit"));

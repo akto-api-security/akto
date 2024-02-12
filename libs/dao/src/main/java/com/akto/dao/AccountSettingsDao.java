@@ -48,10 +48,28 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
         }
     }
 
+    public void updateInitStackType(String initStackType) {
+        instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.INIT_STACK_TYPE, initStackType)
+        );
+    }
+
     public void updateOnboardingFlag(boolean value) {
         instance.updateOne(
             AccountSettingsDao.generateFilter(),
             Updates.set(AccountSettings.SHOW_ONBOARDING, value)
+        );
+    }
+
+    public String getInitStackType() {
+        return instance.findOne(AccountSettingsDao.generateFilter()).getInitStackType();
+    }
+
+    public void updateLastTelemetryUpdateSentTs(String dbName, int ts) {
+        instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.TELEMETRY_UPDATE_SENT_TS_MAP + "." + dbName, ts)
         );
     }
     

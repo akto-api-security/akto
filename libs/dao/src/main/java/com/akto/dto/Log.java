@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.mongodb.BasicDBObject;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -68,6 +69,13 @@ public class Log {
             ", key='" + getKey() + "'" +
             ", timestamp='" + getTimestamp() + "'" +
             "}";
+    }
+
+    public BasicDBObject toBasicDBObject(){
+        return new BasicDBObject("_id", getId())
+                .append("log", getLog())
+                .append("key", getKey())
+                .append("timestamp", getTimestamp());
     }
 
 }

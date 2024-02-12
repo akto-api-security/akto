@@ -15,7 +15,7 @@
               <google-auth scope="" purpose="signin" class="ma-4">
                 <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px">
                   <div>
-                    <img src="@/assets/logo_google.svg" alt="Google" class="logo" />
+                    <img src="/assets/logo_google.svg" alt="Google" class="logo" />
                     <span class="text">Sign in with Google</span>
                   </div>
                 </v-btn>
@@ -53,6 +53,26 @@
                 <div>
                   <v-icon>$githubIcon</v-icon>
                   <span class="text">Sign in with GitHub</span>
+                </div>
+              </v-btn>
+
+              <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
+            </div>
+            <div v-if="oktaAuthorisationUrl">
+              <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px" @click="loginViaOkta">
+                <div>
+                  <img src="/public/okta_logo.svg" alt="Okta" class="logo" />
+                  <span class="text">Sign in with Okta</span>
+                </div>
+              </v-btn>
+
+              <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
+            </div>
+            <div v-if="azureRequestUrl">
+              <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px" @click="loginViaAzure">
+                <div>
+                  <img src="/public/azure_logo.svg" alt="Okta" class="logo" />
+                  <span class="text">Sign in with Azure SSO</span>
                 </div>
               </v-btn>
 
@@ -98,7 +118,9 @@ export default {
       formModel: null,
       isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
       isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
-      githubClientId: window.GITHUB_CLIENT_ID
+      githubClientId: window.GITHUB_CLIENT_ID,
+      oktaAuthorisationUrl: window.OKTA_AUTH_URL,
+      azureRequestUrl: window.AZURE_REQUEST_URL,
     }
   },
   methods: {
@@ -119,6 +141,12 @@ export default {
         this.formModel = { ...formModel }
       }
       this.disableButtons = !formModel.valid
+    },
+    loginViaOkta(){
+      window.location.href = this.oktaAuthorisationUrl
+    },
+    loginViaAzure(){
+      window.location.href = this.azureRequestUrl
     }
   },
   async mounted() {

@@ -33,6 +33,17 @@ export default {
             return resp
         })
     },
+    makeAdmin (email) {
+        return request({
+            url: '/api/makeAdmin',
+            method: 'post',
+            data: {
+                email: email
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
     health() {
         return request({
             url: '/api/health',
@@ -142,6 +153,16 @@ export default {
         });
     },
 
+    toggleTelemetry(enableTelemetry) {
+        return request({
+            url: '/api/toggleTelemetry',
+            method: 'post',
+            data: {
+                enableTelemetry
+            }
+        });
+    },
+
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',
@@ -228,6 +249,48 @@ export default {
             method: 'post',
             data: {
                 "currentState": aktoConfigList
+            }
+        })
+    },
+
+    toggleDebugLogsFeature(enableDebugLogs){
+        return request({
+            url: '/api/toggleDebugLogsFeature',
+            method: 'post',
+            data: {
+                enableDebugLogs
+            }
+        })
+    },
+
+    addFilterHeaderValueMap(filterHeaderValueMap){
+        return request({
+            url: '/api/addFilterHeaderValueMap',
+            method: 'post',
+            data: {
+                filterHeaderValueMap
+            }
+        })
+    },
+
+    addApiCollectionNameMapper(regex, newName, headerName) {
+        return request ({
+            url: '/api/addApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                regex, 
+                newName,
+                headerName
+            }
+        })
+    },
+
+    deleteApiCollectionNameMapper(regex) {
+        return request ({
+            url: '/api/deleteApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                regex
             }
         })
     },

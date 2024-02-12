@@ -56,8 +56,8 @@
           <div class="wrapper">
             <json-viewer
               :contentJSON="data['json']"
-              :errors="{}" 
-              :highlightItemMap="data['highlightPaths']" 
+              :errors="{}"
+              :highlightItemMap="data['highlightPaths']"
               />
           </div>
     </div>
@@ -69,6 +69,7 @@ import obj from "@/util/obj"
 import api from "@/apps/dashboard/views/observe/inventory/api";
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import SimpleMenu from "@/apps/dashboard/shared/components/SimpleMenu"
+import func from "@/util/func"
 
 export default {
     name: "SampleSingleSide",
@@ -100,37 +101,6 @@ export default {
       }
     },
     methods: {
-      copyToClipboard(text) {
-          // main reason to use domElement like this instead of document.body is that execCommand works only if current
-          // component is not above normal document. For example in testing page, we show SampleSingleSide.vue in a v-dialog
-          // NOTE: Do not use navigator.clipboard because it only works for HTTPS sites
-          let domElement = this.$el;
-          if (window.clipboardData && window.clipboardData.setData) {
-              // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
-              return window.clipboardData.setData("Text", text);
-
-          }
-          else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
-              var textarea = document.createElement("textarea");
-              textarea.textContent = text;
-              textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
-              domElement.appendChild(textarea);
-              textarea.focus();
-              textarea.select();
-              textarea.setSelectionRange(0, 99999);
-              try {
-                  return document.execCommand("copy");  // Security exception may be thrown by some browsers.
-              }
-              catch (ex) {
-                  // console.warn("Copy to clipboard failed.", ex);
-                  // return prompt("Copy to clipboard: Ctrl+C, Enter", text);
-              }
-              finally {
-                  domElement.removeChild(textarea);
-              }
-          }
-      },
-
       async copyRequest(type) {
         let copyString = "";
         let snackBarMessage = ""
@@ -154,7 +124,7 @@ export default {
           copyString = JSON.stringify(b)
           snackBarMessage = "Response data copied to clipboard"
         } else {
-          if (type === "CURL") { 
+          if (type === "CURL") {
             snackBarMessage = "Curl request copied to clipboard"
             let resp = await api.convertSampleDataToCurl(JSON.stringify(this.completeData))
             copyString = resp.curlString
@@ -168,21 +138,16 @@ export default {
           console.log(copyString);
         }
 
-        if (copyString) {
-          this.copyToClipboard(copyString)
-          window._AKTO.$emit('SHOW_SNACKBAR', {
-            show: true,
-            text: snackBarMessage,
-            color: 'green'
-          });
-        }
+      if (copyString) {
+        func.copyToClipboard(copyString, snackBarMessage, this.$el)
+      }
       }
     },
 
     computed: {
         tooltipValue: function() {
           return this.simpleCopy ? "Copy response": "Copy as curl"
-           
+
         },
         dd : function() {
           // let b = JSON.parse(this.data)

@@ -21,6 +21,7 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
+import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
@@ -55,6 +56,9 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
+import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
@@ -188,6 +192,10 @@ const router = createBrowserRouter([
             element: <Postman />,
           },
           {
+            path: "integrations/jira",
+            element: <Jira />,
+          },
+          {
             path: "integrations/akto_apis",
             element: <ApiTokens />,
           },
@@ -198,6 +206,14 @@ const router = createBrowserRouter([
           {
             path: "integrations/github_sso",
             element: <GithubSso />
+          },
+          {
+            path: "integrations/okta_sso",
+            element: <OktaIntegration />
+          },
+          {
+            path: "integrations/azure_sso",
+            element: <AzureSso />
           },
           {
             path: "integrations/github_app",

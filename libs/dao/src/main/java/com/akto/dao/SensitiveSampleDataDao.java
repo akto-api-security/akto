@@ -49,23 +49,13 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
-
-        if (counter == 1) {
-            String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-        }
+        String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ApiInfo.ID_URL, SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_METHOD }, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
-
     }
 }

@@ -189,7 +189,6 @@ const transform = {
     prepareSampleData: (res, subType) => {
         let paths = []
         for (const c in res.sensitiveSampleData) {
-            if(c === "") continue
             let paramInfoList = res.sensitiveSampleData[c]
             if (!paramInfoList) {
                 paramInfoList = []
@@ -499,7 +498,8 @@ const transform = {
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
                 riskScore: score,
-                isNew: this.isNewEndpoint(url.lastSeenTs)
+                isNew: this.isNewEndpoint(url.lastSeenTs),
+                sensitiveDataTags: url?.sensitiveTags.join(" "),
             }
         })
 

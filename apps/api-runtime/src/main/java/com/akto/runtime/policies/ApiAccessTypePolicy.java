@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ApiAccessTypePolicy {
@@ -23,17 +24,22 @@ public class ApiAccessTypePolicy {
 
     public boolean findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter) {
         if (privateCidrList == null || privateCidrList.isEmpty()) return false;
-        List<String> ipList = httpResponseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
+        List<String> xForwardedForValues = httpResponseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
+        if (xForwardedForValues == null) xForwardedForValues = new ArrayList<>();
 
-        if (ipList == null) {
-            ipList = new ArrayList<>();
+        List<String> ipList = new ArrayList<>();
+        for (String ip: xForwardedForValues) {
+            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements. 
+            ipList.addAll(Arrays.asList(parts));
         }
 
         String sourceIP = httpResponseParams.getSourceIP();
 
-        if (sourceIP != null && !sourceIP.isEmpty()) {
+        if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
             ipList.add(sourceIP);
         }
+
+        if (ipList.isEmpty() ) return false;
 
         for (String ip: ipList) {
            if (ip == null) continue;

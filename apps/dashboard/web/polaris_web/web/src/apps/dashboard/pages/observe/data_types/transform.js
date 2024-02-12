@@ -7,8 +7,7 @@ const func = {
         keyConditions: { predicates: [], operator: "OR" },
         sensitiveState: '4',
         operator: "OR",
-        dataType: "Custom",
-        redacted: 'false'
+        dataType: "Custom"
       },
 
     convertToSensitiveData: function(state) {
@@ -33,7 +32,7 @@ const func = {
         }
         let resultObj= {
             sensitiveAlways: sensitiveAlways,
-            sensitivePosition: sensitivePosition,
+            sensitivePosition: sensitivePosition
         }
 
         return resultObj;
@@ -51,7 +50,6 @@ const func = {
         initialObj.id = dataObj.id;
         initialObj.name = dataObj.name
         initialObj.dataType = type
-        initialObj.redacted = dataObj.redacted.toString()
         let state = func.convertDataToState(dataObj.sensitiveAlways, dataObj.sensitivePosition)
         initialObj.sensitiveState = state
         if(type === 'Custom'){
@@ -67,19 +65,25 @@ const func = {
         return initialObj;
     },
 
-    convertMapFunction :(element)=> {
-        return{
-            type: element.type,
-            valueMap:{
-                value: element.value
-            }
-        }
-    },
-
     convertDataForCustomPayload : function(state){
 
-        const keyArr = state.keyConditions.predicates.map(this.convertMapFunction)
-        const valueArr = state.valueConditions.predicates.map(this.convertMapFunction)
+        const keyArr = state.keyConditions.predicates.map((element)=> {
+            return{
+                type: element.type,
+                valueMap:{
+                    value: element.value
+                }
+            }
+        })
+
+        const valueArr = state.valueConditions.predicates.map((element)=> {
+            return{
+                type: element.type,
+                valueMap:{
+                    value: element.value
+                }
+            }
+        })
 
         let sensitiveObj = this.convertToSensitiveData(state.sensitiveState)
 
@@ -95,7 +99,6 @@ const func = {
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
-            redacted: state.redacted
         }
 
         return finalObj

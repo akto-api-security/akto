@@ -17,11 +17,10 @@ public class TestRoles {
     public static final String NAME = "name";
     private String name;
     private ObjectId endpointLogicalGroupId;
-    private AuthMechanism authMechanism;
-    @BsonIgnore
-    private EndpointLogicalGroup endpointLogicalGroup;
     public static final String AUTH_WITH_COND_LIST = "authWithCondList";
     private List<AuthWithCond> authWithCondList;
+    @BsonIgnore
+    private EndpointLogicalGroup endpointLogicalGroup;
 
     private String createdBy;
     private int createdTs;
@@ -32,7 +31,7 @@ public class TestRoles {
         this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
-        this.authMechanism = authMechanism;
+        this.authWithCondList = authWithCondList;
         this.createdBy = createdBy;
         this.createdTs = createdTs;
         this.lastUpdatedTs = lastUpdatedTs;
@@ -66,14 +65,6 @@ public class TestRoles {
 
     public void setEndpointLogicalGroupId(ObjectId endpointLogicalGroupId) {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
-    }
-
-    public AuthMechanism getAuthMechanism() {
-        return authMechanism;
-    }
-
-    public void setAuthMechanism(AuthMechanism authMechanism) {
-        this.authMechanism = authMechanism;
     }
 
     public EndpointLogicalGroup getEndpointLogicalGroup() {
@@ -114,7 +105,6 @@ public class TestRoles {
     public void setLastUpdatedTs(int lastUpdatedTs) {
         this.lastUpdatedTs = lastUpdatedTs;
     }
-
 
     public String getHexId() {
         if (hexId == null) return this.id.toHexString();

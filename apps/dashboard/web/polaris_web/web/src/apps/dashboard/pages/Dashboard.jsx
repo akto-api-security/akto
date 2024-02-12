@@ -21,7 +21,6 @@ function Dashboard() {
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
     const allCollections = PersistStore(state => state.allCollections)
-    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
@@ -33,7 +32,7 @@ function Dashboard() {
     }
 
     useEffect(() => {
-        if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
+        if(allCollections && allCollections.length === 0){
             fetchAllCollections()
         }
         transform.setTestMetadata();

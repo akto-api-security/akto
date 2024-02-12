@@ -19,20 +19,20 @@ import java.util.*;
 
 public class VCDemoData {
     public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://52.91.42.30:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://:27017/admini"));
         Context.accountId.set(1_000_000);
         RuntimeFilterDao.instance.initialiseFilters();
 
 //        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null,0));
         Set<String> urls1 = new HashSet<>();
         for (int i=0; i<8; i++) urls1.add(i+"");
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(1, null, Context.now(), urls1,"api.akto.io",0, false, true));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(1, null, Context.now(), urls1,"api.akto.io",0));
         Set<String> urls2 = new HashSet<>();
         for (int i=0; i<10; i++) urls2.add(i+"");
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(2, null, Context.now(), urls2,"staging.akto.io",0, false, true));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(2, null, Context.now(), urls2,"staging.akto.io",0));
         Set<String> urls3 = new HashSet<>();
         for (int i=0; i<9; i++) urls3.add(i+"");
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(3, null, Context.now(), urls3,"prod.akto.io",0, false, true));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(3, null, Context.now(), urls3,"prod.akto.io",0));
 
 
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();

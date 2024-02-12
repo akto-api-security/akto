@@ -154,7 +154,16 @@ public class DependencyFlow {
 
                     Node resultNode = resultNodes.get(id);
                     Map<String, Connection> connections = resultNode.getConnections();
-                    Connection connection = connections.get(reverseEdge.getParam());
+
+                    String param = reverseEdge.getParam();
+                    if (reverseEdge.getIsHeader()) {
+                        param += "_isHeader";
+                    } else if (reverseEdge.isUrlParam()) {
+                        param += "_isUrlParam";
+                    }
+
+                    Connection connection = connections.get(param);
+                    if (connection == null) continue;
                     List<Edge> edges = connection.getEdges();
 
                     if (edges == null || !edges.isEmpty()) continue; // this is because if it already has an edge this means that parameter is not part of the loop, so skip it

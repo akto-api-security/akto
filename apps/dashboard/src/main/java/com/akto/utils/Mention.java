@@ -20,6 +20,7 @@ public class Mention {
                 int userId = Integer.parseInt(matcher.group(1));
                 BasicDBObject mentionedUser = UsersDao.instance.getUserInfo(userId);
                 if ( mentionedUser != null) {
+                    System.out.println();
                     mentioned_users.add(userId);
                 }
             } catch (NumberFormatException e) {

@@ -10,6 +10,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.TestingRun;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.CreateCollectionOptions;
@@ -30,8 +31,10 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         fieldNames = new String[]{TestingRun.END_TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
+        fieldNames = new String[]{"testingEndpoints.apiCollectionId", "endTimestamp"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
     }
-
+    
     public List<Integer> getTestConfigIdsToDelete(List<ObjectId> testingRunIds){
         // this function is to get list of testConfigIds from testingRunIds for deleting from testing_run_config collection in DB.
         Bson filter = Filters.in("_id", testingRunIds);

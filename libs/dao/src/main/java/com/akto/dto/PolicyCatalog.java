@@ -5,6 +5,7 @@ import java.util.Map;
 public class PolicyCatalog {
     private ApiInfo apiInfo;
     private Map<Integer, FilterSampleData> filterSampleDataMap;
+    private boolean seenEarlier = false;
 
     public PolicyCatalog() {}
 
@@ -27,5 +28,13 @@ public class PolicyCatalog {
 
     public void setFilterSampleDataMap(Map<Integer, FilterSampleData> filterSampleDataMap) {
         this.filterSampleDataMap = filterSampleDataMap;
+    }
+
+    public boolean isSeenEarlier() {
+        return seenEarlier;
+    }
+
+    public void setSeenEarlier(boolean seenEarlier) {
+        this.seenEarlier = seenEarlier;
     }
 }

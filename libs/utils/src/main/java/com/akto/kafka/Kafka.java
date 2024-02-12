@@ -18,7 +18,7 @@ public class Kafka {
         try {
             setProducer(brokerIP, lingerMS, batchSize);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
     }
 
@@ -66,6 +66,7 @@ public class Kafka {
         public void onCompletion(RecordMetadata recordMetadata, Exception e) {
             if (e != null) {
                 Kafka.this.close();
+                System.out.println("onCompletion error: " + e.getMessage());
             }
         }
     }

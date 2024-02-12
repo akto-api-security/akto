@@ -5,13 +5,22 @@ import org.apache.commons.lang3.StringUtils;
 public enum DashboardMode {
     LOCAL_DEPLOY, ON_PREM, STAIRWAY, SAAS;
 
+    public static DashboardMode getActualDashboardMode() {
+        DashboardMode dashboardMode = getDashboardMode();
+        if (isSaasDeployment()) {
+            return SAAS;
+        }
+        return dashboardMode;
+    }
+
+    // modify this and remove getActualDashboardMode method
     public static DashboardMode getDashboardMode(){
         String dashboardMode = System.getenv("DASHBOARD_MODE");
-        if(StringUtils.isEmpty(dashboardMode) || "local_deploy".equalsIgnoreCase(dashboardMode)){
-            return LOCAL_DEPLOY;
-        }
         if("on_prem".equalsIgnoreCase(dashboardMode)){
             return ON_PREM;
+        }
+        if("local_deploy".equalsIgnoreCase(dashboardMode)){
+            return LOCAL_DEPLOY;
         }
         if("saas".equalsIgnoreCase(dashboardMode)){
             return SAAS;

@@ -254,6 +254,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        System.out.println("Issue id from db to be updated " + issueId);
+        System.out.println("status id from db to be updated " + statusToBeUpdated);
+        System.out.println("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
                                         Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
@@ -274,6 +277,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        System.out.println("Issue id from db to be updated " + issueIdArray);
+        System.out.println("status id from db to be updated " + statusToBeUpdated);
+        System.out.println("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored

@@ -20,7 +20,6 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 
 public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
@@ -40,8 +39,11 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
+
+        String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.CREATION_TIME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         
-        String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id.apiInfoKey.apiCollectionId"};
+        fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id.apiInfoKey.apiCollectionId"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);    
         
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LAST_SEEN};

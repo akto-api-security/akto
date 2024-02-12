@@ -1,11 +1,22 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
+import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
+import com.akto.har.HAR;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.KafkaListener;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
 import com.akto.dto.ApiToken.Utility;
@@ -13,9 +24,12 @@ import com.akto.util.DashboardMode;
 import com.akto.utils.GzipUtils;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.sun.jna.*;
 
 import java.io.File;
@@ -36,8 +50,18 @@ public class HarAction extends UserAction {
     private byte[] tcpContent;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HarAction.class);
 
+    public String executeWithSkipKafka(boolean skipKafka) throws IOException {
+        this.skipKafka = skipKafka;
+        execute();
+        return SUCCESS.toUpperCase();
+    }
+
     @Override
     public String execute() throws IOException {
+        if (InitializerListener.isKubernetes()) {
+            skipKafka = true;
+        }
+
         ApiCollection apiCollection = null;
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
@@ -78,6 +102,11 @@ public class HarAction extends UserAction {
 
         if (apiCollection.getHostName() != null)  {
             addActionError("Traffic mirroring collection can't be used");
+            return ERROR.toUpperCase();
+        }
+
+        if (!skipKafka && KafkaListener.kafka == null) {
+            addActionError("Dashboard kafka not running");
             return ERROR.toUpperCase();
         }
 
@@ -168,7 +197,8 @@ public class HarAction extends UserAction {
     
             return Action.SUCCESS.toUpperCase();            
         } catch (IOException e) {
-            ;
+            // TODO Auto-generated catch block
+            e.printStackTrace();
             return Action.ERROR.toUpperCase();        
         }
 

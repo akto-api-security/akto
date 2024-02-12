@@ -13,7 +13,7 @@ public class UsageUtils {
         if (usageServiceUrl != null) {
             return usageServiceUrl;
         } else {
-            return "https://usage.akto.io";
+            return "https://saas.usage.akto.io";
         }
     }
 

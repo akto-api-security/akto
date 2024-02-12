@@ -91,6 +91,7 @@ public class CustomAuthTypeAction extends UserAction{
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         executorService.schedule( new Runnable() {
             public void run() {
+                System.out.println("RUNNING");
                 Context.accountId.set(accountId);
                 CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
             }

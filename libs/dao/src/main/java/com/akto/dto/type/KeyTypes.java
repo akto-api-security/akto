@@ -49,7 +49,7 @@ public class KeyTypes {
 
     public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object,
                         String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
-                        boolean isUrlParam) {
+                        boolean isUrlParam, int timestamp) {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
@@ -68,12 +68,12 @@ public class KeyTypes {
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
             paramId.setSubType(subType);
-            singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+            singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, timestamp, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
             occurrences.put(subType, singleTypeInfo);
         }
 
-        singleTypeInfo.setLastSeen(Context.now());
+        singleTypeInfo.setLastSeen(timestamp);
         singleTypeInfo.updateMinMaxValues(object);
 
         SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();
@@ -110,7 +110,19 @@ public class KeyTypes {
         return true;
     }
 
-    private static SubType getSubtype(Object o,String key, boolean checkForSubtypes){
+    public static SubType findSubType(Object o,String key, ParamId paramId) {
+
+        int accountId = Context.accountId.get();
+        boolean checkForSubtypes = true ;
+        for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
+            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
+        }
+        for (String keyType : SingleTypeInfo.getAktoDataTypeMap(accountId).keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
+            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
+        }
+
         if (o == null) {
             return SingleTypeInfo.NULL;
         }
@@ -162,9 +174,8 @@ public class KeyTypes {
 
         if (o instanceof String) {
             String str = o.toString();
-            for(Map.Entry<SubType, Pattern> entry: patternToSubType.entrySet()) {
-                Pattern pattern = entry.getValue();
-                SubType subType = entry.getKey();
+            for(SubType subType: patternToSubType.keySet()) {
+                Pattern pattern = patternToSubType.get(subType);
                 if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(str).matches()) {
                     return subType;
                 }
@@ -185,30 +196,6 @@ public class KeyTypes {
         }
 
         return SingleTypeInfo.OTHER;
-    }
-
-    public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
-        if(executeCheckForSubtypes){
-            return getSubtype(o, key, true);
-        }else{
-            return findSubType(o, key, paramId);
-        }
-    }
-
-    public static SubType findSubType(Object o,String key, ParamId paramId) {
-
-        int accountId = Context.accountId.get();
-        boolean checkForSubtypes = true ;
-        for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
-            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
-        }
-        for (String keyType : SingleTypeInfo.getAktoDataTypeMap(accountId).keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
-            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
-        }
-
-        return getSubtype(o, key, checkForSubtypes);
     }
 
     public Map<SubType,SingleTypeInfo> getOccurrences() {

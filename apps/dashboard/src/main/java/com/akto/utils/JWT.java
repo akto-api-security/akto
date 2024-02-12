@@ -6,11 +6,11 @@ import io.jsonwebtoken.Jwts;
 
 import java.io.*;
 import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -19,7 +19,6 @@ import java.util.Calendar;
 import java.util.Map;
 
 public class JWT {
-
     private static final byte[] privateKey, publicKey;
 
     static {
@@ -37,7 +36,7 @@ public class JWT {
         privateKey = kp == null ? null : kp.getPrivate().getEncoded();
         publicKey = kp == null ? null : kp.getPublic().getEncoded();
     }
-
+    
     public static String createJWT(String privateKeyPath, Map<String, Object> claims,
                                    String issuer, String subject, int expiryUnit, int expiryDuration)
             throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
@@ -77,12 +76,14 @@ public class JWT {
     private static PrivateKey getPrivateKey(String privateKeyPath) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey);
         KeyFactory kf = KeyFactory.getInstance("RSA");
+
         return kf.generatePrivate(keySpec);
     }
 
     private static PublicKey getPublicKey(String publicKeyPath) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKey);
         KeyFactory kf = KeyFactory.getInstance("RSA");
+
         return kf.generatePublic(keySpec);
     }
 

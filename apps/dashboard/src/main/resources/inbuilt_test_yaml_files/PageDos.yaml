@@ -23,16 +23,31 @@ info:
     - CVE-2023-38254
 
 api_selection_filters:
-  query_param:
-    for_one:
-      key:
-        or:
-          - regex: .*limit.*
-          - regex: .*size.*
-          - regex: .*page.*
-        extract: limitKey
-      value:
-        extract: limitValue
+  response_code:
+    and:
+      gte: 200
+      lt: 300
+  or:
+    query_param:
+      for_one:
+        key:
+          or:
+            - regex: .*limit.*
+            - regex: .*size.*
+            - regex: .*page.*
+          extract: limitKey
+        value:
+          extract: limitValue
+    request_payload:
+      for_one:
+        key:
+          or:
+            - regex: .*limit.*
+            - regex: .*size.*
+            - regex: .*page.*
+          extract: limitKey
+        value:
+          extract: limitValue
   response_payload:
     length:
       extract: original_length
@@ -41,7 +56,9 @@ execute:
   type: single
   requests:
     - req:
-        modify_query_param:
+      - modify_query_param:
+          limitKey: ${limitValue}0
+      - modify_body_param:
           limitKey: ${limitValue}0
 
 validate:

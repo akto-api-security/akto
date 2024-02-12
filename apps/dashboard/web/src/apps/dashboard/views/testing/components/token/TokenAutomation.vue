@@ -289,15 +289,9 @@ export default {
             reqData.push(this.stepData[key]["data"]) 
           }
 
-          let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, this.authParamsList)
+          let _authParamsList = this.authParamsList;
 
-          result.then((resp) => {
-              func.showSuccessSnackBar("Login Flow saved successfully!")
-              this.$emit('toggleOriginalStateDb')
-          }).catch((err) => {
-              console.log(err);
-          })
-
+          this.$emit('toggleOriginalStateDb', {reqData, authParamsList: _authParamsList})
           this.showAuthParams = false
           this.$emit('closeLoginStepBuilder')
         },

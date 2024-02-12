@@ -1,8 +1,9 @@
 package com.akto.utils;
 
-import com.akto.dto.*;
-import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -14,6 +15,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.mongodb.BasicDBObject;
 
+import java.io.IOException;
 import java.util.*;
 
 import static com.akto.dto.RawApi.convertHeaders;
@@ -24,39 +26,17 @@ public class RedactSampleData {
 
     public static final String redactValue = "****";
 
-    public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
+    public static String redact(String sample) throws Exception {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-        HttpResponseParams.Source source = httpResponseParams.getSource();
-        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
-        return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
-    }
-
-    public static String redactDataTypes(String sample) throws Exception{
-        return redact(HttpCallParser.parseKafkaMessage(sample), false);
-    }
-
-    private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
-        if(redactAll){
-            responseHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
-            return;
-        }
-        Set<Map.Entry<String, List<String>>> entries = responseHeaders.entrySet();
-        for(Map.Entry<String, List<String>> entry : entries){
-            String key = entry.getKey();
-            List<String> values = entry.getValue();
-            SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
-            if(SingleTypeInfo.isRedacted(subType.getName())){
-                responseHeaders.put(key, Collections.singletonList(redactValue));
-            }
-        }
+        return redact(httpResponseParams);
     }
 
     // never use this function directly. This alters the httpResponseParams
-    public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
+    public static String redact(HttpResponseParams httpResponseParams) throws Exception {
         // response headers
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
-        handleHeaders(responseHeaders, redactAll);
+        responseHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
 
         // response payload
         String responsePayload = httpResponseParams.getPayload();
@@ -64,7 +44,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll);
+            change(node, redactValue);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -79,7 +59,7 @@ public class RedactSampleData {
         // request headers
         Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
         if (requestHeaders == null) requestHeaders = new HashMap<>();
-        handleHeaders(requestHeaders, redactAll);
+        requestHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
 
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
@@ -87,7 +67,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll);
+            change(node, redactValue);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -100,15 +80,13 @@ public class RedactSampleData {
         httpResponseParams.requestParams.setPayload(requestPayload);
 
         // ip
-        if(redactAll) {
-            httpResponseParams.setSourceIP(redactValue);
-        }
+        httpResponseParams.setSourceIP(redactValue);
 
         return convertHttpRespToOriginalString(httpResponseParams);
 
     }
 
-    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll) {
+    public static void change(JsonNode parent, String newValue) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -116,16 +94,9 @@ public class RedactSampleData {
             for(int i = 0; i < arrayNode.size(); i++) {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
-                    if(redactAll){
-                        arrayNode.set(i, new TextNode(redactValue));
-                    } else{
-                        SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
-                        if(SingleTypeInfo.isRedacted(subType.getName())){
-                            arrayNode.set(i, new TextNode(newValue));
-                        }
-                    }
+                    arrayNode.set(i, new TextNode(newValue));
                 } else {
-                    change(parentName, arrayElement, newValue, redactAll);
+                    change(arrayElement, newValue);
                 }
             }
         } else {
@@ -134,18 +105,9 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    if(redactAll){
-                        ((ObjectNode) parent).put(f, newValue);
-                    }
-                    else {
-                        SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), f, null);
-                        if (SingleTypeInfo.isRedacted(subType.getName())) {
-                            ((ObjectNode) parent).put(f, newValue);
-                        }
-                    }
-
+                    ((ObjectNode) parent).put(f, newValue);
                 } else {
-                    change(f, fieldValue, newValue, redactAll);
+                    change(fieldValue, newValue);
                 }
             }
         }
