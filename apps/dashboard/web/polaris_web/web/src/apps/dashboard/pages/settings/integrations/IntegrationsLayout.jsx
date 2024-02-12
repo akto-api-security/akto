@@ -1,13 +1,9 @@
 import React from 'react'
-import PageWithCard from '../../../components/layouts/PageWithCard'
-import { Button, LegacyCard } from '@shopify/polaris'
+import { LegacyCard } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 
 function IntegrationsLayout(props) {
 
-  const redirectDocs = () => {
-    window.open(props.docsUrl)
-  }
 
   const components = [      
       <LegacyCard title="About the Integration" sectioned key="aboutSection">
@@ -22,7 +18,6 @@ function IntegrationsLayout(props) {
         // content="Settings" 
         backUrl='/dashboard/settings/integrations' 
         title={props.title}
-        primaryAction={<Button onClick={redirectDocs} primary>See Docs</Button>}
         components={components}
         divider={true}
         fullWidth={false}

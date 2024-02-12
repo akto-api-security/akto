@@ -2,7 +2,6 @@ import {create} from "zustand"
 import {devtools, persist, createJSONStorage} from "zustand/middleware"
 
 const initialState = {
-    leftNavSelected: '',
     quickstartTasksCompleted: 0,
     subCategoryMap: {},
     subCategoryFromSourceConfigMap: {},
@@ -22,12 +21,12 @@ const initialState = {
     lastCalledSensitiveInfo: 0,
     lastFetchedSensitiveResp: [],
     // selectedSampleApi: {},
+    coverageMap:{},
 };
 
 let persistStore = (set) => ({
     ...initialState,
     accessToken: null,
-    setLeftNavSelected: (selected) => set({ leftNavSelected: selected }),
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
     setQuickstartTasksCompleted: (quickstartTasksCompleted) => set({ quickstartTasksCompleted }),
     setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
@@ -42,6 +41,7 @@ let persistStore = (set) => ({
     setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => set({ lastCalledSensitiveInfo }),
     setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
     // setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
+    setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
 
     resetAll: () => set(initialState), // Reset function
 })

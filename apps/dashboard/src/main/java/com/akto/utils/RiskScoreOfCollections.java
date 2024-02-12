@@ -46,8 +46,9 @@ public class RiskScoreOfCollections {
         List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
 
         // get freshly updated testing run issues here
-        Bson projections = Projections.include("_id", TestingRunIssues.LAST_SEEN);
-        Bson filters = Filters.gte(TestingRunIssues.LAST_SEEN, timeStampFilter);
+        Bson projections = Projections.include("_id", TestingRunIssues.LAST_SEEN, TestingRunIssues.LAST_UPDATED);
+        Bson filters = Filters.or(Filters.gte(TestingRunIssues.LAST_SEEN, timeStampFilter), 
+            Filters.gte(TestingRunIssues.LAST_UPDATED, timeStampFilter));
 
         List<TestingRunIssues> issues = new ArrayList<>();
         try {

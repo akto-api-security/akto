@@ -6,7 +6,6 @@ import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
-import PersistStore from "../../../../main/PersistStore";
 
 import testEditorRequests from "../api";
 
@@ -150,8 +149,8 @@ const YamlEditor = ({ fetchAllTests }) => {
     return (
         <div>
             <div className="editor-header">
-                <div ref={ref} />
                 <HorizontalStack gap={"1"}>
+                    <div ref={ref} />
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>

@@ -1,10 +1,14 @@
 package com.akto.dto.testing;
 
+import com.akto.dao.MCollection;
+import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.data_types.Conditions;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import org.bson.conversions.Bson;
 
 public class LogicalGroupTestingEndpoint extends TestingEndpoints {
     private Conditions andConditions;
@@ -59,5 +63,10 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints {
 
     public void setOrConditions(Conditions orConditions) {
         this.orConditions = orConditions;
+    }
+
+    @Override
+    public Bson createFilters(CollectionType type) {
+        return MCollection.noMatchFilter;
     }
 }

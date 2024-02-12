@@ -18,15 +18,18 @@ public class TestingRunConfig {
     private ObjectId authMechanismId;
 
     private String overriddenTestAppUrl;
+    private String testRoleId;
+
     public TestingRunConfig() {}
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
-                            ObjectId authMechanismId, String overriddenTestAppUrl) {
+                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
         this.authMechanismId = authMechanismId;
         this.overriddenTestAppUrl = overriddenTestAppUrl;
+        this.testRoleId = testRoleId;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -68,6 +71,13 @@ public class TestingRunConfig {
     public void setOverriddenTestAppUrl(String overriddenTestAppUrl) {
         this.overriddenTestAppUrl = overriddenTestAppUrl;
     }
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
+    }
 
     public void rebaseOn(TestingRunConfig that) {
         if (that == null) return;
@@ -88,6 +98,10 @@ public class TestingRunConfig {
 
         if (this.overriddenTestAppUrl == null) {
             this.overriddenTestAppUrl = that.overriddenTestAppUrl;
+        }
+
+        if(this.testRoleId == null) {
+            this.testRoleId = that.testRoleId;
         }
     }
 }

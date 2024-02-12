@@ -41,9 +41,9 @@ public class TestInitializerListener extends MongoBasedTest {
 
     @Test
     public void testChangesInfo() {
-        ApiCollection apiCollection1 = new ApiCollection(0, "coll1", Context.now(), new HashSet<>(), "akto.io", 1);
-        ApiCollection apiCollection2 = new ApiCollection(1, "coll2", Context.now(), new HashSet<>(), "app.akto.io", 2);
-        ApiCollection apiCollection3 = new ApiCollection(2, "coll3", Context.now(), new HashSet<>(), null, 3);
+        ApiCollection apiCollection1 = new ApiCollection(0, "coll1", Context.now(), new HashSet<>(), "akto.io", 1, false, true);
+        ApiCollection apiCollection2 = new ApiCollection(1, "coll2", Context.now(), new HashSet<>(), "app.akto.io", 2, false, true);
+        ApiCollection apiCollection3 = new ApiCollection(2, "coll3", Context.now(), new HashSet<>(), null, 3, false, true);
         ApiCollectionsDao.instance.insertMany(Arrays.asList(apiCollection1, apiCollection2, apiCollection3));
 
         SingleTypeInfo sti1 = generateSti("/api/books", 0, false);
@@ -90,10 +90,10 @@ public class TestInitializerListener extends MongoBasedTest {
         TestingRunIssuesDao.instance.getMCollection().drop();
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "url1", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), 0);
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), 0);
 
         TestingRunIssuesDao.instance.insertMany(Arrays.asList(testingRunIssues1, testingRunIssues2));
 

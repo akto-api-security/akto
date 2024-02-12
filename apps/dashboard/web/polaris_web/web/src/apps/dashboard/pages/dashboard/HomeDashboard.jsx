@@ -10,7 +10,6 @@ import transform from './transform';
 import StackedChart from '../../components/charts/StackedChart';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from "highcharts"
-import SpinnerCentered from '../../components/progress/SpinnerCentered';
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
 import testingFunc from "../testing/transform"
@@ -20,6 +19,8 @@ import PersistStore from '../../../main/PersistStore';
 import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
+import {DashboardBanner} from './components/DashboardBanner';
+import SpinnerCentered from '../../components/progress/SpinnerCentered';
 
 function HomeDashboard() {
 
@@ -37,6 +38,7 @@ function HomeDashboard() {
     const [skip, setSkip] = useState(0)
     const [criticalUrls, setCriticalUrls] = useState(0);
     const [initialSteps, setInitialSteps] = useState({}) ;
+    const [showBannerComponent, setShowBannerComponent] = useState(false)
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -54,6 +56,7 @@ function HomeDashboard() {
             testingApi.getSummaryInfo(0 , func.timeNow()),
             api.fetchRecentFeed(skip),
             api.getIntegratedConnections(),
+            observeApi.getUserEndpoints(),
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -65,6 +68,8 @@ function HomeDashboard() {
         let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
         let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
         let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
+        let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : true ;
+        setShowBannerComponent(!userEndpoints)
 
         setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
         setCoverageObj(coverageInfo)
@@ -261,20 +266,17 @@ function HomeDashboard() {
     }
 
     const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
-    return (
-        <div style={{display: 'flex'}}>
+
+    const dashboardComp = (
+        <div style={{display: 'flex', gap: '32px'}} key={"dashboardComp"}>
             <div style={{flex: 7}}>
-                <PageWithMultipleCards
-                        title={
-                            <Text variant='headingLg'>
-                                Home
-                            </Text>
-                        }
-                        isFirstPage={true}
-                        components={components}
-                />
+                <VerticalStack gap={4}>
+                    {components.map((component) => {
+                        return component
+                    })}
+                </VerticalStack>
             </div>
-            <div style={{flex: 3, paddingRight: '32px'}}>
+            <div style={{flex: 3}}>
                 <VerticalStack gap={5}>
                     <InitialSteps initialSteps={initialSteps}/>
                     <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
@@ -283,6 +285,21 @@ function HomeDashboard() {
                 </VerticalStack>
             </div>
         </div>
+    )
+
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp]
+
+    return (
+            <PageWithMultipleCards
+                title={
+                    <Text variant='headingLg'>
+                        Home
+                    </Text>
+                }
+                isFirstPage={true}
+                components={pageComponents}
+            />
+                
     )
 }
 

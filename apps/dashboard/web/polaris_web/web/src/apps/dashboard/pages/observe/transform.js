@@ -189,6 +189,7 @@ const transform = {
     prepareSampleData: (res, subType) => {
         let paths = []
         for (const c in res.sensitiveSampleData) {
+            if(c === "") continue
             let paramInfoList = res.sensitiveSampleData[c]
             if (!paramInfoList) {
                 paramInfoList = []
@@ -275,23 +276,42 @@ const transform = {
     getStandardHeaderList(){
         return standardHeaders
     },
+    isValidString(string){
+        try {
+            const val = JSON.parse(string)
+            return {type:true, val: val}
+        } catch (error) {
+            return {type:false, val: ""}
+        }
+    },
     getCommonSamples(nonSensitiveData, sensitiveData){
         let sensitiveSamples = this.prepareSampleData(sensitiveData, '')
         const samples = new Set()
         const highlightPathsObj ={}
         sensitiveSamples.forEach((x) => {
-            samples.add(JSON.parse(x.message))
-            highlightPathsObj[JSON.parse(x.message)] = x.highlightPaths
+            const validObj = this.isValidString(x.message)
+            if(validObj.type){
+                samples.add(validObj.val)
+                highlightPathsObj[validObj.val] = x.highlightPaths 
+            }
+            
         })
 
         let uniqueNonSensitive = []
         nonSensitiveData.forEach((x) => {
-            let parsed = JSON.parse(x)
-            if(!samples.has(parsed)){
-                uniqueNonSensitive.push({message: x, highlightPaths: []})
+            try {
+                let parsed = JSON.parse(x)
+                if(samples.size === 0 || !samples.has(parsed)){
+                    uniqueNonSensitive.push({message: x, highlightPaths: []})
+                }
+            } catch (e) {
             }
+            
         })
-        const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
+        let finalArr = [...uniqueNonSensitive]
+        if(samples.size > 0){
+            finalArr = [...sensitiveSamples, ...finalArr]
+        }
         return finalArr
     },
     getColor(key){
@@ -348,14 +368,23 @@ const transform = {
 
     prettifyCollectionsData(newData){
         const prettifyData = newData.map((c)=>{
+            let calcCoverage = '0%';
+            if(c.endpoints > 0){
+                if(c.endpoints < c.testedEndpoints){
+                    calcCoverage= '100%'
+                }else{
+                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
+                }
+            }
             return{
+                ...c,
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
                 riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
-                coverage: c.endpoints > 0 ?Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%' : '0%',
+                coverage: calcCoverage,
                 issuesArr: this.getIssuesList(c.severityInfo),
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,

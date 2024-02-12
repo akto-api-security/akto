@@ -1,8 +1,9 @@
-import { ResourceList, Page, LegacyCard, ResourceItem, Modal, Text, Button, TextField, HorizontalStack, List, Link } from "@shopify/polaris";
+import { ResourceList, LegacyCard, ResourceItem, Modal, Text, Button, TextField, HorizontalStack, List, Link } from "@shopify/polaris";
 import { useEffect, useState, useCallback } from "react";
 import settingsApi from "../api";
 import api from "./api";
 import func from "@/util/func";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 
 function TestLibrary() {
 
@@ -96,93 +97,100 @@ function TestLibrary() {
         return repositoryUrl;
     }
 
-    return (
-        <Page
-            title="Test library"
-            divider
-            primaryAction={<Button
-                id={"add-test-library"}
-                primary
-                onClick={showAddTestLibraryModal}
+    const titleComp= (
+        <LegacyCard title={"Manage test libraries"} sectioned key={"titleComp"}>
+            <List type="bullet">
+                <List.Item>Use distinct IDs for tests in the test library. If a custom test library contains a test with the same id as an existing test, the test from the custom test library will be ignored.</List.Item>
+                <List.Item>To write custom tests visit our <Link target="_blank" url="https://docs.akto.io/test-editor/writing-custom-tests">docs</Link>.</List.Item>
+            </List>
+        </LegacyCard>
+    )
+
+    const bodyComp = (
+        <LegacyCard key={"bodyComp"}>
+            <ResourceList
+                resourceName={{ singular: 'test library', plural: 'test libraries' }}
+                items={data}
+                renderItem={(item) => {
+                    const { repositoryUrl, author, timestamp, count } = item;
+
+                    const shortcutActions = author !== "AKTO" ?
+                        [
+                            {
+                                content: 'Sync',
+                                onAction: () => { handleSyncTestLibrary(repositoryUrl) },
+                            },
+                            {
+                                content: 'Remove test library',
+                                onAction: () => { handleRemoveTestLibrary(repositoryUrl) },
+                            }
+                        ] : []
+
+                    return (<ResourceItem
+                        id={repositoryUrl}
+                        shortcutActions={shortcutActions}
+                        persistActions
+                        onClick={() => { window.open(getStyledForGithubOrDefault(repositoryUrl, "LINK"), "_blank") }}
+                    >
+                        <Text variant="bodyMd" fontWeight="bold" as="h3">
+                            {`${getStyledForGithubOrDefault(repositoryUrl, "NAME")}`}
+                        </Text>
+                        <Text variant="bodyMd">
+                            {author !== "AKTO" ?
+                                getInfo({author, timestamp, count})
+                            : "Default test library"}
+                        </Text>
+                    </ResourceItem>
+                    );
+                }}
+            />
+            <Modal
+                key="modal"
+                open={addTestLibraryModalActive}
+                onClose={() => setAddTestLibraryModalActive(false)}
+                title="New test library"
+                primaryAction={{
+                    id: "add-new-test-library",
+                    content: 'Add',
+                    onAction: addTestLibrary,
+                }}
             >
-                Add new test library
-            </Button>}
-        >
-            <LegacyCard title={"Manage test libraries"} sectioned>
-                <List type="bullet">
-                    <List.Item>Use distinct IDs for tests in the test library. If a custom test library contains a test with the same id as an existing test, the test from the custom test library will be ignored.</List.Item>
-                    <List.Item>To write custom tests visit our <Link target="_blank" url="https://docs.akto.io/test-editor/writing-custom-tests">docs</Link>.</List.Item>
-                </List>
-            </LegacyCard>
+                <Modal.Section>
+                    <div onKeyDown={(e) => func.handleKeyPress(e, addTestLibrary)}>
+                        <HorizontalStack gap={2}>
+                            <div style={{ flexGrow: 1 }}>
+                                <TextField
+                                    id={"repo-url"}
+                                    label="Repository url"
+                                    placeholder="https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip"
+                                    value={repositoryUrl}
+                                    helpText = "The repository url must be a zip file ( < 10 MiB ) containing test library YAML files. Make sure the zip file is reachable from your akto dashboard."
+                                    onChange={handleRepositoryUrlChange}
+                                    autoComplete="off"
+                                />
+                            </div>
+                        </HorizontalStack>
+                    </div>
+                </Modal.Section>
+            </Modal>
+        </LegacyCard>
+    )
 
-            <LegacyCard>
-                <ResourceList
-                    resourceName={{ singular: 'test library', plural: 'test libraries' }}
-                    items={data}
-                    renderItem={(item) => {
-                        const { repositoryUrl, author, timestamp, count } = item;
+    const components = [titleComp, bodyComp]
 
-                        const shortcutActions = author !== "AKTO" ?
-                            [
-                                {
-                                    content: 'Sync',
-                                    onAction: () => { handleSyncTestLibrary(repositoryUrl) },
-                                },
-                                {
-                                    content: 'Remove test library',
-                                    onAction: () => { handleRemoveTestLibrary(repositoryUrl) },
-                                }
-                            ] : []
+    return (
 
-                        return (<ResourceItem
-                            id={repositoryUrl}
-                            shortcutActions={shortcutActions}
-                            persistActions
-                            onClick={() => { window.open(getStyledForGithubOrDefault(repositoryUrl, "LINK"), "_blank") }}
-                        >
-                            <Text variant="bodyMd" fontWeight="bold" as="h3">
-                                {`${getStyledForGithubOrDefault(repositoryUrl, "NAME")}`}
-                            </Text>
-                            <Text variant="bodyMd">
-                                {author !== "AKTO" ?
-                                    getInfo({author, timestamp, count})
-                                : "Default test library"}
-                            </Text>
-                        </ResourceItem>
-                        );
-                    }}
-                />
-                <Modal
-                    key="modal"
-                    open={addTestLibraryModalActive}
-                    onClose={() => setAddTestLibraryModalActive(false)}
-                    title="New test library"
-                    primaryAction={{
-                        id: "add-new-test-library",
-                        content: 'Add',
-                        onAction: addTestLibrary,
-                    }}
-                >
-                    <Modal.Section>
-                        <div onKeyDown={(e) => func.handleKeyPress(e, addTestLibrary)}>
-                            <HorizontalStack gap={2}>
-                                <div style={{ flexGrow: 1 }}>
-                                    <TextField
-                                        id={"repo-url"}
-                                        label="Repository url"
-                                        placeholder="https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip"
-                                        value={repositoryUrl}
-                                        helpText = "The repository url must be a zip file ( < 10 MiB ) containing test library YAML files. Make sure the zip file is reachable from your akto dashboard."
-                                        onChange={handleRepositoryUrlChange}
-                                        autoComplete="off"
-                                    />
-                                </div>
-                            </HorizontalStack>
-                        </div>
-                    </Modal.Section>
-                </Modal>
-            </LegacyCard>
-        </Page>
+        <PageWithMultipleCards
+            components={components}
+            title={
+                <Text variant='headingLg' truncate>
+                    Test library
+                </Text>
+            }
+            primaryAction={<Button primary onClick={showAddTestLibraryModal}>Add new test library</Button>}
+            isFirstPage={true}
+            divider={true}
+        />
     )
 }
 
