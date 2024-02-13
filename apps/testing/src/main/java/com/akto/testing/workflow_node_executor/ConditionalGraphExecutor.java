@@ -38,6 +38,10 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);
         graphExecutorRequest.getExecutionOrder().add(node.getId());
 
+        if (nodeResult.getErrors() != null && nodeResult.getErrors().size() > 0) {
+            return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), success, nodeResult.getErrors());
+        }
+
         if (nodeResult.isVulnerable()) {
             success = true;
         }

@@ -449,6 +449,9 @@ public class Executor {
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
                     TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+                    if (testRole == null) {
+                        return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
+                    }
 
                     ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
                     if (insertedAuthResp != null) {
