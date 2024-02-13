@@ -222,7 +222,7 @@ jobs:
 
   delete:
     if: ${{ always() }}
-    needs: [build, deploy, test]
+    needs: [build-backend, build-frontend, deploy, test]
     runs-on: ubuntu-latest
     environment: Dev
     permissions:
