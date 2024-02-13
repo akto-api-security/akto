@@ -82,6 +82,10 @@ public class YamlNodeExecutor extends NodeExecutor {
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
         ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0);
 
+        if (!singleReq.getSuccess()) {
+            rawApis = new ArrayList<>();
+            testErrors.add(singleReq.getErrMsg());
+        }
         //ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
         //List<RawApi> testRawApis = singleReq.getRawApis();
         TestingRunConfig testingRunConfig = new TestingRunConfig();
