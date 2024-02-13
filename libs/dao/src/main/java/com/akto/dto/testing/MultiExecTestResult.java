@@ -61,7 +61,11 @@ public class MultiExecTestResult extends GenericTestResult {
             String originalMessage = workflowNodeDetails.getOriginalMessage();
             if (messageList.size() <= 1) {
                 List<String> error_messages = new ArrayList<>();
-                error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                if (errors.size() > 0) {
+                    error_messages = errors;
+                } else {
+                    error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                }
                 runResults.add(new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null));
             }
 
