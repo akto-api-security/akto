@@ -144,11 +144,6 @@ public class SingleTypeInfo {
         BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM, OBJECT_ID
     }
 
-    public static void main(String[] args) {
-        boolean parsable = NumberUtils.isParsable("2.33");
-        System.out.println(parsable);
-    }
-
     public enum Position {
         REQUEST_HEADER, REQUEST_PAYLOAD, RESPONSE_HEADER, RESPONSE_PAYLOAD
     }

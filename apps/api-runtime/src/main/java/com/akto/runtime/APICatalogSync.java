@@ -26,7 +26,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
-import org.mozilla.javascript.EcmaError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
