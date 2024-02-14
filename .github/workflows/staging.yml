@@ -106,13 +106,11 @@ jobs:
       IMAGE_TAG: ${{needs.build.outputs.IMAGE_TAG}}
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
-
-
-
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
     #revert branch name
+    - uses: koalalab-inc/bolt@v0.1
     - name: Setup mongo, akto-k8s-agent kube yaml's
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
@@ -186,6 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: koalalab-inc/bolt@v0.1      
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
@@ -223,7 +222,7 @@ jobs:
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
-
+    - uses: koalalab-inc/bolt@v0.1
     - name: Fetch kube yaml
       #revert branch name
       run: |
