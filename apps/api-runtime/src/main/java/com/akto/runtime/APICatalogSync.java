@@ -1432,8 +1432,32 @@ public class APICatalogSync {
         }
 
         Bson findQ = Filters.eq("_id", apiCollectionId);
+        int batchSize = 50;
+        int count = 0;
+        Set<String> batchedUrls = new HashSet<>();
 
-        ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
+        ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.unset(ApiCollection.URLS_STRING));
+
+        for (String url : newURLs) {
+            batchedUrls.add(url);
+            count++;
+
+            if (count == batchSize) {
+                ApiCollectionsDao.instance.getMCollection().bulkWrite(
+                        Collections.singletonList(new UpdateManyModel<>(findQ,
+                                Updates.addEachToSet(ApiCollection.URLS_STRING, new ArrayList<>(batchedUrls)), new UpdateOptions())),
+                        new BulkWriteOptions().ordered(false));
+                count = 0;
+                batchedUrls.clear();
+            }
+        }
+
+        if (!batchedUrls.isEmpty()) {
+            ApiCollectionsDao.instance.getMCollection().bulkWrite(
+                    Collections.singletonList(new UpdateManyModel<>(findQ,
+                            Updates.addEachToSet(ApiCollection.URLS_STRING, new ArrayList<>(batchedUrls)), new UpdateOptions())),
+                    new BulkWriteOptions().ordered(false));
+        }
     }
 
     private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
