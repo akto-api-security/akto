@@ -112,15 +112,6 @@ public class ApiInfo {
             return apiCollectionId + " " + url + " " + method;
         }
 
-        public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
-            int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
-            String url = httpResponseParams.getRequestParams().getURL();
-            url = url.split("\\?")[0];
-            String methodStr = httpResponseParams.getRequestParams().getMethod();
-            URLMethods.Method method = URLMethods.Method.fromString(methodStr);
-            return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
-        }
-
     }
 
 
