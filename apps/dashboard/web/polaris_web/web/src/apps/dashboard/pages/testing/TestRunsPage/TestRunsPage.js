@@ -19,6 +19,7 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import {produce} from "immer"
 import values from "@/util/values";
 import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
+import { time } from "highcharts";
 
 /*
   {
@@ -186,7 +187,7 @@ const getTimeEpoch = (key) => {
 }
 
 const startTimestamp = getTimeEpoch("since")
-const endTimestamp = getTimeEpoch("until")
+const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
