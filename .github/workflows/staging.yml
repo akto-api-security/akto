@@ -110,7 +110,7 @@ jobs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
     #revert branch name
-    - uses: koalalab-inc/@v0.4
+    - uses: koalalab-inc/bolt@v0.4
     - name: Setup mongo, akto-k8s-agent kube yaml's
       run: |
         wget https://raw.githubusercontent.com/akto-api-security/infra/ephemeral_env_staging/mongo.yml
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: koalalab-inc/@v0.4    
+      - uses: koalalab-inc/bolt@v0.4    
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
