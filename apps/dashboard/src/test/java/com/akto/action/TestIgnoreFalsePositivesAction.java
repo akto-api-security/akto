@@ -24,7 +24,7 @@ public class TestIgnoreFalsePositivesAction extends MongoBasedTest{
     @Test
     public void test(){
         AktoDataTypeDao.instance.getMCollection().drop();
-        AktoDataType aktoDataType = new AktoDataType("UUID", false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()));
+        AktoDataType aktoDataType = new AktoDataType("UUID", false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true);
         Set<String> ignored = new HashSet<>();
         ignored.add("something");
         aktoDataType.getIgnoreData().setIgnoredKeysInAllAPIs(ignored);

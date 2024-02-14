@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -129,6 +129,8 @@ function ApiEndpoints() {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [isGptActive, setIsGptActive] = useState(false)
+    const [redacted, setIsRedacted] = useState(false)
+    const [showRedactModal, setShowRedactModal] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -175,6 +177,7 @@ function ApiEndpoints() {
         setLoading(true)
         let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
         setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
+        setIsRedacted(apiCollectionData.redacted)
         let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiCollectionData.data.apiInfoList
         let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
@@ -277,6 +280,24 @@ function ApiEndpoints() {
     function computeApiGroup() {
         api.computeCustomCollections(pageTitle);
         func.setToast(true, false, "API group is being computed.")
+    }
+
+    function redactCheckBoxClicked(){
+        if(!redacted){
+            setShowRedactModal(true)
+        } else {
+            setIsRedacted(false)
+            redactCollection();
+        }
+    }
+
+    function redactCollection(){
+        setShowRedactModal(false)
+        var updatedRedacted = !redacted;
+        api.redactCollection(apiCollectionId, updatedRedacted).then(resp => {
+            setIsRedacted(updatedRedacted)
+            func.setToast(true, false, updatedRedacted ? "Collection redacted" : "Collection unredacted")
+        })
     }
 
     async function exportOpenApi() {
@@ -401,7 +422,7 @@ function ApiEndpoints() {
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
-            <Popover 
+            <Popover
                 active={exportOpen}
                 activator={(
                     <Button onClick={() => setExportOpen(true)} disclosure>
@@ -442,7 +463,7 @@ function ApiEndpoints() {
                     </Popover.Section>
                     <Popover.Section>
                         <VerticalStack gap={2}>
-                            <Text>Export as:</Text>
+                            <Text>Export as</Text>
                                 <VerticalStack gap={1}>
                                 <div onClick={exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
@@ -453,6 +474,18 @@ function ApiEndpoints() {
                                 <div onClick={exportCsv} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
+                            </VerticalStack>
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <Text>Others</Text>
+                                <VerticalStack gap={1}>
+                                <Checkbox
+                                    label='Redact'
+                                    checked={redacted}
+                                    onChange={() => redactCheckBoxClicked()}
+                                />
                             </VerticalStack>
                         </VerticalStack>
                     </Popover.Section>
@@ -526,6 +559,23 @@ function ApiEndpoints() {
         return ret;
     }
 
+    let modal = (
+        <Modal
+            open={showRedactModal}
+            onClose={() => setShowRedactModal(false)}
+            title="Note!"
+            primaryAction={{
+                content: 'Enable',
+                onAction: redactCollection
+            }}
+            key="redact-modal"
+        >
+            <Modal.Section>
+                <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
       const components = [
         loading ? [<SpinnerCentered key="loading" />] : (
             showWorkflowTests ? [
@@ -591,7 +641,8 @@ function ApiEndpoints() {
                       operation={actionOperation}
                       currentApiGroupName={pageTitle}
                       fetchData={fetchData}
-                  />
+                  />,
+                  modal
             ]
         )
       ]

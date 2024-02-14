@@ -1,9 +1,6 @@
 package com.akto.dto.type;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
@@ -13,11 +10,14 @@ public class AccountDataTypesInfo {
     private Map<String, CustomDataType> customDataTypeMap;
     private List<CustomDataType> customDataTypesSortedBySensitivity;
 
+    private Set<String> redactedDataTypes;
+
     private Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
     public AccountDataTypesInfo() {
         this.customDataTypeMap = new HashMap<>();
         this.customDataTypesSortedBySensitivity = new ArrayList<>();
         this.aktoDataTypeMap = new HashMap<>();
+        this.redactedDataTypes = new HashSet<>();
     }
 
     public AccountDataTypesInfo(Map<String,CustomDataType> customDataTypeMap, List<CustomDataType> customDataTypesSortedBySensitivity) {
@@ -46,6 +46,7 @@ public class AccountDataTypesInfo {
         return "{" +
                 " customDataTypeMap='" + getCustomDataTypeMap() + "'" +
                 ", customDataTypesSortedBySensitivity='" + getCustomDataTypesSortedBySensitivity() + "'" +
+                ", redactedDataTypes='" + getRedactedDataTypes() + "'" +
                 "}";
     }
 
@@ -55,5 +56,13 @@ public class AccountDataTypesInfo {
 
     public void setAktoDataTypeMap(Map<String, AktoDataType> aktoDataTypeMap) {
         this.aktoDataTypeMap = aktoDataTypeMap;
+    }
+
+    public Set<String> getRedactedDataTypes() {
+        return redactedDataTypes;
+    }
+
+    public void setRedactedDataTypes(Set<String> redactedDataTypes) {
+        this.redactedDataTypes = redactedDataTypes;
     }
 }

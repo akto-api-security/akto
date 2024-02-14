@@ -71,7 +71,7 @@ public class ConfigParser {
                 Map<String,Object> mapValues = m.convertValue(obj, Map.class);
 
                 for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
-                    String operandType = testEditorEnums.getExecutorOperandType(entry.getKey());
+                    String operandType = testEditorEnums.getExecutorOperandType(entry.getKey(), curNode.getNodeType());
                     String operandValue = testEditorEnums.getExecutorOperandValue(entry.getKey());
                     ExecutorNode node = new ExecutorNode(operandType, new ArrayList<>(), entry.getValue(), operandValue);
                     ExecutorConfigParserResult configParserResult = parse(config, node, curNode);
@@ -86,7 +86,7 @@ public class ConfigParser {
         } else if (values instanceof Map) {
             Map<String,Object> mapValues = m.convertValue(values, Map.class);
             for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
-                String operandType = testEditorEnums.getExecutorOperandType(entry.getKey());
+                String operandType = testEditorEnums.getExecutorOperandType(entry.getKey(), curNode.getNodeType());
                 String operandValue = testEditorEnums.getExecutorOperandValue(entry.getKey());
                 ExecutorNode node = new ExecutorNode(operandType, new ArrayList<>(), entry.getValue(), operandValue);
                 ExecutorConfigParserResult configParserResult = parse(config, node, curNode);
@@ -126,7 +126,7 @@ public class ConfigParser {
             return configParserValidationResult;
         }
 
-        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString())) && !parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Req.name() )) {
+        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString())) && !(parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Req.name()) || parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Loop.name()) )) {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("terminal/nonTerminal Executor operand should have executorParentNode as the parent node");
             return configParserValidationResult;
