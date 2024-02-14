@@ -3,9 +3,8 @@ import { useParams } from 'react-router-dom'
 import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
-import { Avatar, Box, Button,Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon, Badge, List, Link } from '@shopify/polaris'
+import { Avatar, Box, Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon} from '@shopify/polaris'
 import {FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor, CreditCardSecureMajor, FraudProtectMajor} from "@shopify/polaris-icons"
-import func from '@/util/func'
 import './styles.css'
 import transform from '../transform';
 
@@ -48,8 +47,8 @@ function ExportHtml() {
 
     const [vulnerableResultsMap, setVulnerableResultsMap] = useState([]) ;
     const [dataToCurlObj, setDataToCurlObj] = useState({});
-    const [infoState, setInfoState] = useState(moreInfoSections)
     const [severitiesCount,setSeveritiesCount] = useState({HIGH: 0, MEDIUM: 0, LOW: 0}) ;
+    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const subCategoryMap = PersistStore(state => state.subCategoryMap)
 
@@ -275,7 +274,7 @@ function ExportHtml() {
                                             sections={fillContent(item)}
                                             item={item}
                                             dataToCurlObj={dataToCurlObj}
-
+                                            collectionsMap={collectionsMap}
                                         />
                                     </LegacyCard.Section>
                                 </LegacyCard>
@@ -289,6 +288,7 @@ function ExportHtml() {
 }
 
 function MoreInformationComponent(props) {
+    
     const getTruncatedString = (str) => {
         if (str && str.length > 3000) {
             return str.substr(0, 3000) + '  .........';
@@ -334,12 +334,24 @@ function MoreInformationComponent(props) {
             {props.item?.category?.vulnerableTestingRunResults?.map((testingRun, index)=> (
                 <div className="attempts-div" key={index}>
                     <div className="row-div-1">
-                        <span className="api-text">
-                            Vulnerable endpoint : 
-                        </span>
-                        <span className="url-text">
-                            { testingRun.apiInfoKey.url }
-                        </span>
+                        <HorizontalStack gap={1}>
+                            <span className="api-text">
+                                Vulnerable endpoint: 
+                            </span>
+                            <span className="url-text">
+                                { testingRun.apiInfoKey.url }
+                            </span>
+                        </HorizontalStack>
+                        <HorizontalStack>
+                            <Box paddingInlineEnd={4}>
+                                <span className="api-text">
+                                    Collection name: {" "}
+                                </span>
+                                <span className="url-text">
+                                    { props.collectionsMap[testingRun.apiInfoKey.apiCollectionId]} 
+                                </span>
+                            </Box>
+                        </HorizontalStack>
                     </div>
                     {testingRun?.testResults?.map((testRun, index1) => (
                         <div key={index1}>

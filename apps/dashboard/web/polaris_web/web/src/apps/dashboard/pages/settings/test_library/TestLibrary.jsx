@@ -184,7 +184,7 @@ function TestLibrary() {
             components={components}
             title={
                 <Text variant='headingLg' truncate>
-                    API Collections
+                    Test library
                 </Text>
             }
             primaryAction={<Button primary onClick={showAddTestLibraryModal}>Add new test library</Button>}
