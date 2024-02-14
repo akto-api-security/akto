@@ -19,7 +19,6 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import {produce} from "immer"
 import values from "@/util/values";
 import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
-import { time } from "highcharts";
 
 /*
   {
