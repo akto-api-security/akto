@@ -84,29 +84,23 @@ public class FeatureAccess {
         this.gracePeriod = gracePeriod;
     }
 
-    public boolean checkUnlimited() {
+    public boolean checkBooleanOrUnlimited() {
         return usageLimit == -1;
     }
 
     public static final String IS_OVERAGE_AFTER_GRACE = "isOverageAfterGrace";
 
-    public boolean checkOverageAfterGrace() {
-        return checkOverageAfterGrace(gracePeriod);
-    }
-
-    public boolean checkOverageAfterGrace(int gracePeriod) {
+    public boolean checkInvalidAccess() {
 
         // if not granted, then consider it as overage, i.e. cannot use the feature
-        if(!this.getIsGranted()) {
+        if (!getIsGranted()) {
             return true;
         }
 
         // if usage limit is unlimited, then consider it as not overage
-        if(this.checkUnlimited()) {
+        if (checkBooleanOrUnlimited()) {
             return false;
         }
-
-        gracePeriod = Math.max(gracePeriod, 0);
 
         if (usage >= usageLimit) {
             if (overageFirstDetected == -1) {
@@ -115,6 +109,8 @@ public class FeatureAccess {
         } else {
             overageFirstDetected = -1;
         }
+
+        gracePeriod = Math.max(gracePeriod, 0);
 
         return this.getOverageFirstDetected() != -1 &&
                  !( this.getOverageFirstDetected() + gracePeriod > Context.now() );

@@ -13,6 +13,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import TooltipText from "../../../components/shared/TooltipText"
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
 
 const headers = [
@@ -58,6 +59,8 @@ const headers = [
 ]
 
 const sortOptions = [
+    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
+    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
     { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
@@ -85,6 +88,10 @@ function convertToCollectionData(c) {
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
+        if(c.deactivated){
+            c.rowStatus = 'critical',
+            c.disableClick = true
+        }
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
@@ -154,6 +161,7 @@ function ApiCollections() {
         setActive(true)
     }
 
+    const allCollections = PersistStore(state => state.allCollections)
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
@@ -218,19 +226,41 @@ function ApiCollections() {
 
     const createCollectionModalActivatorRef = useRef();
 
-    async function handleRemoveCollections(collectionIdList) {
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        const response = await api.deleteMultipleCollections(collectionIdListObj)
+        await apiFunction(collectionIdListObj)
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
-    const promotedBulkActions = (selectedResources) => [
-        {
-          content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-          onAction: () => handleRemoveCollections(selectedResources)
-        },
-      ];
+    const promotedBulkActions = (selectedResources) => {
+        let actions = [
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            }
+        ];
+
+        const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
+        const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        if (selectedResources.every(v => { return activated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deleted")
+                }
+            )
+        } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
+                }
+            )
+        }
+
+        return actions;
+    }
 
     const modalComponent = <CreateNewCollectionModal
         key="modal"

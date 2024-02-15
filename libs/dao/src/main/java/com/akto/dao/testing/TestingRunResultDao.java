@@ -11,8 +11,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.mongodb.client.model.CreateCollectionOptions;
-import com.mongodb.client.model.IndexOptions;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

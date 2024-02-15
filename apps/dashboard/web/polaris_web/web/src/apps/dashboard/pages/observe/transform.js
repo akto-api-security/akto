@@ -353,12 +353,16 @@ const transform = {
         )
     },
 
-    prettifySubtypes(sensitiveTags){
+    prettifySubtypes(sensitiveTags, deactivated){
         return(
             <Box maxWidth="200px">
                 <HorizontalStack gap={1}>
                     {sensitiveTags.map((item,index)=>{
-                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
+                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box>
+                            <div className={deactivated ? "icon-deactivated" : ""}>
+                                <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
+                            </div>
+                        </Box></Tooltip> : null)
                     })}
                     {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
                 </HorizontalStack>
@@ -386,9 +390,11 @@ const transform = {
                 riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: calcCoverage,
                 issuesArr: this.getIssuesList(c.severityInfo),
-                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
+                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
                 lastTraffic: c.detected,
                 riskScore: c.riskScore,
+                deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
+                activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 ))
             }
         })
 

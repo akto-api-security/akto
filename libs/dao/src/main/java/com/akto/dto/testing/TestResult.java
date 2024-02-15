@@ -35,6 +35,7 @@ public class TestResult extends GenericTestResult {
         EXECUTION_FAILED("Test execution failed"),
         INVALID_EXECUTION_BLOCK("Invalid test execution block in template"),
         NO_API_REQUEST("No test requests created"),
+        DEACTIVATED_ENDPOINT("This is a deactivated endpoint"),
         USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution");
 
         private final String message;
