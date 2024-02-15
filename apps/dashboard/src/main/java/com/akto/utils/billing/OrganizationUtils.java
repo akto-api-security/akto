@@ -73,7 +73,6 @@ public class OrganizationUtils {
                 if (StringUtils.isNumeric(usageLimitObj.toString())) {
                     int usageLimit = Integer.parseInt(usageLimitObj.toString());
                     int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
-
                     int overageFirstDetected = (usage >= usageLimit) ? now : -1;
                     result.put(featureLabel, new FeatureAccess(isGranted, overageFirstDetected, usageLimit, usage));
                 }

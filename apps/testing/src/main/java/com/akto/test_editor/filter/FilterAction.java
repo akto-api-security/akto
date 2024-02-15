@@ -1180,7 +1180,7 @@ public final class FilterAction {
                         if (urlWithParamsTokens.length > i) {
                             obj.put("key", i+"");
                             obj.put("value", urlWithParamsTokens[i]);
-                            if (privateValues.size() < 5) {
+                            if (privateValues.size() < 5 && obj.get("value") != null) {
                                 privateValues.add(obj);
                             }
                             privateCnt++;
@@ -1206,7 +1206,7 @@ public final class FilterAction {
                                 if (!origUrlTokens[i].equals(sUrlTokens[i])) {
                                     obj.put("key", i+"");
                                     obj.put("value", sUrlTokens[i]);
-                                    if (privateValues.size() < 5) {
+                                    if (privateValues.size() < 5 && obj.get("value") != null) {
                                         privateValues.add(obj);
                                     }
                                     break;
@@ -1220,7 +1220,7 @@ public final class FilterAction {
                         String val = valSet.iterator().next();
                         obj.put("key", i+"");
                         obj.put("value", val);
-                        if (privateValues.size() < 5) {
+                        if (privateValues.size() < 5 && obj.get("value") != null) {
                             privateValues.add(obj);
                         }
                     }
@@ -1266,7 +1266,7 @@ public final class FilterAction {
                     if (paramVal != null && !paramVal.equals(origVal)) {
                         obj.put("key", key);
                         obj.put("value", paramVal.toString());
-                        if (privateValues.size() < 5) {
+                        if (privateValues.size() < 5 && obj.get("value") != null) {
                             privateValues.add(obj);
                         }
                         break;
@@ -1278,7 +1278,7 @@ public final class FilterAction {
                 String key = SingleTypeInfo.findLastKeyFromParam(param);
                 obj.put("key", key);
                 obj.put("value", val);
-                if (privateValues.size() < 5) {
+                if (privateValues.size() < 5 && obj.get("value") != null) {
                     privateValues.add(obj);
                 }
             }
