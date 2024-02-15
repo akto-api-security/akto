@@ -1,78 +1,159 @@
-import { Avatar, Box, HorizontalStack, Page, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Divider, Frame, HorizontalStack, Page, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from '../components/SSOTextfield'
+import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
+import api from '../api'
+import func from '@/util/func'
+import "../styles.css"
 
 function SignUp() {
   const [ssoList, setSsoList] = useState([])
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loginActive, setLoginActive] = useState(true)
+  const [loading, setLoading] = useState(false)
+
+  const oktaUrl = window.OKTA_AUTH_URL
+  const azureUrl = window.AZURE_REQUEST_URL
+  const githubId = window.GITHUB_CLIENT_ID
 
   const githubAuthObj = {
     logo: '/public/github_icon.svg',
     text: 'Continue with Github SSO',
-    onClickFunc: () => {console.log("github")}
+    onClickFunc: () => { window.location.href = ("https://github.com/login/oauth/authorize?client_id=" + githubId); }
   }
 
   const azureAuthObj = {
     logo: '/public/azure_logo.svg',
     text: 'Continue with Azure SSO',
-    onClickFunc: () => {console.log("azure")}
+    onClickFunc: () => { window.location.href = azureUrl }
   }
 
   const oktaAuthObj = {
     logo: '/public/okta_logo.svg',
     text: 'Continue with Okta SSO',
-    onClickFunc: () => {console.log("okta")}
+    onClickFunc: () => { window.location.href = oktaUrl }
   }
 
   useEffect(() => {
     let copySsoList = []
-    if(window.GITHUB_CLIENT_ID !== undefined){
+    if (githubId !== undefined && githubId.length > 0) {
       copySsoList.push(githubAuthObj)
     }
 
-    if(window.OKTA_AUTH_URL !== undefined){
+    if (oktaUrl !== undefined && oktaUrl.length > 0) {
       copySsoList.push(oktaAuthObj)
     }
 
-    if(window.AZURE_REQUEST_URL !== undefined){
+    if (azureUrl !== undefined && azureUrl > 0) {
       copySsoList.push(azureAuthObj)
     }
 
     setSsoList(copySsoList)
 
-    if(window.IS_SAAS && window.IS_SAAS==="true"){
+    if (window.IS_SAAS && window.IS_SAAS === "true") {
       window.location.href = "/";
     }
-  },[])
+  }, [])
 
   const ssoCard = (
     ssoList.length === 0 ? null :
-    <VerticalStack gap={5}>
-      {
-        ssoList.map((sso, index) => {
-          return(
+      <VerticalStack gap={5}>
+        {
+          ssoList.map((sso, index) => {
+            return (
               <VerticalStack gap={5} key={index}>
                 <SSOTextfield onClickFunc={sso.onClickFunc} logo={sso.logo} text={sso.text} />
-                
+                <HorizontalStack gap={3}>
+                  <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
+                  <Text variant="bodySm" color="subdued">or</Text>
+                  <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
+                </HorizontalStack>
               </VerticalStack>
-          )
-        })
-      }
-    </VerticalStack>
-    
+            )
+          })
+        }
+      </VerticalStack>
   )
 
-    return (
-      <Page>
-        <Box width='400px'>
-          <VerticalStack gap={8}>
-            <HorizontalStack align='center'>
-              <Avatar source="/public/akto_name_with_logo.svg" />
-            </HorizontalStack>
-            <Text alignment="center" variant="headingLg">Create your account</Text>
-          </VerticalStack>
-        </Box>
-      </Page>
-    )
+  const loginFunc = () => {
+    setLoading(true)
+    try {
+      api.login(email, password).then((resp) => {
+
+      })
+    } catch (error) {
+      func.setToast(true, true, "Email or password incorrect. Please login again.")
+    }
+    setLoading(false)
+  }
+
+  const loginObject = {
+    headingText: "Welcome back",
+    buttonText: "Sign in",
+    linkText: "Sign up",
+    descriptonText: "Need to create a new organization?"
+  }
+
+  const signupObject = {
+    headingText: "Create new account",
+    buttonText: "Sign up",
+    linkText: "Sign in",
+    descriptonText: "Already using Akto?"
+  }
+
+  const activeObject = loginActive ? loginObject : signupObject
+
+  const signupEmailCard = (
+    <VerticalStack gap={4}>
+      <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
+      <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
+
+      <Button fullWidth primary onClick={loginFunc} loading={loading}>{activeObject.buttonText}</Button>
+      <HorizontalStack align="center" gap={1}>
+        <Text>{activeObject.descriptonText}</Text>
+        <Button plain onClick={() => setLoginActive(!loginActive)}>{activeObject.linkText}</Button>
+      </HorizontalStack>
+    </VerticalStack>
+  )
+  return (
+    <div className='login-page'>
+      <Frame >
+        <Page fullWidth >
+          <Box padding="10">
+            <div style={{display: "flex", justifyContent: 'space-between', flexDirection: "column"}}>
+              <HorizontalStack align="center">
+                <Box width='400px'>
+                  <VerticalStack gap={16}>
+                    <HorizontalStack align='center'>
+                      <div className="akto-logo">
+                        <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="2xl-experimental" />
+                      </div>
+                    </HorizontalStack>
+                    <VerticalStack gap={8}>
+                      <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
+                      <VerticalStack gap={5}>
+                        {ssoCard}
+                        {signupEmailCard}
+                      </VerticalStack>
+                    </VerticalStack>
+
+                  </VerticalStack>
+                  <div style={{bottom: "40px", position: "absolute", width: '400px'}}>
+                    <HorizontalStack gap={3} align="center">
+                      <Button plain onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}>Terms of use</Button>
+                      <div style={{width: '1px', height: '24px', background: "#E1E3E5"}} />
+                      <Button plain onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}>Privacy policy</Button>
+                    </HorizontalStack>
+                  </div>
+                </Box>
+              </HorizontalStack>
+            </div>
+          </Box>
+        </Page>
+      </Frame>
+    </div>
+  )
 }
 
 export default SignUp
