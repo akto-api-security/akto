@@ -60,10 +60,10 @@ public class ExecutorAlgorithm {
             valueOp = null;
         }
 
-        List<Object> keyList = resolveExpression(varMap, keyOp);
+        List<Object> keyList = VariableResolver.resolveExpression(varMap, keyOp);
         List<Object> valList = new ArrayList<>();
         if (valueOp != null) {
-            valList = resolveExpression(varMap, valueOp);
+            valList = VariableResolver.resolveExpression(varMap, valueOp);
         }
 
         int rawApiIndex = 0;
@@ -99,6 +99,9 @@ public class ExecutorAlgorithm {
                 }
             }
 
+            if (keyIndex >= keyList.size()) {
+                return new ExecutorSingleRequest(false, "empty arg at left side for operation no " + operationIndex, null, false);
+            }
             Object key = keyList.get(keyIndex);
             Object val = null;
             if (valList != null && valList.size() > 0) {
@@ -136,59 +139,6 @@ public class ExecutorAlgorithm {
         }
 
         return keyList.size();
-
-    }
-
-    public List<Object> resolveExpression(Map<String, Object> varMap, Object key) {
-
-        Object keyContext = null;
-        List<Object> varList = new ArrayList<>();
-        if (key instanceof String) {
-            keyContext = VariableResolver.resolveContextKey(varMap, key.toString());
-        }
-
-        if (keyContext instanceof ArrayList) {
-            return (List) keyContext;
-        }
-
-        if (key instanceof String) {
-            keyContext = VariableResolver.resolveContextVariable(varMap, key.toString());
-        }
-
-        if (keyContext instanceof ArrayList) {
-            return (List) keyContext;
-        }
-
-        if (VariableResolver.isWordListVariable(key, varMap)) {
-            varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
-            return varList;
-        }
-
-        if (key instanceof String) {
-            key = VariableResolver.resolveExpression(varMap, key.toString());
-            if (key instanceof String) {
-                varList.add(key.toString());
-                return varList;
-            } else if (key instanceof ArrayList) {
-                return (List) key;
-            }
-        } else if (key instanceof Map) {
-            varList.add(key);
-            return varList;
-        } else {
-            List<Object> keyList = (List) key;
-            int index = 0;
-            for (Object k: keyList) {
-                List<Object> v = VariableResolver.resolveExpression(varMap, k.toString());
-                if (v != null && v.size() > 0) {
-                    keyList.set(index, v.get(0).toString());
-                }
-                index++;
-            }
-        }
-
-        varList.add(key);
-        return varList;
 
     }
 

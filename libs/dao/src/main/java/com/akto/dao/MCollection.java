@@ -36,6 +36,27 @@ public abstract class MCollection<T> {
         return mongoDatabase.runCommand(new Document("serverStatus",1));
     }
 
+    public boolean isCapped() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+
+        for (Document collection: mongoDatabase.listCollections()) {
+            if (collection.getString("name").equals(getCollName())) {
+                return collection.get("options", new Document()).getBoolean("capped", false);
+            }
+        }
+        return false;
+    }
+    public Document convertToCappedCollection(long sizeInBytes) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        for (Document collection: mongoDatabase.listCollections()) {
+            if (collection.getString("name").equals(getCollName())) {
+                return mongoDatabase.runCommand(new Document("convertToCapped", getCollName())
+                        .append("size", sizeInBytes));
+            }
+        }
+        return null;
+    }
+
     public MongoCollection<T> getMCollection() {
         return getMCollection(getDBName(), getCollName(), getClassT());
     }
@@ -155,8 +176,15 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
+    public T updateOneNoUpsert(Bson q, Bson obj) {
+        return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(false));
+    }
+
     public UpdateResult updateMany (Bson q, Bson obj) {
         return this.getMCollection().updateMany(q, obj);
+    }
+    public UpdateResult updateManyNoUpsert (Bson q, Bson obj) {
+        return this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
     }
     public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList, BulkWriteOptions options) {
         return this.getMCollection().bulkWrite(modelList, options);

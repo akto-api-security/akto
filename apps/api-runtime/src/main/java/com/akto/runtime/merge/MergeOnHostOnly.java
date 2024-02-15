@@ -171,7 +171,7 @@ public class MergeOnHostOnly {
             old.setId(newApiCollectionId);
 
             try {
-                ApiCollectionsDao.instance.insertOne(new ApiCollection(newApiCollectionId, null, old.getStartTs(), new HashSet<>(), host, 0));
+                ApiCollectionsDao.instance.insertOne(new ApiCollection(newApiCollectionId, null, old.getStartTs(), new HashSet<>(), host, 0, false, true));
             } catch (Exception e) {
                 return;
             }
