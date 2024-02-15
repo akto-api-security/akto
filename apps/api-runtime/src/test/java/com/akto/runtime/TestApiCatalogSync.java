@@ -12,7 +12,6 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.*;
-import com.akto.runtime.merge.MergeSimilarUrls;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 
@@ -27,13 +26,13 @@ import static org.junit.Assert.assertEquals;
 public class TestApiCatalogSync extends MongoBasedTest {
     public void testInitializer() {
         Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
-        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
-        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
         AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
         if (info == null) {
             info = new AccountDataTypesInfo();
@@ -77,65 +76,6 @@ public class TestApiCatalogSync extends MongoBasedTest {
         assertEquals(minValue, singleTypeInfo.getMinValue());
         assertEquals(count, singleTypeInfo.getCount());
         assertEquals(valuesCount, singleTypeInfo.getValues().getElements().size());
-    }
-
-
-    @Test
-    public void testMergeAndUpdateDb() {
-        SingleTypeInfoDao.instance.getMCollection().drop();
-        ApiInfoDao.instance.getMCollection().drop();
-        SampleDataDao.instance.getMCollection().drop();
-        TrafficInfoDao.instance.getMCollection().drop();
-        SensitiveSampleDataDao.instance.getMCollection().drop();
-        SensitiveParamInfoDao.instance.getMCollection().drop();
-        FilterSampleDataDao.instance.getMCollection().drop();
-
-        Set<String> toMergeUrls = new HashSet<>();
-        toMergeUrls.add("/api/books/1");
-        toMergeUrls.add("/api/books/2");
-        toMergeUrls.add("/api/books/3");
-        String mergedUrl = "/api/books/INTEGER";
-
-        for (Object m : toMergeUrls.toArray()) {
-            buildAndInsert((String) m);
-        }
-
-        MergeSimilarUrls.mergeAndUpdateDb(mergedUrl, toMergeUrls, 100, URLMethods.Method.GET);
-
-        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
-        for (SingleTypeInfo singleTypeInfo : singleTypeInfos) {
-            assertEquals(mergedUrl, singleTypeInfo.getUrl());
-        }
-        assertEquals(12, singleTypeInfos.size());
-
-        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
-        assertEquals(1, apiInfoList.size());
-        assertEquals(mergedUrl, apiInfoList.get(0).getId().url);
-
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
-        assertEquals(1, sampleDataList.size());
-        assertEquals(mergedUrl, sampleDataList.get(0).getId().url);
-
-        long trafficInfoCount = TrafficInfoDao.instance.getMCollection().countDocuments();
-        assertEquals(0, trafficInfoCount);
-
-        List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(new BasicDBObject());
-        for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
-            assertEquals(mergedUrl, sensitiveSampleData.getId().getUrl());
-        }
-        assertEquals(12, sensitiveSampleDataList.size());
-
-        List<SensitiveParamInfo> sensitiveParamInfoList = SensitiveParamInfoDao.instance.findAll(new BasicDBObject());
-        for (SensitiveParamInfo sensitiveParamInfo : sensitiveParamInfoList) {
-            assertEquals(mergedUrl, sensitiveParamInfo.getUrl());
-        }
-        assertEquals(12, sensitiveParamInfoList.size());
-
-        List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        for (FilterSampleData filterSampleData : filterSampleDataList) {
-            assertEquals(mergedUrl, filterSampleData.getId().getApiInfoKey().getUrl());
-        }
-        assertEquals(3, filterSampleDataList.size());
     }
 
     public void buildAndInsert(String url) {

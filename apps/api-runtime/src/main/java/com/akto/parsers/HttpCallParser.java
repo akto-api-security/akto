@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
+import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
@@ -19,7 +20,10 @@ import com.mongodb.client.model.*;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
+import java.net.URL;
 import java.util.*;
+
+import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 
 public class HttpCallParser {
     
@@ -154,9 +158,13 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI)  {
+    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
-        List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
+        List<HttpResponseParams> filteredResponseParams = responseParams;
+        if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
+            filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
+        }
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -180,6 +188,17 @@ public class HttpCallParser {
             this.sync_count = 0;
         }
 
+    }
+
+    private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
+        List<HttpResponseParams> ret = new ArrayList<>();
+        for(HttpResponseParams httpResponseParams: filteredResponseParams) {
+            if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) continue;
+
+            ret.add(httpResponseParams);
+        }
+
+        return ret;
     }
 
     public void syncTrafficMetricsWithDB() {
@@ -275,6 +294,10 @@ public class HttpCallParser {
             }
 
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN)) {
+                cond = true;
+            }
+
             if (!cond) continue;
             
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), AccountSettings.AKTO_IGNORE_FLAG);

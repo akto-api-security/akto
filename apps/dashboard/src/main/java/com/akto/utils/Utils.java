@@ -1,7 +1,9 @@
 package com.akto.utils;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -179,7 +181,18 @@ public class Utils {
                     return null;
                 }
             } else {
-                Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
+                JsonNode respHeaders = response.get("header");
+                Map<String, String> responseHeadersMap = new HashMap<>();
+                if (respHeaders == null) {
+                    responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
+                }
+
+                JsonNode originalRequest = response.get("originalRequest");
+
+                if (originalRequest != null) {
+                    result.put("path", getPath(originalRequest, variables));
+                }
+
                 responseHeadersString = mapper.writeValueAsString(responseHeadersMap);
 
                 JsonNode responsePayloadNode = response.get("body");
@@ -368,13 +381,19 @@ public class Utils {
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-            info.getHttpCallParser().syncFunction(responses, true, false);
+
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-           DependencyFlow dependencyFlow = new DependencyFlow();
-           dependencyFlow.run();
-           dependencyFlow.syncWithDb();
+            try {
+                DependencyFlow dependencyFlow = new DependencyFlow();
+                dependencyFlow.run();
+                dependencyFlow.syncWithDb();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+            }
         }
     }
 

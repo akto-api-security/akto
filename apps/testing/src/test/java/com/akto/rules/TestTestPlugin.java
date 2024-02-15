@@ -266,7 +266,7 @@ public class TestTestPlugin extends MongoBasedTest {
         String url = "http://google.com/some/path/here/?param1=1&param2=2";
         String newHost = "https://twitter.com:80";
 
-        System.out.println(ApiExecutor.replaceHostFromConfig(url, new TestingRunConfig(0, null, null, null, newHost)));
+        System.out.println(ApiExecutor.replaceHostFromConfig(url, new TestingRunConfig(0, null, null, null, newHost, null)));
 
     }
 

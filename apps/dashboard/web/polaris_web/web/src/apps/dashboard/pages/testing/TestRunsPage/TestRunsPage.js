@@ -186,7 +186,7 @@ const getTimeEpoch = (key) => {
 }
 
 const startTimestamp = getTimeEpoch("since")
-const endTimestamp = getTimeEpoch("until")
+const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
