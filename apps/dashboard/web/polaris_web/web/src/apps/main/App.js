@@ -9,7 +9,6 @@ import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExpos
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
-import { AppProvider } from "@shopify/polaris"
 import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
@@ -285,13 +284,13 @@ const router = createBrowserRouter([
     ],
     errorElement: <ErrorComponent/>
   },
-{
-  path: "/login",
-    element: <SignUp />,
-},
-{
-  path: "/",
-    element: <Navigate to="/login" />,
+  {
+      path: "/login",
+      element: <SignUp />,
+  },
+  {
+      path: "/",
+      element: <Navigate to="/login" />,
   },
 ])
 
