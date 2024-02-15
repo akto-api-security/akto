@@ -62,7 +62,7 @@ public class CustomTestingEndpoints extends TestingEndpoints {
         apiListCondition.setApisList(new ArrayList<>(tmp));
     }
 
-    private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
+    public static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
 
         String prefix = getFilterPrefix(type);
 

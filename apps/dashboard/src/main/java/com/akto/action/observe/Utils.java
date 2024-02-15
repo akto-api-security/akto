@@ -11,6 +11,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Utils {
@@ -42,6 +43,9 @@ public class Utils {
             return endpoints;
         }
     }
+
+    public final static String _START_TS = "startTs";
+    public final static String _LAST_SEEN_TS = "lastSeenTs";
 
     public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip) {
         List<Bson> pipeline = new ArrayList<>();

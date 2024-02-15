@@ -24,6 +24,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -32,6 +33,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.MongoCursor;
@@ -41,8 +43,10 @@ import com.akto.utils.RedactSampleData;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -295,7 +299,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.insertOne(apiCollection);
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-
+        
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 

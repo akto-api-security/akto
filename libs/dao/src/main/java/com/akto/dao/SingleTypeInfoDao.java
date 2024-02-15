@@ -497,8 +497,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     }
 
-    public static final int LARGE_LIMIT = 10_000;
-
     public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
         Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
