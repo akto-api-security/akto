@@ -1,6 +1,7 @@
 package com.akto.action;
 
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
@@ -147,10 +148,8 @@ public class ProfileAction extends UserAction {
                         .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, featureAccess.checkInvalidAccess()));
             }
 
-            boolean dataIngestionPaused = featureWiseAllowed.getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.toString(),
-                    FeatureAccess.noAccess).checkOverageAfterGrace(gracePeriod);
-            boolean testRunsPaused = featureWiseAllowed.getOrDefault(MetricTypes.TEST_RUNS.toString(),
-                    FeatureAccess.noAccess).checkOverageAfterGrace(gracePeriod);
+            boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
+            boolean testRunsPaused = UsageMetricUtils.checkTestRunsOverage(sessionAccId);
             userDetails.append("usagePaused", new BasicDBObject()
                     .append("dataIngestion", dataIngestionPaused)
                     .append("testRuns", testRunsPaused));
