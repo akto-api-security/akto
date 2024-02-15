@@ -19,6 +19,7 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
@@ -111,41 +112,12 @@ public class EndpointUtil {
         }
     }
 
-    private static String getFilterPrefix(CollectionType type) {
-        String prefix = "";
-        switch (type) {
-            case Id_ApiCollectionId:
-                prefix = "_id.";
-                break;
-
-            case Id_ApiInfoKey_ApiCollectionId:
-                prefix = "_id.apiInfoKey.";
-                break;
-
-            case ApiCollectionId:
-            default:
-                break;
-        }
-        return prefix;
-    }
-
-    private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
-
-        String prefix = getFilterPrefix(type);
-
-        return Filters.and(
-                Filters.eq(prefix + SingleTypeInfo._URL, api.getUrl()),
-                Filters.eq(prefix + SingleTypeInfo._METHOD, api.getMethod().toString()),
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, api.getApiCollectionId()));
-
-    }
-
     private static Bson createFilters(CollectionType type, List<ApiInfoKey> apiList) {
         Set<ApiInfoKey> apiSet = new HashSet<>(apiList);
         List<Bson> apiFilters = new ArrayList<>();
         if (apiSet != null && !apiSet.isEmpty()) {
             for (ApiInfoKey api : apiSet) {
-                apiFilters.add(createApiFilters(type, api));
+                apiFilters.add(CustomTestingEndpoints.createApiFilters(type, api));
             }
             return Filters.or(apiFilters);
         }

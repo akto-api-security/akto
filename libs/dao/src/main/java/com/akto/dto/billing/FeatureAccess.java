@@ -68,6 +68,12 @@ public class FeatureAccess {
         this.usage = usage;
     }
 
+    public boolean checkBooleanOrUnlimited() {
+        return usageLimit == -1;
+    }
+    
+    public static final String IS_OVERAGE_AFTER_GRACE = "isOverageAfterGrace";
+
     public int getMeasureEpoch() {
         return measureEpoch;
     }
@@ -83,12 +89,6 @@ public class FeatureAccess {
     public void setGracePeriod(int gracePeriod) {
         this.gracePeriod = gracePeriod;
     }
-
-    public boolean checkBooleanOrUnlimited() {
-        return usageLimit == -1;
-    }
-
-    public static final String IS_OVERAGE_AFTER_GRACE = "isOverageAfterGrace";
 
     public boolean checkInvalidAccess() {
 

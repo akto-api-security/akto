@@ -14,7 +14,6 @@ import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
@@ -25,6 +24,12 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+import io.micrometer.core.instrument.util.StringUtils;
+import org.apache.commons.codec.digest.HmacAlgorithms;
+import org.apache.commons.codec.digest.HmacUtils;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
@@ -116,6 +121,11 @@ public class ProfileAction extends UserAction {
                     Filters.in(Organization.ACCOUNTS, sessionAccId)
             ); 
             String organizationId = organization.getId();
+
+            HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
+            if(initialFeatureWiseAllowed == null) {
+                initialFeatureWiseAllowed = new HashMap<>();
+            }
 
             boolean isOverage = false;
             HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
