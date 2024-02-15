@@ -8,6 +8,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GzipUtils;
@@ -39,6 +40,14 @@ public class HarAction extends UserAction {
     @Override
     public String execute() throws IOException {
         ApiCollection apiCollection = null;
+        
+        /*
+         * We need to allow the first time creation for demo collections 
+         * thus calculating them before creation.
+         */
+        List<Integer> demoCollections = UsageMetricCalculator.getDemos();
+        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
@@ -78,6 +87,18 @@ public class HarAction extends UserAction {
 
         if (apiCollection.getHostName() != null)  {
             addActionError("Traffic mirroring collection can't be used");
+            return ERROR.toUpperCase();
+        }
+
+        String commonErrorMessage = "collection can't be used, please create a new collection.";
+
+        if(demoCollections.contains(apiCollectionId)) {
+            addActionError("Demo " + commonErrorMessage);
+            return ERROR.toUpperCase();
+        }
+
+        if(deactivatedCollections.contains(apiCollectionId)) {
+            addActionError("Deactivated " + commonErrorMessage);
             return ERROR.toUpperCase();
         }
 

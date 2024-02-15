@@ -7,7 +7,6 @@ import com.akto.action.CustomDataTypeAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
-import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -59,6 +58,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
@@ -77,6 +77,7 @@ import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
@@ -94,12 +95,10 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -1570,10 +1569,10 @@ public class InitializerListener implements ServletContextListener {
                         if (DashboardMode.isMetered()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
+                            DeactivateCollections.deactivateCollectionsJob();
                         }
 
                         crons.deleteTestRunsScheduler();
-
 
                         if(isSaas){
                             try {

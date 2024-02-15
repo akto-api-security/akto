@@ -50,6 +50,11 @@ function GithubRow(props) {
     }
 
     function handleRowClick(data){
+
+        if(data.deactivated){
+            return;
+        }
+
         if(data?.collapsibleRow){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
@@ -144,7 +149,7 @@ function GithubRow(props) {
     function LinkCell(cellData, header) {
         return (
             <IndexTable.Cell key={header.title}>
-                <div className='linkClass'>
+                <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} >
                     <Link
                         dataPrimaryLink
                         monochrome
@@ -231,7 +236,7 @@ function GithubRow(props) {
                 id={data.id}
                 key={data.id}
                 position={index}
-                {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
+                {...props.newRow ? {status: ((index % 2) ? "subdued" : '')} : {} }
                 {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id)}}
             >
                 {props?.newRow ? <NewCell /> :<OldCell/>}   

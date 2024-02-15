@@ -5,16 +5,20 @@ import java.util.HashMap;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
 import com.akto.log.CacheLoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import org.json.JSONObject;
 
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
@@ -28,6 +32,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class UsageMetricUtils {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
 
     public static void syncUsageMetricWithAkto(UsageMetric usageMetric) {
@@ -119,6 +124,56 @@ public class UsageMetricUtils {
         } catch (Exception e) {
             cacheLoggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
+    }
+
+    public static boolean checkMeteredOverage(int accountId, MetricTypes metricType) {
+        FeatureAccess featureAccess = getFeatureAccess(accountId, metricType);
+        return featureAccess.checkInvalidAccess();
+    }
+
+    public static boolean checkActiveEndpointOverage(int accountId){
+        return checkMeteredOverage(accountId, MetricTypes.ACTIVE_ENDPOINTS);
+    }
+
+    public static boolean checkTestRunsOverage(int accountId){
+        return checkMeteredOverage(accountId, MetricTypes.TEST_RUNS);
+    }
+
+    public static FeatureAccess getFeatureAccess(int accountId, MetricTypes metricType) {
+        FeatureAccess featureAccess = FeatureAccess.fullAccess;
+        try {
+            if (!DashboardMode.isMetered()) {
+                return featureAccess;
+            }
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+            featureAccess = getFeatureAccess(organization, metricType);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
+        }
+        return featureAccess;
+    }
+
+    public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {
+        FeatureAccess featureAccess = FeatureAccess.fullAccess;
+        try {
+            if (!DashboardMode.isMetered()) {
+                return featureAccess;
+            }
+            if (organization == null) {
+                throw new Exception("Organization not found");
+            }
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+                throw new Exception("feature map not found or empty for organization " + organization.getId());
+            }
+            String featureLabel = metricType.name();
+            featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
+            int gracePeriod = organization.getGracePeriod();
+            featureAccess.setGracePeriod(gracePeriod);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
+        }
+        return featureAccess;
     }
 
 }
