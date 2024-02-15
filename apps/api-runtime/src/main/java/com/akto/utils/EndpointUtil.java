@@ -9,7 +9,6 @@ import java.util.Set;
 
 import org.bson.conversions.Bson;
 
-import com.akto.billing.UsageMetricCalculator;
 import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.MCollection;
@@ -24,6 +23,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
