@@ -38,7 +38,7 @@ public class EndpointUtil {
         int accountId = Context.accountId.get();
         FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, accountId);
 
-        if (featureAccess.checkOverageAfterGrace()) {
+        if (featureAccess.checkInvalidAccess()) {
 
             loggerMaker.infoAndAddToDb("overage detected while processing endpoints, running overage function");
             int usageLimit = featureAccess.getUsageLimit();
@@ -58,7 +58,7 @@ public class EndpointUtil {
 
         Bson filters = Filters.and(
                 Filters.gt(SingleTypeInfo._TIMESTAMP, timestamp),
-                UsageMetricCalculator.excludeDemos(SingleTypeInfo._API_COLLECTION_ID));
+                UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID));
 
         boolean hasMore = false;
 

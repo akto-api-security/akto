@@ -1,4 +1,4 @@
-package com.akto.utils.usage;
+package com.akto.usage;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dao.billing.OrganizationsDao;

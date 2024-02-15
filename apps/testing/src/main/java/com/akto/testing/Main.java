@@ -213,7 +213,7 @@ public class Main {
                 int accountId = account.getId();
                 FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
 
-                if (featureAccess.checkOverageAfterGrace()) {
+                if (featureAccess.checkInvalidAccess()) {
                     loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),

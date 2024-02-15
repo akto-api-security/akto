@@ -146,7 +146,7 @@ public class UsageMetricHandler {
                 FeatureAccess orgUsage = consolidatedOrgUsage.get(featureLabel);
                 featureAccess.setUsage(orgUsage.getUsage());
 
-                if(!featureAccess.checkUnlimited() && featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
+                if(!featureAccess.checkBooleanOrUnlimited() && featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
                     if(featureAccess.getOverageFirstDetected() == -1){
                         featureAccess.setOverageFirstDetected(orgUsage.getOverageFirstDetected());
                     }

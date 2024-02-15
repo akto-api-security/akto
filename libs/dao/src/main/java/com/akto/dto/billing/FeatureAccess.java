@@ -117,7 +117,7 @@ public class FeatureAccess {
     }
 
     public SyncLimit fetchSyncLimit() {
-        return new SyncLimit(!this.checkUnlimited(),
+        return new SyncLimit(!this.checkBooleanOrUnlimited(),
                 Math.max(this.getUsageLimit() - this.getUsage(), 0));
     }
 

@@ -5,16 +5,20 @@ import java.util.HashMap;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
 import com.akto.log.CacheLoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import org.json.JSONObject;
 
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
@@ -28,6 +32,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class UsageMetricUtils {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
 
     public static void syncUsageMetricWithAkto(UsageMetric usageMetric) {
