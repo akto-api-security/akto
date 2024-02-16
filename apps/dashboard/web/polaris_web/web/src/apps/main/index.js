@@ -23,6 +23,8 @@ if (window.DASHBOARD_MODE == 'ON_PREM' && (
 
 if (expired) {
 
+  window.mixpanel.track("DASHBOARD_EXPIRED")
+
   root.render(
     <AppProvider i18n={en}>
       <ExpiredApp />
