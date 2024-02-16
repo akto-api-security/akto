@@ -1,7 +1,7 @@
 <template>
      <v-app>
         <div id="centered-div">
-            Please upgrade to the latest version to continue using akto. For any queries contact support@akto.io.
+            Hey! we noticed you're on an unsupported version. Please upgrade to the latest version to continue using Akto. For any queries contact support@akto.io
         </div>
     </v-app>
 </template>
