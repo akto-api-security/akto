@@ -1345,6 +1345,14 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = segments.join('/');
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
+},
+showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+  Store.getState().setConfirmationModalConfig({
+    modalContent: modalContent,
+    primaryActionContent: primaryActionContent,
+    primaryAction: primaryAction,
+    show: true
+  })
 }
 
 }

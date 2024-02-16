@@ -61,7 +61,7 @@ public class InventoryAction extends UserAction {
     private int startTimestamp = 0; 
     private int endTimestamp = 0;
 
-    List <Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();

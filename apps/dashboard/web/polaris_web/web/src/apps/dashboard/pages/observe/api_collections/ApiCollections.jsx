@@ -247,7 +247,10 @@ function ApiCollections() {
             actions.push(
                 {
                     content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deleted")
+                    onAction: () => {
+                        const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Are you sure, you want to deactivate this collection ?"
+                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
+                    }
                 }
             )
         } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
