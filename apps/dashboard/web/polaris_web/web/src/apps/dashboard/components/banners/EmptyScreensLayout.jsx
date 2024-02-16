@@ -9,7 +9,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
   return (
     <VerticalStack gap={5}>
         <Card padding={5}>
-            <Box paddingBlockStart={5}>
+            <Box paddingBlockStart={5} paddingBlockEnd={16}>
                 <HorizontalStack align="center">
                     <Box width='400px'>
                         <VerticalStack gap={8}>
@@ -22,13 +22,13 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                             </HorizontalStack>
                             <VerticalStack gap={4}>
                                 <HorizontalStack align='center'>
-                                    <Text variant="headingLg">{headingText}</Text>
+                                    <Text variant="headingLg" alignment={"center"}>{headingText}</Text>
                                 </HorizontalStack>
                                 
                                 <Text color="subdued" variant="bodyMd" alignment="center">{description}</Text>
                                 
                                 <HorizontalStack align='center'>
-                                    {redirectUrl ? <Box paddingBlockStart={2} paddingBlockEnd={16}>
+                                    {redirectUrl ? <Box paddingBlockStart={2}>
                                         <Button primary onClick={() => navigate(redirectUrl)}>{buttonText}</Button>
                                     </Box> : null}
                                     {bodyComponent}
