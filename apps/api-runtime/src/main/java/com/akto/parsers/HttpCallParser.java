@@ -360,7 +360,7 @@ public class HttpCallParser {
 
         }
 
-        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         filteredResponseParams.removeIf((temp) -> {
             int apiCollectionId = temp.getRequestParams().getApiCollectionId();
             return deactivatedCollections.contains(apiCollectionId);

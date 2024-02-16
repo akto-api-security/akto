@@ -1,6 +1,7 @@
 package com.akto.usage;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -29,10 +30,10 @@ import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricCalculator.class);
-    public static List<Integer> getDemos() {
+    public static Set<Integer> getDemos() {
         ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
 
-        List<Integer> demos = new ArrayList<>();
+        Set<Integer> demos = new HashSet<>();
         demos.add(1111111111);
 
         if (juiceShop != null) {
@@ -42,16 +43,30 @@ public class UsageMetricCalculator {
         return demos;
     }
 
-    public static List<Integer> getDeactivated(){
-        List<ApiCollection> deactivated = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
-        List<Integer> deactivatedIds = deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+    private static int lastDeactivatedFetched = 0;
+    private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
+    private static Set<Integer> deactivatedCollections = new HashSet<>();
+
+    public static Set<Integer> getDeactivated() {
+
+        if ((lastDeactivatedFetched + REFRESH_INTERVAL) >= Context.now()) {
+            return deactivatedCollections;
+        }
+
+        List<ApiCollection> deactivated = ApiCollectionsDao.instance
+                .findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
+        Set<Integer> deactivatedIds = new HashSet<>(
+                deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
+
+        deactivatedCollections = deactivatedIds;
+        lastDeactivatedFetched = Context.now();
 
         return deactivatedIds;
     }
     
     public static Bson excludeDemosAndDeactivated(String key){
-        List<Integer> demos = getDemos();
-        List<Integer> deactivated = getDeactivated();
+        List<Integer> demos = new ArrayList<>(getDemos());
+        List<Integer> deactivated = new ArrayList<>(getDeactivated());
         deactivated.addAll(demos);
 
         return Filters.nin(key, deactivated);
