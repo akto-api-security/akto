@@ -66,6 +66,10 @@ public class VariableResolver {
 
         if (VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
+            for (int i = 0; i < varList.size(); i++) {
+                List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
+                varList.set(i, vals.get(0).toString());
+            }
             return varList;
         }
 
