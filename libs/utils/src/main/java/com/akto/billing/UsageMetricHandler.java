@@ -172,6 +172,7 @@ public class UsageMetricHandler {
                 Updates.set(Organization.FEATURE_WISE_ALLOWED, organization.getFeatureWiseAllowed()));
     }
 
+    // calc this efficiently.
     public static FeatureAccess calcAndFetchFeatureAccess(MetricTypes metricTypes, int accountId) {
 
         FeatureAccess featureAccess = FeatureAccess.fullAccess;

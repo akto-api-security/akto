@@ -80,6 +80,8 @@ public class UsageMetricCalculator {
         return invalidErrors;
     }
 
+    // cache this API call.    
+
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
         int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(

@@ -18,6 +18,7 @@ import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
+import com.google.common.hash.BloomFilter;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
@@ -769,6 +770,8 @@ public class APICatalogSync {
         }
         return stiList;
     }
+    // BloomFilter allApis = new BloomFilter()
+    //
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
 
@@ -900,6 +903,11 @@ public class APICatalogSync {
 
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            /*
+             * this check on apiInfo
+             * res.getInsertedCount() + Current usage > Limit
+             * Do calcAndDelete on this condition only.
+             */
         }
 
         if (bulkUpdatesForDependencyNode.size() > 0) {
@@ -1609,6 +1617,16 @@ public class APICatalogSync {
                                 slicedWrites,
                                 new BulkWriteOptions().ordered(true).bypassDocumentValidation(false)
                         );
+
+
+                /*
+                * If mirroring collection:
+                *
+                *
+                * else:
+                *
+                *
+                */                        
 
                 loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " + res.getUpserts().size(), LogDb.RUNTIME);
             } while (from < writesForParams.size());
