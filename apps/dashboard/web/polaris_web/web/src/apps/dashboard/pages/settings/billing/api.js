@@ -24,11 +24,11 @@ const billingApi = {
             data: {customerId}
         })
     },
-    refreshUsageData({organizationId}){
+    refreshUsageData(){
         return request({
             url: '/api/refreshUsageDataForOrg',
             method: 'post',
-            data: {organizationId}
+            data: {}
         })
     }
 }

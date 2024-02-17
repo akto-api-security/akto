@@ -48,19 +48,25 @@ function Billing() {
     })
 
     async function refreshUsageData(){
-        await billingApi.refreshUsageData({organizationId: window.STIGG_CUSTOMER_ID})
+        await billingApi.refreshUsageData()
+        func.setToast(true, false, `Syncing usage data. Please refresh after some time.`)
+        setTimeout(() => {
+            window.location.reload();
+        }, 10000)
     }
 
 
     const usageTitle = (
-        <div>
-            <Box paddingBlockEnd="4">
-                <Text variant="headingMd">Your plan</Text>
-            </Box>
-            <Button onClick={() => refreshUsageData()}>
-                Sync usage data
-            </Button>
-        </div>
+        <Box paddingBlockEnd="4">
+            <HorizontalStack align="space-between" blockAlign="center">
+                <Box>
+                    <Text variant="headingMd">Your plan</Text>
+                </Box>
+                <Button onClick={() => refreshUsageData()}>
+                    Sync usage data
+                </Button>
+            </HorizontalStack>
+        </Box>
     )
 
     const usageInfo = (
