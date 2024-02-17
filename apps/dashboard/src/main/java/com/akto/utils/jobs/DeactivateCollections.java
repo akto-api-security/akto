@@ -3,6 +3,7 @@ package com.akto.utils.jobs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -77,7 +78,7 @@ public class DeactivateCollections {
         apiCollectionsAction.fetchAllCollections();
         List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();
 
-        List<Integer> demoIds = UsageMetricCalculator.getDemos();
+        Set<Integer> demoIds = UsageMetricCalculator.getDemos();
         apiCollections.removeIf(apiCollection -> demoIds.contains(apiCollection.getId()));
         apiCollections.removeIf(apiCollection -> apiCollection.isDeactivated());
         apiCollections.removeIf(apiCollection -> ApiCollection.Type.API_GROUP.equals(apiCollection.getType()));
@@ -120,9 +121,7 @@ public class DeactivateCollections {
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
 
-        if(!apiCollectionIds.isEmpty()) {
-            ApiCollectionsDao.instance.deleteAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()));
-        }
+        // TODO: handle case for API groups.
 
         return overage;
     }

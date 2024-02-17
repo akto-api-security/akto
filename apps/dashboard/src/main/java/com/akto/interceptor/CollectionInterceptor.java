@@ -1,6 +1,6 @@
 package com.akto.interceptor;
 
-import java.util.List;
+import java.util.Set;
 
 import com.akto.action.TrafficAction;
 import com.akto.action.observe.InventoryAction;
@@ -17,7 +17,7 @@ public class CollectionInterceptor extends AbstractInterceptor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class);
 
     boolean checkDeactivated(int apiCollectionId) {
-        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         return deactivatedCollections.contains(apiCollectionId);
     }
 

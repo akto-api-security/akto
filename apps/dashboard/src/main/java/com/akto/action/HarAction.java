@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class HarAction extends UserAction {
@@ -45,8 +46,8 @@ public class HarAction extends UserAction {
          * We need to allow the first time creation for demo collections 
          * thus calculating them before creation.
          */
-        List<Integer> demoCollections = UsageMetricCalculator.getDemos();
-        List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
