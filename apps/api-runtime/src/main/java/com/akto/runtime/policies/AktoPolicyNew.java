@@ -94,6 +94,12 @@ public class AktoPolicyNew {
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
         try {
             if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+            /*
+             * this check on apiInfo
+             * res.getInsertedCount() + Current usage > Limit
+             * Do calcAndDelete on this condition only.
+
+             */
             if (!redact && writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
