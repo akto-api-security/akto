@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -225,7 +226,12 @@ public class Main {
                     return;
                 }
 
-                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                int usageLatchCount = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
+                if (featureAccess.checkBooleanOrUnlimited()) {
+                    usageLatchCount = Integer.MAX_VALUE;
+                }
+
+                CountDownLatch usageLatch = new CountDownLatch(usageLatchCount);
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -266,7 +272,7 @@ public class Main {
 
                         }
                     }
-                    testExecutor.init(testingRun, summaryId, syncLimit);
+                    testExecutor.init(testingRun, summaryId, usageLatch);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);

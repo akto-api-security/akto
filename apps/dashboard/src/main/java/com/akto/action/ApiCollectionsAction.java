@@ -461,6 +461,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -486,6 +487,7 @@ public class ApiCollectionsAction extends UserAction {
             addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         return Action.SUCCESS.toUpperCase();
     }
     public String fetchCustomerEndpoints(){
