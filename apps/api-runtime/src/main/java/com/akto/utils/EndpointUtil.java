@@ -10,6 +10,7 @@ import java.util.Set;
 import org.bson.conversions.Bson;
 
 import com.akto.billing.UsageMetricHandler;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.SingleTypeInfoDao;
@@ -37,7 +38,13 @@ public class EndpointUtil {
     public static void calcAndDeleteEndpoints() {
         // check if overage happened and delete over the limit data
         int accountId = Context.accountId.get();
-        FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, accountId);
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
+
+        if (featureAccess.checkBooleanOrUnlimited() || featureAccess.getGracePeriod() > 0) {
+            return;
+        }
+
+        featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, accountId);
 
         if (featureAccess.checkInvalidAccess()) {
 

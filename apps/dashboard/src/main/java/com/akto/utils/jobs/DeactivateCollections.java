@@ -9,6 +9,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import com.akto.action.ApiCollectionsAction;
+import com.akto.billing.UsageMetricHandler;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
@@ -70,6 +71,8 @@ public class DeactivateCollections {
             String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());
             loggerMaker.errorAndAddToDb(e, errorMessage, LogDb.DASHBOARD);
         }
+
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
     }
 
     private static int deactivateCollectionsForAccount(int overage, int measureEpoch) {
