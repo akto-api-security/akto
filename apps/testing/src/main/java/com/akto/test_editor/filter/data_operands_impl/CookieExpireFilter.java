@@ -70,6 +70,6 @@ public class CookieExpireFilter extends DataOperandsImpl {
                 res = true;
             }
         }
-        return result && res;
+        return result == res;
     }
 }
