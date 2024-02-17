@@ -1,11 +1,13 @@
-package com.akto.utils.usage;
+package com.akto.usage;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.Account;
 import com.akto.dto.billing.Organization;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class OrgUtils {
@@ -18,10 +20,11 @@ public class OrgUtils {
                 )
         );
 
+        if(organization == null) return new ArrayList<>();
 
         return AccountsDao.instance.findAll(
                 Filters.and(
-                        Filters.in("_id", organization.getAccounts())
+                        Filters.in(Constants.ID, organization.getAccounts())
                 ));
     }
 }
