@@ -21,7 +21,7 @@ import org.junit.Test;
 
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 public class TestApiCatalogSync extends MongoBasedTest {
     public void testInitializer() {
@@ -203,6 +203,21 @@ public class TestApiCatalogSync extends MongoBasedTest {
         }
 
         return res;
+    }
+
+    @Test
+    public void testIsNumber() {
+        boolean result = APICatalogSync.isNumber("a");
+        assertFalse(result);
+
+        result = APICatalogSync.isNumber("1000.32");
+        assertFalse(result);
+
+        result = APICatalogSync.isNumber("10000");
+        assertTrue(result);
+
+        result = APICatalogSync.isNumber("716520346144920");
+        assertTrue(result);
     }
 
 }

@@ -89,7 +89,10 @@ public class APICatalog {
     }
 
     public static boolean isTemplateUrl(String url) {
-        return url.contains("STRING") || url.contains("INTEGER");
+        return url.contains(SingleTypeInfo.SuperType.STRING.name()) ||
+                url.contains(SingleTypeInfo.SuperType.INTEGER.name()) ||
+                url.contains(SingleTypeInfo.SuperType.FLOAT.name()) ||
+                url.contains(SingleTypeInfo.SuperType.OBJECT_ID.name());
     }
 
     @Override
