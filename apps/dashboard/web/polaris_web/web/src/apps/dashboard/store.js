@@ -34,6 +34,22 @@ let store = (set)=>({
     setAllRoutes:(allRoutes)=>{
         set({allRoutes: allRoutes})
     },
+    confirmationModalConfig: {
+        modalContent: "", 
+        primaryActionContent: "Confirm", 
+        primaryAction: ()=>{},
+        show: false
+    },
+    setConfirmationModalConfig: (updateConfirmationModal) => {
+        set({
+            confirmationModalConfig: {
+                modalContent: updateConfirmationModal.modalContent,
+                primaryActionContent: updateConfirmationModal.primaryActionContent,
+                primaryAction: updateConfirmationModal.primaryAction,
+                show: updateConfirmationModal.show
+            }
+        })
+    },
     
 })
 

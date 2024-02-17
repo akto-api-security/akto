@@ -617,7 +617,7 @@ public class TestExecutor {
         return true;
     }
 
-    List<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
