@@ -884,5 +884,57 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(0, dbState.getTemplateURLToMethods().size());
 
     }
+    @Test
+    public void testMultipleLongMerging() {
+        testInitializer();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+        String url = "/api";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        long maxInt = Integer.MAX_VALUE;
+
+        HttpResponseParams resp = createSampleParams("user1", url + "/books/" + (maxInt + 1) + "/cars/" + (maxInt + 3));
+        responseParams.add(resp);
+
+        parser.syncFunction(responseParams, true, true, null);
+        parser.apiCatalogSync.syncWithDB(true, true);
+
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        assertEquals(1, templateURLToMethods.size());
+
+        URLTemplate urlTemplate = (URLTemplate)  templateURLToMethods.keySet().toArray()[0];
+        assertEquals("api/books/INTEGER/cars/INTEGER", urlTemplate.getTemplateString());
+
+        parser.syncFunction(responseParams, true, true, null);
+        parser.apiCatalogSync.syncWithDB(true, true);
+    }
+
+    @Test
+    public void testMultipleFloatMerging() {
+        testInitializer();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+        String url = "/api";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        float val = new Float("1.3");
+
+        HttpResponseParams resp = createSampleParams("user1", url + "/books/" + (val+ 1) + "/cars/" + (val+ 3));
+        responseParams.add(resp);
+
+        parser.syncFunction(responseParams, true, true, null);
+        parser.apiCatalogSync.syncWithDB(true, true);
+
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        assertEquals(1, templateURLToMethods.size());
+
+        URLTemplate urlTemplate = (URLTemplate)  templateURLToMethods.keySet().toArray()[0];
+        assertEquals("api/books/FLOAT/cars/FLOAT", urlTemplate.getTemplateString());
+
+        parser.syncFunction(responseParams, true, true, null);
+        parser.apiCatalogSync.syncWithDB(true, true);
+    }
+
 
 }

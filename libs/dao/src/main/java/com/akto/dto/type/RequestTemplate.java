@@ -764,7 +764,11 @@ public class RequestTemplate {
             Object val = tokenizedUrl[idx];
 
             if (superType.equals(SuperType.INTEGER)) {
-                val = Integer.parseInt(val.toString());
+                try {
+                    val = Integer.parseInt(val.toString());
+                } catch (Exception e) {
+                    val = Long.parseLong(val.toString());
+                }
             } else if (superType.equals(SuperType.FLOAT)) {
                 val = Float.parseFloat(val.toString());
             }
