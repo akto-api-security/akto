@@ -20,6 +20,7 @@ public class ApiCollection {
     public static final String NAME = "name";
     String name;
     int startTs;
+    public static final String _URLS = "urls";
     Set<String> urls;
     public static final String URLS_STRING = "urls";
     String hostName;
@@ -37,6 +38,9 @@ public class ApiCollection {
     int urlsCount;
 
     public static final String VXLAN_ID = "vxlanId";
+
+    public static final String _DEACTIVATED = "deactivated";
+    boolean deactivated;
 
     public enum Type {
         API_GROUP
@@ -136,6 +140,15 @@ public class ApiCollection {
     public void setUrlsCount(int urlsCount) {
         this.urlsCount = urlsCount;
     }
+
+    public boolean isDeactivated() {
+        return deactivated;
+    }
+
+    public void setDeactivated(boolean deactivated) {
+        this.deactivated = deactivated;
+    }
+
     // to be used in front end
     public String getDisplayName() {
         String result;

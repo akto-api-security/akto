@@ -458,6 +458,36 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     }
 
+    public static final int LARGE_LIMIT = 10_000;
+
+    public int countEndpoints(Bson filters) {
+        int ret = 0;
+
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+
+        Bson projections = Projections.fields(
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS));
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.match(filters));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.limit(LARGE_LIMIT));
+        pipeline.add(Aggregates.count());
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while (endpointsCursor.hasNext()) {
+            ret = endpointsCursor.next().getInt("count");
+            break;
+        }
+
+        return ret;
+    }
+
     public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
         Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;

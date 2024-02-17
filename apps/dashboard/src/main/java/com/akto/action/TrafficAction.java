@@ -99,6 +99,10 @@ public class TrafficAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public int getApiCollectionId() {
+        return apiCollectionId;
+    }
+
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
