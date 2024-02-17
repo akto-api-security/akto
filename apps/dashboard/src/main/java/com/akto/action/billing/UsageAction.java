@@ -3,24 +3,32 @@ package com.akto.action.billing;
 import com.akto.action.UserAction;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.listener.InitializerListener;
-import com.akto.stigg.StiggReporterClient;
+import com.akto.billing.UsageMetricHandler;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.User;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
-
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.concurrent.ExecutorService;
+import com.akto.usage.OrgUtils;
+import com.mongodb.client.model.Filters;
+
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class UsageAction extends UserAction {
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static final String[] freeDomains = new String[] {"gmail.com","yahoo.com","hotmail.com","aol.com","hotmail.co.uk",
             "hotmail.fr","msn.com","yahoo.fr","wanadoo.fr","orange.fr","comcast.net","yahoo.co.uk","yahoo.com.br",
@@ -37,7 +45,8 @@ public class UsageAction extends UserAction {
             "mac.com","centurytel.net","chello.nl","live.ca","aim.com","bigpond.net.au"};
 
     public static final HashSet<String> freeDomainsSet = new HashSet<>(Arrays.asList(freeDomains));
-    public static final ExecutorService ex = Executors.newFixedThreadPool(1);
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
 
     String customerId;
     String planId;
@@ -112,6 +121,43 @@ public class UsageAction extends UserAction {
 
 
         this.customerToken = OrganizationUtils.fetchSignature(customerId, orgUser);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String refreshUsageData(){
+        User sUser = getSUser();
+        int anyAccountId = Integer.parseInt(sUser.findAnyAccountId());
+        
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, anyAccountId));
+
+        if(organization == null){
+            addActionError("Organization not found");
+            return ERROR.toUpperCase();
+        }
+
+        // calculation may take time, so we do it in a separate thread to avoid timeout.
+        executorService.schedule(new Runnable() {
+            public void run() {
+
+                OrgUtils.getSiblingAccounts(anyAccountId).forEach(account -> {
+                    loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(),
+                            LogDb.DASHBOARD);
+                    Context.accountId.set(account.getId());
+                    int accountId = account.getId();
+                    UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
+                });
+
+                try {
+                    String orgId = organization.getId();
+                    loggerMaker.infoAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
+                    OrganizationUtils.flushUsagePipelineForOrg(orgId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
 
         return SUCCESS.toUpperCase();
     }

@@ -9,9 +9,7 @@ public class TestResult extends GenericTestResult {
     private String message;
     public static final String _ERRORS = "errors";
     private List<String> errors;
-    
     public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
-
     private String originalMessage;
     private double percentageMatch;
     private TestInfo testInfo;
@@ -37,7 +35,8 @@ public class TestResult extends GenericTestResult {
         EXECUTION_FAILED("Test execution failed"),
         INVALID_EXECUTION_BLOCK("Invalid test execution block in template"),
         NO_API_REQUEST("No test requests created"),
-        DEACTIVATED_ENDPOINT("This is a deactivated endpoint");
+        DEACTIVATED_ENDPOINT("This is a deactivated endpoint"),
+        USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution");
 
         private final String message;
 

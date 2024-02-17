@@ -17,6 +17,8 @@ public class UsageMetric {
     private MetricTypes metricType;
     public static final String METRIC_TYPE = "metricType";
     private int recordedAt;
+    public static final String RECORDED_AT = "recordedAt";
+    public static final String _USAGE = "usage";
     private int usage;
     private String dashboardMode;
     private String dashboardVersion;
@@ -25,6 +27,7 @@ public class UsageMetric {
     private boolean syncedWithAkto;
     public static final String SYNCED_WITH_AKTO = "syncedWithAkto";
     private String ipAddress;
+    public static final String SYNC_EPOCH = "syncEpoch";
     private int syncEpoch;
     private int measureEpoch;
     private int aktoSaveEpoch;

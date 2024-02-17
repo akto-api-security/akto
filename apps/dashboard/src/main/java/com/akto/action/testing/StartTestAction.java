@@ -1,8 +1,9 @@
 package com.akto.action.testing;
 
-import com.akto.DaoInit;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.billing.UsageMetricHandler;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -12,15 +13,15 @@ import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -35,7 +36,6 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -674,6 +674,11 @@ public class StartTestAction extends UserAction {
         Runnable r = () -> {
             Context.accountId.set(accountId);
             DeleteTestRunsDao.instance.deleteTestRunsFromDb(DeleteTestRuns);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+            if (featureAccess.checkBooleanOrUnlimited() || featureAccess.getGracePeriod() > 0) {
+                return;
+            }
+            UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
         };
         executorService.submit(r);
     }

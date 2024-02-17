@@ -5,6 +5,8 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
+import com.akto.billing.UsageMetricHandler;
+import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
@@ -74,7 +76,7 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
-    
+
     public static List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
 
@@ -193,6 +195,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
         for(ApiCollection collection: apiGroups){
             List<TestingEndpoints> conditions = collection.getConditions();
@@ -296,7 +299,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.insertOne(apiCollection);
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-
+        
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
@@ -322,7 +325,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -458,6 +461,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -483,6 +487,7 @@ public class ApiCollectionsAction extends UserAction {
             addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
+        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
         return Action.SUCCESS.toUpperCase();
     }
     public String fetchCustomerEndpoints(){

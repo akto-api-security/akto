@@ -63,7 +63,7 @@ public class UsageMetricCalculator {
 
         return deactivatedIds;
     }
-    
+
     public static Bson excludeDemosAndDeactivated(String key){
         List<Integer> demos = new ArrayList<>(getDemos());
         List<Integer> deactivated = new ArrayList<>(getDeactivated());
@@ -75,13 +75,15 @@ public class UsageMetricCalculator {
     public static List<String> getInvalidTestErrors() {
         List<String> invalidErrors = new ArrayList<String>() {{
             add(TestResult.TestError.DEACTIVATED_ENDPOINT.toString());
+            add(TestResult.TestError.USAGE_EXCEEDED.getMessage());
         }};
         return invalidErrors;
     }
 
+    // cache this API call.    
+
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
-
         int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
@@ -159,7 +161,13 @@ public class UsageMetricCalculator {
         String jsonString = gson.toJson(activeAccounts);
         usageMetric.setMetadata(jsonString);
 
-        return accounts.size();
+        /*
+         * since we are running this query for each account,
+         * and while consolidating the usage metrics
+         * we are summing up the usage metrics for each account,
+         * thus to avoid over counting, we should just return 1 here.
+         */
+        return 1;
     }
     
     public static void calculateUsageMetric(UsageMetric usageMetric) {
