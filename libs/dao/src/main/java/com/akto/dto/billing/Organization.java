@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Set;
 import org.bson.codecs.pojo.annotations.BsonId;
 
+import com.akto.dao.context.Context;
+
 public class Organization {
     
     // Change this to use a UUID
@@ -29,6 +31,11 @@ public class Organization {
 
     public static final String GRACE_PERIOD = "gracePeriod";
     private int gracePeriod;
+
+    public static final String _EXPIRED = "expired";
+    private boolean expired;
+
+    public static final int NO_SYNC_PERIOD = 60 * 60 * 24 * 3; // 3 days.
 
     public Organization() { }
 
@@ -111,5 +118,25 @@ public class Organization {
 
     public void setLastFeatureMapUpdate(int lastFeatureMapUpdate) {
         this.lastFeatureMapUpdate = lastFeatureMapUpdate;
+    }
+
+    public boolean isExpired() {
+        return expired;
+    }
+
+    public void setExpired(boolean expired) {
+        this.expired = expired;
+    }
+
+    public boolean checkExpirationWithAktoSync() {
+
+        if (expired ||
+                (((lastFeatureMapUpdate > 0) &&
+                        (lastFeatureMapUpdate + Organization.NO_SYNC_PERIOD < Context.now())) &&
+                        (featureWiseAllowed == null || featureWiseAllowed.isEmpty()))) {
+            return true;
+        }
+
+        return false;
     }
 }
