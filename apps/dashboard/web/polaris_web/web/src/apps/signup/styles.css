@@ -8,5 +8,5 @@
 }
 
 .login-page .Polaris-Frame__Main{
-    background: #FAFBFB !important;
+    background: var(--white) !important;
 }
