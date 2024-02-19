@@ -1,43 +1,61 @@
 package com.akto.testing;
 
-import okhttp3.ConnectionPool;
-import okhttp3.OkHttpClient;
+import com.akto.dto.testing.TestingRunResult;
+import okhttp3.*;
+import org.jetbrains.annotations.NotNull;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class HTTPClientHandler {
     private int readTimeout = 30;
     private final OkHttpClient clientWithoutFollowRedirect;
     private final OkHttpClient clientWithFollowRedirect;
+
+    private static OkHttpClient.Builder builder(boolean followRedirects, int readTimeout) {
+        return new OkHttpClient().newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(readTimeout, TimeUnit.SECONDS)
+                .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
+                .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
+                .hostnameVerifier((hostname, session) -> true)
+                .followRedirects(followRedirects);
+    }
+
     private HTTPClientHandler(boolean isSaas) {
-        if(isSaas) {
-            readTimeout = 60;
+        if(isSaas) readTimeout = 60;
+
+        clientWithoutFollowRedirect = builder(false, readTimeout).build();
+        clientWithFollowRedirect = builder(true, readTimeout).build();
+    }
+
+    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs) {
+        if(isSaas) readTimeout = 60;
+        return builder(followRedirects, readTimeout).addNetworkInterceptor(new ResponseInterceptor(testLogs)).build();
+    }
+
+    static class ResponseInterceptor implements Interceptor {
+        List<TestingRunResult.TestLog> testLogs;
+        @Override
+        public @NotNull Response intercept(Chain chain) throws IOException {
+            Request request = chain.request();
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
+            Response response = chain.proceed(request);
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response code for " + request.url() + ": " + response.code()));
+            return response;
         }
-        clientWithoutFollowRedirect = new OkHttpClient().newBuilder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(readTimeout, TimeUnit.SECONDS)
-                .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
-                .followRedirects(false)
-                .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
-                .hostnameVerifier((hostname, session) -> true)
-                .build();
 
-        clientWithFollowRedirect = new OkHttpClient().newBuilder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(readTimeout, TimeUnit.SECONDS)
-                .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
-                .followRedirects(true)
-                .sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0])
-                .hostnameVerifier((hostname, session) -> true)
-                .build();
-
+        public ResponseInterceptor(List<TestingRunResult.TestLog> testLogs) {
+            this.testLogs = testLogs;
+        }
     }
 
     private static final TrustManager[] trustAllCerts = new TrustManager[] {
