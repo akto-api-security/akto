@@ -42,6 +42,10 @@ const editorSetup = {
         languages.setLanguageConfiguration("custom_yaml", conf);
     },
 
+    // taking https://github.com/Microsoft/monaco-editor/issues/338 this as reference
+    // monaco editor doesn't support multiple custom themes to be rendered simultaneosuly
+    // thus here we have changed the name of the token
+    
     setEditorTheme: function(){
         editor.defineTheme("customTheme", {
             base: "vs",
