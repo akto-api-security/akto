@@ -65,6 +65,8 @@ const sortOptions = [
     { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
     { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
     { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
+    { label: 'Traffic seen', value: 'detectedTimestamp asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp' },
+    { label: 'Traffic seen', value: 'detectedTimestamp desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp' },
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
     { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' },
   ];        
@@ -99,6 +101,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+            detectedTimestamp : trafficInfoMap[c.id] || 0,
             riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
         }
     })
@@ -257,7 +260,10 @@ function ApiCollections() {
             actions.push(
                 {
                     content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
+                    onAction: () =>  {
+                        const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
+                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                    }
                 }
             )
         }
