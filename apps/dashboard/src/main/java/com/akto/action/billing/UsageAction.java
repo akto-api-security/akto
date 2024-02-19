@@ -3,11 +3,9 @@ package com.akto.action.billing;
 import com.akto.action.UserAction;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
@@ -18,6 +16,7 @@ import io.micrometer.core.instrument.util.StringUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import com.akto.usage.OrgUtils;
+import com.akto.usage.UsageMetricHandler;
 import com.mongodb.client.model.Filters;
 
 import java.util.concurrent.Executors;
@@ -146,7 +145,7 @@ public class UsageAction extends UserAction {
                             LogDb.DASHBOARD);
                     Context.accountId.set(account.getId());
                     int accountId = account.getId();
-                    UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
+                    UsageMetricHandler.calcAndSyncAccountUsage(accountId);
                 });
 
                 try {
