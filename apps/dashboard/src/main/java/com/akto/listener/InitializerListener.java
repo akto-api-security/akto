@@ -58,7 +58,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
-import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
@@ -2104,83 +2104,12 @@ public class InitializerListener implements ServletContextListener {
             @Override
             public void accept(Account a) {
                 int accountId = a.getId();
-
-                try {
-                    // Get organization to which account belongs to
-                    Organization organization = OrganizationsDao.instance.findOne(
-                            Filters.in(Organization.ACCOUNTS, accountId)
-                    );
-
-                    if (organization == null) {
-                        loggerMaker.errorAndAddToDb("Organization not found for account: " + accountId, LogDb.DASHBOARD);
-                        return;
-                    }
-
-                    loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
-
-                    String organizationId = organization.getId();
-
-                    for (MetricTypes metricType : MetricTypes.values()) {
-
-                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
-                        );
-
-                        if (usageMetricInfo == null) {
-                            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-                            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-                        }
-
-                        int syncEpoch = usageMetricInfo.getSyncEpoch();
-                        int measureEpoch = usageMetricInfo.getMeasureEpoch();
-
-                        // Reset measureEpoch every month
-                        if (Context.now() - measureEpoch > 2629746) {
-                            if (syncEpoch > Context.now() - 86400) {
-                                measureEpoch = Context.now();
-
-                                UsageMetricInfoDao.instance.updateOne(
-                                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
-                                );
-                            }
-
-                        }
-
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                                AccountSettingsDao.generateFilter()
-                        );
-                        String dashboardMode = DashboardMode.getDashboardMode().toString();
-                        String dashboardVersion = accountSettings.getDashboardVersion();
-
-                        UsageMetric usageMetric = new UsageMetric(
-                                organizationId, accountId, metricType, syncEpoch, measureEpoch,
-                                dashboardMode, dashboardVersion
-                        );
-
-                        //calculate usage for metric
-                        UsageMetricCalculator.calculateUsageMetric(usageMetric);
-
-                        UsageMetricsDao.instance.insertOne(usageMetric);
-                        loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
-
-                        UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
-
-                        UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
-                        loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
-                                        usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()),
-                                LogDb.DASHBOARD
-                        );
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
-                }
+                UsageMetricHandler.calcAndSyncAccountUsage(accountId);
             }
         }, "usage-scheduler");
 
         isCalcUsageRunning = false;
     }
-
 
     static boolean isSyncWithAktoRunning = false;
     public static void syncWithAkto() {
