@@ -299,7 +299,8 @@ public class Build {
                 for (KVPair kvPair: kvPairs) {
                     if (kvPair.isHeader()) {
                         String value = kvPair.getValue()+"";
-                        String headerValue = rawApi.getRequest().findHeaderValue(kvPair.getKey());
+                        String headerValue = rawApi.getRequest().findHeaderValueIncludingInCookie(kvPair.getKey());
+                        if (headerValue == null) continue;
                         String[] headerValueSplit = headerValue.split(" ");
                         if (headerValueSplit.length == 2) {
                             String prefix = headerValueSplit[0];
