@@ -8,11 +8,7 @@ import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.YamlTestResult;
+import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
@@ -55,10 +51,10 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public boolean checkAuthBeforeExecution() {
+    public boolean checkAuthBeforeExecution(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
-            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes);
+            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
@@ -72,10 +68,10 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public YamlTestResult executor() {
+    public YamlTestResult executor(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
         YamlTestResult results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
-                this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes);
+                this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes, debug, testLogs);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }

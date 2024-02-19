@@ -184,7 +184,7 @@ public class Build {
 
                 OriginalHttpResponse response = null;
                 try {
-                    response = ApiExecutor.sendRequest(request,false, testingRunConfig);
+                    response = ApiExecutor.sendRequest(request,false, testingRunConfig, false, new ArrayList<>());
                     apisReplayedSet.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
                     request.getHeaders().remove(AccountSettings.AKTO_IGNORE_FLAG);
                     ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));

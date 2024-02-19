@@ -86,7 +86,7 @@ public class StatusCodeAnalyser {
                     if (idx > 0) url += "akto-"+idx; // we want to hit host url once too
 
                     OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
-                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig);
+                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>());
                     boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
                     if (!isStatusGood) continue;
 
@@ -202,7 +202,7 @@ public class StatusCodeAnalyser {
         if (!result) return false;
 
         // execute API
-        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true, testingRunConfig);
+        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>());
 
         // if non 2xx then skip this api
         if (finalResponse.getStatusCode() < 200 || finalResponse.getStatusCode() >= 300) return false;
