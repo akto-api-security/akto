@@ -1,6 +1,7 @@
 package com.akto.dto.dependency_flow;
 
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -33,6 +34,24 @@ public class Node {
         if (o == null || getClass() != o.getClass()) return false;
         Node node = (Node) o;
         return apiCollectionId.equals(node.apiCollectionId) && url.equals(node.url) && method.equals(node.method);
+    }
+
+    public void replaceDots() {
+        Map<String, Connection> updatedConnections = new HashMap<>();
+        for (Map.Entry<String, Connection> entry : connections.entrySet()) {
+            String modifiedKey = entry.getKey().replace(".", "[dot]");
+            updatedConnections.put(modifiedKey, entry.getValue());
+        }
+        this.connections = updatedConnections;
+    }
+
+    public void addDotsBack() {
+        Map<String, Connection> updatedConnections = new HashMap<>();
+
+        for (Map.Entry<String, Connection> entry : connections.entrySet()) {
+            String modifiedKey = entry.getKey().replace("[dot]", ".");
+            updatedConnections.put(modifiedKey, entry.getValue());
+        }
     }
 
     @Override
