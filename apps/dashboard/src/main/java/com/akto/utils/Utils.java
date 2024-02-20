@@ -67,6 +67,41 @@ public class Utils {
 
                         }
                     }
+                    break;
+                case "apikey":
+                    ArrayNode apikeyParams = (ArrayNode) auth.get("apikey");
+                    String authKeyName = "", authValueName = "";
+                    for (JsonNode apikeyHeader : apikeyParams) {
+                        String key = apikeyHeader.get("key").asText();
+                        String value = apikeyHeader.get("value").asText();
+
+                        switch (key) {
+                            case "key":
+                                authKeyName = replaceVariables(value, variableMap);
+                                break;
+                            case "value":
+                                authValueName = replaceVariables(value, variableMap);
+                                break;
+
+                            case "in":
+                                if (!value.equals("header")) {
+                                    throw new IllegalArgumentException("Only header supported in apikey");
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    if (authKeyName.isEmpty() || authValueName.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
+                    } else {
+                        result.put(authKeyName, authValueName);
+                    }
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported auth type: " + authType );
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Unable to parse auth from postman file: " + e.getMessage(), LogDb.DASHBOARD);
