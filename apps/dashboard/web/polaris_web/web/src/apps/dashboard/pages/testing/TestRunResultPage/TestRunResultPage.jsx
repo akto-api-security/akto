@@ -249,7 +249,7 @@ function TestRunResultPage(props) {
               <VerticalStack gap={1}>
                   
                     {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
-                      {"[" + x["testLogType"] + "] " +x["message"]}
+                      {"[" + x["timestamp"] + "] "+  "[" + x["testLogType"] + "] " +x["message"]}
                       </div>)}
               </VerticalStack>
             </Scrollable>
