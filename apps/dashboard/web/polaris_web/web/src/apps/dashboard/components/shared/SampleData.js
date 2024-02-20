@@ -3,6 +3,7 @@ import * as monaco from "monaco-editor"
 import "./style.css";
 import func from "@/util/func"
 import editorSetup from './customEditor';
+import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -208,7 +209,7 @@ function SampleData(props) {
           options['theme']= "customTheme"
           editorSetup.registerLanguage()
           editorSetup.setTokenizer()
-          editorSetup.setEditorTheme()
+          yamlEditorSetup.setEditorTheme()
         }
         if(showDiff){
           instance = monaco.editor.createDiffEditor(ref.current, options)
