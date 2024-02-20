@@ -79,6 +79,13 @@ public class ApiExecutor {
 
         int statusCode = response.code();
         Headers headers = response.headers();
+
+        Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
+
+        return new OriginalHttpResponse(body, responseHeaders, statusCode);
+    }
+
+    public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
         Iterator<Pair<String, String>> headersIterator = headers.iterator();
         Map<String, List<String>> responseHeaders = new HashMap<>();
         while (headersIterator.hasNext()) {
@@ -91,7 +98,7 @@ public class ApiExecutor {
             responseHeaders.get(headerKey).add(headerValue);
         }
 
-        return new OriginalHttpResponse(body, responseHeaders, statusCode);
+        return responseHeaders;
     }
 
     public static String replaceHostFromConfig(String url, TestingRunConfig testingRunConfig) {
