@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.dto.testing.TestingRunResult;
 import okhttp3.*;
+import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
 
 import javax.net.ssl.SSLContext;
@@ -48,8 +49,25 @@ public class HTTPClientHandler {
         public @NotNull Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
+
+            Buffer buffer = new Buffer();
+            RequestBody requestBody = request.body();
+            if (requestBody != null) {
+                requestBody.writeTo(buffer);
+                String requestBodyString = buffer.readUtf8();
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Body: " + requestBodyString));
+            }
+
             Response response = chain.proceed(request);
-            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response code for " + request.url() + ": " + response.code()));
+
+            ResponseBody responseBody = response.peekBody(1024*1024);
+            try {
+                String body = responseBody.string();
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + response.code()));
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             return response;
         }
 
