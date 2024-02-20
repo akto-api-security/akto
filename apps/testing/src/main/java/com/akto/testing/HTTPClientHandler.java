@@ -89,11 +89,11 @@ public class HTTPClientHandler {
         public @NotNull Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
 
-            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
-
             Map<String,List<String>> requestHeadersMap = ApiExecutor.generateHeadersMapFromHeadersObject(request.headers());;
             String requestHeadersString = RawApi.convertHeaders(requestHeadersMap);
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Headers: " + requestHeadersString));
+
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
 
             Response response = chain.proceed(request);
 
