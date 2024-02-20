@@ -4,6 +4,7 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.ByteArrayWrapper;
+import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
 import com.akto.util.Pair;
 import com.mongodb.client.model.Filters;
@@ -18,7 +19,7 @@ import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirecto
 
 public class GithubAccountTask {
 
-    private static final Logger logger = LoggerFactory.getLogger(AccountTask.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(GithubAccountTask.class, LoggerMaker.LogDb.DASHBOARD);
     public static final GithubAccountTask instance = new GithubAccountTask();
 
     public void executeTask(Consumer<Pair<Account, ByteArrayWrapper>> consumeAccount, String taskName) {
@@ -28,22 +29,11 @@ public class GithubAccountTask {
                 Filters.eq(Account.INACTIVE_STR, false)
         );
 
-        GithubSync githubSync = new GithubSync();
-        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
-        if(repoZip == null) {
-            logger.info("Failed to load test templates from github, trying to load from local directory");
-            repoZip = loadTemplateFilesFromDirectory();
-            if(repoZip == null) {
-                logger.error("Failed to load test templates from github or local directory");
-                return;
-            } else {
-                logger.info("Loaded test templates from local directory");
-            }
-        } else {
-            logger.info("Loaded test templates from github");
+        ByteArrayWrapper baw = getTestingTemplates();
+        if (baw == null) {
+            loggerMaker.errorAndAddToDb("Failed to load test templates");
+            return;
         }
-
-        ByteArrayWrapper baw = new ByteArrayWrapper(repoZip);
 
         List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
         for(Account account: activeAccounts) {
@@ -52,8 +42,27 @@ public class GithubAccountTask {
                 consumeAccount.accept(new Pair<>(account, baw));
             } catch (Exception e) {
                 String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
-                logger.error(msgString, e);
+                loggerMaker.errorAndAddToDb(e, msgString);
             }
         }
     }
+
+    public static ByteArrayWrapper getTestingTemplates() {
+        GithubSync githubSync = new GithubSync();
+        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+        if(repoZip == null) {
+            loggerMaker.infoAndAddToDb("Failed to load test templates from github, trying to load from local directory");
+            repoZip = loadTemplateFilesFromDirectory();
+            if(repoZip == null) {
+                loggerMaker.errorAndAddToDb("Failed to load test templates from github or local directory");
+                return null;
+            } else {
+                loggerMaker.infoAndAddToDb("Loaded test templates from local directory");
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("Loaded test templates from github");
+        }
+        return new ByteArrayWrapper(repoZip);
+    }
+
 }

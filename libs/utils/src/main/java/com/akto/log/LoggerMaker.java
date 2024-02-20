@@ -64,6 +64,7 @@ public class LoggerMaker  {
         TESTING,RUNTIME,DASHBOARD,BILLING
     }
 
+    @Deprecated
     public LoggerMaker(Class<?> c) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
@@ -115,6 +116,10 @@ public class LoggerMaker  {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void errorAndAddToDb(Exception e, String err) {
+        errorAndAddToDb(e, err, this.db);
     }
 
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
