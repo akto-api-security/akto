@@ -60,14 +60,20 @@ public class HTTPClientHandler {
 
             Response response = chain.proceed(request);
 
-            ResponseBody responseBody = response.peekBody(1024*1024);
-            try {
-                String body = responseBody.string();
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + response.code()));
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (response == null) {
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + 0));
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: null"));
+            } else {
+                ResponseBody responseBody = response.peekBody(1024*1024);
+                try {
+                    String body = responseBody != null ? responseBody.string() : "null";
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + response.code()));
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
+
             return response;
         }
 
