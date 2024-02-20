@@ -42,6 +42,10 @@ const editorSetup = {
         languages.setLanguageConfiguration("custom_yaml", conf);
     },
 
+    // taking https://github.com/Microsoft/monaco-editor/issues/338 this as reference
+    // monaco editor doesn't support multiple custom themes to be rendered simultaneosuly
+    // thus here we have changed the name of the token
+    
     setEditorTheme: function(){
         editor.defineTheme("customTheme", {
             base: "vs",
@@ -53,7 +57,15 @@ const editorSetup = {
                 { token: "string", foreground: "#0451a5" },
                 { token: "rawString", foreground: "#0451a5" },
                 { token: "identifier", foreground: "#0451a5" },
-                { token: "number", foreground: "#098658"}
+                { token: "number", foreground: "#098658"},
+                { token: 'comment-http', foreground: '#008800', fontStyle: 'italic' },
+                { token: 'keyword-http', foreground: '#0000FF' },
+                { token: 'key-http', foreground: '#A31515'}, // Color for keys
+                { token: 'string-http', foreground: '0451A5' }, // Assuming you meant this for string values
+                { token: 'number-http', foreground: '#0451A5', fontStyle: "bold" }, // Color for numbers
+                { token: 'value-http', foreground: '#0451A5' }, // Color for values
+                { token: 'delimiter-http', foreground: '#000000'}, // Corrected typo here
+                { token: 'default', foreground: '#0451A5'} 
             ],
                 colors: {
                     'editorLineNumber.foreground': '#999999',
