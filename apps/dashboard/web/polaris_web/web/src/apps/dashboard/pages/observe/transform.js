@@ -535,7 +535,7 @@ const transform = {
     async fetchRiskScoreInfo(){
         let tempRiskScoreObj = lastFetchedResp
         let tempSeverityObj = lastFetchedSeverityResp
-        await api.lastUpdatedInfo().then(async(resp) => {
+        api.lastUpdatedInfo().then(async(resp) => {
             if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap >= lastFetchedInfo.lastSensitiveInfo){
                 await api.getRiskScoreInfo().then((res) =>{
                     const newObj = {
