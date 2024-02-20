@@ -70,11 +70,8 @@ import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.tasks.OrganizationTask;
-import com.akto.utils.Auth0;
+import com.akto.utils.*;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubSync;
-import com.akto.utils.HttpUtils;
-import com.akto.utils.RedactSampleData;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.billing.OrganizationUtils;
@@ -1190,17 +1187,17 @@ public class InitializerListener implements ServletContextListener {
             );
         }
     }
-    public static void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
-        if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
-            String resourceName = "/tests-library-master.zip";
+    public static byte[] loadTemplateFilesFromDirectory() {
+        String resourceName = "/tests-library-master.zip";
 
-            loggerMaker.infoAndAddToDb("Loading template files from directory", LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("Loading template files from directory", LogDb.DASHBOARD);
 
-            try (InputStream is = InitializerListener.class.getResourceAsStream(resourceName);
-                ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+        try (InputStream is = InitializerListener.class.getResourceAsStream(resourceName);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
                 if (is == null) {
                     loggerMaker.errorAndAddToDb("Resource not found: " + resourceName, LogDb.DASHBOARD);
+                    return null;
                 } else {
                     // Read the contents of the .zip file into a byte array
                     byte[] buffer = new byte[1024];
@@ -1209,17 +1206,12 @@ public class InitializerListener implements ServletContextListener {
                         baos.write(buffer, 0, bytesRead);
                     }
 
-                    processTemplateFilesZip(baos.toByteArray(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
-                }
-            } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(ex, String.format("Error while loading templates files from directory. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
+                return baos.toByteArray();
             }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.LOAD_TEMPLATES_FILES_FROM_DIRECTORY, Context.now())
-            );
+        } catch (Exception ex) {
+            loggerMaker.errorAndAddToDb(ex, String.format("Error while loading templates files from directory. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
         }
+        return  null;
     }
 
     public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
@@ -1759,7 +1751,6 @@ public class InitializerListener implements ServletContextListener {
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
-        loadTemplateFilesFromDirectory(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }
@@ -1865,34 +1856,20 @@ public class InitializerListener implements ServletContextListener {
     public final static String _AKTO = "AKTO";
 
     public void setUpTestEditorTemplatesScheduler() {
-        GithubSync githubSync = new GithubSync();
-        byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
-
-        if (repoZip != null) {
-            scheduler.scheduleAtFixedRate(new Runnable() {
-                public void run() {
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account t) {
-                            try {
-                                int accountId = t.getId();
-                                loggerMaker.infoAndAddToDb(
-                                        String.format("Updating Akto test templates for account: %d", accountId),
-                                        LogDb.DASHBOARD);
-                                processTemplateFilesZip(repoZip, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
-                            } catch (Exception e) {
-                                cacheLoggerMaker.errorAndAddToDb(e,
-                                        String.format("Error while updating Test Editor Files %s", e.toString()),
-                                        LogDb.DASHBOARD);
-                            }
-                        }
-                    }, "update-test-editor-templates-github");
-                }
-            }, 0, 4, TimeUnit.HOURS);
-        } else {
-            loggerMaker.errorAndAddToDb("Unable to update test templates - test templates zip could not be downloaded", LogDb.DASHBOARD);
-        }
-
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                GithubAccountTask.instance.executeTask((consumer) -> {
+                    try {
+                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + consumer.getFirst(), LogDb.DASHBOARD);
+                        processTemplateFilesZip(consumer.getSecond().getData(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                    } catch (Exception e) {
+                        cacheLoggerMaker.errorAndAddToDb(e,
+                                String.format("Error while updating Test Editor Files %s", e.toString()),
+                                LogDb.DASHBOARD);
+                    }
+                }, "update-test-editor-templates-github");
+            }
+        }, 0, 4, TimeUnit.HOURS);
     }
 
     public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
@@ -1967,7 +1944,7 @@ public class InitializerListener implements ServletContextListener {
                                             Updates.set(YamlTemplate.HASH, templateContent.hashCode()),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
                                             Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
-                            
+
                             try {
                                 Object inactiveObject = TestConfigYamlParser.getFieldIfExists(templateContent,
                                         YamlTemplate.INACTIVE);
