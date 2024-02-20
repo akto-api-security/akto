@@ -51,9 +51,12 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         TestLogType testLogType;
         String message;
 
+        long timestamp;
+
         public TestLog(TestLogType testLogType, String message) {
             this.testLogType = testLogType;
             this.message = message;
+            this.timestamp = System.currentTimeMillis();
         }
 
         public TestLogType getTestLogType() {
@@ -70,6 +73,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
         public void setMessage(String message) {
             this.message = message;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(long timestamp) {
+            this.timestamp = timestamp;
         }
     }
 
