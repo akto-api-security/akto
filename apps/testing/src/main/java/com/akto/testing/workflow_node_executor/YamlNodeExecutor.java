@@ -47,13 +47,13 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
 
-    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes) {
+    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         List<String> testErrors = new ArrayList<>();
 
         YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
 
         if (yamlNodeDetails.getTestId() != null && yamlNodeDetails.getTestId().length() > 0) {
-            return processYamlNode(node, varMap, allowAllStatusCodes, yamlNodeDetails);
+            return processYamlNode(node, varMap, allowAllStatusCodes, yamlNodeDetails, debug, testLogs);
         }
         
         RawApi rawApi = yamlNodeDetails.getRawApi();
@@ -112,7 +112,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig);                
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs);
                 tsAfterReq = Context.nowInMillis();
                 responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
@@ -214,7 +214,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         return m;
     }
 
-    public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails) {
+    public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSubCategory = yamlNodeDetails.getTestId();
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
@@ -266,7 +266,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
-        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null);
+        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null, debug, testLogs);
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();

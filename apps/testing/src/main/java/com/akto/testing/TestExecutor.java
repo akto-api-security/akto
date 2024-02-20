@@ -68,13 +68,13 @@ public class TestExecutor {
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId);
+            apiWiseInit(testingRun, summaryId, false, new ArrayList<>());
         } else {
-            workflowInit(testingRun, summaryId);
+            workflowInit(testingRun, summaryId, false, new ArrayList<>());
         }
     }
 
-    public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
+    public void workflowInit (TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
             loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
@@ -99,7 +99,7 @@ public class TestExecutor {
             Graph graph = new Graph();
             graph.buildGraph(workflowTest);
             GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, workflowTest, testingRun.getId(), summaryId, valuesMap, false, "linear");
-            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest);
+            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs);
             WorkflowTestResultsDao.instance.insertOne(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
@@ -120,7 +120,7 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
@@ -225,7 +225,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap));
+                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -480,7 +480,8 @@ public class TestExecutor {
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
-            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+            boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
@@ -491,7 +492,7 @@ public class TestExecutor {
             try {
                 // todo: commented out older one
 //                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap);
+                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
@@ -557,7 +558,8 @@ public class TestExecutor {
     public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
-                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
+                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
@@ -573,7 +575,7 @@ public class TestExecutor {
                 continue;
             }
             try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
+                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
                 e.printStackTrace();
@@ -607,7 +609,7 @@ public class TestExecutor {
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
+                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
@@ -619,7 +621,7 @@ public class TestExecutor {
             return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
                 false,new ArrayList<>(),100,Context.now(),
-                Context.now(), testRunResultSummaryId, null
+                Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "No samples messages found"))
             );
         }
 
@@ -628,7 +630,12 @@ public class TestExecutor {
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
 
-        filterGraphQlPayload(rawApi, apiInfoKey);
+        try {
+            boolean isGraphQlPayload = filterGraphQlPayload(rawApi, apiInfoKey);
+            if (isGraphQlPayload) testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
+        } catch (Exception e) {
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, e.getMessage()));
+        }
 
         FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
         FilterNode validatorNode = null;
@@ -655,7 +662,7 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes);
-        YamlTestResult testResults = yamlTestTemplate.run();
+        YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();
             res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
@@ -681,15 +688,15 @@ public class TestExecutor {
         return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
-                endTime, testRunResultSummaryId, testResults.getWorkflowTest()
+                endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs
         );
     }
 
-    public void filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
+    public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
 
         String url = apiInfoKey.getUrl();
         if (!url.toLowerCase().contains("graphql") || (!url.toLowerCase().contains("query") && !url.toLowerCase().contains("mutation"))) {
-            return;
+            return false;
         }
 
         String queryName;
@@ -702,17 +709,17 @@ public class TestExecutor {
                 split = apiInfoKey.getUrl().split("mutation/");
             }
             if (split.length < 2) {
-                return;
+                return false;
             }
             String queryStr = split[1];
 
             String []querySplit = queryStr.split("/");
             if (querySplit.length < 2) {
-                return;
+                return false;
             }
             queryName = querySplit[0];
         } catch (Exception e) {
-            return;
+            throw new Exception("Error while getting queryString");
         }
 
         ObjectMapper m = new ObjectMapper();
@@ -725,7 +732,7 @@ public class TestExecutor {
             List<Object> respObjList = Arrays.asList((Object[])respObj);
 
             if (objList.size() != respObjList.size()) {
-                return;
+                return false;
             }
             int index = 0;
 
@@ -751,9 +758,9 @@ public class TestExecutor {
 
             rawApi.getRequest().setBody(updatedBody);
             rawApi.getResponse().setBody(updatedRespBody);
-
+            return true;
         } catch (Exception e) {
-            return;
+            throw new Exception("Error while modifying graphQL payload");
         }
     }
 
