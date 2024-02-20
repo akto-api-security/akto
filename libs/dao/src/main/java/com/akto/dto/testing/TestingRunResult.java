@@ -9,6 +9,7 @@ import com.google.gson.reflect.TypeToken;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -43,12 +44,45 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     private WorkflowTest workflowTest;
 
+    @BsonIgnore
+    private List<TestLog> testLogs = new ArrayList<>();
+
+    public static class TestLog {
+        TestLogType testLogType;
+        String message;
+
+        public TestLog(TestLogType testLogType, String message) {
+            this.testLogType = testLogType;
+            this.message = message;
+        }
+
+        public TestLogType getTestLogType() {
+            return testLogType;
+        }
+
+        public void setTestLogType(TestLogType testLogType) {
+            this.testLogType = testLogType;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+    }
+
+    public enum TestLogType {
+        ERROR, INFO,
+    }
+
     public TestingRunResult() { }
 
     public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,
                             List<GenericTestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
                             int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId, 
-                            WorkflowTest workflowTest) {
+                            WorkflowTest workflowTest, List<TestLog> testLogs) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
         this.testSuperType = testSuperType;
@@ -61,6 +95,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.endTimestamp = endTimestamp;
         this.testRunResultSummaryId = testRunResultSummaryId;
         this.workflowTest = workflowTest;
+        this.testLogs = testLogs;
     }
 
     public ObjectId getId() {
@@ -260,4 +295,11 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         return 0;
     }
 
+    public List<TestLog> getTestLogs() {
+        return testLogs;
+    }
+
+    public void setTestLogs(List<TestLog> testLogs) {
+        this.testLogs = testLogs;
+    }
 }

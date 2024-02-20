@@ -810,7 +810,7 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request, true, null);
+            response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
             loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
         } catch (Exception e) {
             errors.add("API execution failed");
@@ -1844,7 +1844,7 @@ public class InitializerListener implements ServletContextListener {
         String headers = "{\"Content-Type\": \"application/json\"}";
         OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(), "", "POST", body, OriginalHttpRequest.buildHeadersMap(headers), "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>());
             loggerMaker.infoAndAddToDb(String.format("Update deployment status reponse: %s", response.getBody()), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,String.format("Failed to update deployment status, will try again on next boot up : %s", e.toString()), LogDb.DASHBOARD);

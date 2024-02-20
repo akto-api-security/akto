@@ -54,7 +54,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                 100,
                 Context.now(),
                 Context.now(),
-                summaryId, null);
+                summaryId, null, new ArrayList<>());
     }
 
 //     @Test
