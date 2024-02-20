@@ -1858,10 +1858,10 @@ public class InitializerListener implements ServletContextListener {
     public void setUpTestEditorTemplatesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                GithubAccountTask.instance.executeTask((consumer) -> {
+                GithubAccountTask.instance.executeTask((data) -> {
                     try {
-                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + consumer.getFirst(), LogDb.DASHBOARD);
-                        processTemplateFilesZip(consumer.getSecond().getData(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + data.getFirst(), LogDb.DASHBOARD);
+                        processTemplateFilesZip(data.getSecond().getData(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
