@@ -5,6 +5,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -24,7 +25,7 @@ public class ApiExecutor {
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -44,7 +45,10 @@ public class ApiExecutor {
             HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
         }
         
-        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
+        OkHttpClient client = debug ?
+                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs) :
+                HTTPClientHandler.instance.getHTTPClient(followRedirects);
+
         if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
@@ -133,7 +137,7 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
         
         String url = prepareUrl(request, testingRunConfig);
@@ -166,7 +170,7 @@ public class ApiExecutor {
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects);
+                response = getRequest(request, builder, followRedirects, debug, testLogs);
                 break;
             case POST:
             case PUT:
@@ -175,7 +179,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -185,14 +189,14 @@ public class ApiExecutor {
     }
 
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects);
+        return common(okHttpRequest, followRedirects, debug, testLogs);
     }
 
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -211,6 +215,6 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects);
+        return common(okHttpRequest, followRedirects, debug, testLogs);
     }
 }

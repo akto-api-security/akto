@@ -8,6 +8,7 @@ import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.CookieTransformer;
@@ -68,7 +69,7 @@ public class AuthValidator {
 
     }
     
-    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
+    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (String header : auth.getHeaders()) {
@@ -88,7 +89,7 @@ public class AuthValidator {
 
         OriginalHttpResponse testResponse;
         try {
-            testResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true, testingRunConfig);
+            testResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true, testingRunConfig, debug, testLogs);
         } catch(Exception e) {
             return new ExecutionResult(false, "error running check auth " + e.getMessage(), rawApi.getRequest(), null);
         }

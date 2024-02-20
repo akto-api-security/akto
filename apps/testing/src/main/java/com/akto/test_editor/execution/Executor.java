@@ -48,7 +48,7 @@ public class Executor {
     public final String _HOST = "host";
 
     public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
-        AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
+        AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         List<GenericTestResult> result = new ArrayList<>();
         
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
@@ -61,6 +61,7 @@ public class Executor {
         YamlTestResult yamlTestResult;
         WorkflowTest workflowTest = null;
         if (node.getChildNodes().size() < 2) {
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "executor child nodes is less than 2, returning empty execution result"));
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
@@ -76,6 +77,7 @@ public class Executor {
 
         if (modifyExecutionOrderResp.getError() != null) {
             error_messages.add(modifyExecutionOrderResp.getError());
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, modifyExecutionOrderResp.getError()));
             invalidExecutionResult = new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
@@ -117,7 +119,7 @@ public class Executor {
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple")) {
             workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode));
+            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
@@ -167,12 +169,13 @@ public class Executor {
                     }
 
                 } catch (Exception e) {
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "unable to update host header for overridden test URL"));
                     loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
                             LogDb.TESTING);
                 }
                     
                 // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
@@ -181,6 +184,7 @@ public class Executor {
                 }
                 vulnerable = res.getVulnerable();
             } catch(Exception e) {
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());
                 loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             }
@@ -227,7 +231,7 @@ public class Executor {
         }
 
     public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
-        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         Graph graph = new Graph();
@@ -236,7 +240,7 @@ public class Executor {
         List<String> executionOrder = new ArrayList<>();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), null, null);
         GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, graph.getNode("x1"), workflowTest, null, null, varMap, "conditional", workflowTestResult, new HashMap<>(), executionOrder);
-        GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest);
+        GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs);
         return new MultiExecTestResult(graphExecutorResult.getWorkflowTestResult().getNodeResultMap(), graphExecutorResult.getVulnerable(), Confidence.HIGH, graphExecutorRequest.getExecutionOrder());
     }
 
