@@ -56,12 +56,16 @@ public class HTTPClientHandler {
         public @NotNull Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
 
-            Buffer buffer = new Buffer();
-            RequestBody requestBody = request.body();
-            if (requestBody != null) {
-                requestBody.writeTo(buffer);
-                String requestBodyString = buffer.readUtf8();
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Body: " + requestBodyString));
+            try {
+                Buffer buffer = new Buffer();
+                RequestBody requestBody = request.body();
+                if (requestBody != null) {
+                    requestBody.writeTo(buffer);
+                    String requestBodyString = buffer.readUtf8();
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Body: " + requestBodyString));
+                }
+            } catch (Exception e) {
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error while parsing request body: " + e.getMessage()));
             }
 
             Response response = chain.proceed(request);
@@ -70,9 +74,13 @@ public class HTTPClientHandler {
             if (response == null) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: null"));
             } else {
-                ResponseBody responseBody = response.peekBody(1024*1024);
-                String body = responseBody != null ? responseBody.string() : "null";
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
+                try {
+                    ResponseBody responseBody = response.peekBody(1024*1024);
+                    String body = responseBody != null ? responseBody.string() : "null";
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
+                } catch (Exception e) {
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error while parsing resposne body: " + e.getMessage()));
+                }
             }
 
             return response;
@@ -89,11 +97,15 @@ public class HTTPClientHandler {
         public @NotNull Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
 
-            Map<String,List<String>> requestHeadersMap = ApiExecutor.generateHeadersMapFromHeadersObject(request.headers());;
-            String requestHeadersString = RawApi.convertHeaders(requestHeadersMap);
-            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Headers: " + requestHeadersString));
+            try {
+                Map<String,List<String>> requestHeadersMap = ApiExecutor.generateHeadersMapFromHeadersObject(request.headers());;
+                String requestHeadersString = RawApi.convertHeaders(requestHeadersMap);
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Headers: " + requestHeadersString));
 
-            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
+            } catch (Exception e) {
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error while parsing headers or url: " + e.getMessage()));
+            }
 
             Response response = chain.proceed(request);
 
@@ -106,7 +118,7 @@ public class HTTPClientHandler {
                     String responseHeadersString = RawApi.convertHeaders(responseHeadersMap);
                     testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Headers: " + responseHeadersString));
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error while parsing response headers: " + e.getMessage()));
                 }
             }
 
