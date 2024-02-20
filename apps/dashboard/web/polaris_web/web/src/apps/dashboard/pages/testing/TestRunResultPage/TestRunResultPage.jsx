@@ -235,7 +235,7 @@ function TestRunResultPage(props) {
   const [testLogsCollapsibleOpen, setTestLogsCollapsibleOpen] = useState(false)
   const iconSource = testLogsCollapsibleOpen ? ChevronUpMinor : ChevronDownMinor
   const testLogsComponent = (
-    <LegacyCard>
+    <LegacyCard key="testLogsComponent">
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
         <HorizontalStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Test Logs</Text>
@@ -248,7 +248,7 @@ function TestRunResultPage(props) {
             <Scrollable style={{maxHeight: '40vh'}}>
               <VerticalStack gap={1}>
                   
-                    {testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                       {"[" + x["testLogType"] + "] " +x["message"]}
                       </div>)}
               </VerticalStack>
@@ -268,7 +268,7 @@ function TestRunResultPage(props) {
         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
-    testLogsComponent,
+    (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
     ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && testErrorComponent ,
     (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
     <SampleDataList
