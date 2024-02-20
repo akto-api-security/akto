@@ -62,7 +62,8 @@ function OpenApiSource() {
                     fileType="file"
                     acceptString=".json , .yaml, .yml"
                     setSelectedFile={setFilesCheck}
-                    allowMultiple={false} />
+                    allowMultiple={false}
+                    allowedSize={5*1024*1024} />
             </HorizontalStack>
 
             <VerticalStack gap="2">
