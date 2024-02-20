@@ -1,6 +1,8 @@
 package com.akto.testing;
 
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.rules.TestPlugin;
 import okhttp3.*;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -14,6 +16,7 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class HTTPClientHandler {
@@ -40,15 +43,18 @@ public class HTTPClientHandler {
 
     public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs) {
         if(isSaas) readTimeout = 60;
-        return builder(followRedirects, readTimeout).addNetworkInterceptor(new ResponseInterceptor(testLogs)).build();
+        return builder(followRedirects, readTimeout)
+                .addInterceptor(new NormalResponseInterceptor(testLogs))
+                .addNetworkInterceptor(new NetworkResponseInterceptor(testLogs))
+                .build();
     }
 
-    static class ResponseInterceptor implements Interceptor {
+    static class NormalResponseInterceptor implements Interceptor {
+
         List<TestingRunResult.TestLog> testLogs;
         @Override
         public @NotNull Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
-            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
 
             Buffer buffer = new Buffer();
             RequestBody requestBody = request.body();
@@ -60,15 +66,45 @@ public class HTTPClientHandler {
 
             Response response = chain.proceed(request);
 
+
             if (response == null) {
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + 0));
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: null"));
             } else {
                 ResponseBody responseBody = response.peekBody(1024*1024);
+                String body = responseBody != null ? responseBody.string() : "null";
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
+            }
+
+            return response;
+        }
+
+        public NormalResponseInterceptor(List<TestingRunResult.TestLog> testLogs) {
+            this.testLogs = testLogs;
+        }
+    }
+
+    static class NetworkResponseInterceptor implements Interceptor {
+        List<TestingRunResult.TestLog> testLogs;
+        @Override
+        public @NotNull Response intercept(Chain chain) throws IOException {
+            Request request = chain.request();
+
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Hitting URL: " + request.url()));
+
+            Map<String,List<String>> requestHeadersMap = ApiExecutor.generateHeadersMapFromHeadersObject(request.headers());;
+            String requestHeadersString = RawApi.convertHeaders(requestHeadersMap);
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Headers: " + requestHeadersString));
+
+            Response response = chain.proceed(request);
+
+            if (response == null) {
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + 0));
+            } else {
                 try {
-                    String body = responseBody != null ? responseBody.string() : "null";
                     testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response StatusCode: " + response.code()));
-                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: " + body));
+                    Map<String,List<String>> responseHeadersMap = ApiExecutor.generateHeadersMapFromHeadersObject(response.headers());;
+                    String responseHeadersString = RawApi.convertHeaders(responseHeadersMap);
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Headers: " + responseHeadersString));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -77,7 +113,7 @@ public class HTTPClientHandler {
             return response;
         }
 
-        public ResponseInterceptor(List<TestingRunResult.TestLog> testLogs) {
+        public NetworkResponseInterceptor(List<TestingRunResult.TestLog> testLogs) {
             this.testLogs = testLogs;
         }
     }
