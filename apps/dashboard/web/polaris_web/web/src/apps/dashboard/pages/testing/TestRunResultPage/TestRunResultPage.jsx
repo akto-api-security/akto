@@ -248,7 +248,7 @@ function TestRunResultPage(props) {
             <Scrollable style={{maxHeight: '40vh'}}>
               <VerticalStack gap={1}>
                   
-                    {testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                       {"[" + x["testLogType"] + "] " +x["message"]}
                       </div>)}
               </VerticalStack>
