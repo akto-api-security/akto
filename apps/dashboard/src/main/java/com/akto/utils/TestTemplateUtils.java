@@ -1,6 +1,5 @@
 package com.akto.utils;
 
-import com.akto.dto.ByteArrayWrapper;
 import com.akto.log.LoggerMaker;
 
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
@@ -9,7 +8,7 @@ public class TestTemplateUtils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestTemplateUtils.class, LoggerMaker.LogDb.DASHBOARD);
 
-    public static ByteArrayWrapper getTestingTemplates() {
+    public static byte[] getTestingTemplates() {
         GithubSync githubSync = new GithubSync();
         byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
         if(repoZip == null) {
@@ -24,7 +23,7 @@ public class TestTemplateUtils {
         } else {
             loggerMaker.infoAndAddToDb("Loaded test templates from github");
         }
-        return new ByteArrayWrapper(repoZip);
+        return repoZip;
     }
 
 }

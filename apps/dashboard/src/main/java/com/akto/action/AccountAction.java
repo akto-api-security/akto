@@ -311,13 +311,13 @@ public class AccountAction extends UserAction {
                 }
 
                 try {
-                    ByteArrayWrapper testingTemplates = TestTemplateUtils.getTestingTemplates();
+                    byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
                     if(testingTemplates == null){
                         loggerMaker.errorAndAddToDb("Failed to load test templates", LogDb.DASHBOARD);
                         return;
                     }
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(testingTemplates.getData(), InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                    InitializerListener.processTemplateFilesZip(testingTemplates, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
