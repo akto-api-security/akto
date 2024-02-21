@@ -462,24 +462,15 @@ public class InitializerListener implements ServletContextListener {
     private static String fetchPIIFile(PIISource piiSource){
         String fileUrl = piiSource.getFileUrl();
         String id = piiSource.getId();
-        if (fileUrl.startsWith("http")) {
-            String tempFileUrl = "temp_" + id;
-            if(downloadFileCheck(tempFileUrl)){
-                try {
-                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
-                } catch (IOException e) {
-                    loggerMaker.errorAndAddToDb(e, String.format("failed to read file %s", piiSource.getFileUrl()), LogDb.DASHBOARD);
-                    return loadPIIFileFromResources(piiSource.getFileUrl());
-                }
+        String tempFileUrl = "temp_" + id;
+        try {
+            if (downloadFileCheck(tempFileUrl)) {
+                FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
             }
             fileUrl = tempFileUrl;
-            try {
-                return FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
-            } catch (IOException e){
-                loggerMaker.errorAndAddToDb(e, String.format("failed to read file %s", piiSource.getFileUrl()), LogDb.DASHBOARD);
-                return loadPIIFileFromResources(piiSource.getFileUrl());
-            }
-        } else {
+            return FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb(e, String.format("failed to fetch PII file %s from github, trying locally", piiSource.getFileUrl()), LogDb.DASHBOARD);
             return loadPIIFileFromResources(piiSource.getFileUrl());
         }
     }
