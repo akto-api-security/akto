@@ -137,6 +137,8 @@ public class InitializerListener implements ServletContextListener {
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
+
+    private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
 
     public static String getDomain() {
@@ -447,89 +449,120 @@ public class InitializerListener implements ServletContextListener {
         return false;
     }
 
+    private static String loadPIIFileFromResources(String fileUrl){
+        String fileName = piiFileMap.get(fileUrl);
+        if(fileName == null){
+            loggerMaker.errorAndAddToDb("Unable to find file locally: " + fileUrl, LogDb.DASHBOARD);
+            return null;
+        }
+        try {
+            return convertStreamToString(InitializerListener.class.getResourceAsStream("/" + fileName));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception while reading content locally: " + fileUrl, LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private static String fetchPIIFile(PIISource piiSource){
+        String fileUrl = piiSource.getFileUrl();
+        String id = piiSource.getId();
+        if (fileUrl.startsWith("http")) {
+            String tempFileUrl = "temp_" + id;
+            if(downloadFileCheck(tempFileUrl)){
+                try {
+                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                } catch (IOException e) {
+                    loggerMaker.errorAndAddToDb(e, String.format("failed to read file %s", piiSource.getFileUrl()), LogDb.DASHBOARD);
+                    return loadPIIFileFromResources(piiSource.getFileUrl());
+                }
+            }
+            fileUrl = tempFileUrl;
+            try {
+                return FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
+            } catch (IOException e){
+                loggerMaker.errorAndAddToDb(e, String.format("failed to read file %s", piiSource.getFileUrl()), LogDb.DASHBOARD);
+                return loadPIIFileFromResources(piiSource.getFileUrl());
+            }
+        } else {
+            return loadPIIFileFromResources(piiSource.getFileUrl());
+        }
+    }
+
     public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
         for (PIISource piiSource : piiSources) {
-            String fileUrl = piiSource.getFileUrl();
             String id = piiSource.getId();
             Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
             if (currTypes == null) {
                 currTypes = new HashMap<>();
             }
 
-            try {
-                if (fileUrl.startsWith("http")) {
-                    String tempFileUrl = "temp_" + id;
-                    if(downloadFileCheck(tempFileUrl)){
-                        FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
-                    }
-                    fileUrl = tempFileUrl;
-                }
-                String fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
-                BasicDBObject fileObj = BasicDBObject.parse(fileContent);
-                BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
-                Bson findQ = Filters.eq("_id", id);
+            String fileContent = fetchPIIFile(piiSource);
+            if (fileContent == null) {
+                loggerMaker.errorAndAddToDb("Failed to load file from github as well as resources: " + piiSource.getFileUrl(), LogDb.DASHBOARD);
+                continue;
+            }
+            BasicDBObject fileObj = BasicDBObject.parse(fileContent);
+            BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
+            Bson findQ = Filters.eq("_id", id);
 
-                List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
-                Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
-                for(CustomDataType customDataType : customDataTypes){
-                    customDataTypesMap.put(customDataType.getName(), customDataType);
-                }
+            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+            Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
+            for (CustomDataType customDataType : customDataTypes) {
+                customDataTypesMap.put(customDataType.getName(), customDataType);
+            }
 
-                List<Bson> piiUpdates = new ArrayList<>();
+            List<Bson> piiUpdates = new ArrayList<>();
 
-                for (Object dtObj : dataTypes) {
-                    BasicDBObject dt = (BasicDBObject) dtObj;
-                    String piiKey = dt.getString("name").toUpperCase();
-                    PIIType piiType = new PIIType(
-                            piiKey,
-                            dt.getBoolean("sensitive"),
-                            dt.getString("regexPattern"),
-                            dt.getBoolean("onKey")
-                    );
+            for (Object dtObj : dataTypes) {
+                BasicDBObject dt = (BasicDBObject) dtObj;
+                String piiKey = dt.getString("name").toUpperCase();
+                PIIType piiType = new PIIType(
+                        piiKey,
+                        dt.getBoolean("sensitive"),
+                        dt.getString("regexPattern"),
+                        dt.getBoolean("onKey")
+                );
 
-                    CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
-                    CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
+                CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
+                CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
 
-                    if (currTypes.containsKey(piiKey) &&
-                            (currTypes.get(piiKey).equals(piiType) &&
-                                    dt.getBoolean(PIISource.ACTIVE, true))) {
-                        continue;
-                    } else {
-                        if (!dt.getBoolean(PIISource.ACTIVE, true)) {
-                            if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
-                                piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
-                            }
-                        } else {
-                            if (currTypes.getOrDefault(piiKey, null) != piiType || piiSource.getLastSynced() == 0) {
-                                piiUpdates.add(Updates.set(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey, piiType));
-                            }
-                            newCDT.setActive(true);
+                if (currTypes.containsKey(piiKey) &&
+                        (currTypes.get(piiKey).equals(piiType) &&
+                                dt.getBoolean(PIISource.ACTIVE, true))) {
+                    continue;
+                } else {
+                    if (!dt.getBoolean(PIISource.ACTIVE, true)) {
+                        if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
+                            piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
                         }
+                    } else {
+                        if (currTypes.getOrDefault(piiKey, null) != piiType || piiSource.getLastSynced() == 0) {
+                            piiUpdates.add(Updates.set(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey, piiType));
+                        }
+                        newCDT.setActive(true);
+                    }
 
-                        if (existingCDT == null) {
-                            CustomDataTypeDao.instance.insertOne(newCDT);
-                        } else {
-                            List<Bson> updates = getCustomDataTypeUpdates(existingCDT, newCDT);
-                            if (!updates.isEmpty()) {
-                                CustomDataTypeDao.instance.updateOne(
+                    if (existingCDT == null) {
+                        CustomDataTypeDao.instance.insertOne(newCDT);
+                    } else {
+                        List<Bson> updates = getCustomDataTypeUpdates(existingCDT, newCDT);
+                        if (!updates.isEmpty()) {
+                            CustomDataTypeDao.instance.updateOne(
                                     Filters.eq(CustomDataType.NAME, piiKey),
                                     Updates.combine(updates)
-                                );
-                            }
+                            );
                         }
                     }
-
                 }
 
-                if(!piiUpdates.isEmpty()){
-                    piiUpdates.add(Updates.set(PIISource.LAST_SYNCED, Context.now()));
-                    PIISourceDao.instance.updateOne(findQ, Updates.combine(piiUpdates));
-                }
-
-            } catch (IOException e) {
-                loggerMaker.errorAndAddToDb(e, String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
             }
+
+            if (!piiUpdates.isEmpty()) {
+                piiUpdates.add(Updates.set(PIISource.LAST_SYNCED, Context.now()));
+                PIISourceDao.instance.updateOne(findQ, Updates.combine(piiUpdates));
+            }
+
         }
     }
 
@@ -1609,26 +1642,33 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void insertPiiSources(){
+        Map<String, String> map = new HashMap<>();
+        String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
+        map.put(fileUrl, "general.json");
         if (PIISourceDao.instance.findOne("_id", "A") == null) {
-            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
             PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
             piiSource.setId("A");
-
             PIISourceDao.instance.insertOne(piiSource);
         }
 
+        fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
+        map.put(fileUrl, "fintech.json");
         if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
-            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
             PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
             piiSource.setId("Fin");
             PIISourceDao.instance.insertOne(piiSource);
         }
 
+        fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
+        map.put(fileUrl, "filetypes.json");
         if (PIISourceDao.instance.findOne("_id", "File") == null) {
-            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
             PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
             piiSource.setId("File");
             PIISourceDao.instance.insertOne(piiSource);
+        }
+
+        if(piiFileMap == null){
+            piiFileMap = Collections.unmodifiableMap(map);
         }
     }
 
