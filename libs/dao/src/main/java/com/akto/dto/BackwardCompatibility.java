@@ -39,7 +39,6 @@ public class BackwardCompatibility {
     private int enableNewMerging;
 
     public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
-    private int loadTemplateFilesFromDirectory;
 
     public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
     private int aktoDefaultNewUI;
@@ -58,7 +57,7 @@ public class BackwardCompatibility {
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory,
+                                 int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo) {
         this.id = id;
@@ -73,7 +72,6 @@ public class BackwardCompatibility {
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
-        this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
         this.aktoDefaultNewUI = aktoDefaultNewUI;
         this.computeIntegratedConnections = computeIntegratedConnections;
         this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
@@ -187,14 +185,6 @@ public class BackwardCompatibility {
     public void setEnableNewMerging(int enableNewMerging) {
         this.enableNewMerging = enableNewMerging;
     }
-
-    public int getLoadTemplateFilesFromDirectory() {
-        return loadTemplateFilesFromDirectory;
-    } 
-
-    public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
-        return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
-    } 
 
     public int getAktoDefaultNewUI() {
         return aktoDefaultNewUI;
