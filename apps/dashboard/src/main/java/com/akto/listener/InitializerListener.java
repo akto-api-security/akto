@@ -7,7 +7,6 @@ import com.akto.action.CustomDataTypeAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
-import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -43,7 +42,6 @@ import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
-import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
@@ -91,12 +89,10 @@ import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -1898,10 +1894,15 @@ public class InitializerListener implements ServletContextListener {
     public void setUpTestEditorTemplatesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                GithubAccountTask.instance.executeTask((data) -> {
+                ByteArrayWrapper testingTemplates = TestTemplateUtils.getTestingTemplates();
+                if(testingTemplates == null){
+                    loggerMaker.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
+                    return;
+                }
+                AccountTask.instance.executeTask((account) -> {
                     try {
-                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + data.getFirst(), LogDb.DASHBOARD);
-                        processTemplateFilesZip(data.getSecond().getData(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
+                        processTemplateFilesZip(testingTemplates.getData(), _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
