@@ -36,10 +36,13 @@ public class Node {
         return apiCollectionId.equals(node.apiCollectionId) && url.equals(node.url) && method.equals(node.method);
     }
 
+    public static final String DOT = "[dot]";
+    public static final String DOLLAR = "[dollar]";
     public void replaceDots() {
         Map<String, Connection> updatedConnections = new HashMap<>();
         for (Map.Entry<String, Connection> entry : connections.entrySet()) {
-            String modifiedKey = entry.getKey().replace(".", "[dot]");
+            String modifiedKey = entry.getKey().replaceAll("\\.", DOT);
+            modifiedKey = modifiedKey.replaceAll("\\$", DOLLAR);
             updatedConnections.put(modifiedKey, entry.getValue());
         }
         this.connections = updatedConnections;
@@ -49,9 +52,12 @@ public class Node {
         Map<String, Connection> updatedConnections = new HashMap<>();
 
         for (Map.Entry<String, Connection> entry : connections.entrySet()) {
-            String modifiedKey = entry.getKey().replace("[dot]", ".");
+            String modifiedKey = entry.getKey().replaceAll(DOT, ".");
+            modifiedKey = modifiedKey.replaceAll(DOLLAR, "$");
             updatedConnections.put(modifiedKey, entry.getValue());
         }
+
+        this.connections = updatedConnections;
     }
 
     @Override
