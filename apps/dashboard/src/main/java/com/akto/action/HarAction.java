@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.context.Context;
@@ -10,12 +9,10 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GzipUtils;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.io.FileUtils;
@@ -23,8 +20,6 @@ import com.sun.jna.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -41,28 +36,6 @@ public class HarAction extends UserAction {
     private byte[] tcpContent;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HarAction.class);
 
-    public static void main(String[] args) throws IOException {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
-        Context.accountId.set(1_000_000);
-
-        String filePath = "/Users/avneesh/Downloads/whatfix.com_1.har";
-        String content;
-        try {
-            content = new String(Files.readAllBytes(Paths.get(filePath)));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
-
-        System.out.println(content.length());
-
-        HarAction harAction = new HarAction();
-        harAction.setHarString(content);
-        harAction.setApiCollectionName("whatfix");
-        harAction.skipKafka = true;
-        harAction.execute();
-    }
-
     @Override
     public String execute() throws IOException {
         ApiCollection apiCollection = null;
@@ -71,7 +44,7 @@ public class HarAction extends UserAction {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             if (apiCollection == null) {
                 ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-                // apiCollectionsAction.setSession(this.getSession());
+                apiCollectionsAction.setSession(this.getSession());
                 apiCollectionsAction.setCollectionName(apiCollectionName);
                 String result = apiCollectionsAction.createCollection();
                 if (result.equalsIgnoreCase(Action.SUCCESS)) {
@@ -123,16 +96,16 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        // if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
-        //     BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
-        // }
+        if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
+            BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
+        }
 
         try {
             HAR har = new HAR();
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            // String zippedString = GzipUtils.zipString(harString);
-            // com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR,zippedString);
-            // FilesDao.instance.insertOne(file);
+            String zippedString = GzipUtils.zipString(harString);
+            com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR,zippedString);
+            FilesDao.instance.insertOne(file);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
