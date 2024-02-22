@@ -6,7 +6,6 @@ import java.util.Map;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.DeleteTestRunsDao;
 import com.akto.dao.testing.TestingRunConfigDao;
@@ -18,6 +17,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.usage.UsageMetricHandler;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;

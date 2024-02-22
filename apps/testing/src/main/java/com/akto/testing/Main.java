@@ -1,7 +1,6 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
-import com.akto.billing.UsageMetricHandler;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
@@ -27,6 +26,7 @@ import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;

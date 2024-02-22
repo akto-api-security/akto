@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
-import com.akto.billing.UsageMetricHandler;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
@@ -29,6 +28,7 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
