@@ -12,7 +12,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubSync;
+import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
@@ -20,8 +20,6 @@ import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
-import com.amazonaws.services.autoscaling.AmazonAutoScaling;
-import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.RefreshPreferences;
 import com.amazonaws.services.autoscaling.model.StartInstanceRefreshRequest;
 import com.amazonaws.services.autoscaling.model.StartInstanceRefreshResult;
@@ -313,10 +311,13 @@ public class AccountAction extends UserAction {
                 }
 
                 try {
-                    GithubSync githubSync = new GithubSync();
-                    byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+                    byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
+                    if(testingTemplates == null){
+                        loggerMaker.errorAndAddToDb("Failed to load test templates", LogDb.DASHBOARD);
+                        return;
+                    }
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(repoZip, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                    InitializerListener.processTemplateFilesZip(testingTemplates, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
