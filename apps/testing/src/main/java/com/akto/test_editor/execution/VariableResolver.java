@@ -16,6 +16,7 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.test_editor.AuthContextResolveResp;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.SampleData;
@@ -282,7 +283,7 @@ public class VariableResolver {
 
     }
 
-    public static String resolveAuthContext(String expression, Map<String, List<String>> headers, String headerKey) {
+    public static AuthContextResolveResp resolveAuthContext(String expression, Map<String, List<String>> headers, String headerKey) {
         expression = expression.substring(2, expression.length());
         expression = expression.substring(0, expression.length() - 1);
 
@@ -290,7 +291,7 @@ public class VariableResolver {
         String secondParam = params[1];
 
         if (!headers.containsKey(headerKey)) {
-            return null;
+            return new AuthContextResolveResp(null, "auth authHeader " + headerKey + "not present in request headers");
         }
 
         String headerVal = headers.get(headerKey).get(0);
@@ -300,11 +301,14 @@ public class VariableResolver {
 
         List<String> finalValue = new ArrayList<>();
 
+        boolean isJwt = false;
+
         for (String val: splitValue) {
             if (!KeyTypes.isJWT(val)) {
                 finalValue.add(val);
                 continue;
             }
+            isJwt = true;
             if (secondParam.equalsIgnoreCase("none_algo_token")) {
                 NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
                 try {
@@ -340,7 +344,11 @@ public class VariableResolver {
             finalValue.add(modifiedHeaderVal);
         }
         
-        return String.join( " ", finalValue);
+        if (!isJwt) {
+            return new AuthContextResolveResp(null, "header is not of type JWT");
+        }
+
+        return new AuthContextResolveResp(String.join( " ", finalValue), null);
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {

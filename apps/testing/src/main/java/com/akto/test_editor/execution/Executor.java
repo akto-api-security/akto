@@ -515,7 +515,11 @@ public class Executor {
 
                 String authVal;
                 if (VariableResolver.isAuthContext(key)) {
-                    authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), authHeader);
+                    AuthContextResolveResp authContextResolveResp = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), authHeader);
+                    authVal = authContextResolveResp.getAuthVal();
+                    if (authContextResolveResp.getError() != null) {
+                        return new ExecutorSingleOperationResp(false, authContextResolveResp.getError());
+                    }
                 } else {
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
@@ -523,7 +527,7 @@ public class Executor {
                     authVal = authMechanism.getAuthParams().get(0).getValue();
                 }
                 if (authVal == null) {
-                    return new ExecutorSingleOperationResp(false, "auth value missing");
+                    return new ExecutorSingleOperationResp(false, "auth authHeader " + authHeader + "not present in request headers");
                 }
                 return Operations.modifyHeader(rawApi, authHeader, authVal);
             case "test_name":
