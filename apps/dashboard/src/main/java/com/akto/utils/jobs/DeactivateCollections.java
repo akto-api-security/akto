@@ -54,7 +54,7 @@ public class DeactivateCollections {
             if (!featureAccess.checkInvalidAccess()) {
                 return;
             }
-            int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
+            int overage = Math.max(featureAccess.getUsage() - featureAccess.getUsageLimit(), 0);
             String organizationId = organization.getId();
 
             for (int accountId : organization.getAccounts()) {
@@ -67,12 +67,15 @@ public class DeactivateCollections {
                 }
                 overage = deactivateCollectionsForAccount(overage, measureEpoch);
             }
+
+            int deltaUsage = (-1) * (Math.max(featureAccess.getUsage() - featureAccess.getUsageLimit(), 0) - overage);
+            UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
+
         } catch (Exception e) {
             String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());
             loggerMaker.errorAndAddToDb(e, errorMessage, LogDb.DASHBOARD);
         }
 
-        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
     }
 
     private static int deactivateCollectionsForAccount(int overage, int measureEpoch) {

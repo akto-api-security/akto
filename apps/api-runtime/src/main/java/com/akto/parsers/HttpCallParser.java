@@ -1,12 +1,16 @@
 package com.akto.parsers;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -179,8 +183,15 @@ public class HttpCallParser {
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
+            int usageLeft = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
+            boolean checkLimit = !featureAccess.checkBooleanOrUnlimited();
+            System.out.println("checkLimit: " + checkLimit + " usageLeft: " + usageLeft);
+            SyncLimit syncLimit = new SyncLimit(checkLimit, usageLeft);
+
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
             dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();

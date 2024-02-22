@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.billing.UsageMetricHandler;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
@@ -40,7 +41,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -212,7 +212,7 @@ public class Main {
                 }
 
                 int accountId = account.getId();
-                FeatureAccess featureAccess = UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
 
                 if (featureAccess.checkInvalidAccess()) {
                     loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
@@ -226,12 +226,9 @@ public class Main {
                     return;
                 }
 
-                int usageLatchCount = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
-                if (featureAccess.checkBooleanOrUnlimited()) {
-                    usageLatchCount = Integer.MAX_VALUE;
-                }
-
-                CountDownLatch usageLatch = new CountDownLatch(usageLatchCount);
+                int usageLeft = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
+                boolean checkLimit = !featureAccess.checkBooleanOrUnlimited();
+                SyncLimit syncLimit = new SyncLimit(checkLimit, usageLeft);
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -272,7 +269,7 @@ public class Main {
 
                         }
                     }
-                    testExecutor.init(testingRun, summaryId, usageLatch);
+                    testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
@@ -299,6 +296,15 @@ public class Main {
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+                
+                // update usage after test is completed.
+                int deltaUsage = 0;
+                if(syncLimit.checkLimit){
+                    deltaUsage = usageLeft - syncLimit.getUsageLeft();
+                }
+
+                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
+
             }, "testing");
             Thread.sleep(1000);
         }

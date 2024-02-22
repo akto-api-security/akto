@@ -19,7 +19,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.util.AccountTask;
-import com.akto.utils.EndpointUtil;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -310,7 +309,6 @@ public class Main {
                                 }
                             }
                         }
-                        EndpointUtil.calcAndDeleteEndpoints();
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }

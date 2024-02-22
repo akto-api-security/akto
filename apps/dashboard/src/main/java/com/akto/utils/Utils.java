@@ -381,13 +381,11 @@ public class Utils {
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            EndpointUtil.calcAndDeleteEndpoints();
             try {
                 DependencyFlow dependencyFlow = new DependencyFlow();
                 dependencyFlow.run();

@@ -67,9 +67,9 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-    public void init(TestingRun testingRun, ObjectId summaryId, CountDownLatch usageLatch) {
+    public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId, usageLatch);
+            apiWiseInit(testingRun, summaryId, syncLimit);
         } else {
             workflowInit(testingRun, summaryId);
         }
@@ -121,7 +121,7 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, CountDownLatch usageLatch) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
@@ -226,7 +226,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, usageLatch));
+                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, syncLimit));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -310,6 +310,9 @@ public class TestExecutor {
         if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
             ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
         }
+
+        
+
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
@@ -481,7 +484,7 @@ public class TestExecutor {
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
-            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, CountDownLatch usageLatch) {
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, SyncLimit syncLimit) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
@@ -492,7 +495,7 @@ public class TestExecutor {
             try {
                 // todo: commented out older one
 //                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, usageLatch);
+                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, syncLimit);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
@@ -555,10 +558,13 @@ public class TestExecutor {
         }
     }
 
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+    Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
+
     public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
-                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, CountDownLatch usageLatch) {
+                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, SyncLimit syncLimit) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
@@ -574,17 +580,29 @@ public class TestExecutor {
                 continue;
             }
 
+            String failMessage = null;
+            if (deactivatedCollections.contains(apiInfoKey.getApiCollectionId())) {
+                failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
+            } else if (!demoCollections.contains(apiInfoKey.getApiCollectionId()) &&
+                    syncLimit.updateUsageLeftAndCheckSkip()) {
+                failMessage = TestError.USAGE_EXCEEDED.getMessage();
+            }
+
+            if (failMessage != null) {
+                List<GenericTestResult> testResults = new ArrayList<>();
+                String testSuperType = testConfig.getInfo().getCategory().getName();
+                String testSubType = testConfig.getInfo().getSubCategory();
+                testResults.add(new TestResult(null, null, Collections.singletonList(failMessage), 0, false, Confidence.HIGH, null));
+                loggerMaker.infoAndAddToDb("Skipping test, " + failMessage, LogDb.TESTING);
+                testingRunResult = new TestingRunResult(
+                        testRunId, apiInfoKey, testSuperType, testSubType, testResults,
+                        false, new ArrayList<>(), 100, Context.now(),
+                        Context.now(), testRunResultSummaryId, null);
+            }
+
             try {
-                if (usageLatch.getCount() <= 0) {
-                    List<GenericTestResult> testResults = new ArrayList<>();
-                    String testSuperType = testConfig.getInfo().getCategory().getName();
-                    String testSubType = testConfig.getInfo().getSubCategory();
-                    testResults.add(new TestResult(null, null, Collections.singletonList(TestError.USAGE_EXCEEDED.getMessage()), 0, false, Confidence.HIGH, null));
-                    testingRunResult = new TestingRunResult( testRunId, apiInfoKey, testSuperType, testSubType, testResults, false, new ArrayList<>(), 100, Context.now(), Context.now(), testRunResultSummaryId, null);
-                    loggerMaker.infoAndAddToDb("Skipping test, usage exceeded", LogDb.TESTING);
-                } else {
+                if(testingRunResult==null){
                     testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
-                    usageLatch.countDown();
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
@@ -618,23 +636,11 @@ public class TestExecutor {
         return true;
     }
 
-    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
-
-        if (deactivatedCollections.contains(apiInfoKey.getApiCollectionId())) {
-            List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, null, Collections.singletonList(TestError.DEACTIVATED_ENDPOINT.getMessage()),0, false, Confidence.HIGH, null));
-            return new TestingRunResult(
-                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
-                false,new ArrayList<>(),100,Context.now(),
-                Context.now(), testRunResultSummaryId, null
-            );
-        }
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
