@@ -28,9 +28,14 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
-      - name: Download Akto templates zip
+      - name: Download Akto templates zip and PII files
         working-directory: ./apps/dashboard/src/main/resources
-        run: wget -O test-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
+        run: |
+          wget -O tests-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
+          wget -O general.json https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json
+          wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
+          wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
+
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
