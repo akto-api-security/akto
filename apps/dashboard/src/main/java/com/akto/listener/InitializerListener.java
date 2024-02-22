@@ -464,10 +464,12 @@ public class InitializerListener implements ServletContextListener {
         String id = piiSource.getId();
         String tempFileUrl = "temp_" + id;
         try {
-            if (downloadFileCheck(tempFileUrl)) {
-                FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+            if (fileUrl.startsWith("http")) {
+                if (downloadFileCheck(tempFileUrl)) {
+                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                }
+                fileUrl = tempFileUrl;
             }
-            fileUrl = tempFileUrl;
             return FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, String.format("failed to fetch PII file %s from github, trying locally", piiSource.getFileUrl()), LogDb.DASHBOARD);
