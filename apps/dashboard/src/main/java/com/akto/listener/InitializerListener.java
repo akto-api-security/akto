@@ -1688,12 +1688,22 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            gracePeriod = OrganizationUtils.fetchOrgGracePeriod(organizationId, organization.getAdminEmail());
+            BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
+            gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
+            boolean expired = OrganizationUtils.fetchExpired(metaData);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
+            organization.setExpired(expired);
 
-            lastFeatureMapUpdate = Context.now();
+            /*
+             * only update this field if we were able to update
+             * i.e. if we were able to reach akto
+             * or this is the first time being updated.
+             */
+            if (lastFeatureMapUpdate == 0 || (featureWiseAllowed != null && !featureWiseAllowed.isEmpty())) {
+                lastFeatureMapUpdate = Context.now();
+            }
             organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
 
             OrganizationsDao.instance.updateOne(
@@ -1701,6 +1711,7 @@ public class InitializerListener implements ServletContextListener {
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(aktoVersion + " error while fetching feature wise allowed: " + e.toString(),
@@ -2109,13 +2120,82 @@ public class InitializerListener implements ServletContextListener {
             @Override
             public void accept(Account a) {
                 int accountId = a.getId();
-                UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
+
+                try {
+                    // Get organization to which account belongs to
+                    Organization organization = OrganizationsDao.instance.findOne(
+                            Filters.in(Organization.ACCOUNTS, accountId)
+                    );
+
+                    if (organization == null) {
+                        loggerMaker.errorAndAddToDb("Organization not found for account: " + accountId, LogDb.DASHBOARD);
+                        return;
+                    }
+
+                    loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
+
+                    String organizationId = organization.getId();
+
+                    for (MetricTypes metricType : MetricTypes.values()) {
+
+                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
+                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
+                        );
+
+                        if (usageMetricInfo == null) {
+                            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
+                            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
+                        }
+
+                        int syncEpoch = usageMetricInfo.getSyncEpoch();
+                        int measureEpoch = usageMetricInfo.getMeasureEpoch();
+
+                        // Reset measureEpoch every month
+                        if (Context.now() - measureEpoch > 2629746) {
+                            if (syncEpoch > Context.now() - 86400) {
+                                measureEpoch = Context.now();
+
+                                UsageMetricInfoDao.instance.updateOne(
+                                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
+                                );
+                            }
+
+                        }
+
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                AccountSettingsDao.generateFilter()
+                        );
+                        String dashboardMode = DashboardMode.getDashboardMode().toString();
+                        String dashboardVersion = accountSettings.getDashboardVersion();
+
+                        UsageMetric usageMetric = new UsageMetric(
+                                organizationId, accountId, metricType, syncEpoch, measureEpoch,
+                                dashboardMode, dashboardVersion
+                        );
+
+                        //calculate usage for metric
+                        UsageMetricCalculator.calculateUsageMetric(usageMetric);
+
+                        UsageMetricsDao.instance.insertOne(usageMetric);
+                        loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
+
+                        UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
+
+                        UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
+                        loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
+                                        usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()),
+                                LogDb.DASHBOARD
+                        );
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
+                }
             }
         }, "usage-scheduler");
 
         isCalcUsageRunning = false;
     }
-
 
     static boolean isSyncWithAktoRunning = false;
     public static void syncWithAkto() {

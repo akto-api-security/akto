@@ -272,7 +272,7 @@ public class APICatalogSync {
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 String key = sti.getMethod() + " " + sti.getUrl();
-                if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID")) {
+                if (APICatalog.isTemplateUrl(sti.getUrl())) {
                     templateUrlSet.add(key);
                     continue;
                 };
@@ -655,6 +655,20 @@ public class APICatalogSync {
         return !(subType.getName().equals(SingleTypeInfo.GENERIC.getName()) || subType.getName().equals(SingleTypeInfo.OTHER.getName()));
     }
 
+    public static boolean isNumber(String val) {
+        try {
+            Integer.parseInt(val);
+            return true;
+        } catch (Exception ignored1) {
+            try {
+                Long.parseLong(val);
+                return true;
+            } catch (Exception ignored2) {
+                return false;
+            }
+        }
+    }
+
     public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
         String[] tokens = tokenize(newUrl.getUrl());
         if(tokens.length < 2){
@@ -669,7 +683,7 @@ public class APICatalogSync {
             String tempToken = tokens[i];
 
             if (NumberUtils.isParsable(tempToken)) {
-                newTypes[i] = SuperType.INTEGER;
+                newTypes[i] = isNumber(tempToken) ? SuperType.INTEGER : SuperType.FLOAT;
                 tokens[i] = null;
             } else if(ObjectId.isValid(tempToken)){
                 newTypes[i] = SuperType.OBJECT_ID;
@@ -1303,12 +1317,18 @@ public class APICatalogSync {
         for(int i = 0; i < tokens.length; i ++ ) {
             String token = tokens[i];
 
-            if (token.equals("STRING")) {
+            if (token.equals(SuperType.STRING.name())) {
                 tokens[i] = null;
                 types[i] = SuperType.STRING;
-            } else if (token.equals("INTEGER")) {
+            } else if (token.equals(SuperType.INTEGER.name())) {
                 tokens[i] = null;
                 types[i] = SuperType.INTEGER;
+            } else if (token.equals(SuperType.OBJECT_ID.name())) {
+                tokens[i] = null;
+                types[i] = SuperType.OBJECT_ID;
+            } else if (token.equals(SuperType.FLOAT.name())) {
+                tokens[i] = null;
+                types[i] = SuperType.FLOAT;
             } else {
                 types[i] = null;
             }
