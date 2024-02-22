@@ -12,7 +12,6 @@ const mirroringObj = {
     icon: '/public/aws.svg',
     label: "AWS Mirroring",
     text: "You can deploy Akto in AWS and collect traffic through traffic mirroring.",
-    badge: "Recommended",
     docsUrl: 'https://docs.akto.io/traffic-connections/amazon-aws',
     key: "AWS",
     component: <AwsSource />
@@ -113,6 +112,7 @@ const kongObj = {
 const kubernetesObj = {
     icon: '/public/kubernetes.svg',
     label: 'Kubernetes Daemonset',
+    badge: "Recommended",
     text: 'You can deploy Akto in Kubernetes and collect traffic through a daemonset on your Kubernetes configuration.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kubernetes',
     key: "KUBERNETES",
@@ -686,9 +686,9 @@ const yaml_kubernetes = [
 
 const quickStartFunc = {
     getConnectorsList: function (){
-        const connectorsList = [mirroringObj, gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
+        const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, ebpfObj,
-           harFileUploadObj, kongObj, tcpObj
+           harFileUploadObj, kongObj, tcpObj, mirroringObj
         ]
         return connectorsList
     },
